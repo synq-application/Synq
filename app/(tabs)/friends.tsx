@@ -31,7 +31,8 @@ interface Friend {
   imageurl?: string;
   status?: 'available' | 'inactive';
   memo?: string;
-  interests?: string[]; // Added interests field
+  interests?: string[];
+  mutualCount?: number; 
 }
 
 export default function FriendsScreen() {
@@ -42,16 +43,34 @@ export default function FriendsScreen() {
 
   useEffect(() => {
     if (!auth.currentUser) return;
-    const friendsRef = collection(db, "users", auth.currentUser.uid, "friends");
+    const myId = auth.currentUser.uid;
+    const friendsRef = collection(db, "users", myId, "friends");
+
     const unsubFriends = onSnapshot(friendsRef, async (snapshot) => {
       try {
+        // 1. Get IDs of all YOUR friends
+        const myFriendIds = snapshot.docs.map(d => d.id);
+        
         const friendsList: Friend[] = await Promise.all(
           snapshot.docs.map(async (fDoc) => {
             const uSnap = await getDoc(doc(db, "users", fDoc.id));
             const data = uSnap.data();
-            return { id: fDoc.id, ...data } as Friend;
+            
+            // 2. Fetch THEIR friend list IDs
+            const theirFriendsSnap = await getDocs(collection(db, "users", fDoc.id, "friends"));
+            const theirFriendIds = theirFriendsSnap.docs.map(d => d.id);
+            
+            // 3. Find the intersection (Mutuals)
+            const mutuals = theirFriendIds.filter(id => myFriendIds.includes(id));
+
+            return { 
+                id: fDoc.id, 
+                ...data, 
+                mutualCount: mutuals.length 
+            } as Friend;
           })
         );
+        
         const sortedFriends = friendsList.sort((a, b) => 
           (a.displayName || "").localeCompare(b.displayName || "")
         );
@@ -115,14 +134,13 @@ export default function FriendsScreen() {
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.friendName}>{item.displayName || "User"}</Text>
-                {item.status === 'available' ? (
-                  <Text style={styles.synqActive} numberOfLines={1}>
-                    {item.memo || "Ready to connect"}
-                  </Text>
-                ) : (
-                  <Text style={styles.synqInactive}>Synq not active</Text>
-                )}
+                <View style={styles.nameRow}>
+                    <Text style={styles.friendName}>{item.displayName || "User"}</Text>
+                    {item.status === 'available' && (
+                        <View style={styles.activeDotInline} />
+                    )}
+                </View>
+                <Text style={styles.mutualText}>{item.mutualCount || 0} mutual friends</Text>
               </View>
               <Icon name="chevron-forward" size={18} color="#333" />
             </TouchableOpacity>
@@ -132,18 +150,10 @@ export default function FriendsScreen() {
       )}
 
       {/* Profile Detail Modal */}
-      <Modal 
-        visible={!!selectedFriend} 
-        transparent 
-        animationType="fade"
-        onRequestClose={() => setSelectedFriend(null)}
-      >
+      <Modal visible={!!selectedFriend} transparent animationType="fade">
         <View style={styles.popupOverlay}>
           <View style={styles.popupContent}>
-            <TouchableOpacity 
-              style={styles.closeBtn} 
-              onPress={() => setSelectedFriend(null)}
-            >
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedFriend(null)}>
               <Icon name="close" size={24} color="white" />
             </TouchableOpacity>
 
@@ -183,10 +193,7 @@ export default function FriendsScreen() {
               </View>
             )}
 
-            <TouchableOpacity 
-              style={styles.removeBtn} 
-              onPress={() => removeFriend(selectedFriend!.id)}
-            >
+            <TouchableOpacity style={styles.removeBtn} onPress={() => removeFriend(selectedFriend!.id)}>
               <Text style={styles.removeBtnText}>Remove Friend</Text>
             </TouchableOpacity>
           </View>
@@ -298,12 +305,13 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 80, marginBottom: 20, alignItems: 'center' },
   headerTitle: { color: 'white', fontSize: 28, fontWeight: '900', fontFamily: 'Avenir' },
   friendRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15 },
+  nameRow: { flexDirection: 'row', alignItems: 'center' },
+  activeDotInline: { width: 8, height: 8, borderRadius: 4, backgroundColor: ACCENT, marginLeft: 8 },
   separator: { height: 0.5, backgroundColor: '#333', width: '100%' },
   avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#222', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   img: { width: 50, height: 50, borderRadius: 25 },
   friendName: { color: 'white', fontSize: 17, fontWeight: '700', fontFamily: 'Avenir' },
-  synqActive: { color: ACCENT, fontSize: 13, fontFamily: 'Avenir', marginTop: 2 },
-  synqInactive: { color: '#666', fontSize: 13, fontFamily: 'Avenir', marginTop: 2 },
+  mutualText: { color: '#666', fontSize: 13, fontFamily: 'Avenir', marginTop: 2 },
   empty: { color: '#444', textAlign: 'center', marginTop: 50, fontFamily: 'Avenir', fontSize: 22 },
 
   popupOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
@@ -311,12 +319,10 @@ const styles = StyleSheet.create({
   closeBtn: { position: 'absolute', top: 20, right: 20, zIndex: 1 },
   largeAvatar: { width: 120, height: 120, borderRadius: 60, marginBottom: 20, borderWidth: 2, borderColor: ACCENT },
   popupName: { color: 'white', fontSize: 24, fontWeight: '900', fontFamily: 'Avenir' },
-  popupEmail: { color: '#666', fontSize: 14, marginBottom: 15 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', paddingHorizontal: 15, paddingVertical: 5, borderRadius: 20, marginBottom: 20 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', paddingHorizontal: 15, paddingVertical: 5, borderRadius: 20, marginBottom: 20, marginTop: 10 },
   statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   statusText: { color: 'white', fontSize: 12, fontWeight: '600' },
-
-  // Added Interests Styles
+  
   interestsContainer: { width: '100%', marginBottom: 20 },
   sectionLabel: { color: '#444', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 },
   interestsWrapper: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
