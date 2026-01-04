@@ -18,6 +18,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -25,7 +26,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
+  TouchableOpacity, // Added Keyboard
+  TouchableWithoutFeedback // Added TouchableWithoutFeedback
+  ,
+
+
   View
 } from 'react-native';
 import { auth, db } from '../../src/lib/firebase';
@@ -118,7 +123,6 @@ export default function SynqScreen() {
     });
   }, []);
 
-  // Timer Sequence Fix for Type Conflict
   useEffect(() => {
     let timer: any; 
 
@@ -251,7 +255,6 @@ export default function SynqScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
-      {/* 4. ACTIVE SCREEN */}
       {status === 'active' && (
         <View style={{ flex: 1 }}>
           <View style={styles.activeHeader}>
@@ -300,7 +303,6 @@ export default function SynqScreen() {
         </View>
       )}
 
-      {/* 2. ACTIVATING SCREEN & 3. FINDING SCREEN (Unified Text Styles) */}
       {(status === 'activating' || status === 'finding') && (
         <View style={styles.activatingContainer}>
             <Text style={styles.unifiedTitle}>
@@ -314,7 +316,6 @@ export default function SynqScreen() {
         </View>
       )}
 
-      {/* 1. IDLE SCREEN */}
       {status === 'idle' && (
         <View style={styles.inactiveCenter}>
           <Text style={styles.mainTitle}>Ready to activate Synq?</Text>
@@ -335,36 +336,54 @@ export default function SynqScreen() {
         </View>
       )}
 
-      {/* --- MODALS (Code remains identical) --- */}
+      {/* REWRITTEN EDIT MODAL */}
       <Modal visible={isEditModalVisible} transparent animationType="fade">
-        <View style={styles.centeredModalOverlay}>
-          <View style={styles.editPanel}>
-            <Text style={styles.panelTitle}>Edit your Synq</Text>
-            <TextInput 
-              style={styles.panelInput}
-              value={memo}
-              onChangeText={setMemo}
-              placeholder="Update your note..."
-              placeholderTextColor="#666"
-              multiline
-            />
-            <TouchableOpacity 
-              style={styles.saveBtn} 
-              onPress={async () => {
-                await updateDoc(doc(db, 'users', auth.currentUser!.uid), { memo });
-                setIsEditModalVisible(false);
-              }}
-            >
-              <Text style={styles.saveBtnText}>Update Memo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}>
-              <Text style={styles.endSynqBtnText}>End Synq Session</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setIsEditModalVisible(false)} style={{ marginTop: 24 }}>
-              <Text style={{ color: 'white', opacity: 0.6, fontFamily: 'Avenir-Medium' }}>Cancel</Text>
-            </TouchableOpacity>
+        <TouchableWithoutFeedback 
+          onPress={() => {
+            Keyboard.dismiss();
+            setIsEditModalVisible(false);
+          }}
+        >
+          <View style={styles.centeredModalOverlay}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.editPanel}>
+                {/* Top Right X Button */}
+                <TouchableOpacity 
+                  style={styles.modalCloseIcon} 
+                  onPress={() => setIsEditModalVisible(false)}
+                >
+                  <Ionicons name="close" size={24} color="white" />
+                </TouchableOpacity>
+
+                <Text style={styles.panelTitle}>Edit your Synq</Text>
+                <TextInput 
+                  style={styles.panelInput}
+                  value={memo}
+                  onChangeText={setMemo}
+                  placeholder="Update your note..."
+                  placeholderTextColor="#666"
+                  multiline
+                />
+                <TouchableOpacity 
+                  style={styles.saveBtn} 
+                  onPress={async () => {
+                    await updateDoc(doc(db, 'users', auth.currentUser!.uid), { memo });
+                    setIsEditModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.saveBtnText}>Update Memo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}>
+                  <Text style={styles.endSynqBtnText}>End Synq Session</Text>
+                </TouchableOpacity>
+                {/* Visual Cancel Text as secondary option */}
+                <TouchableOpacity onPress={() => setIsEditModalVisible(false)} style={{ marginTop: 24 }}>
+                  <Text style={{ color: 'white', opacity: 0.6, fontFamily: 'Avenir-Medium' }}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
@@ -443,13 +462,9 @@ const styles = StyleSheet.create({
   footer: { padding: 25, paddingBottom: 150 },
   btn: { backgroundColor: ACCENT, padding: 18, borderRadius: 20, alignItems: 'center' },
   btnText: { fontSize: 16, color: 'black', fontFamily: 'Avenir-Black' },
-  
-  // Transition Screens
   activatingContainer: { flex: 1, backgroundColor: 'black', alignItems: 'center', justifyContent: 'center' },
   unifiedTitle: { color: 'white', fontSize: 24, fontFamily: 'Avenir-Black', marginBottom: 50, textAlign: 'center' },
   gifLarge: { width: 250, height: 250 },
-
-  // Idle Screen
   inactiveCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   mainTitle: { color: 'white', fontSize: 32, textAlign: 'center', fontFamily: 'Avenir-Black' },
   memoInput: { color: 'white', fontSize: 18, borderBottomWidth: 1, borderBottomColor: '#222', width: '100%', textAlign: 'center', marginVertical: 40, paddingBottom: 10, fontFamily: 'Avenir-Medium' },
@@ -457,6 +472,10 @@ const styles = StyleSheet.create({
   
   centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
   editPanel: { width: '100%', backgroundColor: '#161616', borderRadius: 32, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: '#222' },
+  
+  // New X style
+  modalCloseIcon: { position: 'absolute', top: 20, right: 20, zIndex: 10 },
+
   panelTitle: { color: 'white', fontSize: 22, marginBottom: 24, fontFamily: 'Avenir-Black' },
   panelInput: { width: '100%', backgroundColor: '#000', color: 'white', padding: 18, borderRadius: 16, fontSize: 16, marginBottom: 20, textAlign: 'center', fontFamily: 'Avenir-Medium' },
   saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 12 },
