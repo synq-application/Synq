@@ -1,10 +1,8 @@
-// app/_layout.tsx
 import { Stack, useRouter, useSegments } from "expo-router";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth } from "../src/lib/firebase";
 
-// Create a small context so children can "poke" the layout to refresh
 const AuthContext = createContext({ refreshAuth: () => {} });
 export const useAuthRefresh = () => useContext(AuthContext);
 
@@ -15,9 +13,7 @@ export default function RootLayout() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Function to manually force React to recognize the updated Firebase User
   const refreshAuth = () => {
-    // We spread the current user into a new object to force a state update
     setUser(auth.currentUser ? { ...auth.currentUser } as User : null);
   };
 
@@ -33,17 +29,20 @@ export default function RootLayout() {
     if (authLoading) return;
 
     const inAuthGroup = segments[0] === "(auth)";
+    const onLocationPage = segments[0] === "location";
     const onDetailsPage = segments[1] === "details";
-    const hasCompletedProfile = !!user?.displayName;
+    const hasName = !!user?.displayName;
 
     if (!user) {
       if (!inAuthGroup) router.replace("/(auth)/welcome");
-    } else if (!hasCompletedProfile) {
+    } else if (!hasName) {
       if (!onDetailsPage) router.replace("/(auth)/details");
+    } else if (onLocationPage) {
+      return;
     } else {
       if (inAuthGroup) router.replace("/(tabs)");
     }
-  }, [user, segments, authLoading]); // user dependency is key here
+  }, [user, segments, authLoading]);
 
   if (authLoading) return null;
 
@@ -51,6 +50,7 @@ export default function RootLayout() {
     <AuthContext.Provider value={{ refreshAuth }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="location" /> 
         <Stack.Screen name="(tabs)" />
       </Stack>
     </AuthContext.Provider>

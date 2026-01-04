@@ -48,7 +48,6 @@ export default function FriendsScreen() {
 
     const unsubFriends = onSnapshot(friendsRef, async (snapshot) => {
       try {
-        // 1. Get IDs of all YOUR friends
         const myFriendIds = snapshot.docs.map(d => d.id);
         
         const friendsList: Friend[] = await Promise.all(
@@ -56,11 +55,9 @@ export default function FriendsScreen() {
             const uSnap = await getDoc(doc(db, "users", fDoc.id));
             const data = uSnap.data();
             
-            // 2. Fetch THEIR friend list IDs
             const theirFriendsSnap = await getDocs(collection(db, "users", fDoc.id, "friends"));
             const theirFriendIds = theirFriendsSnap.docs.map(d => d.id);
             
-            // 3. Find the intersection (Mutuals)
             const mutuals = theirFriendIds.filter(id => myFriendIds.includes(id));
 
             return { 
@@ -170,7 +167,6 @@ export default function FriendsScreen() {
               </Text>
             </View>
 
-            {/* Interests Section */}
             <View style={styles.interestsContainer}>
               <Text style={styles.sectionLabel}>Interests</Text>
               <View style={styles.interestsWrapper}>
@@ -283,9 +279,19 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <View style={styles.searchResult}>
-                <View>
-                    <Text style={styles.friendName}>{item.displayName}</Text>
-                    <Text style={styles.emailDetail}>{item.email}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  {/* Added Profile Picture to Search Result */}
+                  <View style={styles.avatar}>
+                    {item.imageurl ? (
+                      <Image source={{ uri: item.imageurl }} style={styles.img} />
+                    ) : (
+                      <Icon name="person" size={24} color="#444" />
+                    )}
+                  </View>
+                  <View>
+                      <Text style={styles.friendName}>{item.displayName || "User"}</Text>
+                      <Text style={styles.emailDetail}>{item.email}</Text>
+                  </View>
                 </View>
                 <TouchableOpacity onPress={() => sendInvite(item)} style={styles.addBtn}>
                   <Text style={styles.addBtnText}>Add</Text>
@@ -313,7 +319,6 @@ const styles = StyleSheet.create({
   friendName: { color: 'white', fontSize: 17, fontWeight: '700', fontFamily: 'Avenir' },
   mutualText: { color: '#666', fontSize: 13, fontFamily: 'Avenir', marginTop: 2 },
   empty: { color: '#444', textAlign: 'center', marginTop: 50, fontFamily: 'Avenir', fontSize: 22 },
-
   popupOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   popupContent: { width: width * 0.85, backgroundColor: '#111', borderRadius: 30, padding: 30, alignItems: 'center', borderWidth: 1, borderColor: '#222' },
   closeBtn: { position: 'absolute', top: 20, right: 20, zIndex: 1 },
@@ -322,14 +327,12 @@ const styles = StyleSheet.create({
   statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', paddingHorizontal: 15, paddingVertical: 5, borderRadius: 20, marginBottom: 20, marginTop: 10 },
   statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   statusText: { color: 'white', fontSize: 12, fontWeight: '600' },
-  
   interestsContainer: { width: '100%', marginBottom: 20 },
   sectionLabel: { color: '#444', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 },
   interestsWrapper: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   interestRect: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6, marginBottom: 6 },
   interestText: { color: 'white', fontFamily: 'Avenir', fontSize: 12, fontWeight: '600' },
   noInterestsText: { color: '#333', fontSize: 12, fontStyle: 'italic' },
-
   memoBox: { backgroundColor: '#000', padding: 15, borderRadius: 15, width: '100%', marginBottom: 25 },
   memoTitle: { color: '#444', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 5 },
   memoText: { color: 'white', fontSize: 15, fontFamily: 'Avenir' },
