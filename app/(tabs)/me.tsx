@@ -32,11 +32,10 @@ import { auth, db, storage } from "../../src/lib/firebase";
 const ACCENT = "#7DFFA6";
 const { width } = Dimensions.get('window');
 const allActivities = Object.values(presetActivities).flat();
-const defaultPic = null; 
 
 type Connection = {
   name: string;
-  imageUrl: string;
+  imageUrl: string | null;
   synqCount: number;
 };
 
@@ -47,7 +46,7 @@ const fonts = {
 };
 
 export default function ProfileScreen() {
-  const [profileImage, setProfileImage] = useState<string | undefined>();
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isQRExpanded, setQRExpanded] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
@@ -55,8 +54,8 @@ export default function ProfileScreen() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [interests, setInterests] = useState<string[]>([]);
-  const [city, setCity] = useState<string>('');
-  const [state, setState] = useState<string>('');
+  const [city, setCity] = useState<string | null>(null);
+  const [state, setState] = useState<string | null>(null);
   const [memo, setMemo] = useState<string>('');
   const [loadingConnections, setLoadingConnections] = useState(true);
   const [requestCount, setRequestCount] = useState(0);
@@ -68,15 +67,14 @@ export default function ProfileScreen() {
     const unsubscribeProfile = onSnapshot(userDocRef, (userDocSnap) => {
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        const stateAbbr = stateAbbreviations[userData.state] || userData.state || 'N/A';
-        setCity(userData.city || 'Somewhere');
+        setCity(userData.city || null);
+        const stateAbbr = stateAbbreviations[userData.state] || userData.state || null;
         setState(stateAbbr);
+        
         setMemo(userData.memo || '');
         setInterests(userData.interests || []);
         setSelectedInterests(userData.interests || []);
-        if (userData?.imageurl) {
-            setProfileImage(userData.imageurl);
-        }
+        setProfileImage(userData?.imageurl || null);
       }
     });
 
@@ -95,7 +93,7 @@ export default function ProfileScreen() {
               if (friendSnap.exists()) {
                 return {
                   name: friendSnap.data().displayName || "User",
-                  imageUrl: friendSnap.data().imageurl || "",
+                  imageUrl: friendSnap.data().imageurl || null,
                   synqCount: friendDoc.data().synqCount || 0,
                 };
               }
@@ -122,45 +120,25 @@ export default function ProfileScreen() {
   );
 
   const handleDeleteInterest = (interestName: string) => {
-    Alert.alert(
-      "Remove Interest",
-      `Are you sure you want to remove "${interestName}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
-          onPress: async () => {
-            try {
-              const updatedInterests = interests.filter(i => i !== interestName);
-              if (auth.currentUser) {
-                await updateDoc(doc(db, 'users', auth.currentUser.uid), { 
-                  interests: updatedInterests 
-                });
-              }
-            } catch (e) {
-              Alert.alert("Error", "Could not remove interest.");
-            }
-          } 
-        }
-      ]
-    );
+    Alert.alert("Remove Interest", `Remove "${interestName}"?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+          const updatedInterests = interests.filter(i => i !== interestName);
+          await updateDoc(doc(db, 'users', auth.currentUser!.uid), { interests: updatedInterests });
+      }}
+    ]);
   };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') return;
-    
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], 
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
     });
-
-    if (!result.canceled && result.assets[0].uri) {
-      uploadImage(result.assets[0].uri);
-    }
+    if (!result.canceled && result.assets[0].uri) uploadImage(result.assets[0].uri);
   };
 
   const uploadImage = async (uri: string) => {
@@ -199,17 +177,10 @@ export default function ProfileScreen() {
     }
   };
 
-  const accountData = {
-    id: auth.currentUser?.uid,
-    email: auth.currentUser?.email,
-    displayName: auth.currentUser?.displayName,
-  };
+  const accountData = { id: auth.currentUser?.uid, email: auth.currentUser?.email, displayName: auth.currentUser?.displayName };
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      contentContainerStyle={styles.scrollContent}
-    >
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/notifications')}>
@@ -229,8 +200,12 @@ export default function ProfileScreen() {
           <TouchableOpacity onPress={pickImage} style={styles.imageWrapper}>
             {isUploading ? (
               <ActivityIndicator color={ACCENT} />
+            ) : profileImage ? (
+              <Image source={{ uri: profileImage }} style={styles.profileImg} />
             ) : (
-              <Image source={profileImage ? { uri: profileImage } : defaultPic} style={styles.profileImg} />
+              <View style={styles.defaultAvatarContainer}>
+                <Icon name="person" size={80} color="rgba(255,255,255,0.2)" />
+              </View>
             )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setQRExpanded(true)} style={styles.qrToggle}>
@@ -238,11 +213,12 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
         <Text style={styles.nameText}>{auth.currentUser?.displayName}</Text>
-        <Text style={styles.locationText}>{city}, {state}</Text>
+        {city && state && (
+          <Text style={styles.locationText}>{city}, {state}</Text>
+        )}    
         <Text style={styles.memoText}>{memo}</Text>
       </View>
 
-      {/* Top Synqs */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Top Synqs</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -251,7 +227,13 @@ export default function ProfileScreen() {
           ) : connections.length > 0 ? (
             connections.slice(0, 5).map((item, i) => (
               <View key={i} style={styles.connItem}>
-                <Image source={item.imageUrl ? { uri: item.imageUrl } : defaultPic} style={styles.connImg} />
+                {item.imageUrl ? (
+                    <Image source={{ uri: item.imageUrl }} style={styles.connImg} />
+                ) : (
+                    <View style={[styles.connImg, styles.connDefaultAvatar]}>
+                         <Icon name="person" size={24} color="rgba(255,255,255,0.2)" />
+                    </View>
+                )}
                 <Text style={styles.connName} numberOfLines={1}>
                   {item.name.split(' ')[0]}
                 </Text>
@@ -263,16 +245,11 @@ export default function ProfileScreen() {
         </ScrollView>
       </View>
 
-      {/* Interests */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Interests</Text>
         <View style={styles.interestsWrapper}>
           {interests.map((interest, i) => (
-            <TouchableOpacity 
-              key={i} 
-              style={styles.interestRect}
-              onPress={() => handleDeleteInterest(interest)}
-            >
+            <TouchableOpacity key={i} style={styles.interestRect} onPress={() => handleDeleteInterest(interest)}>
               <Text style={styles.interestText}>{interest}</Text>
             </TouchableOpacity>
           ))}
@@ -283,12 +260,10 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Sign Out - Styled to be clear of the floating tab bar */}
       <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
-      {/* QR Expand Modal */}
       <Modal visible={isQRExpanded} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setQRExpanded(false)}>
           <View style={styles.qrModalBox}>
@@ -299,51 +274,28 @@ export default function ProfileScreen() {
 
       <Modal visible={showInputModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={{ flex: 1, width: '100%' }}>
-      <TouchableOpacity 
-        style={{ flex: 1 }} 
-        onPress={() => {setShowInputModal(false); setSearchQuery('');}} 
-      />
-    </View>
+          <TouchableOpacity style={{ flex: 1, width: '100%' }} onPress={() => setShowInputModal(false)} />
           <View style={styles.interestContent}>
             <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>What are you into?</Text>
-                <TouchableOpacity onPress={() => {setShowInputModal(false); setSearchQuery('');}}>
+                <TouchableOpacity onPress={() => setShowInputModal(false)}>
                     <Icon name="close" size={24} color="white" />
                 </TouchableOpacity>
             </View>
-
             <View style={styles.searchBarContainer}>
                 <Icon name="search-outline" size={18} color="#666" style={{marginLeft: 12}} />
-                <TextInput 
-                    style={styles.searchInput}
-                    placeholder="Search interests..."
-                    placeholderTextColor="#666"
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    autoCapitalize="none"
-                />
+                <TextInput style={styles.searchInput} placeholder="Search interests..." placeholderTextColor="#666" value={searchQuery} onChangeText={setSearchQuery} autoCapitalize="none" />
             </View>
-
             <ScrollView contentContainerStyle={styles.interestGrid}>
-              {filteredActivities.length > 0 ? (
-                filteredActivities.map(item => {
-                    const active = selectedInterests.includes(item.name);
-                    return (
-                    <TouchableOpacity 
-                        key={item.name}
-                        onPress={() => setSelectedInterests(prev => active ? prev.filter(i => i !== item.name) : [...prev, item.name])}
-                        style={[styles.chip, active && styles.chipActive]}
-                    >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{item.name}</Text>
-                    </TouchableOpacity>
-                    );
-                })
-              ) : (
-                <Text style={[styles.emptyText, {marginTop: 40}]}>No interests found matching "{searchQuery}"</Text>
-              )}
+              {filteredActivities.map(item => {
+                  const active = selectedInterests.includes(item.name);
+                  return (
+                  <TouchableOpacity key={item.name} onPress={() => setSelectedInterests(prev => active ? prev.filter(i => i !== item.name) : [...prev, item.name])} style={[styles.chip, active && styles.chipActive]}>
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{item.name}</Text>
+                  </TouchableOpacity>
+                  );
+              })}
             </ScrollView>
-            
             <TouchableOpacity onPress={saveInterests} style={styles.saveBtn}>
               <Text style={styles.saveBtnText}>Save Changes</Text>
             </TouchableOpacity>
@@ -356,17 +308,16 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
-  scrollContent: { 
-    paddingBottom: 160 // High padding to allow scrolling past the floating tab bar
-  },
+  scrollContent: { paddingBottom: 160 },
   header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, marginTop: 60, alignItems: 'center' },
   badge: { position: 'absolute', right: -4, top: -4, backgroundColor: 'red', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'black' },
   badgeText: { color: 'white', fontSize: 10, fontFamily: fonts.black },
   profileSection: { alignItems: 'center', marginTop: 10 },
   qrContainer: { width: 200, height: 200, justifyContent: 'center', alignItems: 'center' },
   qrBg: { position: 'absolute', opacity: 0.4, backgroundColor: 'white', borderRadius: 25, padding: 10 },
-  imageWrapper: { width: 160, height: 160, borderRadius: 80, overflow: 'hidden', borderWidth: 2, borderColor: 'white', backgroundColor: '#111', justifyContent: 'center', alignItems: 'center', zIndex: 1 },
+  imageWrapper: { width: 160, height: 160, borderRadius: 80, overflow: 'hidden', borderWidth: 2, borderColor: 'white', backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center', zIndex: 1 },
   profileImg: { width: '100%', height: '100%' },
+  defaultAvatarContainer: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   qrToggle: { position: 'absolute', bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
   nameText: { color: ACCENT, fontSize: 28, fontFamily: fonts.black, marginTop: 20 },
   locationText: { color: 'white', opacity: 0.6, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, marginTop: 4, fontFamily: fonts.heavy },
@@ -375,31 +326,16 @@ const styles = StyleSheet.create({
   sectionTitle: { color: 'white', fontSize: 18, fontFamily: fonts.black, marginBottom: 15 },
   connItem: { alignItems: 'center', marginRight: 20, width: 70 },
   connImg: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#222' },
+  connDefaultAvatar: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' },
   connName: { color: 'white', fontSize: 11, marginTop: 8, textAlign: 'center', fontFamily: fonts.heavy },
   emptyText: { color: '#444', fontFamily: fonts.medium },
   interestsWrapper: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
-  interestRect: { backgroundColor: '#111', borderWidth: 1, borderColor: '#333', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, marginBottom: 8, justifyContent: 'center' },
+  interestRect: { backgroundColor: '#111', borderWidth: 1, borderColor: '#333', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, marginBottom: 8 },
   interestText: { color: 'white', fontFamily: fonts.heavy, fontSize: 13 },
-  addRect: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'transparent', borderWidth: 1, borderColor: ACCENT, borderStyle: 'dashed', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
+  addRect: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: ACCENT, borderStyle: 'dashed', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 4 },
-  signOutBtn: { 
-    alignSelf: 'center', 
-    marginTop: 60, 
-    paddingVertical: 14, 
-    paddingHorizontal: 50, 
-    borderRadius: 20, 
-    borderWidth: 1.5, 
-    borderColor: '#222',
-    backgroundColor: '#0a0a0a'
-  },
-  signOutText: { 
-    color: '#888', 
-    fontFamily: fonts.heavy,
-    fontSize: 14,
-    letterSpacing: 1,
-    textTransform: 'uppercase'
-  },
-
+  signOutBtn: { alignSelf: 'center', marginTop: 60, paddingVertical: 14, paddingHorizontal: 50, borderRadius: 20, borderWidth: 1.5, borderColor: '#222', backgroundColor: '#0a0a0a' },
+  signOutText: { color: '#888', fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   qrModalBox: { backgroundColor: 'white', padding: 25, borderRadius: 30 },
   interestContent: { backgroundColor: '#0a0a0a', width: '100%', height: '85%', marginTop: 'auto', borderTopLeftRadius: 40, borderTopRightRadius: 40, padding: 25, alignItems: 'center' },

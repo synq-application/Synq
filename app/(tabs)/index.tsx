@@ -31,6 +31,10 @@ import {
   ,
 
 
+
+
+
+
   View
 } from 'react-native';
 import { auth, db } from '../../src/lib/firebase';
@@ -389,7 +393,7 @@ export default function SynqScreen() {
       <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalBg}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Your Synqs</Text>
+            <Text style={styles.modalTitle}>Messages</Text>
             <TouchableOpacity onPress={() => setIsInboxVisible(false)}><Ionicons name="close-circle" size={28} color="#444" /></TouchableOpacity>
           </View>
           <FlatList
