@@ -1,21 +1,21 @@
 import { router } from 'expo-router';
 import {
-    collection,
-    deleteDoc,
-    doc,
-    onSnapshot,
-    serverTimestamp,
-    setDoc
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc
 } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { auth, db } from '../src/lib/firebase';
@@ -27,54 +27,31 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!auth.currentUser) {
-        console.log("DEBUG: No user logged in, skipping listener.");
-        return;
-    }
-
-    // Logging the path we are listening to
-    const path = `users/${auth.currentUser.uid}/friendRequests`;
-    console.log(`DEBUG: Starting listener on path: ${path}`);
+    if (!auth.currentUser) return;
 
     const reqRef = collection(db, "users", auth.currentUser.uid, "friendRequests");
     
     const unsubscribe = onSnapshot(reqRef, (snapshot) => {
-      console.log(`DEBUG: Snapshot received. Documents found: ${snapshot.docs.length}`);
-      
-      const reqList = snapshot.docs.map(doc => {
-        const data = doc.data();
-        console.log(`DEBUG: Found request from ${data.fromName || 'Unknown'} (Doc ID: ${doc.id})`);
-        return {
+      const reqList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...data
-        };
-      });
-      
+          ...doc.data()
+      }));
       setRequests(reqList);
       setLoading(false);
     }, (error) => {
-      console.error("DEBUG ERROR: Firestore Snapshot failed:", error.code, error.message);
+      console.error("Firestore Snapshot failed:", error);
       setLoading(false);
     });
 
-    return () => {
-        console.log("DEBUG: Cleaning up Notifications listener.");
-        unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   const handleRequest = async (request: any, accept: boolean) => {
     if (!auth.currentUser) return;
 
-    console.log(`DEBUG: User clicked ${accept ? 'ACCEPT' : 'DENY'} for request from ${request.fromName}`);
-
     try {
       if (accept) {
-        if (!request.fromId) {
-            throw new Error("Missing fromId in request document. Cannot establish friendship.");
-        }
-
-        console.log(`DEBUG: Creating mutual friendship between ${auth.currentUser.uid} and ${request.fromId}`);
+        if (!request.fromId) throw new Error("Missing sender ID.");
 
         // 1. Add to MY friends list
         await setDoc(doc(db, "users", auth.currentUser.uid, "friends", request.fromId), {
@@ -82,7 +59,6 @@ export default function NotificationsScreen() {
           since: serverTimestamp(),
           displayName: request.fromName || "User"
         });
-        console.log("DEBUG: Successfully wrote to CURRENT user's friends list.");
 
         // 2. Add ME to THEIR friends list
         await setDoc(doc(db, "users", request.fromId, "friends", auth.currentUser.uid), {
@@ -90,18 +66,14 @@ export default function NotificationsScreen() {
           since: serverTimestamp(),
           displayName: auth.currentUser.displayName || "User"
         });
-        console.log("DEBUG: Successfully wrote to REQUESTER's friends list.");
 
         Alert.alert("Success", `You are now connected with ${request.fromName}!`);
       }
 
-      // 3. Delete the request
-      console.log(`DEBUG: Deleting request document at: users/${auth.currentUser.uid}/friendRequests/${request.id}`);
+      // 3. Delete the request document
       await deleteDoc(doc(db, "users", auth.currentUser.uid, "friendRequests", request.id));
-      console.log("DEBUG: Request document deleted successfully.");
 
     } catch (e: any) {
-      console.error("DEBUG ERROR: handleRequest failed:", e.message);
       Alert.alert("Error", `Could not process request: ${e.message}`);
     }
   };
@@ -137,11 +109,12 @@ export default function NotificationsScreen() {
                 <View style={styles.avatar}>
                   <Icon name="person" size={20} color="#666" />
                 </View>
-                <View>
+                {/* flex: 1 on this wrapper ensures the text wraps instead of overlapping */}
+                <View style={{ flex: 1 }}>
                   <Text style={styles.requestTitle}>Friend Request</Text>
                   <Text style={styles.requestSubtitle}>
-                    <Text style={styles.boldWhite}>{item.fromName || "Unknown"}</Text>
-                    <Text style={styles.grayText}> wants to synq.</Text>
+                    <Text style={styles.boldWhite}>{item.fromName || "Someone"}</Text>
+                    <Text style={styles.grayText}> wants to be your friend.</Text>
                   </Text>
                 </View>
               </View>
@@ -180,51 +153,60 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: '#222'
   },
-  headerTitle: { color: 'white', fontSize: 18, fontWeight: '800' },
+  headerTitle: { color: 'white', fontSize: 18, fontWeight: '800', fontFamily: 'Avenir' },
   headerSpacer: { width: 28 },
   backBtn: { padding: 5 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent: { padding: 20 },
+  listContent: { padding: 15 },
   requestCard: {
     backgroundColor: '#111',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 15,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#222'
   },
-  infoSection: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  infoSection: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    flex: 1, // Takes up remaining space
+    marginRight: 10 // Space between text and buttons
+  },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#222',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12
   },
-  requestTitle: { color: ACCENT, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  requestSubtitle: { fontSize: 14, marginTop: 2 },
-  boldWhite: { fontWeight: '700', color: 'white' },
+  requestTitle: { color: ACCENT, fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 2 },
+  requestSubtitle: { fontSize: 14, color: 'white', lineHeight: 18 },
+  boldWhite: { fontWeight: '800', color: 'white' },
   grayText: { color: '#aaa' },
-  actionSection: { flexDirection: 'row', marginLeft: 10 },
+  actionSection: { flexDirection: 'row', alignItems: 'center' },
   acceptBtn: {
     backgroundColor: ACCENT,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10
+    marginRight: 8
   },
   denyBtn: {
-    backgroundColor: '#333',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    backgroundColor: '#222',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333'
   },
   emptyContainer: { alignItems: 'center', marginTop: 100 },
   emptyText: { color: '#444', fontSize: 16, marginTop: 15, fontWeight: '600' }

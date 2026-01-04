@@ -297,7 +297,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Interest Selector Modal */}
       <Modal visible={showInputModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={{ flex: 1, width: '100%' }}>
@@ -383,8 +382,6 @@ const styles = StyleSheet.create({
   interestText: { color: 'white', fontFamily: fonts.heavy, fontSize: 13 },
   addRect: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'transparent', borderWidth: 1, borderColor: ACCENT, borderStyle: 'dashed', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 4 },
-  
-  // Updated Sign Out Button
   signOutBtn: { 
     alignSelf: 'center', 
     marginTop: 60, 
