@@ -185,6 +185,7 @@ export default function FriendsScreen() {
   );
 }
 
+// --- SEARCH MODAL COMPONENT ---
 function SearchModal({ visible, onClose, currentFriends }: any) {
   const [queryText, setQueryText] = useState("");
   const [results, setResults] = useState<any[]>([]);
