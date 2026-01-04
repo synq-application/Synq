@@ -1,0 +1,92 @@
+
+export const presetActivities = {
+  // Original & Basics
+  walking: { id: 289, name: "🚶 Walking" },
+  concerts: { id: 158, name: "🎸 Concerts" },
+  hiking: { id: 28, name: "🥾 Hiking" },
+  coffee: { id: 63, name: "☕ Coffee" },
+  yoga: { id: 64, name: "🧘 Yoga" },
+  restaurants: { id: 65, name: "🍽️ Going out to eat" },
+  cooking: { id: 66, name: "👨‍🍳 Cooking" },
+  shopping: { id: 67, name: "🛍️ Shopping" },
+
+  // Nightlife & Social
+  nightlife: { id: 301, name: "🍸 Cocktails & Bars" },
+  dancing: { id: 302, name: "💃 Dancing" },
+  karaoke: { id: 303, name: "🎤 Karaoke" },
+  wine: { id: 304, name: "🍷 Wine Tasting" },
+
+  // Sports & Wellness
+  gym: { id: 305, name: "🏋️ Weightlifting" },
+  running: { id: 306, name: "🏃 Running" },
+  pickleball: { id: 307, name: "🏓 Pickleball" },
+  tennis: { id: 308, name: "🎾 Tennis" },
+  cycling: { id: 309, name: "🚲 Cycling" },
+
+  // Creative & Gaming
+  gaming: { id: 310, name: "🎮 Video Games" },
+  boardgames: { id: 311, name: "🎲 Board Games" },
+  photography: { id: 312, name: "📸 Photography" },
+  museums: { id: 313, name: "🎨 Art & Museums" },
+  movies: { id: 314, name: "🍿 Movies" },
+
+  // Niche/Low Stakes
+  thrifting: { id: 315, name: "🧥 Thrifting" },
+  reading: { id: 316, name: "📚 Reading" },
+  dogs: { id: 317, name: "🐕 Dog Park" },
+  beach: { id: 318, name: "🏖️ Beach Days" }
+};
+
+export const stateAbbreviations: { [key: string]: string } = {
+  "Alabama": "AL",
+  "Alaska": "AK",
+  "Arizona": "AZ",
+  "Arkansas": "AR",
+  "California": "CA",
+  "Colorado": "CO",
+  "Connecticut": "CT",
+  "Delaware": "DE",
+  "District of Columbia": "DC",
+  "Florida": "FL",
+  "Georgia": "GA",
+  "Hawaii": "HI",
+  "Idaho": "ID",
+  "Illinois": "IL",
+  "Indiana": "IN",
+  "Iowa": "IA",
+  "Kansas": "KS",
+  "Kentucky": "KY",
+  "Louisiana": "LA",
+  "Maine": "ME",
+  "Maryland": "MD",
+  "Massachusetts": "MA",
+  "Michigan": "MI",
+  "Minnesota": "MN",
+  "Mississippi": "MS",
+  "Missouri": "MO",
+  "Montana": "MT",
+  "Nebraska": "NE",
+  "Nevada": "NV",
+  "New Hampshire": "NH",
+  "New Jersey": "NJ",
+  "New Mexico": "NM",
+  "New York": "NY",
+  "North Carolina": "NC",
+  "North Dakota": "ND",
+  "Ohio": "OH",
+  "Oklahoma": "OK",
+  "Oregon": "OR",
+  "Pennsylvania": "PA",
+  "Rhode Island": "RI",
+  "South Carolina": "SC",
+  "South Dakota": "SD",
+  "Tennessee": "TN",
+  "Texas": "TX",
+  "Utah": "UT",
+  "Vermont": "VT",
+  "Virginia": "VA",
+  "Washington": "WA",
+  "West Virginia": "WV",
+  "Wisconsin": "WI",
+  "Wyoming": "WY"
+};
