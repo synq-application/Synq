@@ -31,6 +31,7 @@ interface Friend {
   imageurl?: string;
   status?: 'available' | 'inactive';
   memo?: string;
+  interests?: string[]; // Added interests field
 }
 
 export default function FriendsScreen() {
@@ -157,6 +158,22 @@ export default function FriendsScreen() {
               <Text style={styles.statusText}>
                 {selectedFriend?.status === 'available' ? 'Available now' : 'Inactive'}
               </Text>
+            </View>
+
+            {/* Interests Section */}
+            <View style={styles.interestsContainer}>
+              <Text style={styles.sectionLabel}>Interests</Text>
+              <View style={styles.interestsWrapper}>
+                {selectedFriend?.interests && selectedFriend.interests.length > 0 ? (
+                  selectedFriend.interests.map((interest, i) => (
+                    <View key={i} style={styles.interestRect}>
+                      <Text style={styles.interestText}>{interest}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.noInterestsText}>No interests listed</Text>
+                )}
+              </View>
             </View>
 
             {selectedFriend?.memo && (
@@ -298,6 +315,15 @@ const styles = StyleSheet.create({
   statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', paddingHorizontal: 15, paddingVertical: 5, borderRadius: 20, marginBottom: 20 },
   statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   statusText: { color: 'white', fontSize: 12, fontWeight: '600' },
+
+  // Added Interests Styles
+  interestsContainer: { width: '100%', marginBottom: 20 },
+  sectionLabel: { color: '#444', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 },
+  interestsWrapper: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+  interestRect: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6, marginBottom: 6 },
+  interestText: { color: 'white', fontFamily: 'Avenir', fontSize: 12, fontWeight: '600' },
+  noInterestsText: { color: '#333', fontSize: 12, fontStyle: 'italic' },
+
   memoBox: { backgroundColor: '#000', padding: 15, borderRadius: 15, width: '100%', marginBottom: 25 },
   memoTitle: { color: '#444', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 5 },
   memoText: { color: 'white', fontSize: 15, fontFamily: 'Avenir' },
