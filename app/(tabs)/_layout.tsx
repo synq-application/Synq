@@ -1,59 +1,107 @@
-import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import { Image, Platform, StyleSheet, View } from "react-native";
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+const ACCENT = "#7DFFA6";
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
+export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
+        headerShown: false,
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: ACCENT,
+        tabBarInactiveTintColor: "rgba(255,255,255,0.4)",
+        tabBarShowLabel: true,
+        // This ensures the labels don't shift when the center icon is large
+        tabBarLabelStyle: { fontSize: 12, marginBottom: -5 }, 
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name="friends"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
+          title: "Friends",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people-outline" size={size} color={color} />
           ),
         }}
       />
+
       <Tabs.Screen
-        name="two"
+        name="index" 
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: "", // Empty string to prevent text overlap
+          tabBarIcon: ({ focused }) => (
+            <View style={[
+              styles.synqButton, 
+              focused && styles.synqButtonActive
+            ]}>
+              <Image 
+                source={require('../../assets/SYNQ-2.png')} 
+                style={styles.synqIcon} 
+              />
+            </View>
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="me"
+        options={{
+          title: "Me",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-circle-outline" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: "#081212", // Slightly off-black for depth
+    borderTopWidth: 0,
+    height: Platform.OS === "ios" ? 85 : 70,
+    position: 'absolute', // Makes the bar float
+    bottom: 20,
+    left: 20,
+    right: 20,
+    borderRadius: 25, // Rounded corners for a modern look
+    paddingBottom: Platform.OS === "ios" ? 25 : 10,
+    // Bar Shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  synqButton: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "#000", // Dark base
+    justifyContent: "center",
+    alignItems: "center",
+    position: 'absolute',
+    top: -20, // Lifted higher
+    borderWidth: 2,
+    borderColor: ACCENT, // Border acts as the "inner" glow
+    // The "All Around" Glow Effect
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 0 }, // 0 offset makes it glow everywhere
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 15,
+  },
+  synqButtonActive: {
+    transform: [{ scale: 1.1 }], 
+    borderColor: "#FFF",
+    shadowColor: "#FFF",
+  },
+  synqIcon: {
+    width: 100,
+    height: 80,
+    resizeMode: 'contain',
+  }
+});
