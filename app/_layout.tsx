@@ -1,59 +1,58 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+// app/_layout.tsx
+import { Stack, useRouter, useSegments } from "expo-router";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { createContext, useContext, useEffect, useState } from "react";
+import { auth } from "../src/lib/firebase";
 
-import { useColorScheme } from '@/components/useColorScheme';
-
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+// Create a small context so children can "poke" the layout to refresh
+const AuthContext = createContext({ refreshAuth: () => {} });
+export const useAuthRefresh = () => useContext(AuthContext);
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    ...FontAwesome.font,
-  });
+  const segments = useSegments();
+  const router = useRouter();
+  
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+  // Function to manually force React to recognize the updated Firebase User
+  const refreshAuth = () => {
+    // We spread the current user into a new object to force a state update
+    setUser(auth.currentUser ? { ...auth.currentUser } as User : null);
+  };
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    const inAuthGroup = segments[0] === "(auth)";
+    const onDetailsPage = segments[1] === "details";
+    const hasCompletedProfile = !!user?.displayName;
+
+    if (!user) {
+      if (!inAuthGroup) router.replace("/(auth)/welcome");
+    } else if (!hasCompletedProfile) {
+      if (!onDetailsPage) router.replace("/(auth)/details");
+    } else {
+      if (inAuthGroup) router.replace("/(tabs)");
     }
-  }, [loaded]);
+  }, [user, segments, authLoading]); // user dependency is key here
 
-  if (!loaded) {
-    return null;
-  }
-
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  if (authLoading) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+    <AuthContext.Provider value={{ refreshAuth }}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
       </Stack>
-    </ThemeProvider>
+    </AuthContext.Provider>
   );
 }
