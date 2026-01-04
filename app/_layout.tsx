@@ -1,6 +1,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { createContext, useContext, useEffect, useState } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { auth } from "../src/lib/firebase";
 
 const AuthContext = createContext({ refreshAuth: () => {} });
@@ -47,12 +48,14 @@ export default function RootLayout() {
   if (authLoading) return null;
 
   return (
-    <AuthContext.Provider value={{ refreshAuth }}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="location" /> 
-        <Stack.Screen name="(tabs)" />
-      </Stack>
-    </AuthContext.Provider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthContext.Provider value={{ refreshAuth }}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="location" /> 
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+      </AuthContext.Provider>
+    </GestureHandlerRootView>
   );
 }

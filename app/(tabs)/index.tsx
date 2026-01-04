@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import {
   addDoc,
   collection,
+  deleteDoc,
+
   doc,
   getDoc,
   getDocs,
@@ -31,6 +34,7 @@ import {
   Vibration,
   View
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { auth, db } from '../../src/lib/firebase';
 
 const ACCENT = "#7DFFA6";
@@ -46,8 +50,6 @@ export default function SynqScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
-
-  // Modal/Chat States
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [isInboxVisible, setIsInboxVisible] = useState(false);
@@ -55,25 +57,6 @@ export default function SynqScreen() {
   const [allChats, setAllChats] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
-
-  const formatTime = (timestamp: any) => {
-    if (!timestamp) return '';
-    const date = timestamp.toDate();
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const getChatTitle = (chat: any) => {
-    if (!auth.currentUser || !chat.participantNames) return "Synq Chat";
-    const myId = auth.currentUser.uid;
-    const otherNames = Object.entries(chat.participantNames)
-      .filter(([uid]) => uid !== myId)
-      .map(([_, name]) => name as string);
-
-    if (otherNames.length === 0) return "Just You";
-    if (otherNames.length === 1) return `You & ${otherNames[0]}`;
-    const lastFriend = otherNames.pop();
-    return `You, ${otherNames.join(', ')} & ${lastFriend}`;
-  };
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -102,11 +85,7 @@ export default function SynqScreen() {
             }
           }
         }
-      } catch (e) { 
-        console.error(e); 
-      } finally { 
-        setLoading(false); 
-      }
+      } catch (e) { console.error(e); } finally { setLoading(false); }
     };
     init();
 
@@ -120,33 +99,24 @@ export default function SynqScreen() {
     });
   }, []);
 
-  // SMART MATCHING ALERT LOGIC
   const runSmartMatch = (friends: any[]) => {
     if (!userProfile?.interests || userProfile.interests.length === 0) return;
-
     for (const friend of friends) {
       const common = friend.interests?.filter((interest: string) => 
         userProfile.interests.includes(interest)
       );
-
       if (common && common.length > 0) {
         const sharedItem = common[0];
-        
         Vibration.vibrate([0, 400, 100, 400]); 
-
         Alert.alert(
           "Smart Match Found! ⚡️",
           `Your friend ${friend.displayName} is looking to hang. You both love ${sharedItem}—want to Synq up?`,
           [
             { text: "Dismiss", style: "cancel" },
-            { 
-              text: "Chat Now", 
-              onPress: () => {
+            { text: "Chat Now", onPress: () => {
                 setSelectedFriends([friend.id]);
-                // We call the connect logic immediately
                 handleConnectWithId(friend.id);
-              } 
-            }
+            }}
           ]
         );
         break; 
@@ -157,20 +127,15 @@ export default function SynqScreen() {
   useEffect(() => {
     let timer: any; 
     if (status === 'activating') {
-      timer = setTimeout(() => {
-        Vibration.vibrate(100); 
-        setStatus('finding');
-      }, 3000);
+      timer = setTimeout(() => { Vibration.vibrate(100); setStatus('finding'); }, 3000);
     } else if (status === 'finding') {
       timer = setTimeout(async () => {
         const friends = await fetchAvailableFriends();
         if (friends) runSmartMatch(friends);
-        
         Vibration.vibrate(500); 
         setStatus('active');
       }, 3000);
     }
-    
     return () => { if (timer) clearTimeout(timer); };
   }, [status]);
 
@@ -203,62 +168,43 @@ export default function SynqScreen() {
     if (!auth.currentUser) return;
     Vibration.vibrate(200); 
     await updateDoc(doc(db, 'users', auth.currentUser.uid), { 
-      memo, 
-      status: 'available',
-      synqStartedAt: serverTimestamp() 
+      memo, status: 'available', synqStartedAt: serverTimestamp() 
     });
     setStatus('activating');
   };
 
   const endSynq = async () => {
-    Alert.alert(
-      "End Synq?",
-      "You will no longer be visible as available.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "End Session", 
-          style: "destructive",
-          onPress: async () => {
+    Alert.alert("End Synq?", "You will no longer be visible as available.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "End Session", style: "destructive", onPress: async () => {
             if (!auth.currentUser) return;
-            await updateDoc(doc(db, 'users', auth.currentUser.uid), { 
-              status: 'inactive',
-              memo: '' 
-            });
-            setMemo(''); 
-            setStatus('idle');
-            setIsEditModalVisible(false);
+            await updateDoc(doc(db, 'users', auth.currentUser.uid), { status: 'inactive', memo: '' });
+            setMemo(''); setStatus('idle'); setIsEditModalVisible(false);
           }
-        }
-      ]
-    );
+      }
+    ]);
   };
 
-  // helper for the Alert onPress
   const handleConnectWithId = async (friendId: string) => {
       if (!auth.currentUser) return;
-      const myId = auth.currentUser.uid;
-      const participants = [myId, friendId].sort();
+      const participants = [auth.currentUser.uid, friendId].sort();
       await executeConnection(participants);
   };
 
   const handleConnect = async () => {
     if (selectedFriends.length === 0 || !auth.currentUser) return;
-    const myId = auth.currentUser.uid;
-    const participants = [myId, ...selectedFriends].sort();
+    const participants = [auth.currentUser.uid, ...selectedFriends].sort();
     await executeConnection(participants);
   };
 
   const executeConnection = async (participants: string[]) => {
     try {
       const existing = allChats.find(c => JSON.stringify(c.participants.sort()) === JSON.stringify(participants));
-
       if (existing) {
         setActiveChatId(existing.id);
       } else {
         const nameMap: any = {};
         const imgMap: any = {};
-        
         for (const uid of participants) {
           const uSnap = await getDoc(doc(db, 'users', uid));
           if (uSnap.exists()) {
@@ -266,13 +212,9 @@ export default function SynqScreen() {
             imgMap[uid] = uSnap.data().imageurl || DEFAULT_AVATAR;
           }
         }
-
         const chatRef = await addDoc(collection(db, "chats"), {
-          participants,
-          participantNames: nameMap,
-          participantImages: imgMap,
-          createdAt: serverTimestamp(),
-          lastMessage: "Synq established!",
+          participants, participantNames: nameMap, participantImages: imgMap,
+          createdAt: serverTimestamp(), lastMessage: "Synq established!",
         });
         setActiveChatId(chatRef.id);
       }
@@ -286,15 +228,48 @@ export default function SynqScreen() {
     const text = inputText;
     setInputText('');
     await addDoc(collection(db, "chats", activeChatId, "messages"), {
-      text,
-      senderId: auth.currentUser.uid,
+      text, senderId: auth.currentUser.uid,
       imageurl: userProfile?.imageurl || DEFAULT_AVATAR,
       createdAt: serverTimestamp(),
     });
     await updateDoc(doc(db, "chats", activeChatId), { lastMessage: text });
   };
 
-  const currentChat = allChats.find(c => c.id === activeChatId);
+  const handleDeleteChat = async (chatId: string) => {
+    Alert.alert("Delete Chat", "Are you sure you want to delete this conversation?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: async () => {
+        await deleteDoc(doc(db, "chats", chatId));
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }}
+    ]);
+  };
+
+  const getChatTitle = (chat: any) => {
+    if (!auth.currentUser || !chat.participantNames) return "Synq Chat";
+    const myId = auth.currentUser.uid;
+    const otherNames = Object.entries(chat.participantNames)
+      .filter(([uid]) => uid !== myId)
+      .map(([_, name]) => name as string);
+    if (otherNames.length === 0) return "Just You";
+    if (otherNames.length === 1) return `You & ${otherNames[0]}`;
+    const lastFriend = otherNames.pop();
+    return `You, ${otherNames.join(', ')} & ${lastFriend}`;
+  };
+
+  const renderAvatarStack = (images: any) => {
+    if (!images) return <View style={styles.inboxCircle}><Ionicons name="people" size={20} color={ACCENT} /></View>;
+    const displayImages = Object.entries(images)
+      .filter(([uid]) => uid !== auth.currentUser?.uid)
+      .map(([_, url]) => url as string).slice(0, 3);
+    return (
+      <View style={styles.avatarStack}>
+        {displayImages.map((uri, index) => (
+          <Image key={index} source={{ uri: uri || DEFAULT_AVATAR }} style={[styles.stackedPhoto, { left: index * 12, zIndex: 5 - index }]} />
+        ))}
+      </View>
+    );
+  };
 
   if (loading) return <View style={styles.darkFill}><ActivityIndicator color={ACCENT} /></View>;
 
@@ -310,15 +285,8 @@ export default function SynqScreen() {
               {allChats.length > 0 && <View style={styles.badge} />}
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Synq is active</Text>
-            <TouchableOpacity onPress={() => setIsEditModalVisible(true)}>
-              <Ionicons name="create-outline" size={28} color={ACCENT} />
-            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setIsEditModalVisible(true)}><Ionicons name="create-outline" size={28} color={ACCENT} /></TouchableOpacity>
           </View>
-
-          <View>
-            <Text style={styles.subheaderTitle}>Available Friends</Text>
-          </View>
-
           <FlatList
             data={availableFriends}
             keyExtractor={item => item.id}
@@ -328,22 +296,14 @@ export default function SynqScreen() {
                 style={[styles.friendCard, selectedFriends.includes(item.id) && { borderColor: ACCENT }]}
               >
                 <Image source={{ uri: item.imageurl || DEFAULT_AVATAR }} style={styles.friendImg} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.whiteBold}>{item.displayName}</Text>
-                  <Text style={styles.grayText} numberOfLines={1}>{item.memo}</Text>
-                </View>
+                <View style={{ flex: 1 }}><Text style={styles.whiteBold}>{item.displayName}</Text><Text style={styles.grayText} numberOfLines={1}>{item.memo}</Text></View>
                 {selectedFriends.includes(item.id) && <Ionicons name="checkmark-circle" size={24} color={ACCENT} />}
               </TouchableOpacity>
             )}
             contentContainerStyle={{ padding: 20 }}
           />
-
           <View style={styles.footer}>
-            <TouchableOpacity 
-              style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]} 
-              onPress={handleConnect} 
-              disabled={!selectedFriends.length}
-            >
+            <TouchableOpacity style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]} onPress={handleConnect} disabled={!selectedFriends.length}>
               <Text style={styles.btnText}>Connect ({selectedFriends.length})</Text>
             </TouchableOpacity>
           </View>
@@ -352,73 +312,21 @@ export default function SynqScreen() {
 
       {(status === 'activating' || status === 'finding') && (
         <View style={styles.activatingContainer}>
-            <Text style={styles.unifiedTitle}>
-              {status === 'activating' ? "Synq activated..." : "Finding connections..."}
-            </Text>
-            <Image 
-                source={require('../../assets/pulse.gif')} 
-                style={styles.gifLarge}
-                resizeMode="contain"
-            />
+            <Text style={styles.unifiedTitle}>{status === 'activating' ? "Synq activated..." : "Finding connections..."}</Text>
+            <Image source={require('../../assets/pulse.gif')} style={styles.gifLarge} resizeMode="contain" />
         </View>
       )}
 
       {status === 'idle' && (
         <View style={styles.inactiveCenter}>
           <Text style={styles.mainTitle}>Ready to activate Synq?</Text>
-          <TextInput 
-            style={styles.memoInput} 
-            value={memo} 
-            onChangeText={setMemo} 
-            placeholder="What's the plan?" 
-            placeholderTextColor="#444" 
-          />
+          <TextInput style={styles.memoInput} value={memo} onChangeText={setMemo} placeholder="What's the plan?" placeholderTextColor="#444" />
           <TouchableOpacity onPress={startSynq} style={styles.pulseBox}>
-                <Image 
-                    source={require('../../assets/pulse.gif')} 
-                    style={styles.gifLarge}
-                    resizeMode="contain"
-                />
+            <Image source={require('../../assets/pulse.gif')} style={styles.gifLarge} resizeMode="contain" />
           </TouchableOpacity>
         </View>
       )}
 
-      <Modal visible={isEditModalVisible} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={() => setIsEditModalVisible(false)}>
-          <View style={styles.centeredModalOverlay}>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={styles.editPanel}>
-                <Text style={styles.panelTitle}>Edit your Synq</Text>
-                <TextInput 
-                  style={styles.panelInput}
-                  value={memo}
-                  onChangeText={setMemo}
-                  placeholder="Update note..."
-                  placeholderTextColor="#666"
-                  multiline
-                />
-                <TouchableOpacity 
-                  style={styles.saveBtn} 
-                  onPress={async () => {
-                    await updateDoc(doc(db, 'users', auth.currentUser!.uid), { memo });
-                    setIsEditModalVisible(false);
-                  }}
-                >
-                  <Text style={styles.saveBtnText}>Update Memo</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}>
-                  <Text style={styles.endSynqBtnText}>End Session</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setIsEditModalVisible(false)} style={{ marginTop: 20 }}>
-                  <Text style={{ color: 'white', opacity: 0.5 }}>Close</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Message Inbox & Chat Modals */}
       <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalBg}>
           <View style={styles.modalHeader}>
@@ -429,13 +337,21 @@ export default function SynqScreen() {
             data={allChats}
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.inboxItem} onPress={() => { setActiveChatId(item.id); setIsInboxVisible(false); setIsChatVisible(true); }}>
-                <View style={styles.inboxCircle}><Ionicons name="people" size={20} color={ACCENT} /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.whiteBold}>{getChatTitle(item)}</Text>
-                  <Text style={styles.grayText} numberOfLines={1}>{item.lastMessage}</Text>
-                </View>
-              </TouchableOpacity>
+              <Swipeable
+                renderRightActions={() => (
+                  <TouchableOpacity style={styles.deleteAction} onPress={() => handleDeleteChat(item.id)}>
+                    <Ionicons name="trash" size={24} color="white" />
+                  </TouchableOpacity>
+                )}
+              >
+                <TouchableOpacity style={styles.inboxItem} onPress={() => { setActiveChatId(item.id); setIsInboxVisible(false); setIsChatVisible(true); }}>
+                  {renderAvatarStack(item.participantImages)}
+                  <View style={{ flex: 1, marginLeft: Object.keys(item.participantImages || {}).length > 2 ? 35 : 15 }}>
+                    <Text style={styles.whiteBold}>{getChatTitle(item)}</Text>
+                    <Text style={styles.grayText} numberOfLines={1}>{item.lastMessage}</Text>
+                  </View>
+                </TouchableOpacity>
+              </Swipeable>
             )}
           />
         </View>
@@ -444,7 +360,7 @@ export default function SynqScreen() {
       <Modal visible={isChatVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalBg}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle} numberOfLines={1}>{currentChat ? getChatTitle(currentChat) : 'Chat'}</Text>
+            <Text style={styles.modalTitle}>{activeChatId && getChatTitle(allChats.find(c => c.id === activeChatId))}</Text>
             <TouchableOpacity onPress={() => setIsChatVisible(false)}><Ionicons name="close-circle" size={30} color="#444" /></TouchableOpacity>
           </View>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={10}>
@@ -469,6 +385,23 @@ export default function SynqScreen() {
             </View>
           </KeyboardAvoidingView>
         </View>
+      </Modal>
+
+      <Modal visible={isEditModalVisible} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={() => setIsEditModalVisible(false)}>
+          <View style={styles.centeredModalOverlay}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.editPanel}>
+                <Text style={styles.panelTitle}>Edit your Synq</Text>
+                <TextInput style={styles.panelInput} value={memo} onChangeText={setMemo} />
+                <TouchableOpacity style={styles.saveBtn} onPress={async () => { await updateDoc(doc(db,'users',auth.currentUser!.uid),{memo}); setIsEditModalVisible(false); }}>
+                  <Text style={styles.saveBtnText}>Update Memo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}><Text style={styles.endSynqBtnText}>End Session</Text></TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </View>
   );
@@ -496,7 +429,7 @@ const styles = StyleSheet.create({
   memoInput: { color: 'white', fontSize: 18, borderBottomWidth: 1, borderBottomColor: '#222', width: '100%', textAlign: 'center', marginVertical: 40, paddingBottom: 10 },
   pulseBox: { width: 250, height: 250, justifyContent: 'center', alignItems: 'center' },
   centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
-  editPanel: { width: '100%', backgroundColor: '#161616', borderRadius: 32, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: '#222' },
+  editPanel: { width: '100%', backgroundColor: '#161616', borderRadius: 32, padding: 32, alignItems: 'center' },
   panelTitle: { color: 'white', fontSize: 22, marginBottom: 24, fontFamily: 'Avenir-Black' },
   panelInput: { width: '100%', backgroundColor: '#000', color: 'white', padding: 18, borderRadius: 16, marginBottom: 20, textAlign: 'center' },
   saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 12 },
@@ -506,8 +439,11 @@ const styles = StyleSheet.create({
   modalBg: { flex: 1, backgroundColor: '#0A0A0A' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#1A1A1A' },
   modalTitle: { color: 'white', fontSize: 19, fontFamily: 'Avenir-Heavy' },
-  inboxItem: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#151515' },
-  inboxCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  inboxItem: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#151515', backgroundColor: '#0A0A0A' },
+  avatarStack: { width: 60, height: 44, position: 'relative' },
+  stackedPhoto: { width: 44, height: 44, borderRadius: 22, position: 'absolute', borderWidth: 2, borderColor: '#0A0A0A' },
+  inboxCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
+  deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
   msgRow: { flexDirection: 'row', marginBottom: 15 },
   bubble: { padding: 12, borderRadius: 18, maxWidth: '80%' },
   myBubble: { backgroundColor: ACCENT },
