@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import {
   addDoc,
   collection,
@@ -26,15 +27,8 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity, // Added Keyboard
-  TouchableWithoutFeedback // Added TouchableWithoutFeedback
-  ,
-
-
-
-
-
-
+  TouchableOpacity,
+  TouchableWithoutFeedback,
   View
 } from 'react-native';
 import { auth, db } from '../../src/lib/firebase';
@@ -129,13 +123,14 @@ export default function SynqScreen() {
 
   useEffect(() => {
     let timer: any; 
-
     if (status === 'activating') {
       timer = setTimeout(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setStatus('finding');
       }, 3000);
     } else if (status === 'finding') {
       timer = setTimeout(() => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setStatus('active');
         fetchAvailableFriends();
       }, 3000);
@@ -171,6 +166,9 @@ export default function SynqScreen() {
 
   const startSynq = async () => {
     if (!auth.currentUser) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
     await updateDoc(doc(db, 'users', auth.currentUser.uid), { 
       memo, 
       status: 'available',
@@ -190,6 +188,7 @@ export default function SynqScreen() {
           style: "destructive",
           onPress: async () => {
             if (!auth.currentUser) return;
+            Haptics.selectionAsync();
             await updateDoc(doc(db, 'users', auth.currentUser.uid), { 
               status: 'inactive',
               memo: '' 
@@ -205,6 +204,7 @@ export default function SynqScreen() {
 
   const handleConnect = async () => {
     if (selectedFriends.length === 0 || !auth.currentUser) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const myId = auth.currentUser.uid;
       const participants = [myId, ...selectedFriends].sort();
@@ -240,6 +240,7 @@ export default function SynqScreen() {
 
   const sendMessage = async () => {
     if (!inputText.trim() || !activeChatId || !auth.currentUser) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const text = inputText;
     setInputText('');
     await addDoc(collection(db, "chats", activeChatId, "messages"), {
@@ -281,7 +282,10 @@ export default function SynqScreen() {
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
               <TouchableOpacity 
-                onPress={() => setSelectedFriends(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setSelectedFriends(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])
+                }}
                 style={[styles.friendCard, selectedFriends.includes(item.id) && { borderColor: ACCENT }]}
               >
                 <Image source={{ uri: item.imageurl || DEFAULT_AVATAR }} style={styles.friendImg} />
@@ -340,22 +344,12 @@ export default function SynqScreen() {
         </View>
       )}
 
-      {/* REWRITTEN EDIT MODAL */}
       <Modal visible={isEditModalVisible} transparent animationType="fade">
-        <TouchableWithoutFeedback 
-          onPress={() => {
-            Keyboard.dismiss();
-            setIsEditModalVisible(false);
-          }}
-        >
+        <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); setIsEditModalVisible(false); }}>
           <View style={styles.centeredModalOverlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
               <View style={styles.editPanel}>
-                {/* Top Right X Button */}
-                <TouchableOpacity 
-                  style={styles.modalCloseIcon} 
-                  onPress={() => setIsEditModalVisible(false)}
-                >
+                <TouchableOpacity style={styles.modalCloseIcon} onPress={() => setIsEditModalVisible(false)}>
                   <Ionicons name="close" size={24} color="white" />
                 </TouchableOpacity>
 
@@ -371,6 +365,7 @@ export default function SynqScreen() {
                 <TouchableOpacity 
                   style={styles.saveBtn} 
                   onPress={async () => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     await updateDoc(doc(db, 'users', auth.currentUser!.uid), { memo });
                     setIsEditModalVisible(false);
                   }}
@@ -380,7 +375,6 @@ export default function SynqScreen() {
                 <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}>
                   <Text style={styles.endSynqBtnText}>End Synq Session</Text>
                 </TouchableOpacity>
-                {/* Visual Cancel Text as secondary option */}
                 <TouchableOpacity onPress={() => setIsEditModalVisible(false)} style={{ marginTop: 24 }}>
                   <Text style={{ color: 'white', opacity: 0.6, fontFamily: 'Avenir-Medium' }}>Close</Text>
                 </TouchableOpacity>
@@ -390,6 +384,7 @@ export default function SynqScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Inbox and Chat Modals remain with standard logic */}
       <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalBg}>
           <View style={styles.modalHeader}>
@@ -400,7 +395,7 @@ export default function SynqScreen() {
             data={allChats}
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
-              <TouchableOpacity style={styles.inboxItem} onPress={() => { setActiveChatId(item.id); setIsInboxVisible(false); setIsChatVisible(true); }}>
+              <TouchableOpacity style={styles.inboxItem} onPress={() => { Haptics.selectionAsync(); setActiveChatId(item.id); setIsInboxVisible(false); setIsChatVisible(true); }}>
                 <View style={styles.inboxCircle}><Ionicons name="people" size={20} color={ACCENT} /></View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.whiteBold}>{getChatTitle(item)}</Text>
@@ -418,7 +413,6 @@ export default function SynqScreen() {
             <Text style={styles.modalTitle} numberOfLines={1}>{currentChat ? getChatTitle(currentChat) : 'Chat'}</Text>
             <TouchableOpacity onPress={() => setIsChatVisible(false)}><Ionicons name="close-circle" size={30} color="#444" /></TouchableOpacity>
           </View>
-          
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={10}>
             <FlatList
               data={messages}
@@ -476,17 +470,13 @@ const styles = StyleSheet.create({
   
   centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
   editPanel: { width: '100%', backgroundColor: '#161616', borderRadius: 32, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: '#222' },
-  
-  // New X style
   modalCloseIcon: { position: 'absolute', top: 20, right: 20, zIndex: 10 },
-
   panelTitle: { color: 'white', fontSize: 22, marginBottom: 24, fontFamily: 'Avenir-Black' },
   panelInput: { width: '100%', backgroundColor: '#000', color: 'white', padding: 18, borderRadius: 16, fontSize: 16, marginBottom: 20, textAlign: 'center', fontFamily: 'Avenir-Medium' },
   saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 12 },
   saveBtnText: { color: 'black', fontSize: 16, fontFamily: 'Avenir-Black' },
   endSynqBtn: { width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FF453A' },
   endSynqBtnText: { color: '#FF453A', fontSize: 16, fontFamily: 'Avenir-Heavy' },
-
   modalBg: { flex: 1, backgroundColor: '#0A0A0A' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 25, borderBottomWidth: 1, borderBottomColor: '#1A1A1A' },
   modalTitle: { color: 'white', fontSize: 19, flex: 1, fontFamily: 'Avenir-Heavy' },
