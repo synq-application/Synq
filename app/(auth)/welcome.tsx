@@ -6,7 +6,7 @@ const ACCENT = "#7DFFA6";
 export default function Welcome() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>SYNQ</Text>
+      <Text style={styles.title}>Synq</Text>
       
       <Text style={styles.subtitle}>
         A social tool that connects you with available friends for spontaneous time together.

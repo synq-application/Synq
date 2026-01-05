@@ -39,7 +39,8 @@ export default function FriendsScreen() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Set loading to false by default to prevent the initial spinner
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -74,9 +75,8 @@ export default function FriendsScreen() {
         setFriends(sortedFriends);
       } catch (err) {
         console.error("Error fetching friend data:", err);
-      } finally {
-        setLoading(false);
       }
+      // No need for finally { setLoading(false) } since we start as false
     });
 
     return () => unsubFriends();
@@ -111,40 +111,40 @@ export default function FriendsScreen() {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <ActivityIndicator color={ACCENT} style={{ marginTop: 50 }} />
-      ) : (
-        <FlatList
-          data={friends}
-          keyExtractor={(item) => item.id}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.friendRow} 
-              onPress={() => setSelectedFriend(item)}
-            >
-              <View style={styles.avatar}>
-                {item.imageurl ? (
-                  <Image source={{ uri: item.imageurl }} style={styles.img} />
-                ) : (
-                  <Icon name="person" size={24} color="#444" />
-                )}
+      {/* Loading indicator removed for background loading */}
+      <FlatList
+        data={friends}
+        keyExtractor={(item) => item.id}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            style={styles.friendRow} 
+            onPress={() => setSelectedFriend(item)}
+          >
+            <View style={styles.avatar}>
+              {item.imageurl ? (
+                <Image source={{ uri: item.imageurl }} style={styles.img} />
+              ) : (
+                <Icon name="person" size={24} color="#444" />
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.nameRow}>
+                  <Text style={styles.friendName}>{item.displayName || "User"}</Text>
+                  {item.status === 'available' && (
+                      <View style={styles.activeDotInline} />
+                  )}
               </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.nameRow}>
-                    <Text style={styles.friendName}>{item.displayName || "User"}</Text>
-                    {item.status === 'available' && (
-                        <View style={styles.activeDotInline} />
-                    )}
-                </View>
-                <Text style={styles.mutualText}>{item.mutualCount || 0} mutual friends</Text>
-              </View>
-              <Icon name="chevron-forward" size={18} color="#333" />
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={<Text style={styles.empty}>No friends yet. Tap + to find people.</Text>}
-        />
-      )}
+              <Text style={styles.mutualText}>{item.mutualCount || 0} mutual friends</Text>
+            </View>
+            <Icon name="chevron-forward" size={18} color="#333" />
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={
+          // Only show "No friends" once the app has had a chance to check (friends length 0)
+          <Text style={styles.empty}>No friends yet. Tap + to find people.</Text>
+        }
+      />
 
       {/* Profile Detail Modal */}
       <Modal visible={!!selectedFriend} transparent animationType="fade">
@@ -160,12 +160,12 @@ export default function FriendsScreen() {
             />
 
             <Text style={styles.popupName}>{selectedFriend?.displayName}</Text>
-            <View style={styles.statusBadge}>
+            <div style={styles.statusBadge}>
               <View style={[styles.statusDot, { backgroundColor: selectedFriend?.status === 'available' ? ACCENT : '#444' }]} />
               <Text style={styles.statusText}>
                 {selectedFriend?.status === 'available' ? 'Available now' : 'Inactive'}
               </Text>
-            </View>
+            </div>
 
             <View style={styles.interestsContainer}>
               <Text style={styles.sectionLabel}>Interests</Text>
@@ -280,7 +280,6 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
             renderItem={({ item }) => (
               <View style={styles.searchResult}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  {/* Added Profile Picture to Search Result */}
                   <View style={styles.avatar}>
                     {item.imageurl ? (
                       <Image source={{ uri: item.imageurl }} style={styles.img} />
