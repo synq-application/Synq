@@ -15,6 +15,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -50,6 +51,7 @@ export default function ProfileScreen() {
   const [isQRExpanded, setQRExpanded] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
+  const [showMemoModal, setShowMemoModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [connections, setConnections] = useState<Connection[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
@@ -57,6 +59,8 @@ export default function ProfileScreen() {
   const [city, setCity] = useState<string | null>(null);
   const [state, setState] = useState<string | null>(null);
   const [memo, setMemo] = useState<string>('');
+  const [monthlyMemo, setMonthlyMemo] = useState<string>('');
+  const [tempMonthlyMemo, setTempMonthlyMemo] = useState<string>('');
   const [loadingConnections, setLoadingConnections] = useState(true);
   const [requestCount, setRequestCount] = useState(0);
 
@@ -72,6 +76,7 @@ export default function ProfileScreen() {
         setState(stateAbbr);
         
         setMemo(userData.memo || '');
+        setMonthlyMemo(userData.monthlyMemo || '');
         setInterests(userData.interests || []);
         setSelectedInterests(userData.interests || []);
         setProfileImage(userData?.imageurl || null);
@@ -177,11 +182,20 @@ export default function ProfileScreen() {
     }
   };
 
+  const saveMonthlyMemo = async () => {
+    if (!auth.currentUser) return;
+    try {
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), { monthlyMemo: tempMonthlyMemo });
+      setShowMemoModal(false);
+    } catch (e) {
+      Alert.alert("Error", "Could not save monthly memo.");
+    }
+  };
+
   const accountData = { id: auth.currentUser?.uid, email: auth.currentUser?.email, displayName: auth.currentUser?.displayName };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/notifications')}>
           <Icon name="notifications-outline" size={26} color={ACCENT} />
@@ -260,10 +274,32 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* MONTHLY MEMO SECTION */}
+      <View style={styles.section}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionTitle}>Monthly Memo</Text>
+          <TouchableOpacity onPress={() => { setTempMonthlyMemo(monthlyMemo); setShowMemoModal(true); }}>
+            <Icon name="create-outline" size={18} color={ACCENT} />
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity 
+          style={styles.monthlyMemoBox} 
+          onPress={() => { setTempMonthlyMemo(monthlyMemo); setShowMemoModal(true); }}
+        >
+          <Text style={styles.monthlyMemoSubtitle}>
+            What’s going on this month that you’d like to share? Tap to edit
+          </Text>
+          <Text style={styles.monthlyMemoContent}>
+            {monthlyMemo || "No plans shared yet for this month..."}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
+      {/* QR MODAL */}
       <Modal visible={isQRExpanded} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setQRExpanded(false)}>
           <View style={styles.qrModalBox}>
@@ -272,6 +308,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </Modal>
 
+      {/* INTERESTS MODAL */}
       <Modal visible={showInputModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={{ flex: 1, width: '100%' }} onPress={() => setShowInputModal(false)} />
@@ -302,6 +339,34 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* MONTHLY MEMO MODAL */}
+      <Modal visible={showMemoModal} transparent animationType="slide">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <TouchableOpacity style={{ flex: 1, width: '100%' }} onPress={() => setShowMemoModal(false)} />
+          <View style={styles.interestContent}>
+            <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Monthly Memo</Text>
+                <TouchableOpacity onPress={() => setShowMemoModal(false)}>
+                    <Icon name="close" size={24} color="white" />
+                </TouchableOpacity>
+            </View>
+            <Text style={styles.inputLabel}>Update your monthly highlights, events, or invites:</Text>
+            <TextInput 
+              style={styles.largeTextInput} 
+              placeholder="e.g. May 7th - LP Farmer's Market..." 
+              placeholderTextColor="#444" 
+              multiline 
+              value={tempMonthlyMemo} 
+              onChangeText={setTempMonthlyMemo}
+              autoFocus
+            />
+            <TouchableOpacity onPress={saveMonthlyMemo} style={styles.saveBtn}>
+              <Text style={styles.saveBtnText}>Save Memo</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -322,10 +387,11 @@ const styles = StyleSheet.create({
   nameText: { color: ACCENT, fontSize: 28, fontFamily: fonts.black, marginTop: 20 },
   locationText: { color: 'white', opacity: 0.6, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, marginTop: 4, fontFamily: fonts.heavy },
   memoText: { color: '#888', fontStyle: 'italic', marginTop: 12, paddingHorizontal: 40, textAlign: 'center', fontFamily: fonts.medium },
-  section: { marginTop: 35, paddingHorizontal: 25 },
+  section: { marginTop: 25, paddingHorizontal: 25 },
   sectionTitle: { color: 'white', fontSize: 18, fontFamily: fonts.black, marginBottom: 15 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   connItem: { alignItems: 'center', marginRight: 20, width: 70 },
-  connImg: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#222' },
+  connImg: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#222', borderColor: 'white', borderWidth: 1 },
   connDefaultAvatar: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' },
   connName: { color: 'white', fontSize: 11, marginTop: 8, textAlign: 'center', fontFamily: fonts.heavy },
   emptyText: { color: '#444', fontFamily: fonts.medium },
@@ -334,7 +400,10 @@ const styles = StyleSheet.create({
   interestText: { color: 'white', fontFamily: fonts.heavy, fontSize: 13 },
   addRect: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: ACCENT, borderStyle: 'dashed', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 4 },
-  signOutBtn: { alignSelf: 'center', marginTop: 60, paddingVertical: 14, paddingHorizontal: 50, borderRadius: 20, borderWidth: 1.5, borderColor: '#222', backgroundColor: '#0a0a0a' },
+  monthlyMemoBox: { backgroundColor: '#111', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#222' },
+  monthlyMemoSubtitle: { color: '#555', fontSize: 12, fontFamily: fonts.medium, marginBottom: 10 },
+  monthlyMemoContent: { color: 'white', fontSize: 15, fontFamily: fonts.medium, lineHeight: 22 },
+  signOutBtn: { alignSelf: 'center', marginTop: 40, paddingVertical: 14, paddingHorizontal: 50, borderRadius: 20, borderWidth: 1.5, borderColor: '#222', backgroundColor: '#0a0a0a' },
   signOutText: { color: '#888', fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
   qrModalBox: { backgroundColor: 'white', padding: 25, borderRadius: 30 },
@@ -348,6 +417,8 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: ACCENT, borderColor: ACCENT },
   chipText: { color: '#666', fontFamily: fonts.heavy },
   chipTextActive: { color: 'black' },
+  inputLabel: { color: '#888', marginBottom: 15, fontSize: 14, fontFamily: fonts.medium, width: '100%' },
+  largeTextInput: { width: '100%', flex: 1, backgroundColor: '#111', color: 'white', borderRadius: 15, padding: 15, fontSize: 16, fontFamily: fonts.medium, textAlignVertical: 'top', marginBottom: 20, borderWidth: 1, borderColor: '#333' },
   saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 18, borderRadius: 20, marginBottom: 10, alignItems: 'center' },
   saveBtnText: { color: 'black', fontFamily: fonts.black, fontSize: 16 }
 });
