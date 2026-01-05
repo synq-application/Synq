@@ -6,17 +6,30 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
+  Keyboard,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  TouchableWithoutFeedback,
+  View
 } from "react-native";
 import Icon from 'react-native-vector-icons/Ionicons';
 import { auth, db } from '../../src/lib/firebase';
 
+const { height } = Dimensions.get('window');
 const ACCENT = "#7DFFA6";
+
+// Font scaling logic for consistency across platforms
+const fonts = {
+  black: Platform.OS === 'ios' ? 'Avenir-Heavy' : 'sans-serif-condensed',
+  heavy: Platform.OS === 'ios' ? 'Avenir-Heavy' : 'sans-serif-medium',
+  medium: Platform.OS === 'ios' ? 'Avenir-Medium' : 'sans-serif',
+  book: Platform.OS === 'ios' ? 'Avenir-Book' : 'sans-serif',
+};
 
 export default function Details() {
   const router = useRouter();
@@ -32,7 +45,7 @@ export default function Details() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'We need access to your photos to upload a profile picture.');
+      Alert.alert('Permission Denied', 'We need access to your photos.');
       return;
     }
 
@@ -50,112 +63,120 @@ export default function Details() {
 
   const saveDetails = async () => {
     if (!auth.currentUser) return;
-
     try {
       setLoading(true);
-
       const fullName = `${firstName.trim()} ${lastName.trim()}`;
-
-      // 1. Update Authentication Profile
-      await updateProfile(auth.currentUser, {
-        displayName: fullName,
-        photoURL: image 
-      });
-
-      // 2. Create/Update Firestore Document
+      await updateProfile(auth.currentUser, { displayName: fullName, photoURL: image });
       await setDoc(doc(db, "users", auth.currentUser.uid), {
         uid: auth.currentUser.uid,
         displayName: fullName,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        email: auth.currentUser.email,
         imageurl: image, 
         status: 'inactive', 
         createdAt: new Date().toISOString(),
       }, { merge: true });
-
       await auth.currentUser.reload();
-      
-      // 3. Navigate to the next onboarding screen
       router.push('/location'); 
-
     } catch (e: any) {
-      console.error("Error saving profile:", e);
-      Alert.alert(
-        "Couldn't save details",
-        e?.message ?? "Something went wrong. Please try again."
-      );
+      Alert.alert("Error", e?.message ?? "Something went wrong.");
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerSection}>
-        <Text style={styles.title}>What’s your name?</Text>
-        <Text style={styles.subtitle}>Help friends recognize you on Synq.</Text>
-      </View>
-
-      <View style={styles.avatarContainer}>
-        <TouchableOpacity onPress={pickImage} style={styles.avatarCircle}>
-          {image ? (
-            <Image source={{ uri: image }} style={styles.avatarImage} />
-          ) : (
-            <View style={styles.placeholderIcon}>
-              <Icon name="camera-outline" size={32} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.addPhotoText}>Add Photo</Text>
-            </View>
-          )}
-          <View style={styles.plusBadge}>
-            <Icon name="add" size={16} color="black" />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        <View style={styles.innerContent}>
+          
+          <View style={styles.headerSection}>
+            <Text style={styles.title}>What’s your name?</Text>
+            <Text style={styles.subtitle}>Help friends recognize you on Synq.</Text>
           </View>
-        </TouchableOpacity>
-        <Text style={styles.optionalText}>(Optional)</Text>
+
+          <View style={styles.avatarContainer}>
+            <TouchableOpacity onPress={pickImage} style={styles.avatarCircle}>
+              {image ? (
+                <Image source={{ uri: image }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.placeholderIcon}>
+                  <Icon name="camera-outline" size={32} color="rgba(255,255,255,0.5)" />
+                  <Text style={styles.addPhotoText}>Add Photo</Text>
+                </View>
+              )}
+              <View style={styles.plusBadge}>
+                <Icon name="add" size={16} color="black" />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.optionalText}>(Optional)</Text>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <TextInput
+              value={firstName}
+              onChangeText={setFirstName}
+              placeholder="First Name"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              autoCapitalize="words"
+              autoCorrect={false}
+              style={styles.input}
+            />
+
+            <TextInput
+              value={lastName}
+              onChangeText={setLastName}
+              placeholder="Last Name"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              autoCapitalize="words"
+              autoCorrect={false}
+              style={[styles.input, { marginTop: 12 }]}
+            />
+          </View>
+
+          <TouchableOpacity
+            disabled={!canContinue}
+            onPress={saveDetails}
+            style={[styles.button, !canContinue && { opacity: 0.5 }]}
+          >
+            {loading ? <ActivityIndicator color="black" /> : <Text style={styles.buttonText}>Continue</Text>}
+          </TouchableOpacity>
+
+        </View>
       </View>
-
-      <View style={{ marginTop: 24 }}>
-        <TextInput
-          value={firstName}
-          onChangeText={setFirstName}
-          placeholder="First Name"
-          placeholderTextColor="rgba(255,255,255,0.35)"
-          autoCapitalize="words"
-          autoCorrect={false}
-          style={styles.input}
-        />
-
-        <TextInput
-          value={lastName}
-          onChangeText={setLastName}
-          placeholder="Last Name"
-          placeholderTextColor="rgba(255,255,255,0.35)"
-          autoCapitalize="words"
-          autoCorrect={false}
-          style={[styles.input, { marginTop: 12 }]}
-        />
-      </View>
-
-      <TouchableOpacity
-        disabled={!canContinue}
-        onPress={saveDetails}
-        style={[styles.button, !canContinue && { opacity: 0.5 }]}
-      >
-        {loading ? (
-          <ActivityIndicator color="black" />
-        ) : (
-          <Text style={styles.buttonText}>Continue</Text>
-        )}
-      </TouchableOpacity>
-    </View>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "black", padding: 24, justifyContent: "center" },
-  headerSection: { marginBottom: 20 },
-  title: { color: "white", fontSize: 28, fontWeight: "800", textAlign: 'center' },
-  subtitle: { color: "rgba(255,255,255,0.7)", fontSize: 16, marginTop: 8, textAlign: 'center' },
-  avatarContainer: { alignItems: 'center', marginVertical: 20 },
+  container: { 
+    flex: 1, 
+    backgroundColor: "black", 
+    paddingHorizontal: 24 
+  },
+  innerContent: {
+    width: '100%',
+    marginTop: height * 0.15, 
+  },
+  headerSection: { 
+    marginBottom: 20 
+  },
+  title: { 
+    color: "white", 
+    fontSize: 28, 
+    fontFamily: fonts.black,
+    textAlign: 'center' 
+  },
+  subtitle: { 
+    color: "rgba(255,255,255,0.7)", 
+    fontSize: 16, 
+    marginTop: 8, 
+    fontFamily: fonts.medium,
+    textAlign: 'center' 
+  },
+  avatarContainer: { 
+    alignItems: 'center', 
+    marginVertical: 20 
+  },
   avatarCircle: {
     width: 110,
     height: 110,
@@ -168,7 +189,12 @@ const styles = StyleSheet.create({
   },
   avatarImage: { width: 110, height: 110, borderRadius: 55 },
   placeholderIcon: { alignItems: 'center' },
-  addPhotoText: { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 4, fontWeight: '600' },
+  addPhotoText: { 
+    color: 'rgba(255,255,255,0.4)', 
+    fontSize: 12, 
+    marginTop: 4, 
+    fontFamily: fonts.heavy 
+  },
   plusBadge: {
     position: 'absolute',
     bottom: 2,
@@ -182,7 +208,15 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: 'black'
   },
-  optionalText: { color: 'rgba(255,255,255,0.3)', fontSize: 12, marginTop: 8 },
+  optionalText: { 
+    color: 'rgba(255,255,255,0.3)', 
+    fontSize: 12, 
+    marginTop: 8,
+    fontFamily: fonts.book
+  },
+  inputContainer: {
+    marginTop: 10,
+  },
   input: {
     color: "white",
     backgroundColor: "rgba(255,255,255,0.08)",
@@ -190,16 +224,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     fontSize: 16,
+    fontFamily: fonts.medium,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
   },
   button: {
-    marginTop: 24,
+    marginTop: 32,
     backgroundColor: ACCENT,
     height: 52,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-  buttonText: { color: "black", fontSize: 16, fontWeight: "800" },
+  buttonText: { 
+    color: "black", 
+    fontSize: 18, 
+    fontFamily: fonts.black 
+  },
 });

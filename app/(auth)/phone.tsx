@@ -22,11 +22,7 @@ import { app, auth, firebaseConfig } from "../../src/lib/firebase";
 const { width, height } = Dimensions.get('window');
 const ACCENT = "#7DFFA6";
 
-const synqSvg = `
-  <svg width="390" height="565" viewBox="0 0 390 565" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path fill-rule="evenodd" clip-rule="evenodd" d="M315.808 523.349C309.142 527.14 300.865 522.325 300.865 514.656V302.238C300.865 298.642 302.796 295.322 305.923 293.545L463.367 204.029C470.033 200.239 478.31 205.053 478.31 212.722V360.975C478.31 362.753 478.783 364.498 479.682 366.032L504.916 409.08C506.747 412.203 506.747 416.072 504.916 419.195L483.3 456.065C480.533 460.784 474.488 462.404 469.732 459.701L453.672 450.573C450.608 448.831 446.852 448.831 443.788 450.574L315.808 523.349ZM349.216 338.697C349.216 335.101 351.147 331.782 354.273 330.004L422.996 290.928C429.662 287.138 437.939 291.953 437.939 299.621V377.51C437.939 381.106 436.008 384.425 432.881 386.203L364.159 425.278C357.493 429.069 349.216 424.254 349.216 416.585V338.697Z" fill="#FFFFFF" fill-opacity="0.05"/>
-  </svg>
-`;
+const synqSvg = `<svg width="390" height="565" viewBox="0 0 390 565" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M315.808 523.349C309.142 527.14 300.865 522.325 300.865 514.656V302.238C300.865 298.642 302.796 295.322 305.923 293.545L463.367 204.029C470.033 200.239 478.31 205.053 478.31 212.722V360.975C478.31 362.753 478.783 364.498 479.682 366.032L504.916 409.08C506.747 412.203 506.747 416.072 504.916 419.195L483.3 456.065C480.533 460.784 474.488 462.404 469.732 459.701L453.672 450.573C450.608 448.831 446.852 448.831 443.788 450.574L315.808 523.349ZM349.216 338.697C349.216 335.101 351.147 331.782 354.273 330.004L422.996 290.928C429.662 287.138 437.939 291.953 437.939 299.621V377.51C437.939 381.106 436.008 384.425 432.881 386.203L364.159 425.278C357.493 429.069 349.216 424.254 349.216 416.585V338.697Z" fill="#FFFFFF" fill-opacity="0.05"/></svg>`;
 
 const fonts = {
   black: Platform.OS === 'ios' ? 'Avenir-Medium' : 'sans-serif-condensed',
@@ -45,7 +41,6 @@ export default function Phone() {
   const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
   const [loading, setLoading] = useState(false);
 
-  // Auto-verify when code is full
   useEffect(() => {
     if (code.join("").length === 6) {
       verifyCode();
@@ -58,28 +53,23 @@ export default function Phone() {
   };
 
   const handleChange = (text: string, index: number) => {
-    // 1. Handle Autofill (multiple characters at once)
     const cleanText = text.replace(/\D/g, "");
     
+    // Handle Autofill
     if (cleanText.length > 1) {
       const otpArray = cleanText.slice(0, 6).split("");
       const newCode = ["", "", "", "", "", ""];
-      otpArray.forEach((char, i) => {
-        newCode[i] = char;
-      });
+      otpArray.forEach((char, i) => { newCode[i] = char; });
       setCode(newCode);
       Keyboard.dismiss();
       return;
     }
 
-    // 2. Handle Single Character Input
+    // Handle Single Digit
     const newCode = [...code];
     newCode[index] = cleanText;
     setCode(newCode);
-
-    if (cleanText && index < 5) {
-      inputs.current[index + 1]?.focus();
-    }
+    if (cleanText && index < 5) inputs.current[index + 1]?.focus();
   };
 
   const handleKeyPress = (e: any, index: number) => {
@@ -103,7 +93,7 @@ export default function Phone() {
       setConfirm(confirmation);
       setIsCodeSent(true);
       setCode(["", "", "", "", "", ""]);
-      setTimeout(() => inputs.current[0]?.focus(), 250);
+      // Keyboard stays down here unless you explicitly call focus()
     } catch (error: any) {
       Alert.alert("Error", error?.message ?? "Please try again.");
     } finally {
@@ -114,7 +104,6 @@ export default function Phone() {
   const verifyCode = async () => {
     const fullCode = code.join("");
     if (fullCode.length !== 6 || loading) return;
-
     try {
       setLoading(true);
       await confirm.confirm(fullCode);
@@ -147,10 +136,7 @@ export default function Phone() {
           <Text style={styles.closeText}>Back</Text>
         </TouchableOpacity>
 
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.container}
-        >
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.container}>
           {!isCodeSent ? (
             <View style={styles.innerContent}>
               <Text style={styles.title}>What’s your{"\n"}number?</Text>
@@ -173,14 +159,12 @@ export default function Phone() {
                     keyboardType="phone-pad"
                     placeholder="555 555 0100"
                     placeholderTextColor="rgba(255,255,255,0.2)"
-                    autoFocus
+                    autoFocus={false}
                   />
                 </View>
               </View>
 
-              <Text style={styles.helper}>
-                We'll text you a code to verify your account.
-              </Text>
+              <Text style={styles.helper}>We'll text you a code to verify your account.</Text>
 
               <TouchableOpacity
                 onPress={sendVerificationCode}
@@ -188,6 +172,13 @@ export default function Phone() {
                 disabled={loading || phoneNumber.length < 10}
               >
                 {loading ? <ActivityIndicator color="black" /> : <Text style={styles.primaryButtonText}>Send Code</Text>}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/email')}
+                style={styles.emailBtn}
+              >
+                <Text style={styles.linkText}>Sign up with email instead</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -204,9 +195,9 @@ export default function Phone() {
                     onChangeText={(text) => handleChange(text, index)}
                     onKeyPress={(e) => handleKeyPress(e, index)}
                     keyboardType="number-pad"
-                    textContentType="oneTimeCode" // Essential for iOS
+                    textContentType="oneTimeCode"
                     autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
-                    maxLength={6} // Allow the first box to catch the 6-digit autofill string
+                    maxLength={6}
                     style={[styles.otpBox, digit !== "" && styles.otpBoxFilled]}
                   />
                 ))}
@@ -257,5 +248,6 @@ const styles = StyleSheet.create({
   otpBox: { width: width / 8.5, height: 60, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, textAlign: "center", fontSize: 24, color: "white", fontFamily: fonts.black, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   otpBoxFilled: { borderColor: ACCENT, backgroundColor: 'rgba(125, 255, 166, 0.05)' },
   resendBtn: { marginTop: 25, alignSelf: 'center' },
-  linkText: { color: ACCENT, fontSize: 14, fontFamily: fonts.heavy },
+  emailBtn: { marginTop: 20, alignSelf: 'center' },
+  linkText: { color: ACCENT, fontSize: 15, fontFamily: fonts.heavy },
 });
