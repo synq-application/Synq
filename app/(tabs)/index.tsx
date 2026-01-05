@@ -181,7 +181,7 @@ export default function SynqScreen() {
   const endSynq = async () => {
     Alert.alert("End Synq?", "You will no longer be visible as available.", [
       { text: "Cancel", style: "cancel" },
-      { text: "End Session", style: "destructive", onPress: async () => {
+      { text: "Deactivate Synq", style: "destructive", onPress: async () => {
             if (!auth.currentUser) return;
             await updateDoc(doc(db, 'users', auth.currentUser!.uid), { status: 'inactive', memo: '' });
             setMemo(''); setStatus('idle'); setIsEditModalVisible(false);
@@ -434,7 +434,7 @@ export default function SynqScreen() {
                   <TouchableOpacity style={styles.saveBtn} onPress={async () => { await updateDoc(doc(db,'users',auth.currentUser!.uid),{memo}); setIsEditModalVisible(false); }}>
                     <Text style={styles.saveBtnText}>Update Memo</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}><Text style={styles.endSynqBtnText}>End Session</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}><Text style={styles.endSynqBtnText}>Deactivate Synq</Text></TouchableOpacity>
                 </View>
               </TouchableWithoutFeedback>
             </View>
