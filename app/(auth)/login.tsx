@@ -4,8 +4,8 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
@@ -16,7 +16,15 @@ import {
 } from "react-native";
 import { auth } from "../../src/lib/firebase";
 
+const { height } = Dimensions.get('window');
 const ACCENT = "#7DFFA6";
+
+const fonts = {
+  black: Platform.OS === 'ios' ? 'Avenir-Medium' : 'sans-serif-condensed',
+  heavy: Platform.OS === 'ios' ? 'Avenir-Medium' : 'sans-serif-medium',
+  medium: Platform.OS === 'ios' ? 'Avenir-Medium' : 'sans-serif',
+  book: Platform.OS === 'ios' ? 'Avenir-Book' : 'sans-serif',
+};
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -31,7 +39,7 @@ export default function Login() {
 
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
     } catch (error: any) {
       console.error(error);
       Alert.alert("Login Failed", error.message);
@@ -41,14 +49,10 @@ export default function Login() {
   };
 
   return (
-    // TouchableWithoutFeedback allows tapping the background to close keyboard
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
-      >
+      <View style={styles.container}>
         <View style={styles.inner}>
-          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.title}>Welcome Back!</Text>
           <Text style={styles.subtitle}>Sign in to your account</Text>
 
           <View style={styles.inputGroup}>
@@ -74,7 +78,7 @@ export default function Login() {
           </View>
 
           <TouchableOpacity 
-            style={styles.button} 
+            style={[styles.button, (!email || !password) && { opacity: 0.5 }]} 
             onPress={handleLogin}
             disabled={loading}
           >
@@ -89,7 +93,7 @@ export default function Login() {
             <Text style={styles.backText}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </TouchableWithoutFeedback>
   );
 }
@@ -98,39 +102,42 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "black",
+    paddingHorizontal: 24,
   },
   inner: {
-    flex: 1,
-    padding: 24,
-    justifyContent: "center", 
+    width: '100%',
+    // Static positioning: 18% from the top of the screen
+    marginTop: height * 0.25,
   },
   title: {
     color: "white",
     fontSize: 32,
-    fontWeight: "800",
+    fontFamily: fonts.black,
   },
   subtitle: {
     color: "rgba(255,255,255,0.6)",
     fontSize: 16,
     marginTop: 8,
     marginBottom: 32,
+    fontFamily: fonts.medium,
   },
   inputGroup: {
     gap: 12,
   },
   input: {
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     height: 56,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 16,
     color: "white",
     fontSize: 16,
+    fontFamily: fonts.medium,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
   button: {
     backgroundColor: ACCENT,
-    height: 56,
+    height: 58,
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
@@ -138,14 +145,16 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "black",
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 18,
+    fontFamily: fonts.black,
   },
   backButton: {
-    marginTop: 20,
+    marginTop: 24,
     alignItems: "center",
   },
   backText: {
-    color: "rgba(255,255,255,0.5)",
+    color: ACCENT,
+    fontSize: 15,
+    fontFamily: fonts.heavy,
   }
 });
