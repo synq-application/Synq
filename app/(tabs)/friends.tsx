@@ -160,12 +160,12 @@ export default function FriendsScreen() {
             />
 
             <Text style={styles.popupName}>{selectedFriend?.displayName}</Text>
-            <div style={styles.statusBadge}>
+            <View style={styles.statusBadge}>
               <View style={[styles.statusDot, { backgroundColor: selectedFriend?.status === 'available' ? ACCENT : '#444' }]} />
               <Text style={styles.statusText}>
                 {selectedFriend?.status === 'available' ? 'Available now' : 'Inactive'}
               </Text>
-            </div>
+            </View>
 
             <View style={styles.interestsContainer}>
               <Text style={styles.sectionLabel}>Interests</Text>
