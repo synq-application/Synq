@@ -4,7 +4,6 @@ import {
   addDoc,
   collection,
   deleteDoc,
-
   doc,
   getDoc,
   getDocs,
@@ -99,6 +98,12 @@ export default function SynqScreen() {
     });
   }, []);
 
+  const formatTime = (timestamp: any) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   const runSmartMatch = (friends: any[]) => {
     if (!userProfile?.interests || userProfile.interests.length === 0) return;
     for (const friend of friends) {
@@ -178,7 +183,7 @@ export default function SynqScreen() {
       { text: "Cancel", style: "cancel" },
       { text: "End Session", style: "destructive", onPress: async () => {
             if (!auth.currentUser) return;
-            await updateDoc(doc(db, 'users', auth.currentUser.uid), { status: 'inactive', memo: '' });
+            await updateDoc(doc(db, 'users', auth.currentUser!.uid), { status: 'inactive', memo: '' });
             setMemo(''); setStatus('idle'); setIsEditModalVisible(false);
           }
       }
@@ -239,6 +244,10 @@ export default function SynqScreen() {
     Alert.alert("Delete Chat", "Are you sure you want to delete this conversation?", [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: async () => {
+        if (activeChatId === chatId) {
+          setIsChatVisible(false);
+          setActiveChatId(null);
+        }
         await deleteDoc(doc(db, "chats", chatId));
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }}
@@ -246,7 +255,7 @@ export default function SynqScreen() {
   };
 
   const getChatTitle = (chat: any) => {
-    if (!auth.currentUser || !chat.participantNames) return "Synq Chat";
+    if (!chat || !auth.currentUser || !chat.participantNames) return "Synq Chat";
     const myId = auth.currentUser.uid;
     const otherNames = Object.entries(chat.participantNames)
       .filter(([uid]) => uid !== myId)
@@ -274,136 +283,165 @@ export default function SynqScreen() {
   if (loading) return <View style={styles.darkFill}><ActivityIndicator color={ACCENT} /></View>;
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      
-      {status === 'active' && (
-        <View style={{ flex: 1 }}>
-          <View style={styles.activeHeader}>
-            <TouchableOpacity onPress={() => setIsInboxVisible(true)}>
-              <Ionicons name="chatbubbles-outline" size={28} color="white" />
-              {allChats.length > 0 && <View style={styles.badge} />}
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Synq is active</Text>
-            <TouchableOpacity onPress={() => setIsEditModalVisible(true)}><Ionicons name="create-outline" size={28} color={ACCENT} /></TouchableOpacity>
-          </View>
-          <FlatList
-            data={availableFriends}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity 
-                onPress={() => setSelectedFriends(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
-                style={[styles.friendCard, selectedFriends.includes(item.id) && { borderColor: ACCENT }]}
-              >
-                <Image source={{ uri: item.imageurl || DEFAULT_AVATAR }} style={styles.friendImg} />
-                <View style={{ flex: 1 }}><Text style={styles.whiteBold}>{item.displayName}</Text><Text style={styles.grayText} numberOfLines={1}>{item.memo}</Text></View>
-                {selectedFriends.includes(item.id) && <Ionicons name="checkmark-circle" size={24} color={ACCENT} />}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        
+        {status === 'active' && (
+          <View style={{ flex: 1 }}>
+            <View style={styles.activeHeader}>
+              <TouchableOpacity onPress={() => setIsInboxVisible(true)}>
+                <Ionicons name="chatbubbles-outline" size={28} color="white" />
+                {allChats.length > 0 && <View style={styles.badge} />}
               </TouchableOpacity>
-            )}
-            contentContainerStyle={{ padding: 20 }}
-          />
-          <View style={styles.footer}>
-            <TouchableOpacity style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]} onPress={handleConnect} disabled={!selectedFriends.length}>
-              <Text style={styles.btnText}>Connect ({selectedFriends.length})</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {(status === 'activating' || status === 'finding') && (
-        <View style={styles.activatingContainer}>
-            <Text style={styles.unifiedTitle}>{status === 'activating' ? "Synq activated..." : "Finding connections..."}</Text>
-            <Image source={require('../../assets/pulse.gif')} style={styles.gifLarge} resizeMode="contain" />
-        </View>
-      )}
-
-      {status === 'idle' && (
-        <View style={styles.inactiveCenter}>
-          <Text style={styles.mainTitle}>Ready to activate Synq?</Text>
-          <TextInput style={styles.memoInput} value={memo} onChangeText={setMemo} placeholder="What's the plan?" placeholderTextColor="#444" />
-          <TouchableOpacity onPress={startSynq} style={styles.pulseBox}>
-            <Image source={require('../../assets/pulse.gif')} style={styles.gifLarge} resizeMode="contain" />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modalBg}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Messages</Text>
-            <TouchableOpacity onPress={() => setIsInboxVisible(false)}><Ionicons name="close-circle" size={28} color="#444" /></TouchableOpacity>
-          </View>
-          <FlatList
-            data={allChats}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-              <Swipeable
-                renderRightActions={() => (
-                  <TouchableOpacity style={styles.deleteAction} onPress={() => handleDeleteChat(item.id)}>
-                    <Ionicons name="trash" size={24} color="white" />
-                  </TouchableOpacity>
-                )}
-              >
-                <TouchableOpacity style={styles.inboxItem} onPress={() => { setActiveChatId(item.id); setIsInboxVisible(false); setIsChatVisible(true); }}>
-                  {renderAvatarStack(item.participantImages)}
-                  <View style={{ flex: 1, marginLeft: Object.keys(item.participantImages || {}).length > 2 ? 35 : 15 }}>
-                    <Text style={styles.whiteBold}>{getChatTitle(item)}</Text>
-                    <Text style={styles.grayText} numberOfLines={1}>{item.lastMessage}</Text>
-                  </View>
-                </TouchableOpacity>
-              </Swipeable>
-            )}
-          />
-        </View>
-      </Modal>
-
-      <Modal visible={isChatVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modalBg}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{activeChatId && getChatTitle(allChats.find(c => c.id === activeChatId))}</Text>
-            <TouchableOpacity onPress={() => setIsChatVisible(false)}><Ionicons name="close-circle" size={30} color="#444" /></TouchableOpacity>
-          </View>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={10}>
+              <Text style={styles.headerTitle}>Synq is active</Text>
+              <TouchableOpacity onPress={() => setIsEditModalVisible(true)}><Ionicons name="create-outline" size={28} color={ACCENT} /></TouchableOpacity>
+            </View>
             <FlatList
-              data={messages}
+              data={availableFriends}
               keyExtractor={item => item.id}
-              renderItem={({ item }) => {
-                const isMe = item.senderId === auth.currentUser?.uid;
-                return (
-                  <View style={[styles.msgRow, isMe ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}>
-                    <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
-                        <Text style={{ color: isMe ? 'black' : 'white', fontSize: 16 }}>{item.text}</Text>
-                    </View>
-                  </View>
-                );
-              }}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  onPress={() => setSelectedFriends(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                  style={[styles.friendCard, selectedFriends.includes(item.id) && { borderColor: ACCENT }]}
+                >
+                  <Image source={{ uri: item.imageurl || DEFAULT_AVATAR }} style={styles.friendImg} />
+                  <View style={{ flex: 1 }}><Text style={styles.whiteBold}>{item.displayName}</Text><Text style={styles.grayText} numberOfLines={1}>{item.memo}</Text></View>
+                  {selectedFriends.includes(item.id) && <Ionicons name="checkmark-circle" size={24} color={ACCENT} />}
+                </TouchableOpacity>
+              )}
               contentContainerStyle={{ padding: 20 }}
             />
-            <View style={styles.inputRow}>
-              <TextInput style={styles.input} value={inputText} onChangeText={setInputText} placeholder="Message..." placeholderTextColor="#666" />
-              <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}><Ionicons name="send" size={18} color="black" /></TouchableOpacity>
+            <View style={styles.footer}>
+              <TouchableOpacity style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]} onPress={handleConnect} disabled={!selectedFriends.length}>
+                <Text style={styles.btnText}>Connect ({selectedFriends.length})</Text>
+              </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
-
-      <Modal visible={isEditModalVisible} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={() => setIsEditModalVisible(false)}>
-          <View style={styles.centeredModalOverlay}>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={styles.editPanel}>
-                <Text style={styles.panelTitle}>Edit your Synq</Text>
-                <TextInput style={styles.panelInput} value={memo} onChangeText={setMemo} />
-                <TouchableOpacity style={styles.saveBtn} onPress={async () => { await updateDoc(doc(db,'users',auth.currentUser!.uid),{memo}); setIsEditModalVisible(false); }}>
-                  <Text style={styles.saveBtnText}>Update Memo</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}><Text style={styles.endSynqBtnText}>End Session</Text></TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
           </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-    </View>
+        )}
+
+        {(status === 'activating' || status === 'finding') && (
+          <View style={styles.activatingContainer}>
+              <Text style={styles.unifiedTitle}>{status === 'activating' ? "Synq activated..." : "Finding connections..."}</Text>
+              <Image source={require('../../assets/pulse.gif')} style={styles.gifLarge} resizeMode="contain" />
+          </View>
+        )}
+
+        {status === 'idle' && (
+          <View style={styles.inactiveCenter}>
+            <Text style={styles.mainTitle}>Ready to activate Synq?</Text>
+            <TextInput 
+              style={styles.memoInput} 
+              value={memo} 
+              onChangeText={setMemo} 
+              placeholder="Optional memo: Happy Hour anyone?" 
+              placeholderTextColor="#444"
+              blurOnSubmit={true}
+            />
+            <TouchableOpacity onPress={startSynq} style={styles.pulseBox} activeOpacity={0.8}>
+              <Image source={require('../../assets/pulse.gif')} style={styles.gifLarge} resizeMode="contain" />
+              <Text style={styles.tapToActivate}>Tap when you're free to meet up</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
+          <View style={styles.modalBg}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Messages</Text>
+              <TouchableOpacity onPress={() => setIsInboxVisible(false)}><Ionicons name="close-circle" size={28} color="#444" /></TouchableOpacity>
+            </View>
+            <FlatList
+              data={allChats}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <Swipeable
+                  renderRightActions={() => (
+                    <TouchableOpacity style={styles.deleteAction} onPress={() => handleDeleteChat(item.id)}>
+                      <Ionicons name="trash" size={24} color="white" />
+                    </TouchableOpacity>
+                  )}
+                >
+                  <TouchableOpacity style={styles.inboxItem} onPress={() => { setActiveChatId(item.id); setIsInboxVisible(false); setIsChatVisible(true); }}>
+                    {renderAvatarStack(item.participantImages)}
+                    <View style={{ flex: 1, marginLeft: Object.keys(item.participantImages || {}).length > 2 ? 35 : 15 }}>
+                      <Text style={styles.whiteBold}>{getChatTitle(item)}</Text>
+                      <Text style={styles.grayText} numberOfLines={1}>{item.lastMessage}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </Swipeable>
+              )}
+            />
+          </View>
+        </Modal>
+
+        <Modal visible={isChatVisible} animationType="slide" presentationStyle="pageSheet">
+          <View style={styles.modalBg}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {activeChatId && getChatTitle(allChats.find(c => c.id === activeChatId))}
+              </Text>
+              <TouchableOpacity onPress={() => setIsChatVisible(false)}><Ionicons name="close-circle" size={30} color="#444" /></TouchableOpacity>
+            </View>
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+              style={{ flex: 1 }} 
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+            >
+              <FlatList
+                data={messages}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => {
+                  const isMe = item.senderId === auth.currentUser?.uid;
+                  return (
+                    <View style={[styles.msgContainer, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+                        {!isMe && <Image source={{ uri: item.imageurl || DEFAULT_AVATAR }} style={styles.chatAvatar} />}
+                        <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
+                            <Text style={{ color: isMe ? 'black' : 'white', fontSize: 16 }}>{item.text}</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.timestampOutside, isMe ? { marginRight: 4 } : { marginLeft: 44 }]}>
+                        {formatTime(item.createdAt)}
+                      </Text>
+                    </View>
+                  );
+                }}
+                contentContainerStyle={{ padding: 20 }}
+              />
+              <View style={styles.inputRow}>
+                <TextInput 
+                   style={styles.input} 
+                   value={inputText} 
+                   onChangeText={setInputText} 
+                   placeholder="Message..." 
+                   placeholderTextColor="#666" 
+                   multiline={false}
+                />
+                <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}><Ionicons name="send" size={18} color="black" /></TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
+
+        <Modal visible={isEditModalVisible} transparent animationType="fade">
+          <TouchableWithoutFeedback onPress={() => setIsEditModalVisible(false)}>
+            <View style={styles.centeredModalOverlay}>
+              <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View style={styles.editPanel}>
+                  <Text style={styles.panelTitle}>Edit your Synq</Text>
+                  <TextInput style={styles.panelInput} value={memo} onChangeText={setMemo} />
+                  <TouchableOpacity style={styles.saveBtn} onPress={async () => { await updateDoc(doc(db,'users',auth.currentUser!.uid),{memo}); setIsEditModalVisible(false); }}>
+                    <Text style={styles.saveBtnText}>Update Memo</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}><Text style={styles.endSynqBtnText}>End Session</Text></TouchableOpacity>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -411,23 +449,23 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
   darkFill: { flex: 1, backgroundColor: 'black', justifyContent: 'center' },
   activeHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, paddingTop: 60, paddingBottom: 20, alignItems: 'center' },
-  headerTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Black' },
-  subheaderTitle: { color: 'white', fontSize: 16, textAlign: 'center', marginBottom: 10 },
+  headerTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Medium' },
   badge: { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: ACCENT },
   friendCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', padding: 15, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: '#222' },
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
-  whiteBold: { color: 'white', fontSize: 17, fontFamily: 'Avenir-Heavy' },
+  whiteBold: { color: 'white', fontSize: 17, fontFamily: 'Avenir-Medium' },
   grayText: { color: '#666', fontSize: 13, marginTop: 2 },
   footer: { padding: 25, paddingBottom: 150 },
   btn: { backgroundColor: ACCENT, padding: 18, borderRadius: 20, alignItems: 'center' },
-  btnText: { fontSize: 16, color: 'black', fontFamily: 'Avenir-Black' },
+  btnText: { fontSize: 16, color: 'black', fontFamily: 'Avenir-Medium' },
   activatingContainer: { flex: 1, backgroundColor: 'black', alignItems: 'center', justifyContent: 'center' },
-  unifiedTitle: { color: 'white', fontSize: 24, fontFamily: 'Avenir-Black', marginBottom: 50, textAlign: 'center' },
+  unifiedTitle: { color: 'white', fontSize: 28, fontFamily: 'Avenir', marginBottom: 50, textAlign: 'center' },
   gifLarge: { width: 250, height: 250 },
-  inactiveCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  mainTitle: { color: 'white', fontSize: 32, textAlign: 'center', fontFamily: 'Avenir-Black' },
-  memoInput: { color: 'white', fontSize: 18, borderBottomWidth: 1, borderBottomColor: '#222', width: '100%', textAlign: 'center', marginVertical: 40, paddingBottom: 10 },
-  pulseBox: { width: 250, height: 250, justifyContent: 'center', alignItems: 'center' },
+  inactiveCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  mainTitle: { color: 'white', fontSize: 32, textAlign: 'center', fontFamily: 'Avenir' },
+  memoInput: { color: 'white', fontSize: 18, borderBottomWidth: 1, borderBottomColor: '#222', width: '100%', textAlign: 'center', marginVertical: 40, paddingBottom: 10, fontStyle: "italic" },
+  pulseBox: { width: 250, height: 300, justifyContent: 'center', alignItems: 'center' },
+  tapToActivate: { color: ACCENT, fontSize: 18, fontFamily: 'Avenir-Medium', marginTop: -10, opacity: 0.8, letterSpacing: 0.5, textAlign: 'center' },
   centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
   editPanel: { width: '100%', backgroundColor: '#161616', borderRadius: 32, padding: 32, alignItems: 'center' },
   panelTitle: { color: 'white', fontSize: 22, marginBottom: 24, fontFamily: 'Avenir-Black' },
@@ -444,11 +482,22 @@ const styles = StyleSheet.create({
   stackedPhoto: { width: 44, height: 44, borderRadius: 22, position: 'absolute', borderWidth: 2, borderColor: '#0A0A0A' },
   inboxCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
-  msgRow: { flexDirection: 'row', marginBottom: 15 },
+  msgContainer: { marginBottom: 15 },
   bubble: { padding: 12, borderRadius: 18, maxWidth: '80%' },
   myBubble: { backgroundColor: ACCENT },
   theirBubble: { backgroundColor: '#222' },
-  inputRow: { flexDirection: 'row', padding: 15, paddingBottom: Platform.OS === 'ios' ? 40 : 15, backgroundColor: '#050505', alignItems: 'center' },
+  chatAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8, marginBottom: 4 },
+  timestampOutside: { fontSize: 10, color: '#666', marginTop: 2, fontFamily: 'Avenir' },
+  inputRow: { 
+    flexDirection: 'row', 
+    paddingHorizontal: 15, 
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 15, 
+    backgroundColor: '#050505', 
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#111' 
+  },
   input: { flex: 1, backgroundColor: '#151515', borderRadius: 25, paddingHorizontal: 15, paddingVertical: 12, color: 'white' },
   sendBtn: { backgroundColor: ACCENT, width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginLeft: 10 }
 });
