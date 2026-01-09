@@ -8,16 +8,6 @@ import {
   getDoc,
   getDocs,
   increment,
-
-
-
-
-
-
-
-
-
-
   onSnapshot,
   orderBy,
   query,
