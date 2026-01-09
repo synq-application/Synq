@@ -248,7 +248,7 @@ export default function ProfileScreen() {
           ) : connections.length > 0 ? (
             connections.slice(0, 3).map((item, i) => (
               <View key={i} style={styles.connItem}>
-                <View style={[styles.imageCircle, i === 0 && { borderColor: ACCENT, borderWidth: 2 }]}>
+                <View style={[styles.imageCircle, { borderColor: ACCENT, borderWidth: 2 }]}>
                   {item.imageUrl ? (
                       <Image source={{ uri: item.imageUrl }} style={styles.connImg} />
                   ) : (
@@ -256,14 +256,15 @@ export default function ProfileScreen() {
                            <Icon name="person" size={24} color="rgba(255,255,255,0.2)" />
                       </View>
                   )}
-                  {i === 0 && <View style={styles.crown}><Icon name="star" size={10} color="black" /></View>}
+                  {i === 0 && (
+                    <View style={styles.crown}>
+                      <Icon name="star" size={10} color="black" />
+                    </View>
+                  )}
                 </View>
                 <Text style={styles.connName} numberOfLines={1}>
                   {item.name.split(' ')[0]}
                 </Text>
-                {/* <View style={styles.scoreBadge}>
-                  <Text style={styles.scoreText}>{item.synqCount}</Text>
-                </View> */}
               </View>
             ))
           ) : (
@@ -401,12 +402,10 @@ const styles = StyleSheet.create({
   synqsContainer: { flexDirection: 'row', justifyContent: 'flex-start', gap: 20 },
   connItem: { alignItems: 'center', width: 80 },
   imageCircle: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', position: 'relative' },
-  connImg: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#222', borderColor: '#333', borderWidth: 1 },
+  connImg: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#222' },
   connDefaultAvatar: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' },
   crown: { position: 'absolute', bottom: 0, right: 0, backgroundColor: ACCENT, padding: 3, borderRadius: 10, borderWidth: 2, borderColor: 'black', zIndex: 10 },
   connName: { color: 'white', fontSize: 12, marginTop: 10, textAlign: 'center', fontFamily: fonts.heavy },
-  scoreBadge: { backgroundColor: '#111', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginTop: 5, borderWidth: 1, borderColor: '#222' },
-  scoreText: { color: ACCENT, fontSize: 10, fontFamily: fonts.black },
   emptyText: { color: '#333', fontFamily: fonts.medium, fontSize: 14 },
   interestsWrapper: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   interestRect: { backgroundColor: '#111', borderWidth: 1, borderColor: '#222', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, marginBottom: 8 },
@@ -430,7 +429,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: ACCENT, borderColor: ACCENT },
   chipText: { color: '#555', fontFamily: fonts.heavy },
   chipTextActive: { color: 'black' },
-  inputLabel: { color: '#666', marginBottom: 15, fontSize: 14, fontFamily: fonts.medium, width: '100%', lineHeight: 20 },
   largeTextInput: { width: '100%', flex: 1, backgroundColor: '#111', color: 'white', borderRadius: 20, padding: 20, fontSize: 17, fontFamily: fonts.medium, textAlignVertical: 'top', marginBottom: 20, borderWidth: 1, borderColor: '#222' },
   saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 20, borderRadius: 22, marginBottom: 20, alignItems: 'center' },
   saveBtnText: { color: 'black', fontFamily: fonts.black, fontSize: 17 }
