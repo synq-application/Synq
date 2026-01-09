@@ -12,6 +12,8 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -22,7 +24,14 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { auth, db } from '../../src/lib/firebase';
 
 const ACCENT = "#7DFFA6";
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+const fonts = {
+  black: Platform.OS === 'ios' ? 'Avenir-Black' : 'sans-serif-condensed',
+  heavy: Platform.OS === 'ios' ? 'Avenir-Heavy' : 'sans-serif-medium',
+  medium: Platform.OS === 'ios' ? 'Avenir-Medium' : 'sans-serif',
+  book: Platform.OS === 'ios' ? 'Avenir-Book' : 'sans-serif',
+};
 
 interface Friend {
   id: string;
@@ -31,6 +40,7 @@ interface Friend {
   imageurl?: string;
   status?: 'available' | 'inactive';
   memo?: string;
+  monthlyMemo?: string; 
   interests?: string[];
   mutualCount?: number; 
 }
@@ -39,8 +49,6 @@ export default function FriendsScreen() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
-  // Set loading to false by default to prevent the initial spinner
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -55,10 +63,8 @@ export default function FriendsScreen() {
           snapshot.docs.map(async (fDoc) => {
             const uSnap = await getDoc(doc(db, "users", fDoc.id));
             const data = uSnap.data();
-            
             const theirFriendsSnap = await getDocs(collection(db, "users", fDoc.id, "friends"));
             const theirFriendIds = theirFriendsSnap.docs.map(d => d.id);
-            
             const mutuals = theirFriendIds.filter(id => myFriendIds.includes(id));
 
             return { 
@@ -76,7 +82,6 @@ export default function FriendsScreen() {
       } catch (err) {
         console.error("Error fetching friend data:", err);
       }
-      // No need for finally { setLoading(false) } since we start as false
     });
 
     return () => unsubFriends();
@@ -104,14 +109,14 @@ export default function FriendsScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Friends</Text>
         <TouchableOpacity onPress={() => setSearchModalVisible(true)}>
-          <Icon name="add-circle-outline" size={30} color={ACCENT} />
+          <Icon name="add-circle-outline" size={32} color={ACCENT} />
         </TouchableOpacity>
       </View>
 
-      {/* Loading indicator removed for background loading */}
       <FlatList
         data={friends}
         keyExtractor={(item) => item.id}
@@ -137,16 +142,16 @@ export default function FriendsScreen() {
               </View>
               <Text style={styles.mutualText}>{item.mutualCount || 0} mutual friends</Text>
             </View>
-            <Icon name="chevron-forward" size={18} color="#333" />
+            <Icon name="chevron-forward" size={18} color="#222" />
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          // Only show "No friends" once the app has had a chance to check (friends length 0)
-          <Text style={styles.empty}>No friends yet. Tap + to find people.</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.empty}>No friends yet.{"\n"}Tap + to find people.</Text>
+          </View>
         }
       />
 
-      {/* Profile Detail Modal */}
       <Modal visible={!!selectedFriend} transparent animationType="fade">
         <View style={styles.popupOverlay}>
           <View style={styles.popupContent}>
@@ -166,6 +171,13 @@ export default function FriendsScreen() {
                 {selectedFriend?.status === 'available' ? 'Available now' : 'Inactive'}
               </Text>
             </View>
+
+            {selectedFriend?.monthlyMemo && (
+              <View style={[styles.memoBox, { borderColor: ACCENT, borderWidth: 1 }]}>
+                <Text style={[styles.memoTitle, { color: ACCENT }]}>Monthly Memo</Text>
+                <Text style={styles.memoText}>{selectedFriend.monthlyMemo}</Text>
+              </View>
+            )}
 
             <View style={styles.interestsContainer}>
               <Text style={styles.sectionLabel}>Interests</Text>
@@ -205,7 +217,6 @@ export default function FriendsScreen() {
   );
 }
 
-// --- SEARCH MODAL COMPONENT ---
 function SearchModal({ visible, onClose, currentFriends }: any) {
   const [queryText, setQueryText] = useState("");
   const [results, setResults] = useState<any[]>([]);
@@ -232,7 +243,7 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
         );
       setResults(filtered);
     } catch (e) {
-      console.error("DEBUG: Search failed", e);
+      console.error("Search failed", e);
     } finally {
       setIsSearching(false);
     }
@@ -251,7 +262,6 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
       Alert.alert("Sent!", `Invite sent to ${targetUser.displayName}`);
       onClose();
     } catch (e: any) {
-      console.error("DEBUG ERROR: Failed to send invite", e.message);
       Alert.alert("Error", "Could not send invite.");
     }
   };
@@ -297,7 +307,6 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
                 </TouchableOpacity>
               </View>
             )}
-            ListEmptyComponent={queryText.length >= 3 ? <Text style={styles.empty}>No users found.</Text> : null}
           />
         )}
       </View>
@@ -307,42 +316,43 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black', paddingHorizontal: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 80, marginBottom: 20, alignItems: 'center' },
-  headerTitle: { color: 'white', fontSize: 28, fontWeight: '900', fontFamily: 'Avenir' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 70, marginBottom: 20, alignItems: 'center' },
+  headerTitle: { color: 'white', fontSize: 32, fontFamily: fonts.black },
   friendRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15 },
   nameRow: { flexDirection: 'row', alignItems: 'center' },
   activeDotInline: { width: 8, height: 8, borderRadius: 4, backgroundColor: ACCENT, marginLeft: 8 },
-  separator: { height: 0.5, backgroundColor: '#333', width: '100%' },
-  avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#222', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  img: { width: 50, height: 50, borderRadius: 25 },
-  friendName: { color: 'white', fontSize: 17, fontWeight: '700', fontFamily: 'Avenir' },
-  mutualText: { color: '#666', fontSize: 13, fontFamily: 'Avenir', marginTop: 2 },
-  empty: { color: '#444', textAlign: 'center', marginTop: 50, fontFamily: 'Avenir', fontSize: 22 },
-  popupOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
-  popupContent: { width: width * 0.85, backgroundColor: '#111', borderRadius: 30, padding: 30, alignItems: 'center', borderWidth: 1, borderColor: '#222' },
+  separator: { height: 0.5, backgroundColor: '#1a1a1a', width: '100%' },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  img: { width: 52, height: 52, borderRadius: 26 },
+  friendName: { color: 'white', fontSize: 18, fontFamily: fonts.heavy },
+  mutualText: { color: '#666', fontSize: 13, fontFamily: fonts.medium, marginTop: 2 },
+  emptyContainer: { flex: 1, justifyContent: 'center', marginTop: 100 },
+  empty: { color: '#333', textAlign: 'center', fontFamily: fonts.heavy, fontSize: 20, lineHeight: 28 },
+  popupOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', justifyContent: 'center', alignItems: 'center' },
+  popupContent: { width: width * 0.88, backgroundColor: '#111', borderRadius: 32, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: '#222' },
   closeBtn: { position: 'absolute', top: 20, right: 20, zIndex: 1 },
-  largeAvatar: { width: 120, height: 120, borderRadius: 60, marginBottom: 20, borderWidth: 2, borderColor: ACCENT },
-  popupName: { color: 'white', fontSize: 24, fontWeight: '900', fontFamily: 'Avenir' },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', paddingHorizontal: 15, paddingVertical: 5, borderRadius: 20, marginBottom: 20, marginTop: 10 },
+  largeAvatar: { width: 110, height: 110, borderRadius: 55, marginBottom: 16, borderWidth: 2, borderColor: ACCENT },
+  popupName: { color: 'white', fontSize: 26, fontFamily: fonts.black },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 20, marginTop: 8 },
   statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  statusText: { color: 'white', fontSize: 12, fontWeight: '600' },
+  statusText: { color: 'white', fontSize: 13, fontFamily: fonts.heavy },
   interestsContainer: { width: '100%', marginBottom: 20 },
-  sectionLabel: { color: '#444', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 8 },
+  sectionLabel: { color: '#444', fontSize: 11, fontFamily: fonts.black, textTransform: 'uppercase', marginBottom: 10, letterSpacing: 1 },
   interestsWrapper: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  interestRect: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6, marginBottom: 6 },
-  interestText: { color: 'white', fontFamily: 'Avenir', fontSize: 12, fontWeight: '600' },
-  noInterestsText: { color: '#333', fontSize: 12, fontStyle: 'italic' },
-  memoBox: { backgroundColor: '#000', padding: 15, borderRadius: 15, width: '100%', marginBottom: 25 },
-  memoTitle: { color: '#444', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', marginBottom: 5 },
-  memoText: { color: 'white', fontSize: 15, fontFamily: 'Avenir' },
-  removeBtn: { marginTop: 10 },
-  removeBtnText: { color: '#ff453a', fontWeight: '600' },
+  interestRect: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#222', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginRight: 6, marginBottom: 6 },
+  interestText: { color: 'white', fontFamily: fonts.medium, fontSize: 13 },
+  noInterestsText: { color: '#333', fontSize: 13, fontFamily: fonts.book, fontStyle: 'italic' },
+  memoBox: { backgroundColor: '#000', padding: 18, borderRadius: 20, width: '100%', marginBottom: 15 },
+  memoTitle: { color: '#666', fontSize: 11, fontFamily: fonts.black, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 },
+  memoText: { color: 'white', fontSize: 15, fontFamily: fonts.medium, lineHeight: 20 },
+  removeBtn: { marginTop: 15, padding: 10 },
+  removeBtnText: { color: '#ff453a', fontFamily: fonts.heavy, fontSize: 14 },
   modalBody: { flex: 1, backgroundColor: '#000', padding: 20 },
-  searchBarRow: { flexDirection: 'row', alignItems: 'center', gap: 15, marginBottom: 20 },
-  input: { flex: 1, backgroundColor: '#111', color: 'white', padding: 12, borderRadius: 10, fontFamily: 'Avenir' },
-  cancelText: { color: ACCENT, fontWeight: '600', fontFamily: 'Avenir' },
+  searchBarRow: { flexDirection: 'row', alignItems: 'center', gap: 15, marginBottom: 20, marginTop: 40 },
+  input: { flex: 1, backgroundColor: '#111', color: 'white', padding: 14, borderRadius: 14, fontFamily: fonts.medium, fontSize: 16 },
+  cancelText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 16 },
   searchResult: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 0.5, borderBottomColor: '#222' },
-  emailDetail: { color: '#666', fontSize: 12, fontFamily: 'Avenir' },
-  addBtn: { backgroundColor: ACCENT, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 10 },
-  addBtnText: { fontWeight: '900', color: 'black', fontFamily: 'Avenir' }
+  emailDetail: { color: '#666', fontSize: 13, fontFamily: fonts.book },
+  addBtn: { backgroundColor: ACCENT, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+  addBtnText: { color: 'black', fontFamily: fonts.black, fontSize: 14 }
 });
