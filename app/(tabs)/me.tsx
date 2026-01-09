@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   qrToggle: { position: 'absolute', bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
   nameText: { color: ACCENT, fontSize: 32, fontFamily: fonts.black, marginTop: 20 },
   locationText: { color: 'white', opacity: 0.6, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1.5, marginTop: 4, fontFamily: fonts.heavy },
-  memoText: { color: '#888', fontStyle: 'italic', marginTop: 12, paddingHorizontal: 40, textAlign: 'center', fontFamily: fonts.medium, lineHeight: 20 },
+  memoText: { color: '#888', fontStyle: 'italic', marginTop: 12, paddingHorizontal: 40, textAlign: 'center', fontFamily: fonts.medium, lineHeight: 20, fontSize: 16 },
   section: { marginTop: 30, paddingHorizontal: 25 },
   sectionTitle: { color: 'white', fontSize: 20, fontFamily: fonts.black, marginBottom: 15 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
