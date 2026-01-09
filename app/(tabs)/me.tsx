@@ -261,9 +261,9 @@ export default function ProfileScreen() {
                 <Text style={styles.connName} numberOfLines={1}>
                   {item.name.split(' ')[0]}
                 </Text>
-                <View style={styles.scoreBadge}>
+                {/* <View style={styles.scoreBadge}>
                   <Text style={styles.scoreText}>{item.synqCount}</Text>
-                </View>
+                </View> */}
               </View>
             ))
           ) : (
