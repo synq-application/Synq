@@ -19,6 +19,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -41,9 +42,10 @@ type Connection = {
 };
 
 const fonts = {
-  black: Platform.OS === 'ios' ? 'Avenir-Heavy' : 'sans-serif-condensed',
+  black: Platform.OS === 'ios' ? 'Avenir-Black' : 'sans-serif-condensed',
   heavy: Platform.OS === 'ios' ? 'Avenir-Heavy' : 'sans-serif-medium',
   medium: Platform.OS === 'ios' ? 'Avenir-Medium' : 'sans-serif',
+  book: Platform.OS === 'ios' ? 'Avenir-Book' : 'sans-serif',
 };
 
 export default function ProfileScreen() {
@@ -74,7 +76,6 @@ export default function ProfileScreen() {
         setCity(userData.city || null);
         const stateAbbr = stateAbbreviations[userData.state] || userData.state || null;
         setState(stateAbbr);
-        
         setMemo(userData.memo || '');
         setMonthlyMemo(userData.monthlyMemo || '');
         setInterests(userData.interests || []);
@@ -196,6 +197,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/notifications')}>
           <Icon name="notifications-outline" size={26} color={ACCENT} />
@@ -234,29 +236,40 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Top Synqs</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionTitle}>Top Synqs</Text>
+          <TouchableOpacity onPress={() => Alert.alert("Synq Score", "Your Top Synqs are the people you message most! Every message sent increases your score.")}>
+            <Icon name="information-circle-outline" size={18} color="#444" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.synqsContainer}>
           {loadingConnections ? (
             <ActivityIndicator color={ACCENT} />
           ) : connections.length > 0 ? (
-            connections.slice(0, 5).map((item, i) => (
+            connections.slice(0, 3).map((item, i) => (
               <View key={i} style={styles.connItem}>
-                {item.imageUrl ? (
-                    <Image source={{ uri: item.imageUrl }} style={styles.connImg} />
-                ) : (
-                    <View style={[styles.connImg, styles.connDefaultAvatar]}>
-                         <Icon name="person" size={24} color="rgba(255,255,255,0.2)" />
-                    </View>
-                )}
+                <View style={[styles.imageCircle, i === 0 && { borderColor: ACCENT, borderWidth: 2 }]}>
+                  {item.imageUrl ? (
+                      <Image source={{ uri: item.imageUrl }} style={styles.connImg} />
+                  ) : (
+                      <View style={[styles.connImg, styles.connDefaultAvatar]}>
+                           <Icon name="person" size={24} color="rgba(255,255,255,0.2)" />
+                      </View>
+                  )}
+                  {i === 0 && <View style={styles.crown}><Icon name="star" size={10} color="black" /></View>}
+                </View>
                 <Text style={styles.connName} numberOfLines={1}>
                   {item.name.split(' ')[0]}
                 </Text>
+                <View style={styles.scoreBadge}>
+                  <Text style={styles.scoreText}>{item.synqCount}</Text>
+                </View>
               </View>
             ))
           ) : (
-            <Text style={styles.emptyText}>No connections yet.</Text>
+            <Text style={styles.emptyText}>Start messaging to see your top synqs.</Text>
           )}
-        </ScrollView>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -274,7 +287,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* MONTHLY MEMO SECTION */}
       <View style={styles.section}>
         <View style={styles.rowBetween}>
           <Text style={styles.sectionTitle}>Monthly Memo</Text>
@@ -283,14 +295,14 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
         <TouchableOpacity 
-          style={styles.monthlyMemoBox} 
+          style={[styles.monthlyMemoBox, { borderColor: monthlyMemo ? ACCENT : '#222' }]} 
           onPress={() => { setTempMonthlyMemo(monthlyMemo); setShowMemoModal(true); }}
         >
           <Text style={styles.monthlyMemoSubtitle}>
-            What’s going on this month that you’d like to share? Tap to edit
+            What's going on this month that you'd like to share? Tap to edit
           </Text>
           <Text style={styles.monthlyMemoContent}>
-            {monthlyMemo || "No plans shared yet for this month..."}
+            {monthlyMemo || "No plans shared yet for this month. Tap to add your first memo!"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -299,7 +311,6 @@ export default function ProfileScreen() {
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
-      {/* QR MODAL */}
       <Modal visible={isQRExpanded} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setQRExpanded(false)}>
           <View style={styles.qrModalBox}>
@@ -308,7 +319,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* INTERESTS MODAL */}
       <Modal visible={showInputModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <TouchableOpacity style={{ flex: 1, width: '100%' }} onPress={() => setShowInputModal(false)} />
@@ -340,7 +350,6 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* MONTHLY MEMO MODAL */}
       <Modal visible={showMemoModal} transparent animationType="slide">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={{ flex: 1, width: '100%' }} onPress={() => setShowMemoModal(false)} />
@@ -351,7 +360,6 @@ export default function ProfileScreen() {
                     <Icon name="close" size={24} color="white" />
                 </TouchableOpacity>
             </View>
-            <Text style={styles.inputLabel}>Update your monthly highlights, events, or invites:</Text>
             <TextInput 
               style={styles.largeTextInput} 
               placeholder="e.g. May 7th - LP Farmer's Market..." 
@@ -384,41 +392,46 @@ const styles = StyleSheet.create({
   profileImg: { width: '100%', height: '100%' },
   defaultAvatarContainer: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   qrToggle: { position: 'absolute', bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
-  nameText: { color: ACCENT, fontSize: 28, fontFamily: fonts.black, marginTop: 20 },
-  locationText: { color: 'white', opacity: 0.6, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, marginTop: 4, fontFamily: fonts.heavy },
-  memoText: { color: '#888', fontStyle: 'italic', marginTop: 12, paddingHorizontal: 40, textAlign: 'center', fontFamily: fonts.medium },
-  section: { marginTop: 25, paddingHorizontal: 25 },
-  sectionTitle: { color: 'white', fontSize: 18, fontFamily: fonts.black, marginBottom: 15 },
+  nameText: { color: ACCENT, fontSize: 32, fontFamily: fonts.black, marginTop: 20 },
+  locationText: { color: 'white', opacity: 0.6, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1.5, marginTop: 4, fontFamily: fonts.heavy },
+  memoText: { color: '#888', fontStyle: 'italic', marginTop: 12, paddingHorizontal: 40, textAlign: 'center', fontFamily: fonts.medium, lineHeight: 20 },
+  section: { marginTop: 30, paddingHorizontal: 25 },
+  sectionTitle: { color: 'white', fontSize: 20, fontFamily: fonts.black, marginBottom: 15 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  connItem: { alignItems: 'center', marginRight: 20, width: 70 },
-  connImg: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#222', borderColor: 'white', borderWidth: 1 },
+  synqsContainer: { flexDirection: 'row', justifyContent: 'flex-start', gap: 20 },
+  connItem: { alignItems: 'center', width: 80 },
+  imageCircle: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  connImg: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#222', borderColor: '#333', borderWidth: 1 },
   connDefaultAvatar: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' },
-  connName: { color: 'white', fontSize: 11, marginTop: 8, textAlign: 'center', fontFamily: fonts.heavy },
-  emptyText: { color: '#444', fontFamily: fonts.medium },
+  crown: { position: 'absolute', bottom: 0, right: 0, backgroundColor: ACCENT, padding: 3, borderRadius: 10, borderWidth: 2, borderColor: 'black', zIndex: 10 },
+  connName: { color: 'white', fontSize: 12, marginTop: 10, textAlign: 'center', fontFamily: fonts.heavy },
+  scoreBadge: { backgroundColor: '#111', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginTop: 5, borderWidth: 1, borderColor: '#222' },
+  scoreText: { color: ACCENT, fontSize: 10, fontFamily: fonts.black },
+  emptyText: { color: '#333', fontFamily: fonts.medium, fontSize: 14 },
   interestsWrapper: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
-  interestRect: { backgroundColor: '#111', borderWidth: 1, borderColor: '#333', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, marginBottom: 8 },
+  interestRect: { backgroundColor: '#111', borderWidth: 1, borderColor: '#222', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, marginBottom: 8 },
   interestText: { color: 'white', fontFamily: fonts.heavy, fontSize: 13 },
   addRect: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: ACCENT, borderStyle: 'dashed', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 4 },
-  monthlyMemoBox: { backgroundColor: '#111', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#222' },
-  monthlyMemoSubtitle: { color: '#555', fontSize: 12, fontFamily: fonts.medium, marginBottom: 10 },
-  monthlyMemoContent: { color: 'white', fontSize: 15, fontFamily: fonts.medium, lineHeight: 22 },
-  signOutBtn: { alignSelf: 'center', marginTop: 40, paddingVertical: 14, paddingHorizontal: 50, borderRadius: 20, borderWidth: 1.5, borderColor: '#222', backgroundColor: '#0a0a0a' },
-  signOutText: { color: '#888', fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 1, textTransform: 'uppercase' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
-  qrModalBox: { backgroundColor: 'white', padding: 25, borderRadius: 30 },
-  interestContent: { backgroundColor: '#0a0a0a', width: '100%', height: '85%', marginTop: 'auto', borderTopLeftRadius: 40, borderTopRightRadius: 40, padding: 25, alignItems: 'center' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { color: 'white', fontSize: 24, fontFamily: fonts.black },
-  searchBarContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', borderRadius: 15, width: '100%', marginBottom: 20, borderWidth: 1, borderColor: '#333' },
-  searchInput: { flex: 1, color: 'white', padding: 12, fontFamily: fonts.medium, fontSize: 16 },
-  interestGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingBottom: 20 },
-  chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 25, backgroundColor: '#111', borderWidth: 1, borderColor: '#222', margin: 5 },
+  monthlyMemoBox: { backgroundColor: '#111', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#222' },
+  monthlyMemoSubtitle: { color: '#555', fontSize: 11, fontFamily: fonts.black, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
+  monthlyMemoContent: { color: 'white', fontSize: 16, fontFamily: fonts.medium, lineHeight: 24 },
+  signOutBtn: { alignSelf: 'center', marginTop: 50, paddingVertical: 14, paddingHorizontal: 60, borderRadius: 25, borderWidth: 1.5, borderColor: '#222', backgroundColor: '#0a0a0a' },
+  signOutText: { color: '#666', fontFamily: fonts.heavy, fontSize: 13, letterSpacing: 2, textTransform: 'uppercase' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+  qrModalBox: { backgroundColor: 'white', padding: 25, borderRadius: 40 },
+  interestContent: { backgroundColor: '#0a0a0a', width: '100%', height: '85%', marginTop: 'auto', borderTopLeftRadius: 40, borderTopRightRadius: 40, padding: 30, alignItems: 'center' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 25 },
+  modalTitle: { color: 'white', fontSize: 26, fontFamily: fonts.black },
+  searchBarContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', borderRadius: 18, width: '100%', marginBottom: 20, borderWidth: 1, borderColor: '#333' },
+  searchInput: { flex: 1, color: 'white', padding: 14, fontFamily: fonts.medium, fontSize: 16 },
+  interestGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', paddingBottom: 30 },
+  chip: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 30, backgroundColor: '#111', borderWidth: 1, borderColor: '#222', margin: 6 },
   chipActive: { backgroundColor: ACCENT, borderColor: ACCENT },
-  chipText: { color: '#666', fontFamily: fonts.heavy },
+  chipText: { color: '#555', fontFamily: fonts.heavy },
   chipTextActive: { color: 'black' },
-  inputLabel: { color: '#888', marginBottom: 15, fontSize: 14, fontFamily: fonts.medium, width: '100%' },
-  largeTextInput: { width: '100%', flex: 1, backgroundColor: '#111', color: 'white', borderRadius: 15, padding: 15, fontSize: 16, fontFamily: fonts.medium, textAlignVertical: 'top', marginBottom: 20, borderWidth: 1, borderColor: '#333' },
-  saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 18, borderRadius: 20, marginBottom: 10, alignItems: 'center' },
-  saveBtnText: { color: 'black', fontFamily: fonts.black, fontSize: 16 }
+  inputLabel: { color: '#666', marginBottom: 15, fontSize: 14, fontFamily: fonts.medium, width: '100%', lineHeight: 20 },
+  largeTextInput: { width: '100%', flex: 1, backgroundColor: '#111', color: 'white', borderRadius: 20, padding: 20, fontSize: 17, fontFamily: fonts.medium, textAlignVertical: 'top', marginBottom: 20, borderWidth: 1, borderColor: '#222' },
+  saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 20, borderRadius: 22, marginBottom: 20, alignItems: 'center' },
+  saveBtnText: { color: 'black', fontFamily: fonts.black, fontSize: 17 }
 });
