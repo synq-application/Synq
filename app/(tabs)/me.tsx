@@ -41,7 +41,7 @@ type Connection = {
 };
 
 const fonts = {
-  black: Platform.OS === 'ios' ? 'Avenir-Black' : 'sans-serif-condensed',
+  black: Platform.OS === 'ios' ? 'Avenir-Heavy' : 'sans-serif-condensed',
   heavy: Platform.OS === 'ios' ? 'Avenir-Heavy' : 'sans-serif-medium',
   medium: Platform.OS === 'ios' ? 'Avenir-Medium' : 'sans-serif',
 };
@@ -223,7 +223,7 @@ export default function ProfileScreen() {
             )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setQRExpanded(true)} style={styles.qrToggle}>
-            <Icon name="qr-code-outline" size={20} color="black" />
+            <Icon name="qr-code-outline" size={13} color="black" />
           </TouchableOpacity>
         </View>
         <Text style={styles.nameText}>{auth.currentUser?.displayName}</Text>
