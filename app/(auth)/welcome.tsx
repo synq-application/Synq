@@ -16,27 +16,23 @@ const synqSvg = `
 `;
 
 export default function Welcome() {
-  // Animation Values
   const fadeWelcome = useRef(new Animated.Value(0)).current;
   const fadeInstructions = useRef(new Animated.Value(0)).current;
   const fadeActions = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.sequence([
-      // 1. Show Welcome Immediately
       Animated.timing(fadeWelcome, {
         toValue: 1,
-        duration: 800,
+        duration: 500,
         useNativeDriver: true,
       }),
-      // 2. Wait 2 seconds, then show Instructions
-      Animated.delay(2000),
+      Animated.delay(1000),
       Animated.timing(fadeInstructions, {
         toValue: 1,
-        duration: 800,
+        duration: 500,
         useNativeDriver: true,
       }),
-      // 3. Wait a beat, then show Buttons
       Animated.delay(1000),
       Animated.timing(fadeActions, {
         toValue: 1,
@@ -53,21 +49,18 @@ export default function Welcome() {
       </View>
 
       <View style={styles.content}>
-        {/* Step 1: Welcome Text */}
         <Animated.View style={{ opacity: fadeWelcome, transform: [{ translateY: fadeWelcome.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
           <Text style={styles.subtitle}>
             Welcome to Synq, a social tool that connects you with available friends for spontaneous time together.
           </Text>
         </Animated.View>
 
-        {/* Step 2: Instruction Text */}
         <Animated.View style={{ opacity: fadeInstructions, transform: [{ translateY: fadeInstructions.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
           <Text style={[styles.subtitle, { marginTop: 30 }]}>
             When you're free, tap the Synq button to activate, see which friends are available, and make it happen!
           </Text>
         </Animated.View>
 
-        {/* Step 3: Action Buttons */}
         <Animated.View style={[styles.actionWrapper, { opacity: fadeActions }]}>
           <Pressable
             onPress={() => router.push("/(auth)/phone")}
