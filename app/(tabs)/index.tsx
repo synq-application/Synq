@@ -61,7 +61,6 @@ export default function SynqScreen() {
   const [showAICard, setShowAICard] = useState(false);
   const [aiResponse, setAiResponse] = useState('');
 
-  // 1. Initial Init and Chat Listener
   useEffect(() => {
     if (!auth.currentUser) return;
 
@@ -102,14 +101,13 @@ export default function SynqScreen() {
     });
   }, []);
 
-  // 2. REAL-TIME FRIEND LISTENER (The Blake Fix)
+
   useEffect(() => {
     if (!auth.currentUser || status !== 'active') {
       setAvailableFriends([]);
       return;
     }
 
-    // Listen to your friends sub-collection
     const friendsRef = collection(db, 'users', auth.currentUser.uid, 'friends');
     
     const unsubscribe = onSnapshot(friendsRef, async (snapshot) => {
@@ -204,7 +202,6 @@ export default function SynqScreen() {
       timer = setTimeout(() => { Vibration.vibrate(100); setStatus('finding'); }, 2000);
     } else if (status === 'finding') {
       timer = setTimeout(async () => {
-        // Run match logic on current snapshot
         if (availableFriends.length > 0) runSmartMatch(availableFriends);
         Vibration.vibrate(500);
         setStatus('active');
