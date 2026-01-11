@@ -9,6 +9,7 @@ export const presetActivities = {
   restaurants: { id: 65, name: "🍽️ Going out to eat" },
   cooking: { id: 66, name: "👨‍🍳 Cooking" },
   shopping: { id: 67, name: "🛍️ Shopping" },
+  football: { id: 69, name: "🏈 Football" },
 
   // Nightlife & Social
   nightlife: { id: 301, name: "🍸 Cocktails & Bars" },
@@ -21,7 +22,6 @@ export const presetActivities = {
   running: { id: 306, name: "🏃 Running" },
   pickleball: { id: 307, name: "🏓 Pickleball" },
   tennis: { id: 308, name: "🎾 Tennis" },
-  cycling: { id: 309, name: "🚲 Cycling" },
 
   // Creative & Gaming
   gaming: { id: 310, name: "🎮 Video Games" },
