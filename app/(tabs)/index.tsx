@@ -25,6 +25,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -53,6 +54,7 @@ export default function SynqScreen() {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [isInboxVisible, setIsInboxVisible] = useState(false);
+  const [isExploreVisible, setIsExploreVisible] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [allChats, setAllChats] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
@@ -61,9 +63,13 @@ export default function SynqScreen() {
   const [showAICard, setShowAICard] = useState(false);
   const [aiResponse, setAiResponse] = useState('');
 
+  const [aiOptions, setAiOptions] = useState<any[]>([]);
+  const [selectedOption, setSelectedOption] = useState<any>(null);
+  const [showOptionsList, setShowOptionsList] = useState(false);
+  const [currentCategory, setCurrentCategory] = useState('');
+
   useEffect(() => {
     if (!auth.currentUser) return;
-
     const init = async () => {
       try {
         const userRef = doc(db, 'users', auth.currentUser!.uid);
@@ -93,7 +99,7 @@ export default function SynqScreen() {
 
     const q = query(
       collection(db, "chats"),
-      where("participants", "array-contains", auth.currentUser.uid),
+      where("participants", "array-contains", auth.currentUser!.uid),
       orderBy("createdAt", "desc")
     );
     return onSnapshot(q, (snap) => {
@@ -101,15 +107,12 @@ export default function SynqScreen() {
     });
   }, []);
 
-
   useEffect(() => {
     if (!auth.currentUser || status !== 'active') {
       setAvailableFriends([]);
       return;
     }
-
     const friendsRef = collection(db, 'users', auth.currentUser.uid, 'friends');
-    
     const unsubscribe = onSnapshot(friendsRef, async (snapshot) => {
       const activeFriendsData = await Promise.all(
         snapshot.docs.map(async (fDoc) => {
@@ -127,52 +130,27 @@ export default function SynqScreen() {
     return () => unsubscribe();
   }, [status]);
 
-  const formatTime = (timestamp: any) => {
-    if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  useEffect(() => {
+    if (!activeChatId || !isChatVisible) return;
+    const q = query(collection(db, "chats", activeChatId, "messages"), orderBy("createdAt", "asc"));
+    return onSnapshot(q, (snap) => {
+      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }, [activeChatId, isChatVisible]);
 
-  const triggerAISuggestion = async () => {
-    if (!activeChatId || isAILoading) return;
-    setIsAILoading(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      const functions = getFunctions();
-      const getSuggestions = httpsCallable(functions, 'getSynqSuggestions');
-      const currentChat = allChats.find(c => c.id === activeChatId);
-      if (!currentChat) throw new Error("Chat not found");
-      const friendId = currentChat.participants.find((id: string) => id !== auth.currentUser?.uid);
-      const friendSnap = await getDoc(doc(db, "users", friendId));
-      const friendInterests = friendSnap.exists() ? (friendSnap.data()?.interests || []) : [];
-      const shared = (userProfile?.interests || []).filter((i: any) => friendInterests.includes(i));
-      const result = await getSuggestions({
-        shared: shared.length > 0 ? shared : ["exploring new spots"],
-        location: userProfile?.city || "nearby"
-      });
-      setAiResponse((result.data as any).suggestion);
-      setShowAICard(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) { console.error("AI Error:", error); } finally { setIsAILoading(false); }
-  };
-
-  const sendAISuggestionToChat = async () => {
-    if (!aiResponse || !activeChatId || !auth.currentUser) return;
-    try {
-      await addDoc(collection(db, "chats", activeChatId, "messages"), {
-        text: `✨ Synq AI Suggestion:\n\n${aiResponse}`,
-        senderId: auth.currentUser.uid,
-        imageurl: userProfile?.imageurl || DEFAULT_AVATAR,
-        createdAt: serverTimestamp(),
-      });
-      await updateDoc(doc(db, "chats", activeChatId), {
-        lastMessage: "AI Suggestion shared",
-        updatedAt: serverTimestamp()
-      });
-      setShowAICard(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) { console.error("Failed to share AI suggestion", e); }
-  };
+  useEffect(() => {
+    let timer: any;
+    if (status === 'activating') {
+      timer = setTimeout(() => { Vibration.vibrate(100); setStatus('finding'); }, 2000);
+    } else if (status === 'finding') {
+      timer = setTimeout(async () => {
+        if (availableFriends.length > 0) runSmartMatch(availableFriends);
+        Vibration.vibrate(500);
+        setStatus('active');
+      }, 2000);
+    }
+    return () => { if (timer) clearTimeout(timer); };
+  }, [status]);
 
   const runSmartMatch = (friends: any[]) => {
     if (!userProfile?.interests || userProfile.interests.length === 0) return;
@@ -196,27 +174,85 @@ export default function SynqScreen() {
     }
   };
 
-  useEffect(() => {
-    let timer: any;
-    if (status === 'activating') {
-      timer = setTimeout(() => { Vibration.vibrate(100); setStatus('finding'); }, 2000);
-    } else if (status === 'finding') {
-      timer = setTimeout(async () => {
-        if (availableFriends.length > 0) runSmartMatch(availableFriends);
-        Vibration.vibrate(500);
-        setStatus('active');
-      }, 2000);
-    }
-    return () => { if (timer) clearTimeout(timer); };
-  }, [status]);
+  const formatTime = (timestamp: any) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
-  useEffect(() => {
-    if (!activeChatId || !isChatVisible) return;
-    const q = query(collection(db, "chats", activeChatId, "messages"), orderBy("createdAt", "asc"));
-    return onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  const triggerAISuggestion = async (category: string) => {
+    if (!activeChatId || isAILoading) return;
+    setIsAILoading(true);
+    setCurrentCategory(category);
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const functions = getFunctions();
+      const getSuggestions = httpsCallable(functions, 'getSynqSuggestions');
+      const currentChat = allChats.find(c => c.id === activeChatId);
+      const city = userProfile?.city + " " + userProfile?.state;
+
+      const friendId = currentChat.participants.find((id: string) => id !== auth.currentUser?.uid);
+      const friendSnap = await getDoc(doc(db, "users", friendId));
+      const friendInterests = friendSnap.exists() ? (friendSnap.data()?.interests || []) : [];
+      const shared = (userProfile?.interests || []).filter((i: any) => friendInterests.includes(i));
+
+      const payload = {
+        category: category,
+        shared: shared.length > 0 ? shared : ["exploring new spots"],
+        location: city
+      };
+
+      const result = await getSuggestions(payload);
+      const data = result.data as any;
+
+      if (data.suggestions) {
+        setAiOptions(data.suggestions);
+        setShowOptionsList(true);
+      } else {
+        setAiResponse(data.suggestion);
+        setIsExploreVisible(false);
+        setShowAICard(true);
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error("AI Error:", error);
+    } finally {
+      setIsAILoading(false);
+    }
+  };
+
+const sendAISuggestionToChat = async () => {
+  if (!activeChatId || !auth.currentUser) return;
+
+  const textToSend = selectedOption
+    ? `${selectedOption.name}\n${selectedOption.location}`
+    : `✨ Synq AI Suggestion:\n\n${aiResponse}`;
+
+  try {
+    await addDoc(collection(db, "chats", activeChatId, "messages"), {
+      text: textToSend,
+      senderId: auth.currentUser.uid,
+      imageurl: userProfile?.imageurl || DEFAULT_AVATAR,
+      venueImage: selectedOption?.imageUrl || selectedOption?.imageurl || null,
+      createdAt: serverTimestamp(),
     });
-  }, [activeChatId, isChatVisible]);
+    
+    await updateDoc(doc(db, "chats", activeChatId), {
+      lastMessage: selectedOption ? `Shared: ${selectedOption.name}` : "AI Suggestion shared",
+      updatedAt: serverTimestamp()
+    });
+
+    setIsExploreVisible(false); 
+    setShowOptionsList(false);
+    setSelectedOption(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  } catch (e) { 
+    console.error("Failed to share AI suggestion", e); 
+  }
+};
 
   const startSynq = async () => {
     if (!auth.currentUser) return;
@@ -350,7 +386,6 @@ export default function SynqScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
-
         {status === 'active' && (
           <View style={{ flex: 1 }}>
             <View style={styles.activeHeader}>
@@ -418,8 +453,6 @@ export default function SynqScreen() {
             </TouchableOpacity>
           </View>
         )}
-
-        {/* ... MODALS AND STYLES REMAIN THE SAME ... */}
         <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
@@ -449,7 +482,6 @@ export default function SynqScreen() {
             />
           </View>
         </Modal>
-
         <Modal visible={isChatVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
@@ -458,40 +490,49 @@ export default function SynqScreen() {
                   {activeChatId && getChatTitle(allChats.find(c => c.id === activeChatId))}
                 </Text>
                 <TouchableOpacity
-                  onPress={triggerAISuggestion}
-                  style={[styles.aiTrigger, isAILoading && { opacity: 0.5 }]}
-                  disabled={isAILoading}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setIsExploreVisible(true);
+                  }}
+                  hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
+                  style={[styles.aiTrigger, { marginLeft: 10 }]}
                 >
-                  {isAILoading ? (
-                    <ActivityIndicator size="small" color={ACCENT} />
-                  ) : (
-                    <Ionicons name="sparkles" size={18} color={ACCENT} />
-                  )}
+                  <Ionicons name="sparkles" size={20} color={ACCENT} />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => { setIsChatVisible(false); setShowAICard(false); }}><Ionicons name="close-circle" size={30} color="#444" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => { setIsChatVisible(false); setShowAICard(false); setShowOptionsList(false); }}><Ionicons name="close-circle" size={30} color="#444" /></TouchableOpacity>
             </View>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={60}>
               <View style={{ flex: 1 }}>
                 <FlatList
                   data={messages}
                   keyExtractor={item => item.id}
-                  renderItem={({ item }) => {
-                    const isMe = item.senderId === auth.currentUser?.uid;
-                    const currentChat = allChats.find(c => c.id === activeChatId);
-                    const senderAvatar = currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
-                    return (
-                      <View style={[styles.msgContainer, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
-                        <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-                          {!isMe && <Image source={{ uri: senderAvatar }} style={styles.chatAvatar} />}
-                          <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
-                            <Text style={{ color: isMe ? 'black' : 'white', fontSize: 16 }}>{item.text}</Text>
-                          </View>
-                        </View>
-                        <Text style={[styles.timestampOutside, isMe ? { marginRight: 4 } : { marginLeft: 44 }]}>{formatTime(item.createdAt)}</Text>
-                      </View>
-                    );
-                  }}
+renderItem={({ item }) => {
+  const isMe = item.senderId === auth.currentUser?.uid;
+  const currentChat = allChats.find(c => c.id === activeChatId);
+  const senderAvatar = currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
+  
+  return (
+    <View style={[styles.msgContainer, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+        {!isMe && <Image source={{ uri: senderAvatar }} style={styles.chatAvatar} />}
+        <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
+          {item.venueImage && (
+            <Image 
+              source={{ uri: item.venueImage }} 
+              style={{ width: 200, height: 120, borderRadius: 12, marginBottom: 8 }} 
+              resizeMode="cover"
+            />
+          )}
+          <Text style={{ color: isMe ? 'black' : 'white', fontSize: 16 }}>{item.text}</Text>
+        </View>
+      </View>
+      <Text style={[styles.timestampOutside, isMe ? { marginRight: 4 } : { marginLeft: 44 }]}>
+        {formatTime(item.createdAt)}
+      </Text>
+    </View>
+  );
+}}
                   contentContainerStyle={{ padding: 20 }}
                 />
                 {showAICard && (
@@ -517,6 +558,113 @@ export default function SynqScreen() {
                 <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}><Ionicons name="send" size={18} color="black" /></TouchableOpacity>
               </View>
             </KeyboardAvoidingView>
+            {isExploreVisible && (
+              <View style={[StyleSheet.absoluteFill, { zIndex: 1000, backgroundColor: 'rgba(0,0,0,0.8)' }]}>
+                <TouchableWithoutFeedback onPress={() => { setIsExploreVisible(false); setShowOptionsList(false); }}>
+                  <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+                    <TouchableWithoutFeedback>
+                      <View style={styles.explorePanel}>
+                        {!showOptionsList ? (
+                          <>
+                            <View style={styles.modalHeader}>
+                              <Text style={styles.modalTitle}>Explore Ideas</Text>
+                              <TouchableOpacity onPress={() => setIsExploreVisible(false)}>
+                                <Ionicons name="close-circle" size={32} color="#444" />
+                              </TouchableOpacity>
+                            </View>
+
+                            <ScrollView contentContainerStyle={{ padding: 20 }}>
+                              <Text style={styles.sectionHeader}>Mutual Interests</Text>
+                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
+                                {['Coffee', 'Yoga', 'Concerts', 'Hiking'].map((item) => (
+                                  <TouchableOpacity key={item} style={styles.ideaCircle} onPress={() => triggerAISuggestion(item)}>
+                                    <View style={styles.circlePlaceholder}>
+                                      <Ionicons
+                                        name={item === 'Coffee' ? 'cafe' : item === 'Yoga' ? 'body' : item === 'Concerts' ? 'musical-notes' : 'trail-sign'}
+                                        size={30}
+                                        color="white"
+                                      />
+                                    </View>
+                                    <Text style={styles.circleText}>{item}</Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </ScrollView>
+
+                              <Text style={styles.sectionHeader}>Popular Now</Text>
+                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
+                                {['Sunday Brunch', 'Farmers Markets', 'Museums', 'Bars'].map((item) => (
+                                  <TouchableOpacity key={item} style={styles.ideaCircle} onPress={() => triggerAISuggestion(item)}>
+                                    <View style={[styles.circlePlaceholder, { borderColor: ACCENT }]}>
+                                      <Ionicons
+                                        name={item.includes('Brunch') ? 'restaurant' : item.includes('Markets') ? 'cart' : item.includes('Museums') ? 'business' : 'wine'}
+                                        size={30}
+                                        color={ACCENT}
+                                      />
+                                    </View>
+                                    <Text style={styles.circleText}>{item}</Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </ScrollView>
+
+                              {isAILoading && (
+                                <View style={{ marginTop: 20, alignItems: 'center' }}>
+                                  <ActivityIndicator color={ACCENT} />
+                                  <Text style={{ color: 'white', marginTop: 8 }}>Synq AI is thinking...</Text>
+                                </View>
+                              )}
+                            </ScrollView>
+                          </>
+                        ) : (
+                          <View style={{ flex: 1 }}>
+                            <View style={styles.modalHeader}>
+                              <TouchableOpacity onPress={() => setShowOptionsList(false)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="chevron-back" size={24} color={ACCENT} />
+                                <Text style={[styles.modalTitle, { color: ACCENT, marginLeft: 8 }]}>{currentCategory} Spots</Text>
+                              </TouchableOpacity>
+                            </View>
+
+                            <FlatList
+                              data={aiOptions}
+                              keyExtractor={(item) => item.name}
+                              contentContainerStyle={{ padding: 20 }}
+                              renderItem={({ item }) => (
+                                <TouchableOpacity
+                                  style={[styles.venueCard, selectedOption?.name === item.name && styles.selectedCard]}
+                                  onPress={() => setSelectedOption(item)}
+                                >
+                                  <Image
+                                    source={{ uri: item.imageUrl || item.imageurl || 'https://via.placeholder.com/150' }}
+                                    style={styles.venueImage}
+                                  />
+                                  <View style={{ flex: 1, marginLeft: 12 }}>
+                                    <Text style={styles.venueName}>{item.name}</Text>
+                                    <Text style={styles.venueRating}>{item.rating} stars</Text>
+                                    <Text style={styles.venueDesc}>{item.location}</Text>
+                                  </View>
+                                  {selectedOption?.name === item.name && <Ionicons name="checkmark-circle" size={24} color={ACCENT} />}
+                                </TouchableOpacity>
+                              )}
+                            />
+
+                            <TouchableOpacity
+                              style={[styles.sendIdeaBtn, !selectedOption && { opacity: 0.5 }]}
+                              disabled={!selectedOption}
+                              onPress={() => {
+                                sendAISuggestionToChat();
+                                setIsExploreVisible(false);
+                                setShowOptionsList(false);
+                              }}
+                            >
+                              <Text style={styles.sendIdeaText}>Send Idea</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableWithoutFeedback>
+                  </View>
+                </TouchableWithoutFeedback>
+              </View>
+            )}
           </View>
         </Modal>
 
@@ -544,16 +692,7 @@ export default function SynqScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
   darkFill: { flex: 1, backgroundColor: 'black', justifyContent: 'center' },
-  activeHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: 25, 
-    paddingTop: 70, 
-    paddingBottom: 20, 
-    alignItems: 'center',
-    backgroundColor: 'black', 
-    height: 140, 
-  },
+  activeHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, paddingTop: 70, paddingBottom: 20, alignItems: 'center', backgroundColor: 'black', height: 140 },
   headerTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Heavy', textAlign: 'center' },
   headerIconContainer: { width: 40, alignItems: 'center', justifyContent: 'center' },
   badge: { position: 'absolute', top: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: ACCENT, borderWidth: 2, borderColor: 'black' },
@@ -575,36 +714,87 @@ const styles = StyleSheet.create({
   pulseBox: { width: 250, height: 300, justifyContent: 'center', alignItems: 'center' },
   tapToActivate: { color: ACCENT, fontSize: 18, fontFamily: 'Avenir-Medium', marginTop: -10, opacity: 0.8, letterSpacing: 0.5, textAlign: 'center' },
   centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
+  modalBg: { flex: 1, backgroundColor: '#000' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
+  modalTitle: { color: 'white', fontSize: 24, fontFamily: 'Avenir-Black' },
+  deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
+  inboxItem: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#111' },
+  inboxCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
+  avatarStack: { width: 50, height: 50, position: 'relative' },
+  stackedPhoto: { width: 40, height: 40, borderRadius: 20, position: 'absolute', borderWidth: 2, borderColor: 'black' },
+  msgContainer: { marginBottom: 15 },
+  chatAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
+  bubble: { padding: 15, borderRadius: 22, maxWidth: '75%' },
+  myBubble: { backgroundColor: ACCENT },
+  theirBubble: { backgroundColor: '#1C1C1E' },
+  timestampOutside: { color: '#444', fontSize: 11, marginTop: 4, fontFamily: 'Avenir' },
+  inputRow: { flexDirection: 'row', padding: 20, paddingBottom: 40, backgroundColor: 'black', alignItems: 'center' },
+  input: { flex: 1, backgroundColor: '#1C1C1E', borderRadius: 25, paddingHorizontal: 20, paddingVertical: 12, color: 'white', fontSize: 16, marginRight: 10 },
+  sendBtn: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: ACCENT, justifyContent: 'center', alignItems: 'center' },
+  aiTrigger: {
+    padding: 8,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  explorePanel: { height: '85%', backgroundColor: '#0A0A0A', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
+  sectionHeader: { color: 'white', fontSize: 18, fontFamily: 'Avenir-Black', marginBottom: 20, paddingHorizontal: 20 },
+  scrollRow: { marginBottom: 30, paddingLeft: 20 },
+  ideaCircle: { alignItems: 'center', marginRight: 25 },
+  circlePlaceholder: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#333' },
+  circleText: { color: 'white', fontSize: 13, fontFamily: 'Avenir-Medium' },
+  venueCard: {
+    flexDirection: 'row', // Ensures image is to the left of text
+    alignItems: 'center',
+    backgroundColor: '#111',
+    padding: 12,
+    borderRadius: 18,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#222',
+  },
+  selectedCard: {
+    borderColor: ACCENT,
+    backgroundColor: '#1a1a1a',
+  },
+  venueImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    backgroundColor: '#333',
+  },
+  venueName: {
+    color: 'white',
+    fontSize: 16,
+    fontFamily: 'Avenir-Heavy',
+  },
+  venueRating: {
+    color: ACCENT,
+    fontSize: 12,
+    marginVertical: 2,
+  },
+  venueDesc: {
+    color: '#888',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  sendIdeaBtn: { backgroundColor: '#8E8E93', margin: 20, padding: 18, borderRadius: 12, alignItems: 'center' },
+  sendIdeaText: { color: 'white', fontFamily: 'Avenir-Black', fontSize: 16 },
+  inChatAICardContainer: { paddingHorizontal: 20, marginVertical: 10 },
+  inChatAICard: { backgroundColor: '#1C1C1E', borderRadius: 20, padding: 20, borderLeftWidth: 4, borderLeftColor: ACCENT },
+  aiCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  aiCardTitleSmall: { color: ACCENT, fontSize: 14, fontFamily: 'Avenir-Heavy', letterSpacing: 0.5 },
+  aiCardBodySmall: { color: 'white', fontSize: 15, fontFamily: 'Avenir', lineHeight: 22, marginBottom: 15 },
+  aiShareBtnSmall: { backgroundColor: ACCENT, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+  aiShareBtnText: { color: 'black', fontSize: 14, fontFamily: 'Avenir-Heavy' },
   editPanel: { width: '100%', backgroundColor: '#161616', borderRadius: 32, padding: 32, alignItems: 'center' },
   panelTitle: { color: 'white', fontSize: 22, marginBottom: 24, fontFamily: 'Avenir-Black' },
   panelInput: { width: '100%', backgroundColor: '#000', color: 'white', padding: 18, borderRadius: 16, marginBottom: 20, textAlign: 'center' },
   saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 12 },
   saveBtnText: { color: 'black', fontSize: 16, fontFamily: 'Avenir-Black' },
   endSynqBtn: { width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FF453A' },
-  endSynqBtnText: { color: '#FF453A', fontSize: 16 },
-  modalBg: { flex: 1, backgroundColor: '#0A0A0A' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#1A1A1A' },
-  modalTitle: { color: 'white', fontSize: 19, fontFamily: 'Avenir-Heavy' },
-  aiTrigger: { marginLeft: 10, backgroundColor: '#111', padding: 6, borderRadius: 10, borderWidth: 1, borderColor: ACCENT, minWidth: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
-  inboxItem: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#151515', backgroundColor: '#0A0A0A' },
-  avatarStack: { width: 60, height: 44, position: 'relative' },
-  stackedPhoto: { width: 44, height: 44, borderRadius: 22, position: 'absolute', borderWidth: 2, borderColor: '#0A0A0A' },
-  inboxCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
-  deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
-  msgContainer: { marginBottom: 15 },
-  bubble: { padding: 12, borderRadius: 18, maxWidth: '80%' },
-  myBubble: { backgroundColor: ACCENT },
-  theirBubble: { backgroundColor: '#222' },
-  chatAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8, marginBottom: 4 },
-  timestampOutside: { fontSize: 10, color: '#666', marginTop: 2, fontFamily: 'Avenir' },
-  inputRow: { flexDirection: 'row', paddingHorizontal: 15, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 10 : 15, backgroundColor: '#050505', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#111' },
-  input: { flex: 1, backgroundColor: '#151515', borderRadius: 25, paddingHorizontal: 15, paddingVertical: 12, color: 'white' },
-  sendBtn: { backgroundColor: ACCENT, width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginLeft: 10 },
-  inChatAICardContainer: { position: 'absolute', bottom: 20, left: 20, right: 20, zIndex: 100 },
-  inChatAICard: { backgroundColor: '#1C1C1E', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: ACCENT, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8 },
-  aiCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  aiCardTitleSmall: { color: 'white', fontSize: 14, fontFamily: 'Avenir-Heavy' },
-  aiCardBodySmall: { color: '#E5E5E5', fontSize: 14, lineHeight: 20, fontFamily: 'Avenir', marginBottom: 15 },
-  aiShareBtnSmall: { backgroundColor: ACCENT, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
-  aiShareBtnText: { color: 'black', fontSize: 14, fontFamily: 'Avenir-Black' }
+  endSynqBtnText: { color: '#FF453A', fontSize: 16 }
 });
