@@ -36,11 +36,8 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
-
-const ACCENT = "#7DFFA6";
-const DEFAULT_AVATAR = 'https://www.gravatar.com/avatar/?d=mp';
-const EXPIRATION_HOURS = 12;
 
 type SynqStatus = 'idle' | 'activating' | 'finding' | 'active';
 
@@ -224,35 +221,35 @@ export default function SynqScreen() {
     }
   };
 
-const sendAISuggestionToChat = async () => {
-  if (!activeChatId || !auth.currentUser) return;
+  const sendAISuggestionToChat = async () => {
+    if (!activeChatId || !auth.currentUser) return;
 
-  const textToSend = selectedOption
-    ? `${selectedOption.name}\n${selectedOption.location}`
-    : `✨ Synq AI Suggestion:\n\n${aiResponse}`;
+    const textToSend = selectedOption
+      ? `${selectedOption.name}\n${selectedOption.location}`
+      : `✨ Synq AI Suggestion:\n\n${aiResponse}`;
 
-  try {
-    await addDoc(collection(db, "chats", activeChatId, "messages"), {
-      text: textToSend,
-      senderId: auth.currentUser.uid,
-      imageurl: userProfile?.imageurl || DEFAULT_AVATAR,
-      venueImage: selectedOption?.imageUrl || selectedOption?.imageurl || null,
-      createdAt: serverTimestamp(),
-    });
-    
-    await updateDoc(doc(db, "chats", activeChatId), {
-      lastMessage: selectedOption ? `Shared: ${selectedOption.name}` : "AI Suggestion shared",
-      updatedAt: serverTimestamp()
-    });
+    try {
+      await addDoc(collection(db, "chats", activeChatId, "messages"), {
+        text: textToSend,
+        senderId: auth.currentUser.uid,
+        imageurl: userProfile?.imageurl || DEFAULT_AVATAR,
+        venueImage: selectedOption?.imageUrl || selectedOption?.imageurl || null,
+        createdAt: serverTimestamp(),
+      });
 
-    setIsExploreVisible(false); 
-    setShowOptionsList(false);
-    setSelectedOption(null);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  } catch (e) { 
-    console.error("Failed to share AI suggestion", e); 
-  }
-};
+      await updateDoc(doc(db, "chats", activeChatId), {
+        lastMessage: selectedOption ? `Shared: ${selectedOption.name}` : "AI Suggestion shared",
+        updatedAt: serverTimestamp()
+      });
+
+      setIsExploreVisible(false);
+      setShowOptionsList(false);
+      setSelectedOption(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.error("Failed to share AI suggestion", e);
+    }
+  };
 
   const startSynq = async () => {
     if (!auth.currentUser) return;
@@ -507,32 +504,32 @@ const sendAISuggestionToChat = async () => {
                 <FlatList
                   data={messages}
                   keyExtractor={item => item.id}
-renderItem={({ item }) => {
-  const isMe = item.senderId === auth.currentUser?.uid;
-  const currentChat = allChats.find(c => c.id === activeChatId);
-  const senderAvatar = currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
-  
-  return (
-    <View style={[styles.msgContainer, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-        {!isMe && <Image source={{ uri: senderAvatar }} style={styles.chatAvatar} />}
-        <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
-          {item.venueImage && (
-            <Image 
-              source={{ uri: item.venueImage }} 
-              style={{ width: 200, height: 120, borderRadius: 12, marginBottom: 8 }} 
-              resizeMode="cover"
-            />
-          )}
-          <Text style={{ color: isMe ? 'black' : 'white', fontSize: 16 }}>{item.text}</Text>
-        </View>
-      </View>
-      <Text style={[styles.timestampOutside, isMe ? { marginRight: 4 } : { marginLeft: 44 }]}>
-        {formatTime(item.createdAt)}
-      </Text>
-    </View>
-  );
-}}
+                  renderItem={({ item }) => {
+                    const isMe = item.senderId === auth.currentUser?.uid;
+                    const currentChat = allChats.find(c => c.id === activeChatId);
+                    const senderAvatar = currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
+
+                    return (
+                      <View style={[styles.msgContainer, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+                          {!isMe && <Image source={{ uri: senderAvatar }} style={styles.chatAvatar} />}
+                          <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
+                            {item.venueImage && (
+                              <Image
+                                source={{ uri: item.venueImage }}
+                                style={{ width: 200, height: 120, borderRadius: 12, marginBottom: 8 }}
+                                resizeMode="cover"
+                              />
+                            )}
+                            <Text style={{ color: isMe ? 'black' : 'white', fontSize: 16 }}>{item.text}</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.timestampOutside, isMe ? { marginRight: 4 } : { marginLeft: 44 }]}>
+                          {formatTime(item.createdAt)}
+                        </Text>
+                      </View>
+                    );
+                  }}
                   contentContainerStyle={{ padding: 20 }}
                 />
                 {showAICard && (
@@ -592,7 +589,7 @@ renderItem={({ item }) => {
 
                               <Text style={styles.sectionHeader}>Popular Now</Text>
                               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
-                                {['Sunday Brunch', 'Farmers Markets', 'Museums', 'Bars'].map((item) => (
+                                {['Brunch', 'Farmers Markets', 'Museums', 'Bars'].map((item) => (
                                   <TouchableOpacity key={item} style={styles.ideaCircle} onPress={() => triggerAISuggestion(item)}>
                                     <View style={[styles.circlePlaceholder, { borderColor: ACCENT }]}>
                                       <Ionicons
