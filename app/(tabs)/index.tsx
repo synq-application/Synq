@@ -696,9 +696,9 @@ useEffect(() => {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'black' },
-  darkFill: { flex: 1, backgroundColor: 'black', justifyContent: 'center' },
-  activeHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, paddingTop: 70, paddingBottom: 20, alignItems: 'center', backgroundColor: 'black', height: 140 },
+  container: { flex: 1, backgroundColor: "#0F1115" },
+  darkFill: { flex: 1, backgroundColor: "#0F1115", justifyContent: 'center' },
+  activeHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, paddingTop: 70, paddingBottom: 20, alignItems: 'center', backgroundColor: "#0F1115", height: 140 },
   headerTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Heavy', textAlign: 'center' },
   headerIconContainer: { width: 40, alignItems: 'center', justifyContent: 'center' },
   badge: { position: 'absolute', top: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: ACCENT, borderWidth: 2, borderColor: 'black' },
@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
   btnText: { fontSize: 16, color: 'black', fontFamily: 'Avenir-Medium' },
   deactivateLink: { marginTop: 20, alignSelf: 'center', padding: 10 },
   deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: 'Avenir-Medium', opacity: 0.9 },
-  activatingContainer: { flex: 1, backgroundColor: 'black', alignItems: 'center', justifyContent: 'center' },
+  activatingContainer: { flex: 1, backgroundColor: "#0F1115", alignItems: 'center', justifyContent: 'center' },
   unifiedTitle: { color: 'white', fontSize: 28, fontFamily: 'Avenir', marginBottom: 50, textAlign: 'center' },
   gifLarge: { width: 250, height: 250 },
   inactiveCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
@@ -720,7 +720,7 @@ const styles = StyleSheet.create({
   pulseBox: { width: 250, height: 300, justifyContent: 'center', alignItems: 'center' },
   tapToActivate: { color: ACCENT, fontSize: 18, fontFamily: 'Avenir-Medium', marginTop: -10, opacity: 0.8, letterSpacing: 0.5, textAlign: 'center' },
   centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
-  modalBg: { flex: 1, backgroundColor: '#000' },
+  modalBg: { flex: 1, backgroundColor: "#0F1115" },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
   modalTitle: { color: 'white', fontSize: 18, fontFamily: 'Avenir-Black' },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
   myBubble: { backgroundColor: ACCENT },
   theirBubble: { backgroundColor: '#1C1C1E' },
   timestampOutside: { color: '#444', fontSize: 11, marginTop: 4, fontFamily: 'Avenir' },
-  inputRow: { flexDirection: 'row', padding: 20, paddingBottom: 40, backgroundColor: 'black', alignItems: 'center' },
+  inputRow: { flexDirection: 'row', padding: 20, paddingBottom: 40, backgroundColor: "#0F1115", alignItems: 'center' },
   input: { flex: 1, backgroundColor: '#1C1C1E', borderRadius: 25, paddingHorizontal: 20, paddingVertical: 12, color: 'white', fontSize: 16, marginRight: 10 },
   sendBtn: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: ACCENT, justifyContent: 'center', alignItems: 'center' },
   aiTrigger: {
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
   aiShareBtnText: { color: 'black', fontSize: 14, fontFamily: 'Avenir-Heavy' },
   editPanel: { width: '100%', backgroundColor: '#161616', borderRadius: 32, padding: 32, alignItems: 'center' },
   panelTitle: { color: 'white', fontSize: 22, marginBottom: 24, fontFamily: 'Avenir-Black' },
-  panelInput: { width: '100%', backgroundColor: '#000', color: 'white', padding: 18, borderRadius: 16, marginBottom: 20, textAlign: 'center' },
+  panelInput: { width: '100%', backgroundColor: "#0F1115", color: 'white', padding: 18, borderRadius: 16, marginBottom: 20, textAlign: 'center' },
   saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 12 },
   saveBtnText: { color: 'black', fontSize: 16, fontFamily: 'Avenir-Black' },
   endSynqBtn: { width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FF453A' },

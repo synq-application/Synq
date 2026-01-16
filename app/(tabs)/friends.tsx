@@ -375,7 +375,7 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "black", paddingHorizontal: 20 },
+  container: { flex: 1, backgroundColor: "#0F1115", paddingHorizontal: 20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.book,
     fontStyle: "italic",
   },
-  memoBox: { backgroundColor: "#000", padding: 18, borderRadius: 20, width: "100%", marginBottom: 15 },
+  memoBox: { backgroundColor: "#0F1115", padding: 18, borderRadius: 20, width: "100%", marginBottom: 15 },
   memoTitle: {
     color: "#666",
     fontSize: 11,
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   memoText: { color: "white", fontSize: 15, fontFamily: fonts.medium, lineHeight: 20 },
   removeBtn: { marginTop: 15, padding: 10 },
   removeBtnText: { color: "#ff453a", fontFamily: fonts.heavy, fontSize: 14 },
-  modalBody: { flex: 1, backgroundColor: "#000", padding: 20 },
+  modalBody: { flex: 1, backgroundColor: "#0F1115", padding: 20 },
   searchBarRow: { flexDirection: "row", alignItems: "center", gap: 15, marginBottom: 20, marginTop: 40 },
   input: {
     flex: 1,

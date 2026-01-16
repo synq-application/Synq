@@ -381,7 +381,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'black' },
+  container: { flex: 1, backgroundColor: "#0F1115" },
   scrollContent: { paddingBottom: 160 },
   header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, marginTop: 60, alignItems: 'center' },
   badge: { position: 'absolute', right: -4, top: -4, backgroundColor: 'red', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'black' },
