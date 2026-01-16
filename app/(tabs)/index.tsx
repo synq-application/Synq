@@ -38,8 +38,7 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
-
-type SynqStatus = 'idle' | 'activating' | 'finding' | 'active';
+import { SynqStatus, formatTime } from '../helpers';
 
 export default function SynqScreen() {
   const [memo, setMemo] = useState('');
@@ -59,7 +58,6 @@ export default function SynqScreen() {
   const [isAILoading, setIsAILoading] = useState(false);
   const [showAICard, setShowAICard] = useState(false);
   const [aiResponse, setAiResponse] = useState('');
-
   const [aiOptions, setAiOptions] = useState<any[]>([]);
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [showOptionsList, setShowOptionsList] = useState(false);
@@ -72,16 +70,13 @@ export default function SynqScreen() {
       try {
         const userRef = doc(db, 'users', auth.currentUser!.uid);
         const userSnap = await getDoc(userRef);
-
         if (userSnap.exists()) {
           const data = userSnap.data();
           setUserProfile(data);
           setMemo(data.memo || '');
-
           if (data.status === 'available' && data.synqStartedAt) {
             const startTime = data.synqStartedAt.toDate().getTime();
             const hoursElapsed = (new Date().getTime() - startTime) / (1000 * 60 * 60);
-
             if (hoursElapsed > EXPIRATION_HOURS) {
               await updateDoc(userRef, { status: 'inactive', memo: '' });
               setStatus('idle');
@@ -175,12 +170,6 @@ useEffect(() => {
         break;
       }
     }
-  };
-
-  const formatTime = (timestamp: any) => {
-    if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const triggerAISuggestion = async (category: string) => {
