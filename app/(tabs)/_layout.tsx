@@ -13,7 +13,6 @@ export default function TabsLayout() {
         tabBarActiveTintColor: ACCENT,
         tabBarInactiveTintColor: "rgba(255,255,255,0.4)",
         tabBarShowLabel: true,
-        // This ensures the labels don't shift when the center icon is large
         tabBarLabelStyle: { fontSize: 12, marginBottom: -5 }, 
       }}
     >
@@ -30,7 +29,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index" 
         options={{
-          title: "", // Empty string to prevent text overlap
+          title: "", 
           tabBarIcon: ({ focused }) => (
             <View style={[
               styles.synqButton, 
@@ -60,16 +59,15 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: "#081212", // Slightly off-black for depth
+    backgroundColor: "#081212",
     borderTopWidth: 0,
     height: Platform.OS === "ios" ? 85 : 70,
-    position: 'absolute', // Makes the bar float
+    position: 'absolute', 
     bottom: 20,
     left: 20,
     right: 20,
-    borderRadius: 25, // Rounded corners for a modern look
+    borderRadius: 25,
     paddingBottom: Platform.OS === "ios" ? 25 : 10,
-    // Bar Shadow
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -80,16 +78,15 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: "#000", // Dark base
+    backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
     position: 'absolute',
-    top: -20, // Lifted higher
+    top: -20, 
     borderWidth: 2,
-    borderColor: ACCENT, // Border acts as the "inner" glow
-    // The "All Around" Glow Effect
+    borderColor: ACCENT, 
     shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 0 }, // 0 offset makes it glow everywhere
+    shadowOffset: { width: 0, height: 0 }, 
     shadowOpacity: 0.8,
     shadowRadius: 15,
     elevation: 15,

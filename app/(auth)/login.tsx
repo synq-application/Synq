@@ -147,7 +147,7 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "black", paddingHorizontal: 24 },
+  container: { flex: 1, backgroundColor: "#0F1115", paddingHorizontal: 24 },
   inner: { width: '100%', marginTop: height * 0.22 },
   title: { color: "white", fontSize: 32, fontFamily: fonts.black },
   subtitle: { color: "rgba(255,255,255,0.6)", fontSize: 16, marginTop: 8, marginBottom: 32, fontFamily: fonts.medium },
