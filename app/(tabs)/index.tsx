@@ -15,7 +15,7 @@ import {
   where
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -64,6 +64,7 @@ export default function SynqScreen() {
   const [selectedOption, setSelectedOption] = useState<any>(null);
   const [showOptionsList, setShowOptionsList] = useState(false);
   const [currentCategory, setCurrentCategory] = useState('');
+  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -127,14 +128,19 @@ export default function SynqScreen() {
     return () => unsubscribe();
   }, [status]);
 
-  useEffect(() => {
-    if (!activeChatId || !isChatVisible) return;
-    const q = query(collection(db, "chats", activeChatId, "messages"), orderBy("createdAt", "asc"));
-    return onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-  }, [activeChatId, isChatVisible]);
-
+useEffect(() => {
+  if (!activeChatId || !isChatVisible) return;
+  const q = query(collection(db, "chats", activeChatId, "messages"), orderBy("createdAt", "asc"));
+  
+  return onSnapshot(q, (snap) => {
+    const newMessages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    setMessages(newMessages);
+    
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  });
+}, [activeChatId, isChatVisible])
   useEffect(() => {
     let timer: any;
     if (status === 'activating') {
@@ -189,7 +195,6 @@ export default function SynqScreen() {
       const getSuggestions = httpsCallable(functions, 'getSynqSuggestions');
       const currentChat = allChats.find(c => c.id === activeChatId);
       const city = userProfile?.city + " " + userProfile?.state;
-
       const friendId = currentChat.participants.find((id: string) => id !== auth.currentUser?.uid);
       const friendSnap = await getDoc(doc(db, "users", friendId));
       const friendInterests = friendSnap.exists() ? (friendSnap.data()?.interests || []) : [];
@@ -502,25 +507,37 @@ export default function SynqScreen() {
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={60}>
               <View style={{ flex: 1 }}>
                 <FlatList
+                  ref={flatListRef}
                   data={messages}
                   keyExtractor={item => item.id}
+                  onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                  onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
                   renderItem={({ item }) => {
                     const isMe = item.senderId === auth.currentUser?.uid;
+                    const isSystemIdea = item.text.includes('✨ Synq AI Suggestion') || item.venueImage;
+
                     const currentChat = allChats.find(c => c.id === activeChatId);
                     const senderAvatar = currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
+
+                    if (isSystemIdea) {
+                      return (
+                        <View style={styles.centeredIdeaContainer}>
+                          <View style={styles.ideaBubble}>
+                            {item.venueImage && (
+                              <Image source={{ uri: item.venueImage }} style={styles.ideaImage} resizeMode="cover" />
+                            )}
+                            <Text style={styles.ideaText}>{item.text}</Text>
+                          </View>
+                          <Text style={styles.timestampCentered}>{formatTime(item.createdAt)}</Text>
+                        </View>
+                      );
+                    }
 
                     return (
                       <View style={[styles.msgContainer, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
                           {!isMe && <Image source={{ uri: senderAvatar }} style={styles.chatAvatar} />}
                           <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
-                            {item.venueImage && (
-                              <Image
-                                source={{ uri: item.venueImage }}
-                                style={{ width: 200, height: 120, borderRadius: 12, marginBottom: 8 }}
-                                resizeMode="cover"
-                              />
-                            )}
                             <Text style={{ color: isMe ? 'black' : 'white', fontSize: 16 }}>{item.text}</Text>
                           </View>
                         </View>
@@ -618,6 +635,9 @@ export default function SynqScreen() {
                                 <Ionicons name="chevron-back" size={24} color={ACCENT} />
                                 <Text style={[styles.modalTitle, { color: ACCENT, marginLeft: 8 }]}>{currentCategory} Spots</Text>
                               </TouchableOpacity>
+                              <TouchableOpacity onPress={() => setIsExploreVisible(false)}>
+                                <Ionicons name="close-circle" size={32} color="#444" />
+                              </TouchableOpacity>
                             </View>
 
                             <FlatList
@@ -713,7 +733,7 @@ const styles = StyleSheet.create({
   centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
   modalBg: { flex: 1, backgroundColor: '#000' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
-  modalTitle: { color: 'white', fontSize: 24, fontFamily: 'Avenir-Black' },
+  modalTitle: { color: 'white', fontSize: 18, fontFamily: 'Avenir-Black' },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
   inboxItem: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#111' },
   inboxCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
@@ -744,7 +764,7 @@ const styles = StyleSheet.create({
   circlePlaceholder: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#333' },
   circleText: { color: 'white', fontSize: 13, fontFamily: 'Avenir-Medium' },
   venueCard: {
-    flexDirection: 'row', // Ensures image is to the left of text
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#111',
     padding: 12,
@@ -793,5 +813,42 @@ const styles = StyleSheet.create({
   saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 12 },
   saveBtnText: { color: 'black', fontSize: 16, fontFamily: 'Avenir-Black' },
   endSynqBtn: { width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FF453A' },
-  endSynqBtnText: { color: '#FF453A', fontSize: 16 }
+  endSynqBtnText: { color: '#FF453A', fontSize: 16 },
+  centeredIdeaContainer: {
+    alignItems: 'center',
+    marginVertical: 15,
+    width: '100%',
+  },
+  ideaBubble: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: ACCENT,
+    padding: 12,
+    width: '85%',
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  ideaImage: {
+    width: '100%',
+    height: 150,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  ideaText: {
+    color: 'white',
+    fontSize: 15,
+    textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  timestampCentered: {
+    color: '#666',
+    fontSize: 10,
+    marginTop: 4,
+  },
 });
