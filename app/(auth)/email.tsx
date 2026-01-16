@@ -113,7 +113,7 @@ export default function EmailSignup() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "black",
+    backgroundColor: "#0F1115",
     paddingHorizontal: 24,
   },
   innerContent: {

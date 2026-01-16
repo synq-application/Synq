@@ -24,7 +24,7 @@ import {
 import { auth, db } from "../src/lib/firebase";
 
 const ACCENT = "#7DFFA6";
-const BACKGROUND = "#000000";
+const BACKGROUND = "#0F1115";
 const SURFACE = "#161616";
 
 const fonts = {

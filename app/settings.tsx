@@ -3,21 +3,21 @@ import { router } from 'expo-router';
 import { doc, onSnapshot } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
 import {
-    Image,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View
+  Image,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { auth, db } from "../src/lib/firebase";
 
 const ACCENT = "#7DFFA6";
-const BACKGROUND = "#000000";
+const BACKGROUND = "#0F1115";
 const SURFACE = "#161616";
 
 const fonts = {

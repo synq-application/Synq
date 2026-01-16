@@ -103,7 +103,7 @@ export default function LocationDetails() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: "black", 
+    backgroundColor: "#0F1115", 
     padding: 24, 
     justifyContent: "center" 
   },
