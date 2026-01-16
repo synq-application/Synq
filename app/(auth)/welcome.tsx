@@ -84,7 +84,7 @@ export default function Welcome() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F1115",
+    backgroundColor: "black",
   },
   svgBackground: {
     ...StyleSheet.absoluteFillObject,

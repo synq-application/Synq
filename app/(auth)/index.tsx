@@ -25,6 +25,6 @@ export default function AssemblySplash() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F1115" },
+  container: { flex: 1, backgroundColor: "black" },
   gif: { width: "100%", height: "100%" },
 });

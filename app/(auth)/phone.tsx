@@ -226,7 +226,7 @@ export default function Phone() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0F1115"},
+  root: { flex: 1, backgroundColor: "black"},
   svgBackground: { ...StyleSheet.absoluteFillObject, opacity: 0.5, left: -20 },
   close: { position: "absolute", top: 60, left: 25, zIndex: 10 },
   closeText: { fontSize: 16, color: ACCENT, fontFamily: fonts.heavy },

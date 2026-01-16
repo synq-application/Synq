@@ -59,7 +59,7 @@ export default function Verify() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F1115" },
+  container: { flex: 1, backgroundColor: "black" },
   inner: { flex: 1, padding: 24, justifyContent: "center" },
   title: { fontSize: 28, fontWeight: "700", color: "white" },
   subtitle: { marginTop: 10, fontSize: 16, color: "rgba(255,255,255,0.7)" },
