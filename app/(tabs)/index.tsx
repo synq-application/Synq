@@ -446,8 +446,8 @@ useEffect(() => {
               data={availableFriends}
               keyExtractor={item => item.id}
               ListEmptyComponent={
-                <><Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 24 }}>No free friends right now :/</Text>
-                <Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 20 }}>In the meantime, add more connections to increase the chances of having overlapping free time!</Text></>
+                <><Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 22 }}>No free friends right now :/</Text>
+                <Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 18 }}>In the meantime, add more connections to increase the chances of having overlapping free time!</Text></>
               }
               renderItem={({ item }) => (
                 <TouchableOpacity
