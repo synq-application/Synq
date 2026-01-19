@@ -65,20 +65,37 @@ export default function SynqScreen() {
   const [currentCategory, setCurrentCategory] = useState('');
   const flatListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-  const subscription = DeviceEventEmitter.addListener('openChat', (data) => {
-    if (data.chatId) {
-      setActiveChatId(data.chatId);
-      setIsChatVisible(true);
-      setIsInboxVisible(false);
-    }
-  });
+  const [hasUnread, setHasUnread] = useState(false);
 
-  return () => subscription.remove();
-}, []);
+  const markChatRead = async (chatId: string) => {
+    if (!auth.currentUser) return;
+    const myId = auth.currentUser.uid;
+
+    try {
+      await updateDoc(doc(db, 'chats', chatId), {
+        [`lastReadBy.${myId}`]: serverTimestamp(),
+      });
+    } catch (e) {
+      console.error('Failed to mark chat read', e);
+    }
+  };
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('openChat', async (data) => {
+      if (data.chatId) {
+        setActiveChatId(data.chatId);
+        setIsChatVisible(true);
+        setIsInboxVisible(false);
+        await markChatRead(data.chatId);
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     if (!auth.currentUser) return;
+
     const init = async () => {
       try {
         const userRef = doc(db, 'users', auth.currentUser!.uid);
@@ -99,100 +116,121 @@ export default function SynqScreen() {
             }
           }
         }
-      } catch (e) { console.error(e); } finally { setLoading(false); }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
+
     init();
 
     const q = query(
-      collection(db, "chats"),
-      where("participants", "array-contains", auth.currentUser!.uid),
-      orderBy("createdAt", "desc")
+      collection(db, 'chats'),
+      where('participants', 'array-contains', auth.currentUser!.uid),
+      orderBy('createdAt', 'desc')
     );
+
     return onSnapshot(q, (snap) => {
-      setAllChats(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const chats = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setAllChats(chats);
+
+      const myId = auth.currentUser!.uid;
+
+      const anyUnread = chats.some((c: any) => {
+        const updatedAtMs = c.updatedAt?.toMillis?.() ?? 0;
+        const lastReadMs = c.lastReadBy?.[myId]?.toMillis?.() ?? 0;
+        const lastSender = c.lastMessageSenderId;
+        return !!lastSender && lastSender !== myId && updatedAtMs > lastReadMs;
+      });
+
+      setHasUnread(anyUnread);
     });
   }, []);
 
-useEffect(() => {
-  if (!auth.currentUser || status !== "active") {
-    setAvailableFriends([]);
-    return;
-  }
-
-  const myId = auth.currentUser.uid;
-  const friendsRef = collection(db, "users", myId, "friends");
-  const friendUnsubs = new Map<string, () => void>();
-  const friendState = new Map<string, any>(); 
-
-  const emit = () => {
-    setAvailableFriends(Array.from(friendState.values()));
-  };
-
-  const friendsUnsub = onSnapshot(friendsRef, (friendsSnap) => {
-    const friendIds = new Set(friendsSnap.docs.map((d) => d.id));
-
-    for (const [fid, unsub] of friendUnsubs.entries()) {
-      if (!friendIds.has(fid)) {
-        unsub();
-        friendUnsubs.delete(fid);
-        friendState.delete(fid);
-      }
+  useEffect(() => {
+    if (!auth.currentUser || status !== 'active') {
+      setAvailableFriends([]);
+      return;
     }
 
-    friendsSnap.docs.forEach((fDoc) => {
-      const fid = fDoc.id;
-      if (friendUnsubs.has(fid)) return;
+    const myId = auth.currentUser.uid;
+    const friendsRef = collection(db, 'users', myId, 'friends');
+    const friendUnsubs = new Map<string, () => void>();
+    const friendState = new Map<string, any>();
 
-      const uRef = doc(db, "users", fid);
-      const uUnsub = onSnapshot(uRef, (uSnap) => {
-        if (!uSnap.exists()) {
+    const emit = () => {
+      setAvailableFriends(Array.from(friendState.values()));
+    };
+
+    const friendsUnsub = onSnapshot(friendsRef, (friendsSnap) => {
+      const friendIds = new Set(friendsSnap.docs.map((d) => d.id));
+
+      for (const [fid, unsub] of friendUnsubs.entries()) {
+        if (!friendIds.has(fid)) {
+          unsub();
+          friendUnsubs.delete(fid);
           friendState.delete(fid);
+        }
+      }
+
+      friendsSnap.docs.forEach((fDoc) => {
+        const fid = fDoc.id;
+        if (friendUnsubs.has(fid)) return;
+
+        const uRef = doc(db, 'users', fid);
+        const uUnsub = onSnapshot(uRef, (uSnap) => {
+          if (!uSnap.exists()) {
+            friendState.delete(fid);
+            emit();
+            return;
+          }
+
+          const data = uSnap.data();
+
+          if (data?.status === 'available') {
+            friendState.set(fid, { id: fid, ...data });
+          } else {
+            friendState.delete(fid);
+          }
+
           emit();
-          return;
-        }
+        });
 
-        const data = uSnap.data();
-
-        if (data?.status === "available") {
-          friendState.set(fid, { id: fid, ...data });
-        } else {
-          friendState.delete(fid);
-        }
-
-        emit();
+        friendUnsubs.set(fid, uUnsub);
       });
-
-      friendUnsubs.set(fid, uUnsub);
+      emit();
     });
-    emit();
-  });
 
-  return () => {
-    friendsUnsub();
-    friendUnsubs.forEach((unsub) => unsub());
-    friendUnsubs.clear();
-    friendState.clear();
-  };
-}, [status]);
+    return () => {
+      friendsUnsub();
+      friendUnsubs.forEach((unsub) => unsub());
+      friendUnsubs.clear();
+      friendState.clear();
+    };
+  }, [status]);
 
+  useEffect(() => {
+    if (!activeChatId || !isChatVisible) return;
+    const q = query(collection(db, 'chats', activeChatId, 'messages'), orderBy('createdAt', 'asc'));
 
-useEffect(() => {
-  if (!activeChatId || !isChatVisible) return;
-  const q = query(collection(db, "chats", activeChatId, "messages"), orderBy("createdAt", "asc"));
-  
-  return onSnapshot(q, (snap) => {
-    const newMessages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    setMessages(newMessages);
-    
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  });
-}, [activeChatId, isChatVisible])
+    return onSnapshot(q, (snap) => {
+      const newMessages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setMessages(newMessages);
+
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+  }, [activeChatId, isChatVisible]);
+
   useEffect(() => {
     let timer: any;
     if (status === 'activating') {
-      timer = setTimeout(() => { Vibration.vibrate(100); setStatus('finding'); }, 2000);
+      timer = setTimeout(() => {
+        Vibration.vibrate(100);
+        setStatus('finding');
+      }, 2000);
     } else if (status === 'finding') {
       timer = setTimeout(async () => {
         if (availableFriends.length > 0) runSmartMatch(availableFriends);
@@ -200,24 +238,24 @@ useEffect(() => {
         setStatus('active');
       }, 2000);
     }
-    return () => { if (timer) clearTimeout(timer); };
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [status]);
 
   const runSmartMatch = (friends: any[]) => {
     if (!userProfile?.interests || userProfile.interests.length === 0) return;
     for (const friend of friends) {
-      const common = friend.interests?.filter((interest: string) =>
-        userProfile.interests.includes(interest)
-      );
+      const common = friend.interests?.filter((interest: string) => userProfile.interests.includes(interest));
       if (common && common.length > 0) {
         const sharedItem = common[0];
         Vibration.vibrate([0, 400, 100, 400]);
         Alert.alert(
-          "Smart Match Found! ⚡️",
+          'Smart Match Found! ⚡️',
           `Your friend ${friend.displayName} is looking to hang. You both love ${sharedItem}—want to Synq up?`,
           [
-            { text: "Dismiss", style: "cancel" },
-            { text: "Chat Now", onPress: () => handleConnectWithId(friend.id) }
+            { text: 'Dismiss', style: 'cancel' },
+            { text: 'Chat Now', onPress: () => handleConnectWithId(friend.id) }
           ]
         );
         break;
@@ -235,16 +273,16 @@ useEffect(() => {
     try {
       const functions = getFunctions();
       const getSuggestions = httpsCallable(functions, 'getSynqSuggestions');
-      const currentChat = allChats.find(c => c.id === activeChatId);
-      const city = userProfile?.city + " " + userProfile?.state;
+      const currentChat = allChats.find((c) => c.id === activeChatId);
+      const city = userProfile?.city + ' ' + userProfile?.state;
       const friendId = currentChat.participants.find((id: string) => id !== auth.currentUser?.uid);
-      const friendSnap = await getDoc(doc(db, "users", friendId));
-      const friendInterests = friendSnap.exists() ? (friendSnap.data()?.interests || []) : [];
+      const friendSnap = await getDoc(doc(db, 'users', friendId));
+      const friendInterests = friendSnap.exists() ? friendSnap.data()?.interests || [] : [];
       const shared = (userProfile?.interests || []).filter((i: any) => friendInterests.includes(i));
 
       const payload = {
         category: category,
-        shared: shared.length > 0 ? shared : ["exploring new spots"],
+        shared: shared.length > 0 ? shared : ['exploring new spots'],
         location: city
       };
 
@@ -262,7 +300,7 @@ useEffect(() => {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      console.error("AI Error:", error);
+      console.error('AI Error:', error);
     } finally {
       setIsAILoading(false);
     }
@@ -276,16 +314,17 @@ useEffect(() => {
       : `✨ Synq AI Suggestion:\n\n${aiResponse}`;
 
     try {
-      await addDoc(collection(db, "chats", activeChatId, "messages"), {
+      await addDoc(collection(db, 'chats', activeChatId, 'messages'), {
         text: textToSend,
         senderId: auth.currentUser.uid,
         imageurl: userProfile?.imageurl || DEFAULT_AVATAR,
         venueImage: selectedOption?.imageUrl || selectedOption?.imageurl || null,
-        createdAt: serverTimestamp(),
+        createdAt: serverTimestamp()
       });
 
-      await updateDoc(doc(db, "chats", activeChatId), {
-        lastMessage: selectedOption ? `Shared: ${selectedOption.name}` : "AI Suggestion shared",
+      await updateDoc(doc(db, 'chats', activeChatId), {
+        lastMessage: selectedOption ? `Shared: ${selectedOption.name}` : 'AI Suggestion shared',
+        lastMessageSenderId: auth.currentUser.uid,
         updatedAt: serverTimestamp()
       });
 
@@ -294,7 +333,7 @@ useEffect(() => {
       setSelectedOption(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
-      console.error("Failed to share AI suggestion", e);
+      console.error('Failed to share AI suggestion', e);
     }
   };
 
@@ -302,19 +341,25 @@ useEffect(() => {
     if (!auth.currentUser) return;
     Vibration.vibrate(200);
     await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-      memo, status: 'available', synqStartedAt: serverTimestamp()
+      memo,
+      status: 'available',
+      synqStartedAt: serverTimestamp()
     });
     setStatus('activating');
   };
 
   const endSynq = async () => {
-    Alert.alert("End Synq?", "You will no longer be visible as available.", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert('End Synq?', 'You will no longer be visible as available.', [
+      { text: 'Cancel', style: 'cancel' },
       {
-        text: "Deactivate Synq", style: "destructive", onPress: async () => {
+        text: 'Deactivate Synq',
+        style: 'destructive',
+        onPress: async () => {
           if (!auth.currentUser) return;
           await updateDoc(doc(db, 'users', auth.currentUser!.uid), { status: 'inactive', memo: '' });
-          setMemo(''); setStatus('idle'); setIsEditModalVisible(false);
+          setMemo('');
+          setStatus('idle');
+          setIsEditModalVisible(false);
         }
       }
     ]);
@@ -334,7 +379,7 @@ useEffect(() => {
 
   const executeConnection = async (participants: string[]) => {
     try {
-      const existing = allChats.find(c => JSON.stringify(c.participants.sort()) === JSON.stringify(participants));
+      const existing = allChats.find((c) => JSON.stringify(c.participants.sort()) === JSON.stringify(participants));
       if (existing) {
         setActiveChatId(existing.id);
       } else {
@@ -347,51 +392,69 @@ useEffect(() => {
             imgMap[uid] = uSnap.data().imageurl || DEFAULT_AVATAR;
           }
         }
-        const chatRef = await addDoc(collection(db, "chats"), {
-          participants, participantNames: nameMap, participantImages: imgMap,
-          createdAt: serverTimestamp(), lastMessage: "Synq established!",
+        const chatRef = await addDoc(collection(db, 'chats'), {
+          participants,
+          participantNames: nameMap,
+          participantImages: imgMap,
+          createdAt: serverTimestamp(),
+          lastMessage: 'Synq established!'
         });
         setActiveChatId(chatRef.id);
       }
       setIsChatVisible(true);
       setSelectedFriends([]);
-    } catch (e) { console.error(e); }
-  }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const sendMessage = async () => {
     if (!inputText.trim() || !activeChatId || !auth.currentUser) return;
-    const currentChat = allChats.find(c => c.id === activeChatId);
+    const currentChat = allChats.find((c) => c.id === activeChatId);
     if (!currentChat) return;
+
     const text = inputText;
     const myId = auth.currentUser.uid;
     setInputText('');
+
     try {
-      await addDoc(collection(db, "chats", activeChatId, "messages"), {
-        text, senderId: myId,
+      await addDoc(collection(db, 'chats', activeChatId, 'messages'), {
+        text,
+        senderId: myId,
         imageurl: userProfile?.imageurl || DEFAULT_AVATAR,
-        createdAt: serverTimestamp(),
+        createdAt: serverTimestamp()
       });
-      await updateDoc(doc(db, "chats", activeChatId), {
+
+      await updateDoc(doc(db, 'chats', activeChatId), {
         lastMessage: text,
+        lastMessageSenderId: myId,
         updatedAt: serverTimestamp()
       });
+
       const otherParticipants = currentChat.participants.filter((pId: string) => pId !== myId);
       otherParticipants.forEach(async (pId: string) => {
-        const mySideFriendDoc = doc(db, "users", myId, "friends", pId);
-        await updateDoc(mySideFriendDoc, { synqCount: increment(1) }).catch(() => { });
-        const theirSideFriendDoc = doc(db, "users", pId, "friends", myId);
-        await updateDoc(theirSideFriendDoc, { synqCount: increment(1) }).catch(() => { });
+        const mySideFriendDoc = doc(db, 'users', myId, 'friends', pId);
+        await updateDoc(mySideFriendDoc, { synqCount: increment(1) }).catch(() => {});
+        const theirSideFriendDoc = doc(db, 'users', pId, 'friends', myId);
+        await updateDoc(theirSideFriendDoc, { synqCount: increment(1) }).catch(() => {});
       });
-    } catch (e) { console.error("Failed to send message", e); }
+    } catch (e) {
+      console.error('Failed to send message', e);
+    }
   };
 
   const handleDeleteChat = async (chatId: string) => {
-    Alert.alert("Delete Chat", "Are you sure you want to delete this conversation?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert('Delete Chat', 'Are you sure you want to delete this conversation?', [
+      { text: 'Cancel', style: 'cancel' },
       {
-        text: "Delete", style: "destructive", onPress: async () => {
-          if (activeChatId === chatId) { setIsChatVisible(false); setActiveChatId(null); }
-          await deleteDoc(doc(db, "chats", chatId));
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          if (activeChatId === chatId) {
+            setIsChatVisible(false);
+            setActiveChatId(null);
+          }
+          await deleteDoc(doc(db, 'chats', chatId));
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         }
       }
@@ -399,26 +462,36 @@ useEffect(() => {
   };
 
   const getChatTitle = (chat: any) => {
-    if (!chat || !auth.currentUser || !chat.participantNames) return "Synq Chat";
+    if (!chat || !auth.currentUser || !chat.participantNames) return 'Synq Chat';
     const myId = auth.currentUser.uid;
     const otherNames = Object.entries(chat.participantNames)
       .filter(([uid]) => uid !== myId)
       .map(([_, name]) => name as string);
-    if (otherNames.length === 0) return "Just You";
+    if (otherNames.length === 0) return 'Just You';
     if (otherNames.length === 1) return `You & ${otherNames[0]}`;
     const lastFriend = otherNames.pop();
     return `You, ${otherNames.join(', ')} & ${lastFriend}`;
   };
 
   const renderAvatarStack = (images: any) => {
-    if (!images) return <View style={styles.inboxCircle}><Ionicons name="people" size={20} color={ACCENT} /></View>;
+    if (!images)
+      return (
+        <View style={styles.inboxCircle}>
+          <Ionicons name="people" size={20} color={ACCENT} />
+        </View>
+      );
     const displayImages = Object.entries(images)
       .filter(([uid]) => uid !== auth.currentUser?.uid)
-      .map(([_, url]) => url as string).slice(0, 3);
+      .map(([_, url]) => url as string)
+      .slice(0, 3);
     return (
       <View style={styles.avatarStack}>
         {displayImages.map((uri, index) => (
-          <Image key={index} source={{ uri: uri || DEFAULT_AVATAR }} style={[styles.stackedPhoto, { left: index * 12, zIndex: 5 - index }]} />
+          <Image
+            key={index}
+            source={{ uri: uri || DEFAULT_AVATAR }}
+            style={[styles.stackedPhoto, { left: index * 12, zIndex: 5 - index }]}
+          />
         ))}
       </View>
     );
@@ -430,37 +503,58 @@ useEffect(() => {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
+
         {status === 'active' && (
           <View style={{ flex: 1 }}>
             <View style={styles.activeHeader}>
               <TouchableOpacity onPress={() => setIsInboxVisible(true)} style={styles.headerIconContainer}>
                 <Ionicons name="chatbubbles-outline" size={28} color="white" />
-                {allChats.length > 0 && <View style={styles.badge} />}
+                {/* ✅ UPDATED: badge only when there are unread messages */}
+                {hasUnread && <View style={styles.badge} />}
               </TouchableOpacity>
+
               <Text style={styles.headerTitle}>Synq is active</Text>
+
               <TouchableOpacity onPress={() => setIsEditModalVisible(true)} style={styles.headerIconContainer}>
                 <Ionicons name="create-outline" size={28} color={ACCENT} />
               </TouchableOpacity>
             </View>
+
             <FlatList
               data={availableFriends}
-              keyExtractor={item => item.id}
+              keyExtractor={(item) => item.id}
               ListEmptyComponent={
-                <><Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 22 }}>No free friends right now :/</Text>
-                <Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 18 }}>In the meantime, add more connections to increase the chances of having overlapping free time!</Text></>
+                <>
+                  <Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 22 }}>
+                    No free friends right now :/
+                  </Text>
+                  <Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 18 }}>
+                    In the meantime, add more connections to increase the chances of having overlapping free time!
+                  </Text>
+                </>
               }
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  onPress={() => setSelectedFriends(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                  onPress={() =>
+                    setSelectedFriends((prev) =>
+                      prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
+                    )
+                  }
                   style={[styles.friendCard, selectedFriends.includes(item.id) && { borderColor: ACCENT }]}
                 >
                   <Image source={{ uri: item.imageurl || DEFAULT_AVATAR }} style={styles.friendImg} />
-                  <View style={{ flex: 1 }}><Text style={styles.whiteBold}>{item.displayName}</Text><Text style={styles.grayText} numberOfLines={1}>{item.memo}</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.whiteBold}>{item.displayName}</Text>
+                    <Text style={styles.grayText} numberOfLines={1}>
+                      {item.memo}
+                    </Text>
+                  </View>
                   {selectedFriends.includes(item.id) && <Ionicons name="checkmark-circle" size={24} color={ACCENT} />}
                 </TouchableOpacity>
               )}
               contentContainerStyle={{ padding: 20 }}
             />
+
             <View style={styles.footer}>
               <TouchableOpacity
                 style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
@@ -469,6 +563,7 @@ useEffect(() => {
               >
                 <Text style={styles.btnText}>Connect ({selectedFriends.length})</Text>
               </TouchableOpacity>
+
               <TouchableOpacity onPress={endSynq} style={styles.deactivateLink}>
                 <Text style={styles.deactivateLinkText}>Deactivate Synq</Text>
               </TouchableOpacity>
@@ -478,7 +573,7 @@ useEffect(() => {
 
         {(status === 'activating' || status === 'finding') && (
           <View style={styles.activatingContainer}>
-            <Text style={styles.unifiedTitle}>{status === 'activating' ? "Synq activated..." : "Finding connections..."}</Text>
+            <Text style={styles.unifiedTitle}>{status === 'activating' ? 'Synq activated...' : 'Finding connections...'}</Text>
             <Image source={require('../../assets/pulse.gif')} style={styles.gifLarge} resizeMode="contain" />
           </View>
         )}
@@ -500,15 +595,19 @@ useEffect(() => {
             </TouchableOpacity>
           </View>
         )}
+
         <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Messages</Text>
-              <TouchableOpacity onPress={() => setIsInboxVisible(false)}><Ionicons name="close-circle" size={28} color="#444" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setIsInboxVisible(false)}>
+                <Ionicons name="close-circle" size={28} color="#444" />
+              </TouchableOpacity>
             </View>
+
             <FlatList
               data={allChats}
-              keyExtractor={item => item.id}
+              keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <Swipeable
                   renderRightActions={() => (
@@ -517,11 +616,21 @@ useEffect(() => {
                     </TouchableOpacity>
                   )}
                 >
-                  <TouchableOpacity style={styles.inboxItem} onPress={() => { setActiveChatId(item.id); setIsInboxVisible(false); setIsChatVisible(true); }}>
+                  <TouchableOpacity
+                    style={styles.inboxItem}
+                    onPress={async () => {
+                      setActiveChatId(item.id);
+                      setIsInboxVisible(false);
+                      setIsChatVisible(true);
+                      await markChatRead(item.id);
+                    }}
+                  >
                     {renderAvatarStack(item.participantImages)}
                     <View style={{ flex: 1, marginLeft: Object.keys(item.participantImages || {}).length > 2 ? 35 : 15 }}>
                       <Text style={styles.whiteBold}>{getChatTitle(item)}</Text>
-                      <Text style={styles.grayText} numberOfLines={1}>{item.lastMessage}</Text>
+                      <Text style={styles.grayText} numberOfLines={1}>
+                        {item.lastMessage}
+                      </Text>
                     </View>
                   </TouchableOpacity>
                 </Swipeable>
@@ -529,13 +638,12 @@ useEffect(() => {
             />
           </View>
         </Modal>
+
         <Modal visible={isChatVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.modalTitle}>
-                  {activeChatId && getChatTitle(allChats.find(c => c.id === activeChatId))}
-                </Text>
+                <Text style={styles.modalTitle}>{activeChatId && getChatTitle(allChats.find((c) => c.id === activeChatId))}</Text>
                 <TouchableOpacity
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -547,30 +655,37 @@ useEffect(() => {
                   <Ionicons name="sparkles" size={20} color={ACCENT} />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => { setIsChatVisible(false); setShowAICard(false); setShowOptionsList(false); }}><Ionicons name="close-circle" size={30} color="#444" /></TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsChatVisible(false);
+                  setShowAICard(false);
+                  setShowOptionsList(false);
+                }}
+              >
+                <Ionicons name="close-circle" size={30} color="#444" />
+              </TouchableOpacity>
             </View>
+
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={60}>
               <View style={{ flex: 1 }}>
                 <FlatList
                   ref={flatListRef}
                   data={messages}
-                  keyExtractor={item => item.id}
+                  keyExtractor={(item) => item.id}
                   onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                   onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
                   renderItem={({ item }) => {
                     const isMe = item.senderId === auth.currentUser?.uid;
                     const isSystemIdea = item.text.includes('✨ Synq AI Suggestion') || item.venueImage;
 
-                    const currentChat = allChats.find(c => c.id === activeChatId);
+                    const currentChat = allChats.find((c) => c.id === activeChatId);
                     const senderAvatar = currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
 
                     if (isSystemIdea) {
                       return (
                         <View style={styles.centeredIdeaContainer}>
                           <View style={styles.ideaBubble}>
-                            {item.venueImage && (
-                              <Image source={{ uri: item.venueImage }} style={styles.ideaImage} resizeMode="cover" />
-                            )}
+                            {item.venueImage && <Image source={{ uri: item.venueImage }} style={styles.ideaImage} resizeMode="cover" />}
                             <Text style={styles.ideaText}>{item.text}</Text>
                           </View>
                           <Text style={styles.timestampCentered}>{formatTime(item.createdAt)}</Text>
@@ -594,6 +709,7 @@ useEffect(() => {
                   }}
                   contentContainerStyle={{ padding: 20 }}
                 />
+
                 {showAICard && (
                   <View style={styles.inChatAICardContainer}>
                     <View style={styles.inChatAICard}>
@@ -612,14 +728,30 @@ useEffect(() => {
                   </View>
                 )}
               </View>
+
               <View style={styles.inputRow}>
-                <TextInput style={styles.input} value={inputText} onChangeText={setInputText} placeholder="Message..." placeholderTextColor="#666" multiline={false} />
-                <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}><Ionicons name="send" size={18} color="black" /></TouchableOpacity>
+                <TextInput
+                  style={styles.input}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder="Message..."
+                  placeholderTextColor="#666"
+                  multiline={false}
+                />
+                <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}>
+                  <Ionicons name="send" size={18} color="black" />
+                </TouchableOpacity>
               </View>
             </KeyboardAvoidingView>
+
             {isExploreVisible && (
               <View style={[StyleSheet.absoluteFill, { zIndex: 1000, backgroundColor: 'rgba(0,0,0,0.8)' }]}>
-                <TouchableWithoutFeedback onPress={() => { setIsExploreVisible(false); setShowOptionsList(false); }}>
+                <TouchableWithoutFeedback
+                  onPress={() => {
+                    setIsExploreVisible(false);
+                    setShowOptionsList(false);
+                  }}
+                >
                   <View style={{ flex: 1, justifyContent: 'flex-end' }}>
                     <TouchableWithoutFeedback>
                       <View style={styles.explorePanel}>
@@ -694,10 +826,7 @@ useEffect(() => {
                                   style={[styles.venueCard, selectedOption?.name === item.name && styles.selectedCard]}
                                   onPress={() => setSelectedOption(item)}
                                 >
-                                  <Image
-                                    source={{ uri: item.imageUrl || item.imageurl || 'https://via.placeholder.com/150' }}
-                                    style={styles.venueImage}
-                                  />
+                                  <Image source={{ uri: item.imageUrl || item.imageurl || 'https://via.placeholder.com/150' }} style={styles.venueImage} />
                                   <View style={{ flex: 1, marginLeft: 12 }}>
                                     <Text style={styles.venueName}>{item.name}</Text>
                                     <Text style={styles.venueRating}>{item.rating} stars</Text>
@@ -737,10 +866,18 @@ useEffect(() => {
                 <View style={styles.editPanel}>
                   <Text style={styles.panelTitle}>Edit your Synq</Text>
                   <TextInput style={styles.panelInput} value={memo} onChangeText={setMemo} />
-                  <TouchableOpacity style={styles.saveBtn} onPress={async () => { await updateDoc(doc(db, 'users', auth.currentUser!.uid), { memo }); setIsEditModalVisible(false); }}>
+                  <TouchableOpacity
+                    style={styles.saveBtn}
+                    onPress={async () => {
+                      await updateDoc(doc(db, 'users', auth.currentUser!.uid), { memo });
+                      setIsEditModalVisible(false);
+                    }}
+                  >
                     <Text style={styles.saveBtnText}>Update Memo</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}><Text style={styles.endSynqBtnText}>Deactivate Synq</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}>
+                    <Text style={styles.endSynqBtnText}>Deactivate Synq</Text>
+                  </TouchableOpacity>
                 </View>
               </TouchableWithoutFeedback>
             </View>
@@ -754,11 +891,39 @@ useEffect(() => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
   darkFill: { flex: 1, backgroundColor: 'black', justifyContent: 'center' },
-  activeHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 25, paddingTop: 70, paddingBottom: 20, alignItems: 'center', backgroundColor: 'black', height: 140 },
+  activeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 25,
+    paddingTop: 70,
+    paddingBottom: 20,
+    alignItems: 'center',
+    backgroundColor: 'black',
+    height: 140
+  },
   headerTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Heavy', textAlign: 'center' },
   headerIconContainer: { width: 40, alignItems: 'center', justifyContent: 'center' },
-  badge: { position: 'absolute', top: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: ACCENT, borderWidth: 2, borderColor: 'black' },
-  friendCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', padding: 15, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: '#222' },
+  badge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: ACCENT,
+    borderWidth: 2,
+    borderColor: 'black'
+  },
+  friendCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111',
+    padding: 15,
+    borderRadius: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#222'
+  },
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
   whiteBold: { color: 'white', fontSize: 17, fontFamily: 'Avenir-Medium' },
   grayText: { color: '#666', fontSize: 13, marginTop: 2 },
@@ -772,11 +937,29 @@ const styles = StyleSheet.create({
   gifLarge: { width: 250, height: 250 },
   inactiveCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   mainTitle: { color: 'white', fontSize: 32, textAlign: 'center', fontFamily: 'Avenir' },
-  memoInput: { color: 'white', fontSize: 18, borderBottomWidth: 1, borderBottomColor: '#222', width: '100%', textAlign: 'center', marginVertical: 40, paddingBottom: 10, fontStyle: "italic" },
+  memoInput: {
+    color: 'white',
+    fontSize: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+    width: '100%',
+    textAlign: 'center',
+    marginVertical: 40,
+    paddingBottom: 10,
+    fontStyle: 'italic'
+  },
   pulseBox: { width: 250, height: 300, justifyContent: 'center', alignItems: 'center' },
-  tapToActivate: { color: ACCENT, fontSize: 22, fontFamily: 'Avenir-Medium', marginTop: -10, opacity: 0.8, letterSpacing: 0.5, textAlign: 'center' },
+  tapToActivate: {
+    color: ACCENT,
+    fontSize: 22,
+    fontFamily: 'Avenir-Medium',
+    marginTop: -10,
+    opacity: 0.8,
+    letterSpacing: 0.5,
+    textAlign: 'center'
+  },
   centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
-  modalBg: { flex: 1, backgroundColor: "black" },
+  modalBg: { flex: 1, backgroundColor: 'black' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
   modalTitle: { color: 'white', fontSize: 18, fontFamily: 'Avenir-Black' },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
@@ -800,7 +983,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333',
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   explorePanel: { height: '85%', backgroundColor: '#0A0A0A', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
   sectionHeader: { color: 'white', fontSize: 18, fontFamily: 'Avenir-Black', marginBottom: 20, paddingHorizontal: 20 },
