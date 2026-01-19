@@ -156,9 +156,9 @@ export default function FriendsScreen() {
                   <View style={styles.activeDotInline} />
                 )}
               </View>
-              <Text style={styles.mutualText}>
-                {item.mutualCount || 0} mutual friends
-              </Text>
+            <Text style={styles.mutualText}>
+              {item.mutualCount || 0} mutual {item.mutualCount === 1 ? "friend" : "friends"}
+            </Text>
             </View>
             <Icon name="chevron-forward" size={18} color="#222" />
           </TouchableOpacity>
