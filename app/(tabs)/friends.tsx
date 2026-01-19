@@ -99,26 +99,30 @@ export default function FriendsScreen() {
 
   const removeFriend = async (friendId: string) => {
     if (!auth.currentUser) return;
-    Alert.alert("Remove Friend", "Are you sure you want to remove this friend?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteDoc(
-              doc(db, "users", auth.currentUser!.uid, "friends", friendId),
-            );
-            await deleteDoc(
-              doc(db, "users", friendId, "friends", auth.currentUser!.uid),
-            );
-            setSelectedFriend(null);
-          } catch (e) {
-            console.error(e);
-          }
+    Alert.alert(
+      "Remove Friend",
+      "Are you sure you want to remove this friend?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDoc(
+                doc(db, "users", auth.currentUser!.uid, "friends", friendId),
+              );
+              await deleteDoc(
+                doc(db, "users", friendId, "friends", auth.currentUser!.uid),
+              );
+              setSelectedFriend(null);
+            } catch (e) {
+              console.error(e);
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   return (
@@ -156,9 +160,10 @@ export default function FriendsScreen() {
                   <View style={styles.activeDotInline} />
                 )}
               </View>
-            <Text style={styles.mutualText}>
-              {item.mutualCount || 0} mutual {item.mutualCount === 1 ? "friend" : "friends"}
-            </Text>
+              <Text style={styles.mutualText}>
+                {item.mutualCount || 0} mutual{" "}
+                {item.mutualCount === 1 ? "friend" : "friends"}
+              </Text>
             </View>
             <Icon name="chevron-forward" size={18} color="#222" />
           </TouchableOpacity>
@@ -210,7 +215,12 @@ export default function FriendsScreen() {
             </View>
 
             {selectedFriend?.monthlyMemo && (
-              <View style={[styles.memoBox, { borderColor: ACCENT, borderWidth: 1 }]}>
+              <View
+                style={[
+                  styles.memoBox,
+                  { borderColor: ACCENT, borderWidth: 1 },
+                ]}
+              >
                 <Text style={[styles.memoTitle, { color: ACCENT }]}>
                   Monthly Memo
                 </Text>
@@ -221,7 +231,8 @@ export default function FriendsScreen() {
             <View style={styles.interestsContainer}>
               <Text style={styles.sectionLabel}>Interests</Text>
               <View style={styles.interestsWrapper}>
-                {selectedFriend?.interests && selectedFriend.interests.length > 0 ? (
+                {selectedFriend?.interests &&
+                selectedFriend.interests.length > 0 ? (
                   selectedFriend.interests.map((interest, i) => (
                     <View key={i} style={styles.interestRect}>
                       <Text style={styles.interestText}>{interest}</Text>
@@ -259,10 +270,25 @@ export default function FriendsScreen() {
   );
 }
 
-function SearchModal({ visible, onClose, currentFriends }: any) {
+function SearchModal({
+  visible,
+  onClose,
+  currentFriends,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  currentFriends: string[];
+}) {
   const [queryText, setQueryText] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+    useEffect(() => {
+    if (!visible) return;
+    setQueryText("");
+    setResults([]);
+    setIsSearching(false);
+  }, [visible]);
 
   const searchUsers = async (val: string) => {
     setQueryText(val);
@@ -296,8 +322,12 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
 
   const sendInvite = async (targetUser: any) => {
     if (!auth.currentUser) return;
+
     try {
       Keyboard.dismiss();
+
+      const meSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
+      const meData = meSnap.exists() ? meSnap.data() : {};
 
       const requestDocRef = doc(
         db,
@@ -307,16 +337,26 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
         auth.currentUser.uid,
       );
 
+      const senderName =
+        meData?.displayName || auth.currentUser.displayName || "Someone";
+      const senderImageUrl = meData?.imageurl || null;
+
       await setDoc(requestDocRef, {
+        senderId: auth.currentUser.uid,
+        senderName,
+        senderImageUrl,
         fromId: auth.currentUser.uid,
-        fromName: auth.currentUser.displayName || "Someone",
+        fromName: senderName,
+        fromImageUrl: senderImageUrl,
         status: "pending",
         sentAt: serverTimestamp(),
+        notifyOnCreate: true,
       });
 
       Alert.alert("Sent!", `Invite sent to ${targetUser.displayName}`);
       onClose();
     } catch (e: any) {
+      console.error(e);
       Alert.alert("Error", "Could not send invite.");
     }
   };
@@ -345,10 +385,12 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
             data={results}
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"    
+            keyboardDismissMode="on-drag"
             renderItem={({ item }) => (
               <View style={styles.searchResult}>
-                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+                >
                   <View style={styles.avatar}>
                     {item.imageurl ? (
                       <Image source={{ uri: item.imageurl }} style={styles.img} />
@@ -357,12 +399,17 @@ function SearchModal({ visible, onClose, currentFriends }: any) {
                     )}
                   </View>
                   <View>
-                    <Text style={styles.friendName}>{item.displayName || "User"}</Text>
+                    <Text style={styles.friendName}>
+                      {item.displayName || "User"}
+                    </Text>
                     <Text style={styles.emailDetail}>{item.email}</Text>
                   </View>
                 </View>
 
-                <TouchableOpacity onPress={() => sendInvite(item)} style={styles.addBtn}>
+                <TouchableOpacity
+                  onPress={() => sendInvite(item)}
+                  style={styles.addBtn}
+                >
                   <Text style={styles.addBtnText}>Add</Text>
                 </TouchableOpacity>
               </View>
@@ -405,7 +452,12 @@ const styles = StyleSheet.create({
   },
   img: { width: 52, height: 52, borderRadius: 26 },
   friendName: { color: "white", fontSize: 18, fontFamily: fonts.heavy },
-  mutualText: { color: "#666", fontSize: 13, fontFamily: fonts.medium, marginTop: 2 },
+  mutualText: {
+    color: "#666",
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    marginTop: 2,
+  },
   emptyContainer: { flex: 1, justifyContent: "center", marginTop: 100 },
   empty: {
     color: "#333",
@@ -460,7 +512,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     letterSpacing: 1,
   },
-  interestsWrapper: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center" },
+  interestsWrapper: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
   interestRect: {
     backgroundColor: "#1a1a1a",
     borderWidth: 1,
@@ -478,7 +534,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.book,
     fontStyle: "italic",
   },
-  memoBox: { backgroundColor: "black", padding: 18, borderRadius: 20, width: "100%", marginBottom: 15 },
+  memoBox: {
+    backgroundColor: "black",
+    padding: 18,
+    borderRadius: 20,
+    width: "100%",
+    marginBottom: 15,
+  },
   memoTitle: {
     color: "#666",
     fontSize: 11,
@@ -487,11 +549,22 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     letterSpacing: 0.5,
   },
-  memoText: { color: "white", fontSize: 15, fontFamily: fonts.medium, lineHeight: 20 },
+  memoText: {
+    color: "white",
+    fontSize: 15,
+    fontFamily: fonts.medium,
+    lineHeight: 20,
+  },
   removeBtn: { marginTop: 15, padding: 10 },
   removeBtnText: { color: "#ff453a", fontFamily: fonts.heavy, fontSize: 14 },
   modalBody: { flex: 1, backgroundColor: "black", padding: 20 },
-  searchBarRow: { flexDirection: "row", alignItems: "center", gap: 15, marginBottom: 20, marginTop: 40 },
+  searchBarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 15,
+    marginBottom: 20,
+    marginTop: 40,
+  },
   input: {
     flex: 1,
     backgroundColor: "#111",
@@ -511,6 +584,11 @@ const styles = StyleSheet.create({
     borderBottomColor: "#222",
   },
   emailDetail: { color: "#666", fontSize: 13, fontFamily: fonts.book },
-  addBtn: { backgroundColor: ACCENT, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+  addBtn: {
+    backgroundColor: ACCENT,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
   addBtnText: { color: "black", fontFamily: fonts.black, fontSize: 14 },
 });

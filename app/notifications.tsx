@@ -4,6 +4,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -13,6 +14,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Platform,
   SafeAreaView,
   StatusBar,
@@ -26,6 +28,8 @@ import { auth, db } from "../src/lib/firebase";
 const ACCENT = "#7DFFA6";
 const BACKGROUND = "black";
 const SURFACE = "#161616";
+const DEFAULT_AVATAR =
+  "https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png";
 
 const fonts = {
   black: Platform.OS === "ios" ? "Avenir-Black" : "sans-serif-condensed",
@@ -65,53 +69,84 @@ export default function NotificationsScreen() {
     if (!auth.currentUser) return;
 
     try {
+      if (!request.fromId) throw new Error("Missing sender ID.");
+
       if (accept) {
-        if (!request.fromId) throw new Error("Missing sender ID.");
+        const meSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
+        const meData = meSnap.exists() ? meSnap.data() : {};
+        const myName = meData?.displayName || auth.currentUser.displayName || "User";
+        const myImageUrl = meData?.imageurl || DEFAULT_AVATAR;
+
+        let senderName = request.fromName || "User";
+        let senderImageUrl = request.fromImageUrl || request.fromImageurl || request.imageurl || null;
+
+        if (!senderImageUrl) {
+          const senderSnap = await getDoc(doc(db, "users", request.fromId));
+          if (senderSnap.exists()) {
+            const senderData = senderSnap.data();
+            senderName = senderName || senderData?.displayName || "User";
+            senderImageUrl = senderData?.imageurl || DEFAULT_AVATAR;
+          }
+        }
+
         await setDoc(doc(db, "users", auth.currentUser.uid, "friends", request.fromId), {
           synqCount: 0,
           since: serverTimestamp(),
-          displayName: request.fromName || "User",
+          displayName: senderName,
+          imageurl: senderImageUrl || DEFAULT_AVATAR,
         });
+
         await setDoc(doc(db, "users", request.fromId, "friends", auth.currentUser.uid), {
           synqCount: 0,
           since: serverTimestamp(),
-          displayName: auth.currentUser.displayName || "User",
+          displayName: myName,
+          imageurl: myImageUrl,
         });
 
-        Alert.alert("Success", `You are now connected with ${request.fromName}!`);
+        Alert.alert("Success", `You are now connected with ${senderName}!`);
       }
+
       await deleteDoc(doc(db, "users", auth.currentUser.uid, "friendRequests", request.id));
     } catch (e: any) {
       Alert.alert("Error", `Could not process request: ${e.message}`);
     }
   };
 
-  const RequestRow = ({ item }: { item: any }) => (
-    <View style={styles.row}>
-      <View style={styles.rowLeft}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={18} color="#666" />
+  const RequestRow = ({ item }: { item: any }) => {
+    const fromImageUrl =
+      item.fromImageUrl || item.fromImageurl || item.imageurl || null;
+
+    return (
+      <View style={styles.row}>
+        <View style={styles.rowLeft}>
+          <View style={styles.avatar}>
+            {fromImageUrl ? (
+              <Image source={{ uri: fromImageUrl }} style={styles.avatarImg} />
+            ) : (
+              <Ionicons name="person" size={18} color="#666" />
+            )}
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowKicker}>Friend Request</Text>
+            <Text style={styles.rowText} numberOfLines={2}>
+              <Text style={styles.boldWhite}>{item.fromName || "Someone"}</Text>
+              <Text style={styles.grayText}> wants to be your friend.</Text>
+            </Text>
+          </View>
         </View>
 
-        <View style={{ flex: 1 }}>
-          <Text style={styles.rowKicker}>Friend Request</Text>
-          <Text style={styles.rowText} numberOfLines={2}>
-            <Text style={styles.boldWhite}>{item.fromName || "Someone"}</Text>
-            <Text style={styles.grayText}> wants to be your friend.</Text>
-          </Text>
+        <View style={styles.rowRight}>
+          <TouchableOpacity onPress={() => handleRequest(item, true)} style={styles.acceptBtn}>
+            <Ionicons name="checkmark" size={18} color="black" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleRequest(item, false)} style={styles.denyBtn}>
+            <Ionicons name="close" size={18} color="white" />
+          </TouchableOpacity>
         </View>
       </View>
-
-      <View style={styles.rowRight}>
-        <TouchableOpacity onPress={() => handleRequest(item, true)} style={styles.acceptBtn}>
-          <Ionicons name="checkmark" size={18} color="black" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleRequest(item, false)} style={styles.denyBtn}>
-          <Ionicons name="close" size={18} color="white" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -224,6 +259,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
+    overflow: "hidden",
+  },
+  avatarImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
 
   rowKicker: {
