@@ -18,12 +18,13 @@ import {
   Keyboard,
   Modal,
   Platform,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
@@ -230,9 +231,14 @@ export default function FriendsScreen() {
 
             <View style={styles.interestsContainer}>
               <Text style={styles.sectionLabel}>Interests</Text>
-              <View style={styles.interestsWrapper}>
-                {selectedFriend?.interests &&
-                selectedFriend.interests.length > 0 ? (
+
+              <ScrollView
+                style={styles.interestsScroll}
+                contentContainerStyle={styles.interestsWrapper}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
+                {selectedFriend?.interests && selectedFriend.interests.length > 0 ? (
                   selectedFriend.interests.map((interest, i) => (
                     <View key={i} style={styles.interestRect}>
                       <Text style={styles.interestText}>{interest}</Text>
@@ -241,8 +247,9 @@ export default function FriendsScreen() {
                 ) : (
                   <Text style={styles.noInterestsText}>No interests listed</Text>
                 )}
-              </View>
+              </ScrollView>
             </View>
+
 
             {selectedFriend?.memo && (
               <View style={styles.memoBox}>
@@ -283,7 +290,7 @@ function SearchModal({
   const [results, setResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-    useEffect(() => {
+  useEffect(() => {
     if (!visible) return;
     setQueryText("");
     setResults([]);
@@ -475,11 +482,16 @@ const styles = StyleSheet.create({
   popupContent: {
     width: width * 0.88,
     backgroundColor: "#111",
+    maxHeight: "85%",
     borderRadius: 32,
     padding: 24,
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#222",
+  },
+  interestsScroll: {
+    maxHeight: 140,
+    width: "100%",
   },
   closeBtn: { position: "absolute", top: 20, right: 20, zIndex: 1 },
   largeAvatar: {
@@ -516,6 +528,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
+    paddingBottom: 4,
   },
   interestRect: {
     backgroundColor: "#1a1a1a",
