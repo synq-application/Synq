@@ -1,8 +1,120 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 const logger = require("firebase-functions/logger");
+const admin = require("firebase-admin");
 
+if (admin.apps.length === 0) {
+    admin.initializeApp();
+}
+
+/**
+ * TRIGGER: New Chat Message
+ */
+exports.onMessageSent = onDocumentCreated({
+    document: "chats/{chatId}/messages/{messageId}",
+    region: "us-central1"
+}, async (event) => {
+    const messageSnapshot = event.data;
+    if (!messageSnapshot) return;
+    const messageData = messageSnapshot.data();
+    const { chatId } = event.params;
+
+    try {
+        const chatDoc = await admin.firestore().collection("chats").doc(chatId).get();
+        if (!chatDoc.exists) return;
+        
+        const chatData = chatDoc.data();
+        const recipientIds = (chatData.participants || []).filter(id => id !== messageData.senderId);
+
+        for (const recipientId of recipientIds) {
+            const userDoc = await admin.firestore().collection("users").doc(recipientId).get();
+            const userData = userDoc.data();
+
+            if (userData?.pushToken) {
+                const senderName = chatData.participantNames?.[messageData.senderId] || "New Message";
+                await axios.post("https://exp.host/--/api/v2/push/send", {
+                    to: userData.pushToken,
+                    sound: "default",
+                    title: senderName,
+                    body: messageData.text,
+                    data: { chatId: chatId }, 
+                });
+            }
+        }
+    } catch (error) {
+        logger.error("Error in onMessageSent:", error);
+    }
+});
+
+/**
+ * TRIGGER: New Friend Request Received
+ */
+exports.onFriendRequestSent = onDocumentCreated({
+    document: "users/{userId}/friendRequests/{requestId}",
+    region: "us-central1"
+}, async (event) => {
+    const requestData = event.data.data();
+    const { userId } = event.params; // The recipient
+
+    try {
+        const recipientDoc = await admin.firestore().collection("users").doc(userId).get();
+        const recipientData = recipientDoc.data();
+
+        if (recipientData?.pushToken) {
+            // senderDisplayName should be passed when you addDoc to friendRequests in your app
+            const senderName = requestData.senderName || "A user";
+            
+            await axios.post("https://exp.host/--/api/v2/push/send", {
+                to: recipientData.pushToken,
+                sound: "default",
+                title: "New Friend Request 🤝",
+                body: `${senderName} wants to Synq up with you!`,
+                data: { type: "friend_request" }, 
+            });
+        }
+    } catch (error) {
+        logger.error("Error in onFriendRequestSent:", error);
+    }
+});
+
+/**
+ * TRIGGER: Friend Request Accepted
+ * Watches the 'friends' subcollection for new connections.
+ */
+exports.onFriendAccepted = onDocumentCreated({
+    document: "users/{userId}/friends/{friendId}",
+    region: "us-central1"
+}, async (event) => {
+    const { userId, friendId } = event.params;
+
+    try {
+        // We notify the person who was "accepted" (the friendId)
+        const friendDoc = await admin.firestore().collection("users").doc(friendId).get();
+        const friendData = friendDoc.data();
+
+        // We get the name of the person who just clicked "Accept" (the userId)
+        const userDoc = await admin.firestore().collection("users").doc(userId).get();
+        const userData = userDoc.data();
+
+        if (friendData?.pushToken) {
+            await axios.post("https://exp.host/--/api/v2/push/send", {
+                to: friendData.pushToken,
+                sound: "default",
+                title: "Request Accepted! ✨",
+                body: `${userData?.displayName || "A user"} accepted your friend request.`,
+                data: { type: "friend_accepted" },
+            });
+        }
+    } catch (error) {
+        logger.error("Error in onFriendAccepted:", error);
+    }
+});
+
+/**
+ * CALLABLE: AI Suggestions
+ */
 exports.getSynqSuggestions = onCall(
     {
         secrets: ["GEMINI_API_KEY", "GOOGLE_MAPS_API_KEY"],
@@ -10,7 +122,6 @@ exports.getSynqSuggestions = onCall(
     },
     async (request) => {
         if (!request.auth) {
-            logger.error("Auth Error: User not authenticated");
             throw new HttpsError("unauthenticated", "Must be logged in.");
         }
 
@@ -23,33 +134,17 @@ exports.getSynqSuggestions = onCall(
 
             const prompt = `You are a local expert in ${location}. Based on interests: ${shared.join(
                 ", "
-            )}, suggest 3 ${category} venues.
-Return ONLY a JSON array:
-[{"name":"Venue Name"}]`;
+            )}, suggest 3 ${category} venues. Return ONLY a JSON array: [{"name":"Venue Name"}]`;
 
             const result = await model.generateContent(prompt);
             const rawText = result?.response?.text?.() || "";
             const cleaned = rawText.replace(/```json|```/g, "").trim();
 
-            let venues;
-            try {
-                venues = JSON.parse(cleaned);
-            } catch (parseErr) {
-                logger.error(">>> STEP 2 ERROR: Failed to parse Gemini JSON", {
-                    cleaned,
-                    error: parseErr?.message,
-                });
-                throw new HttpsError("internal", "AI response was not valid JSON.");
-            }
-
-            logger.info(">>> STEP 2: Gemini suggested venues", { venues });
-
+            let venues = JSON.parse(cleaned);
             const enrichedSuggestions = [];
 
             for (const venue of venues) {
                 try {
-                    logger.info(`>>> STEP 3: Searching Google for: ${venue.name}`);
-
                     const googleRes = await axios.post(
                         "https://places.googleapis.com/v1/places:searchText",
                         { textQuery: `${venue.name} in ${location}` },
@@ -57,10 +152,7 @@ Return ONLY a JSON array:
                             headers: {
                                 "Content-Type": "application/json",
                                 "X-Goog-Api-Key": googleKey,
-
-                                // ✅ Include shortFormattedAddress so you can show "Dupont Circle, Washington, DC"
-                                "X-Goog-FieldMask":
-                                    "places.displayName,places.rating,places.photos,places.shortFormattedAddress,places.formattedAddress",
+                                "X-Goog-FieldMask": "places.displayName,places.rating,places.photos,places.shortFormattedAddress,places.formattedAddress",
                             },
                         }
                     );
@@ -71,38 +163,20 @@ Return ONLY a JSON array:
                     if (place?.photos?.length > 0) {
                         const photoName = place.photos[0].name;
                         imageUrl = `https://places.googleapis.com/v1/${photoName}/media?key=${googleKey}&maxWidthPx=400`;
-                        logger.info(`>>> Image found for ${venue.name}`);
-                    } else {
-                        logger.warn(`>>> No photos found for ${venue.name}`);
                     }
-
-                    const shortLoc =
-                        place?.shortFormattedAddress ||
-                        place?.formattedAddress ||
-                        "Location not available";
 
                     enrichedSuggestions.push({
                         ...venue,
                         rating: place?.rating ? Number(place.rating).toFixed(1) : "4.0",
                         imageUrl,
-                        location: shortLoc,
+                        location: place?.shortFormattedAddress || "Location not available",
                         address: place?.formattedAddress || "Address not available",
                     });
                 } catch (e) {
-                    logger.error(`>>> STEP 3 ERROR: Google enrichment failed for ${venue.name}`, {
-                        error: e.response?.data || e.message,
-                    });
-
-                    enrichedSuggestions.push({
-                        ...venue,
-                        imageUrl: "https://via.placeholder.com/150",
-                        rating: "4.0",
-                        location: "Location not available",
-                    });
+                    enrichedSuggestions.push({ ...venue, imageUrl: "https://via.placeholder.com/150", rating: "4.0" });
                 }
             }
 
-            logger.info(">>> FINAL: Returning results", { count: enrichedSuggestions.length });
             return { suggestions: enrichedSuggestions };
         } catch (error) {
             logger.error(">>> TOP-LEVEL CRITICAL ERROR:", error);

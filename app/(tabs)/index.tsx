@@ -19,6 +19,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   FlatList,
   Image,
   Keyboard,
@@ -65,6 +66,18 @@ export default function SynqScreen() {
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
+  const subscription = DeviceEventEmitter.addListener('openChat', (data) => {
+    if (data.chatId) {
+      setActiveChatId(data.chatId);
+      setIsChatVisible(true);
+      setIsInboxVisible(false);
+    }
+  });
+
+  return () => subscription.remove();
+}, []);
+
+  useEffect(() => {
     if (!auth.currentUser) return;
     const init = async () => {
       try {
@@ -100,28 +113,68 @@ export default function SynqScreen() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!auth.currentUser || status !== 'active') {
-      setAvailableFriends([]);
-      return;
-    }
-    const friendsRef = collection(db, 'users', auth.currentUser.uid, 'friends');
-    const unsubscribe = onSnapshot(friendsRef, async (snapshot) => {
-      const activeFriendsData = await Promise.all(
-        snapshot.docs.map(async (fDoc) => {
-          const pSnap = await getDoc(doc(db, 'users', fDoc.id));
-          if (pSnap.exists() && pSnap.data()?.status === 'available') {
-            return { id: fDoc.id, ...pSnap.data() };
-          }
-          return null;
-        })
-      );
-      const filtered = activeFriendsData.filter(Boolean) as any[];
-      setAvailableFriends(filtered);
-    });
+useEffect(() => {
+  if (!auth.currentUser || status !== "active") {
+    setAvailableFriends([]);
+    return;
+  }
 
-    return () => unsubscribe();
-  }, [status]);
+  const myId = auth.currentUser.uid;
+  const friendsRef = collection(db, "users", myId, "friends");
+  const friendUnsubs = new Map<string, () => void>();
+  const friendState = new Map<string, any>(); 
+
+  const emit = () => {
+    setAvailableFriends(Array.from(friendState.values()));
+  };
+
+  const friendsUnsub = onSnapshot(friendsRef, (friendsSnap) => {
+    const friendIds = new Set(friendsSnap.docs.map((d) => d.id));
+
+    for (const [fid, unsub] of friendUnsubs.entries()) {
+      if (!friendIds.has(fid)) {
+        unsub();
+        friendUnsubs.delete(fid);
+        friendState.delete(fid);
+      }
+    }
+
+    friendsSnap.docs.forEach((fDoc) => {
+      const fid = fDoc.id;
+      if (friendUnsubs.has(fid)) return;
+
+      const uRef = doc(db, "users", fid);
+      const uUnsub = onSnapshot(uRef, (uSnap) => {
+        if (!uSnap.exists()) {
+          friendState.delete(fid);
+          emit();
+          return;
+        }
+
+        const data = uSnap.data();
+
+        if (data?.status === "available") {
+          friendState.set(fid, { id: fid, ...data });
+        } else {
+          friendState.delete(fid);
+        }
+
+        emit();
+      });
+
+      friendUnsubs.set(fid, uUnsub);
+    });
+    emit();
+  });
+
+  return () => {
+    friendsUnsub();
+    friendUnsubs.forEach((unsub) => unsub());
+    friendUnsubs.clear();
+    friendState.clear();
+  };
+}, [status]);
+
 
 useEffect(() => {
   if (!activeChatId || !isChatVisible) return;
@@ -392,7 +445,10 @@ useEffect(() => {
             <FlatList
               data={availableFriends}
               keyExtractor={item => item.id}
-              ListEmptyComponent={<Text style={{ color: '#444', textAlign: 'center', marginTop: 50 }}>No friends are Synqed up right now.</Text>}
+              ListEmptyComponent={
+                <><Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 24 }}>No free friends right now :/</Text>
+                <Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 20 }}>In the meantime, add more connections to increase the chances of having overlapping free time!</Text></>
+              }
               renderItem={({ item }) => (
                 <TouchableOpacity
                   onPress={() => setSelectedFriends(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
@@ -718,7 +774,7 @@ const styles = StyleSheet.create({
   mainTitle: { color: 'white', fontSize: 32, textAlign: 'center', fontFamily: 'Avenir' },
   memoInput: { color: 'white', fontSize: 18, borderBottomWidth: 1, borderBottomColor: '#222', width: '100%', textAlign: 'center', marginVertical: 40, paddingBottom: 10, fontStyle: "italic" },
   pulseBox: { width: 250, height: 300, justifyContent: 'center', alignItems: 'center' },
-  tapToActivate: { color: ACCENT, fontSize: 18, fontFamily: 'Avenir-Medium', marginTop: -10, opacity: 0.8, letterSpacing: 0.5, textAlign: 'center' },
+  tapToActivate: { color: ACCENT, fontSize: 22, fontFamily: 'Avenir-Medium', marginTop: -10, opacity: 0.8, letterSpacing: 0.5, textAlign: 'center' },
   centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
   modalBg: { flex: 1, backgroundColor: "black" },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
