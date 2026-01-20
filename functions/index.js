@@ -9,9 +9,6 @@ if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 
-/**
- * TRIGGER: New Chat Message
- */
 exports.onMessageSent = onDocumentCreated({
     document: "chats/{chatId}/messages/{messageId}",
     region: "us-central1"
@@ -48,15 +45,12 @@ exports.onMessageSent = onDocumentCreated({
     }
 });
 
-/**
- * TRIGGER: New Friend Request Received
- */
 exports.onFriendRequestSent = onDocumentCreated({
     document: "users/{userId}/friendRequests/{requestId}",
     region: "us-central1"
 }, async (event) => {
     const requestData = event.data.data();
-    const { userId } = event.params; // The recipient
+    const { userId } = event.params;
 
     try {
         const recipientDoc = await admin.firestore().collection("users").doc(userId).get();
@@ -70,7 +64,7 @@ exports.onFriendRequestSent = onDocumentCreated({
                 to: recipientData.pushToken,
                 sound: "default",
                 title: "New Friend Request 🤝",
-                body: `${senderName} wants to Synq up with you!`,
+                body: `${senderName} wants to Synq with you!`,
                 data: { type: "friend_request" }, 
             });
         }
@@ -84,33 +78,69 @@ exports.onFriendRequestSent = onDocumentCreated({
  * Watches the 'friends' subcollection for new connections.
  */
 exports.onFriendAccepted = onDocumentCreated({
-    document: "users/{userId}/friends/{friendId}",
-    region: "us-central1"
+  document: "users/{userId}/friends/{friendId}",
+  region: "us-central1",
 }, async (event) => {
-    const { userId, friendId } = event.params;
+  const { userId, friendId } = event.params;
 
-    try {
-        // We notify the person who was "accepted" (the friendId)
-        const friendDoc = await admin.firestore().collection("users").doc(friendId).get();
-        const friendData = friendDoc.data();
+  const friendSnap = event.data;
+  if (!friendSnap) return;
 
-        // We get the name of the person who just clicked "Accept" (the userId)
-        const userDoc = await admin.firestore().collection("users").doc(userId).get();
-        const userData = userDoc.data();
+  const friendDocData = friendSnap.data() || {};
 
-        if (friendData?.pushToken) {
-            await axios.post("https://exp.host/--/api/v2/push/send", {
-                to: friendData.pushToken,
-                sound: "default",
-                title: "Request Accepted! ✨",
-                body: `${userData?.displayName || "A user"} accepted your friend request.`,
-                data: { type: "friend_accepted" },
-            });
-        }
-    } catch (error) {
-        logger.error("Error in onFriendAccepted:", error);
-    }
+  // ✅ Only send the push if THIS doc creation is the "accept" side that should notify
+  if (friendDocData.notifyOnCreate !== true) {
+    logger.info("Skipping friend accepted notification (notifyOnCreate != true).", {
+      userId,
+      friendId,
+    });
+    return;
+  }
+
+  // ✅ Optional idempotency guard: prevent duplicates if function retries
+  const notifId = `${userId}_accepted_${friendId}`; // stable id
+  const notifRef = admin
+    .firestore()
+    .collection("users")
+    .doc(friendId)
+    .collection("notificationLocks")
+    .doc(notifId);
+
+  const alreadySent = await notifRef.get();
+  if (alreadySent.exists) {
+    logger.info("Skipping duplicate friend accepted notification.", { userId, friendId });
+    return;
+  }
+
+  try {
+    const friendUserDoc = await admin.firestore().collection("users").doc(friendId).get();
+    const friendUserData = friendUserDoc.data();
+
+    const accepterDoc = await admin.firestore().collection("users").doc(userId).get();
+    const accepterData = accepterDoc.data();
+
+    if (!friendUserData?.pushToken) return;
+
+    await axios.post("https://exp.host/--/api/v2/push/send", {
+      to: friendUserData.pushToken,
+      sound: "default",
+      title: "Request Accepted! ✨",
+      body: `${accepterData?.displayName || "A user"} accepted your friend request.`,
+      data: { type: "friend_accepted", fromUserId: userId },
+    });
+
+    // write lock AFTER successful send
+    await notifRef.set({
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      from: userId,
+      to: friendId,
+      type: "friend_accepted",
+    });
+  } catch (error) {
+    logger.error("Error in onFriendAccepted:", error);
+  }
 });
+
 
 /**
  * CALLABLE: AI Suggestions
