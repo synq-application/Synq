@@ -41,7 +41,7 @@
         {
           "ios": {
             "useFrameworks": "static",
-            "deploymentTarget": "15.1" 
+            "deploymentTarget": "15.1"
           }
         }
       ]
@@ -54,6 +54,7 @@
       "eas": {
         "projectId": "27049d71-1c6b-4aa5-b874-1a6ddcb2b5be"
       }
-    }
+    },
+    "owner": "stefaniebaarman"
   }
 }
