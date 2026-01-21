@@ -1,14 +1,14 @@
-import { ACCENT, BG, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
+import { ACCENT, BG, MUTED, TEXT, fonts, synqSvg } from "@/constants/Variables";
 import { router } from "expo-router";
 import React from "react";
 import {
-  Image,
-  SafeAreaView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Image,
+    SafeAreaView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { SvgXml } from "react-native-svg";
 
@@ -19,10 +19,10 @@ type Props = {
   totalSteps?: number;
 };
 
-export default function MakePlansScreen({
+export default function SeeWhenFriendsAvailable({
   onNext,
   onSkip,
-  step = 1,
+  step = 3,
   totalSteps = 4,
 }: Props) {
   return (
@@ -32,39 +32,28 @@ export default function MakePlansScreen({
         <View pointerEvents="none" style={styles.bgSvgWrap}>
           <SvgXml xml={synqSvg} width="120%" height="120%" />
         </View>
-        <TouchableOpacity
-          onPress={() => (onNext ? onNext() : router.push("/(auth)/getting-started"))}
-          activeOpacity={0.7}
-          style={styles.skip}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
+        <TouchableOpacity onPress={onSkip} activeOpacity={0.7} style={styles.skip}>
           <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
-
         <View style={styles.topCopy}>
-          <Text style={styles.title}>Make plans, not posts.</Text>
+          <Text style={styles.title}>See when friends{"\n"}are available.</Text>
           <View style={styles.divider} />
           <Text style={styles.sub}>
-            Synq shows when your friends are{"\n"}so hanging out actually happens.
+            Tap the Synq button to see{"\n"}who’s free to hang out.
           </Text>
         </View>
-
-        <View style={styles.orbWrap}>
-          <Image
-            // source={require("../../../assets/onboarding/synq-orb.png")}
-            style={styles.orb}
-            resizeMode="contain"
-          />
+        <View pointerEvents="none" style={styles.phoneWrap}>
+          <Image source={require("./chat.png")} style={styles.phone} resizeMode="contain" />
         </View>
-
         <View style={styles.bottom}>
           <TouchableOpacity
-            onPress={() => (onNext ? onNext() : router.push("/(auth)/welcome"))}
+            onPress={() => (onNext ? onNext() : router.push("/(auth)/getting-started"))}
             activeOpacity={0.85}
             style={styles.nextBtn}
           >
-            <Text style={styles.nextText}>Next</Text>
+            <Text style={styles.nextText}>Continue</Text>
           </TouchableOpacity>
+
           <View style={styles.dots} accessibilityLabel={`Step ${step} of ${totalSteps}`}>
             {Array.from({ length: totalSteps }).map((_, i) => {
               const active = i + 1 === step;
@@ -84,27 +73,28 @@ export default function MakePlansScreen({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG },
-  container: { flex: 1, backgroundColor: BG, paddingHorizontal: 22 },
+  container: { flex: 1, backgroundColor: BG },
+
   bgSvgWrap: {
     position: "absolute",
     top: -40,
     left: -40,
     right: -40,
     bottom: -40,
-    opacity: 0.3,
+    opacity: 0.35,
     transform: [{ rotate: "-8deg" }],
   },
   skip: { position: "absolute", top: 14, right: 18, zIndex: 10 },
-  skipText: {
-    color: "rgba(255,255,255,0.55)",
-    fontFamily: fonts.book,
-    fontSize: 16,
+  skipText: { color: MUTED, fontFamily: fonts.book, fontSize: 16 },
+  topCopy: {
+    paddingTop: 86,
+    paddingHorizontal: 22,
+    zIndex: 3,
   },
-  topCopy: { paddingTop: 86 },
   title: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 34,
+    fontSize: 32,
     letterSpacing: 0.2,
   },
   divider: {
@@ -120,20 +110,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
-  orbWrap: {
-    flex: 1,
-    justifyContent: "center",
+
+  phoneWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: -200,
     alignItems: "center",
-    marginTop: 8,
+    zIndex: 0,
   },
-  orb: {
-    width: 320,
-    height: 320,
-    opacity: 0.98,
+  phone: {
+    width: 490,  
+    height: 660, 
   },
   bottom: {
-    paddingBottom: 26,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 26,
     alignItems: "center",
+    paddingHorizontal: 22,
+    zIndex: 6,
   },
   nextBtn: {
     width: "88%",
@@ -144,20 +141,15 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 5
   },
   nextText: {
     color: ACCENT,
     fontFamily: fonts.heavy,
     fontSize: 18,
-    letterSpacing: 0.2,
   },
-  dots: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+
+  dots: { flexDirection: "row", gap: 8, marginTop: 14 },
   dot: { width: 7, height: 7, borderRadius: 99 },
   dotInactive: { backgroundColor: "rgba(255,255,255,0.18)" },
   dotActive: { backgroundColor: ACCENT },
