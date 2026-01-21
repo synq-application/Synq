@@ -1,4 +1,5 @@
-import { ACCENT, BG, MUTED, TEXT, fonts, synqSvg } from "@/constants/Variables";
+import { ACCENT, BG, TEXT, fonts, synqSvg } from "@/constants/Variables";
+import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
@@ -9,7 +10,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SvgXml } from "react-native-svg";
 
@@ -27,28 +28,86 @@ export default function SeeWhenFriendsAvailable({
   totalSteps = 4,
 }: Props) {
   const topFade = useRef(new Animated.Value(0)).current;
-  const phoneFade = useRef(new Animated.Value(0)).current;
+  const pulseFade = useRef(new Animated.Value(0)).current;
   const bottomFade = useRef(new Animated.Value(0)).current;
 
+  // subtle visual vibration + a gentle “breath”
+  const jitter = useRef(new Animated.Value(0)).current;
+  const breathe = useRef(new Animated.Value(0)).current;
+
+  // stop haptics immediately on navigate/unmount
+  const hapticsActiveRef = useRef(true);
+
   useEffect(() => {
+    // enter animations
     Animated.stagger(120, [
-      Animated.timing(topFade, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(phoneFade, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(bottomFade, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
+      Animated.timing(topFade, { toValue: 1, duration: 520, useNativeDriver: true }),
+      Animated.timing(pulseFade, { toValue: 1, duration: 480, useNativeDriver: true }),
+      Animated.timing(bottomFade, { toValue: 1, duration: 520, useNativeDriver: true }),
     ]).start();
-  }, []);
+
+    // tiny jitter loop (energy)
+    const jitterLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(jitter, { toValue: 1, duration: 90, useNativeDriver: true }),
+        Animated.timing(jitter, { toValue: -1, duration: 90, useNativeDriver: true }),
+        Animated.timing(jitter, { toValue: 0, duration: 140, useNativeDriver: true }),
+      ])
+    );
+    jitterLoop.start();
+
+    // gentle “breathing” scale (premium, not gimmicky)
+    const breatheLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breathe, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(breathe, { toValue: 0, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    breatheLoop.start();
+
+    // REAL haptics loop: tap…tap…pause (feels like a pulse)
+    hapticsActiveRef.current = true;
+
+    const runHaptics = async () => {
+      const beat = async () => {
+        try {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch {}
+      };
+
+      while (hapticsActiveRef.current) {
+        await beat();
+        await sleep(140);
+        if (!hapticsActiveRef.current) break;
+
+        await beat();
+        await sleep(900);
+      }
+    };
+
+    runHaptics();
+
+    return () => {
+      hapticsActiveRef.current = false;
+      jitterLoop.stop();
+      breatheLoop.stop();
+    };
+  }, [topFade, pulseFade, bottomFade, jitter, breathe]);
+
+  const handleNext = () => {
+    // stop haptics immediately so they don’t bleed into next screen
+    hapticsActiveRef.current = false;
+    onNext ? onNext() : router.push("/(auth)/getting-started");
+  };
+
+  const handleSkip = () => {
+    hapticsActiveRef.current = false;
+    onSkip ? onSkip() : router.push("/(auth)/getting-started");
+  };
+
+  const jitterX = jitter.interpolate({ inputRange: [-1, 1], outputRange: [-1.2, 1.2] });
+  const jitterY = jitter.interpolate({ inputRange: [-1, 1], outputRange: [0.8, -0.8] });
+  const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1.035] });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -58,8 +117,11 @@ export default function SeeWhenFriendsAvailable({
           <SvgXml xml={synqSvg} width="120%" height="120%" />
         </View>
 
+        {/* quiet zone behind copy so text always reads clean */}
+        <View pointerEvents="none" style={styles.topOverlay} />
+
         <TouchableOpacity
-          onPress={() => (onSkip ? onSkip() : router.push("/(auth)/getting-started"))}
+          onPress={handleSkip}
           activeOpacity={0.7}
           style={styles.skip}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -68,28 +130,32 @@ export default function SeeWhenFriendsAvailable({
         </TouchableOpacity>
 
         <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
-          <Text style={styles.title}>See when friends{"\n"}are available.</Text>
+          {/* concise, brand-aligned */}
+          <Text style={styles.title}>Make it happen.</Text>
           <View style={styles.divider} />
-          <Text style={styles.sub}>
-            Tap the Synq button to see{"\n"}who’s free to hang out.
-          </Text>
+          <Text style={styles.sub}>Tap to Synq. Connect in the moment.</Text>
         </Animated.View>
 
-        {/* Phone graphic */}
-        <Animated.View pointerEvents="none" style={[styles.phoneWrap, { opacity: phoneFade }]}>
+        {/* HERO: centered pulse + subtle vibration */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.pulseWrap,
+            {
+              opacity: pulseFade,
+              transform: [{ translateX: jitterX }, { translateY: jitterY }, { scale }],
+            },
+          ]}
+        >
           <Image
-            //source={require("./chat.png")}
-            style={styles.phone}
+            source={require("../../assets/pulse.gif")}
+            style={styles.pulse}
             resizeMode="contain"
           />
         </Animated.View>
 
         <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
-          <TouchableOpacity
-            onPress={() => (onNext ? onNext() : router.push("/(auth)/getting-started"))}
-            activeOpacity={0.85}
-            style={styles.nextBtn}
-          >
+          <TouchableOpacity onPress={handleNext} activeOpacity={0.88} style={styles.nextBtn}>
             <Text style={styles.nextText}>Continue</Text>
           </TouchableOpacity>
 
@@ -110,63 +176,74 @@ export default function SeeWhenFriendsAvailable({
   );
 }
 
+function sleep(ms: number) {
+  return new Promise((res) => setTimeout(res, ms));
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG },
   container: { flex: 1, backgroundColor: BG },
 
   bgSvgWrap: {
     position: "absolute",
-    top: -40,
-    left: -40,
-    right: -40,
-    bottom: -40,
-    opacity: 0.35,
-    transform: [{ rotate: "-8deg" }],
+    top: -45,
+    left: -45,
+    right: -45,
+    bottom: -45,
+    opacity: 0.28,
+    transform: [{ rotate: "-10deg" }],
+  },
+
+  topOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 260
   },
 
   skip: { position: "absolute", top: 14, right: 18, zIndex: 10 },
   skipText: {
-    color: "rgba(255,255,255,0.55)", // matches your other screens
+    color: "rgba(255,255,255,0.55)",
     fontFamily: fonts.book,
     fontSize: 16,
   },
 
-  topCopy: {
-    paddingTop: 86,
-    paddingHorizontal: 22,
-    zIndex: 3,
-  },
+  topCopy: { paddingTop: 86, paddingHorizontal: 22, zIndex: 6 },
   title: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 32,
-    letterSpacing: 0.2,
+    fontSize: 34,
+    letterSpacing: -0.3,
   },
   divider: {
     marginTop: 14,
     height: 1,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    width: "78%",
+    backgroundColor: "rgba(255,255,255,0.10)",
+    width: "70%",
   },
   sub: {
     marginTop: 16,
-    color: MUTED,
+    color: "rgba(255,255,255,0.78)",
     fontFamily: fonts.medium,
     fontSize: 16,
-    lineHeight: 22,
+    lineHeight: 24,
   },
 
-  phoneWrap: {
+  // true hero centering
+  pulseWrap: {
     position: "absolute",
+    top: "35%",
     left: 0,
     right: 0,
-    bottom: -200,
     alignItems: "center",
-    zIndex: 0,
+    marginTop: 10, // tiny optical correction (feels centered with header + CTA)
+    zIndex: 2,
   },
-  phone: {
-    width: 490,
-    height: 660,
+  pulse: {
+    width: 300,
+    height: 300,
+    opacity: 0.98,
   },
 
   bottom: {
@@ -176,7 +253,7 @@ const styles = StyleSheet.create({
     bottom: 26,
     alignItems: "center",
     paddingHorizontal: 22,
-    zIndex: 6,
+    zIndex: 10,
   },
   nextBtn: {
     width: "88%",
@@ -187,7 +264,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 5,
   },
   nextText: {
     color: ACCENT,

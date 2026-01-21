@@ -9,7 +9,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SvgXml } from "react-native-svg";
 
@@ -48,7 +48,7 @@ export default function MakePlansScreen({
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [topFade, orbFade, bottomFade]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -59,7 +59,9 @@ export default function MakePlansScreen({
         </View>
 
         <TouchableOpacity
-          onPress={() => (onSkip ? onSkip() : router.push("/(auth)/getting-started"))}
+          onPress={() =>
+            onSkip ? onSkip() : router.push("/(auth)/getting-started")
+          }
           activeOpacity={0.7}
           style={styles.skip}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -68,10 +70,14 @@ export default function MakePlansScreen({
         </TouchableOpacity>
 
         <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
-          <Text style={styles.title}>Make plans, not posts.</Text>
+          <Text style={styles.title}>
+            Turn spare moments{"\n"}into shared ones.
+          </Text>
+
           <View style={styles.divider} />
+
           <Text style={styles.sub}>
-            Synq shows when your friends are{"\n"}so hanging out actually happens.
+            A social tool that shows you which friends are free—right now.
           </Text>
         </Animated.View>
 
@@ -79,6 +85,7 @@ export default function MakePlansScreen({
           <Image
             style={styles.orb}
             resizeMode="contain"
+            // source={require("../../assets/orb.png")}
           />
         </Animated.View>
 
@@ -91,7 +98,10 @@ export default function MakePlansScreen({
             <Text style={styles.nextText}>Next</Text>
           </TouchableOpacity>
 
-          <View style={styles.dots} accessibilityLabel={`Step ${step} of ${totalSteps}`}>
+          <View
+            style={styles.dots}
+            accessibilityLabel={`Step ${step} of ${totalSteps}`}
+          >
             {Array.from({ length: totalSteps }).map((_, i) => {
               const active = i + 1 === step;
               return (
@@ -132,6 +142,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     fontSize: 34,
     letterSpacing: 0.2,
+    lineHeight: 40,
   },
   divider: {
     marginTop: 14,

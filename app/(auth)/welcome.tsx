@@ -9,7 +9,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SvgXml } from "react-native-svg";
 
@@ -48,7 +48,7 @@ export default function SpontaneousHangouts({
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [topFade, graphicFade, bottomFade]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -59,7 +59,9 @@ export default function SpontaneousHangouts({
         </View>
 
         <TouchableOpacity
-          onPress={() => (onSkip ? onSkip() : router.push("/(auth)/getting-started"))}
+          onPress={() =>
+            onSkip ? onSkip() : router.push("/(auth)/getting-started")
+          }
           activeOpacity={0.7}
           style={styles.skip}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -68,17 +70,16 @@ export default function SpontaneousHangouts({
         </TouchableOpacity>
 
         <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
-          <Text style={styles.title}>Spontaneous hangouts start here.</Text>
+          <Text style={styles.title}>Plans that actually happen.</Text>
           <View style={styles.divider} />
           <Text style={styles.sub}>
-            Synq shows when friends are free to meet up —
-            {"\n"}so plans actually happen.
+           No guessing, no waiting—connect when it works.
           </Text>
         </Animated.View>
 
         <Animated.View style={[styles.graphicWrap, { opacity: graphicFade }]}>
           <Image
-            source={require("./synq-network.png")}
+           //source={require("./synq-network.png")}
             style={styles.network}
             resizeMode="contain"
           />
@@ -93,7 +94,10 @@ export default function SpontaneousHangouts({
             <Text style={styles.nextText}>Continue</Text>
           </TouchableOpacity>
 
-          <View style={styles.dots} accessibilityLabel={`Step ${step} of ${totalSteps}`}>
+          <View
+            style={styles.dots}
+            accessibilityLabel={`Step ${step} of ${totalSteps}`}
+          >
             {Array.from({ length: totalSteps }).map((_, i) => {
               const active = i + 1 === step;
               return (
@@ -128,7 +132,7 @@ const styles = StyleSheet.create({
   },
   skip: { position: "absolute", top: 14, right: 18, zIndex: 10 },
   skipText: {
-    color: "rgba(255,255,255,0.55)", 
+    color: "rgba(255,255,255,0.55)",
     fontFamily: fonts.book,
     fontSize: 16,
   },

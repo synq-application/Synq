@@ -1,4 +1,4 @@
-import { ACCENT, BG, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
+import { ACCENT, BG, fonts, synqSvg, TEXT } from "@/constants/Variables";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -16,36 +16,38 @@ export default function GetStartedScreen() {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
       <View style={styles.container}>
-
+        {/* Background */}
         <View pointerEvents="none" style={styles.bgSvgWrap}>
           <SvgXml xml={synqSvg} width="120%" height="120%" />
         </View>
 
+        {/* Copy */}
         <View style={styles.topCopy}>
-          <Text style={styles.title}>You’re ready.</Text>
-          <View style={styles.divider} />
+          <Text style={styles.kicker}>Ready when you are</Text>
+          <Text style={styles.title}>Let’s Synq.</Text>
           <Text style={styles.sub}>
-            Turn Synq on when you’re free and{"\n"}see who’s down to meet up.
+            Turn it on when you’re free.{"\n"}
+            See which friends are free too.
           </Text>
         </View>
 
+        {/* CTA */}
         <View style={styles.bottom}>
-          <TouchableOpacity
-            activeOpacity={0.88}
-            style={styles.primaryBtn}
-            onPress={() => router.push("/(auth)/phone")}
-          >
-            <Text style={styles.primaryText}>Get Started</Text>
-          </TouchableOpacity>
-
-          <View style={styles.signInRow}>
-            <Text style={styles.signInText}>Already have an account? </Text>
+          <View style={styles.ctaCard}>
             <TouchableOpacity
-              onPress={() => router.push("/(auth)/login")}
-              activeOpacity={0.8}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.9}
+              style={styles.primaryBtn}
+              onPress={() => router.push("/(auth)/phone")}
             >
-              <Text style={styles.signInLink}>Sign in here</Text>
+              <Text style={styles.primaryText}>Get started</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={styles.secondaryBtn}
+              onPress={() => router.push("/(auth)/login")}
+            >
+              <Text style={styles.secondaryText}>I already have an account</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -60,74 +62,105 @@ const styles = StyleSheet.create({
 
   bgSvgWrap: {
     position: "absolute",
-    top: -40,
-    left: -40,
-    right: -40,
-    bottom: -40,
-    opacity: 0.35,
-    transform: [{ rotate: "-8deg" }],
+    top: -55,
+    left: -55,
+    right: -55,
+    bottom: -55,
+    opacity: 0.22,
+    transform: [{ rotate: "-10deg" }],
   },
+
   topCopy: {
-    paddingTop: 86,
+    paddingTop: 96,
     paddingHorizontal: 22,
   },
+
+  kicker: {
+    color: "rgba(255,255,255,0.6)",
+    fontFamily: fonts.book,
+    fontSize: 13,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    marginBottom: 10,
+  },
+
   title: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 34,
-    letterSpacing: 0.2,
+    fontSize: 44,
+    letterSpacing: -0.8,
+    lineHeight: 48,
   },
-  divider: {
-    marginTop: 14,
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    width: "78%",
-  },
+
   sub: {
-    marginTop: 16,
-    color: MUTED,
+    marginTop: 14,
+    color: "rgba(255,255,255,0.78)",
     fontFamily: fonts.medium,
     fontSize: 16,
-    lineHeight: 22,
+    lineHeight: 24,
+    width: "92%",
   },
 
   bottom: {
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 36,
-    alignItems: "center",
-    paddingHorizontal: 22,
+    bottom: 28,
+    paddingHorizontal: 18,
+  },
+
+  ctaCard: {
+    borderRadius: 26,
+    padding: 16,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
   },
 
   primaryBtn: {
-    width: "88%",
-    height: 56,
-    borderRadius: 18,
+    height: 58,
+    borderRadius: 22,
     backgroundColor: ACCENT,
     justifyContent: "center",
     alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
   },
+
   primaryText: {
     color: "#061006",
     fontFamily: fonts.heavy,
     fontSize: 18,
-    letterSpacing: 0.2,
+    letterSpacing: 0.15,
   },
 
-  signInRow: {
-    flexDirection: "row",
+  secondaryBtn: {
+    marginTop: 12,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    justifyContent: "center",
     alignItems: "center",
-    marginTop: 14,
   },
-  signInText: {
-    color: "rgba(255,255,255,0.55)",
+
+  secondaryText: {
+    color: "rgba(255,255,255,0.82)",
+    fontFamily: fonts.medium,
+    fontSize: 15,
+  },
+
+  micro: {
+    marginTop: 12,
+    textAlign: "center",
+    color: "rgba(255,255,255,0.40)",
     fontFamily: fonts.book,
-    fontSize: 14,
-  },
-  signInLink: {
-    color: ACCENT,
-    fontFamily: fonts.heavy,
-    fontSize: 14,
+    fontSize: 12,
   },
 });
