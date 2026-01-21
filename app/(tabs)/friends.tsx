@@ -1,3 +1,4 @@
+import { ACCENT, BG, fonts, MUTED, TEXT } from "@/constants/Variables";
 import {
   collection,
   deleteDoc,
@@ -17,27 +18,23 @@ import {
   Image,
   Keyboard,
   Modal,
-  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
 
-const ACCENT = "#7DFFA6";
 const { width } = Dimensions.get("window");
 
-const fonts = {
-  black: Platform.OS === "ios" ? "Avenir-Black" : "sans-serif-condensed",
-  heavy: Platform.OS === "ios" ? "Avenir-Heavy" : "sans-serif-medium",
-  medium: Platform.OS === "ios" ? "Avenir-Medium" : "sans-serif",
-  book: Platform.OS === "ios" ? "Avenir-Book" : "sans-serif",
-};
+const SURFACE = "rgba(255,255,255,0.06)";
+const BORDER = "rgba(255,255,255,0.08)";
+const MUTED2 = "rgba(255,255,255,0.45)";
+const MUTED3 = "rgba(255,255,255,0.25)";
 
 interface Friend {
   id: string;
@@ -71,23 +68,21 @@ export default function FriendsScreen() {
             const data = uSnap.data();
 
             const theirFriendsSnap = await getDocs(
-              collection(db, "users", fDoc.id, "friends"),
+              collection(db, "users", fDoc.id, "friends")
             );
             const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
-            const mutuals = theirFriendIds.filter((id) =>
-              myFriendIds.includes(id),
-            );
+            const mutuals = theirFriendIds.filter((id) => myFriendIds.includes(id));
 
             return {
               id: fDoc.id,
-              ...data,
+              ...(data as any),
               mutualCount: mutuals.length,
             } as Friend;
-          }),
+          })
         );
 
         const sortedFriends = friendsList.sort((a, b) =>
-          (a.displayName || "").localeCompare(b.displayName || ""),
+          (a.displayName || "").localeCompare(b.displayName || "")
         );
         setFriends(sortedFriends);
       } catch (err) {
@@ -100,135 +95,118 @@ export default function FriendsScreen() {
 
   const removeFriend = async (friendId: string) => {
     if (!auth.currentUser) return;
-    Alert.alert(
-      "Remove Friend",
-      "Are you sure you want to remove this friend?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteDoc(
-                doc(db, "users", auth.currentUser!.uid, "friends", friendId),
-              );
-              await deleteDoc(
-                doc(db, "users", friendId, "friends", auth.currentUser!.uid),
-              );
-              setSelectedFriend(null);
-            } catch (e) {
-              console.error(e);
-            }
-          },
+    Alert.alert("Remove Friend", "Are you sure you want to remove this friend?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteDoc(doc(db, "users", auth.currentUser!.uid, "friends", friendId));
+            await deleteDoc(doc(db, "users", friendId, "friends", auth.currentUser!.uid));
+            setSelectedFriend(null);
+          } catch (e) {
+            console.error(e);
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Friends</Text>
-        <TouchableOpacity onPress={() => setSearchModalVisible(true)}>
-          <Icon name="add-circle-outline" size={32} color={ACCENT} />
+        <View>
+          <Text style={styles.headerTitle}>Friends</Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => setSearchModalVisible(true)}
+          activeOpacity={0.7}
+          style={styles.headerAction}
+        >
+          <Icon name="add-circle-outline" size={30} color={ACCENT} />
         </TouchableOpacity>
       </View>
+
+      <View style={styles.headerDivider} />
 
       <FlatList
         data={friends}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 20 }}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.friendRow}
-            onPress={() => setSelectedFriend(item)}
-          >
+          <TouchableOpacity style={styles.friendRow} onPress={() => setSelectedFriend(item)} activeOpacity={0.75}>
             <View style={styles.avatar}>
               {item.imageurl ? (
                 <Image source={{ uri: item.imageurl }} style={styles.img} />
               ) : (
-                <Icon name="person" size={24} color="#444" />
+                <Icon name="person" size={22} color={MUTED3} />
               )}
+              {item.status === "available" && <View style={styles.activeDotAvatar} />}
             </View>
+
             <View style={{ flex: 1 }}>
-              <View style={styles.nameRow}>
-                <Text style={styles.friendName}>
-                  {item.displayName || "User"}
-                </Text>
-                {item.status === "available" && (
-                  <View style={styles.activeDotInline} />
-                )}
-              </View>
+              <Text style={styles.friendName}>{item.displayName || "User"}</Text>
               <Text style={styles.mutualText}>
-                {item.mutualCount || 0} mutual{" "}
-                {item.mutualCount === 1 ? "friend" : "friends"}
+                {item.mutualCount || 0} mutual {item.mutualCount === 1 ? "friend" : "friends"}
               </Text>
             </View>
-            <Icon name="chevron-forward" size={18} color="#222" />
+
+            <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.25)" />
           </TouchableOpacity>
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.empty}>
-              No friends yet.{"\n"}Tap + to find people.
-            </Text>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>No friends yet</Text>
+              <Text style={styles.emptyText}>Tap the + to find people and send a request.</Text>
+            </View>
           </View>
         }
       />
 
-      <Modal visible={!!selectedFriend} transparent animationType="fade">
+      {/* Friend Profile Modal */}
+      <Modal visible={!!selectedFriend} transparent animationType="fade" onRequestClose={() => setSelectedFriend(null)}>
         <View style={styles.popupOverlay}>
           <View style={styles.popupContent}>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => setSelectedFriend(null)}
-            >
-              <Icon name="close" size={24} color="white" />
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedFriend(null)} activeOpacity={0.7}>
+              <Icon name="close" size={22} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
 
             <Image
               source={{
-                uri:
-                  selectedFriend?.imageurl ||
-                  "https://www.gravatar.com/avatar/?d=mp",
+                uri: selectedFriend?.imageurl || "https://www.gravatar.com/avatar/?d=mp",
               }}
               style={styles.largeAvatar}
             />
 
-            <Text style={styles.popupName}>{selectedFriend?.displayName}</Text>
+            <Text style={styles.popupName}>{selectedFriend?.displayName || "User"}</Text>
+
             <View style={styles.statusBadge}>
               <View
                 style={[
                   styles.statusDot,
-                  {
-                    backgroundColor:
-                      selectedFriend?.status === "available" ? ACCENT : "#444",
-                  },
+                  { backgroundColor: selectedFriend?.status === "available" ? ACCENT : "rgba(255,255,255,0.22)" },
                 ]}
               />
               <Text style={styles.statusText}>
-                {selectedFriend?.status === "available"
-                  ? "Available now"
-                  : "Inactive"}
+                {selectedFriend?.status === "available" ? "Available now" : "Inactive"}
               </Text>
             </View>
 
-            {selectedFriend?.monthlyMemo && (
-              <View
-                style={[
-                  styles.memoBox,
-                  { borderColor: ACCENT, borderWidth: 1 },
-                ]}
-              >
-                <Text style={[styles.memoTitle, { color: ACCENT }]}>
-                  Monthly Memo
-                </Text>
+            {selectedFriend?.monthlyMemo ? (
+              <View style={styles.memoBoxAccent}>
+                <Text style={styles.memoTitleAccent}>Monthly Memo</Text>
                 <Text style={styles.memoText}>{selectedFriend.monthlyMemo}</Text>
               </View>
-            )}
+            ) : null}
 
+            {/* Interests */}
             <View style={styles.interestsContainer}>
               <Text style={styles.sectionLabel}>Interests</Text>
 
@@ -240,7 +218,7 @@ export default function FriendsScreen() {
               >
                 {selectedFriend?.interests && selectedFriend.interests.length > 0 ? (
                   selectedFriend.interests.map((interest, i) => (
-                    <View key={i} style={styles.interestRect}>
+                    <View key={i} style={styles.interestPill}>
                       <Text style={styles.interestText}>{interest}</Text>
                     </View>
                   ))
@@ -250,18 +228,14 @@ export default function FriendsScreen() {
               </ScrollView>
             </View>
 
-
-            {selectedFriend?.memo && (
+            {selectedFriend?.memo ? (
               <View style={styles.memoBox}>
                 <Text style={styles.memoTitle}>Current Memo</Text>
                 <Text style={styles.memoText}>{selectedFriend.memo}</Text>
               </View>
-            )}
+            ) : null}
 
-            <TouchableOpacity
-              style={styles.removeBtn}
-              onPress={() => removeFriend(selectedFriend!.id)}
-            >
+            <TouchableOpacity style={styles.removeBtn} onPress={() => removeFriend(selectedFriend!.id)} activeOpacity={0.75}>
               <Text style={styles.removeBtnText}>Remove Friend</Text>
             </TouchableOpacity>
           </View>
@@ -316,7 +290,7 @@ function SearchModal({
             u.id !== auth.currentUser?.uid &&
             !currentFriends.includes(u.id) &&
             (u.displayName?.toLowerCase().includes(val.toLowerCase()) ||
-              u.email?.toLowerCase().includes(val.toLowerCase())),
+              u.email?.toLowerCase().includes(val.toLowerCase()))
         );
 
       setResults(filtered);
@@ -341,11 +315,10 @@ function SearchModal({
         "users",
         targetUser.id,
         "friendRequests",
-        auth.currentUser.uid,
+        auth.currentUser.uid
       );
 
-      const senderName =
-        meData?.displayName || auth.currentUser.displayName || "Someone";
+      const senderName = meData?.displayName || auth.currentUser.displayName || "Someone";
       const senderImageUrl = meData?.imageurl || null;
 
       await setDoc(requestDocRef, {
@@ -371,18 +344,24 @@ function SearchModal({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.modalBody}>
-        <View style={styles.searchBarRow}>
+        <StatusBar barStyle="light-content" />
+
+        <View style={styles.searchHeader}>
+          <Text style={styles.searchTitle}>Add friends</Text>
+          <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.searchInputWrap}>
           <TextInput
             placeholder="Search by name or email..."
-            placeholderTextColor="#666"
-            style={styles.input}
+            placeholderTextColor="rgba(255,255,255,0.25)"
+            style={styles.searchInput}
             value={queryText}
             onChangeText={searchUsers}
             autoCapitalize="none"
           />
-          <TouchableOpacity onPress={onClose}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
         </View>
 
         {isSearching ? (
@@ -393,34 +372,37 @@ function SearchModal({
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
             renderItem={({ item }) => (
               <View style={styles.searchResult}>
-                <View
-                  style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
-                >
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                   <View style={styles.avatar}>
                     {item.imageurl ? (
                       <Image source={{ uri: item.imageurl }} style={styles.img} />
                     ) : (
-                      <Icon name="person" size={24} color="#444" />
+                      <Icon name="person" size={22} color={MUTED3} />
                     )}
                   </View>
-                  <View>
-                    <Text style={styles.friendName}>
-                      {item.displayName || "User"}
-                    </Text>
+                  <View style={{ paddingRight: 12 }}>
+                    <Text style={styles.friendName}>{item.displayName || "User"}</Text>
                     <Text style={styles.emailDetail}>{item.email}</Text>
                   </View>
                 </View>
 
-                <TouchableOpacity
-                  onPress={() => sendInvite(item)}
-                  style={styles.addBtn}
-                >
+                <TouchableOpacity onPress={() => sendInvite(item)} style={styles.addBtn} activeOpacity={0.8}>
                   <Text style={styles.addBtnText}>Add</Text>
                 </TouchableOpacity>
               </View>
             )}
+            ListEmptyComponent={
+              queryText.length >= 3 ? (
+                <View style={{ paddingTop: 24 }}>
+                  <Text style={{ color: MUTED2, textAlign: "center", fontFamily: fonts.book }}>
+                    No results found.
+                  </Text>
+                </View>
+              ) : null
+            }
           />
         )}
       </View>
@@ -429,179 +411,202 @@ function SearchModal({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "black", paddingHorizontal: 20 },
+  container: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
+
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 70,
-    marginBottom: 20,
-    alignItems: "center",
+    marginTop: 78,
+    alignItems: "flex-end",
   },
-  headerTitle: { color: "white", fontSize: 32, fontFamily: fonts.black },
-  friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 15 },
-  nameRow: { flexDirection: "row", alignItems: "center" },
-  activeDotInline: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: ACCENT,
-    marginLeft: 8,
-  },
-  separator: { height: 0.5, backgroundColor: "#1a1a1a", width: "100%" },
+  headerTitle: { color: TEXT, fontSize: 32, fontFamily: fonts.heavy, letterSpacing: 0.2 },
+  headerSub: { color: MUTED, fontSize: 14, fontFamily: fonts.book, marginTop: 6 },
+  headerAction: { paddingLeft: 12, paddingVertical: 6 },
+
+  headerDivider: { marginTop: 16, height: 1, backgroundColor: BORDER },
+
+  friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
+  separator: { height: 1, backgroundColor: BORDER, width: "100%" },
+
   avatar: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: "#111",
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 15,
+    marginRight: 14,
   },
   img: { width: 52, height: 52, borderRadius: 26 },
-  friendName: { color: "white", fontSize: 18, fontFamily: fonts.heavy },
-  mutualText: {
-    color: "#666",
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    marginTop: 2,
+  activeDotAvatar: {
+    position: "absolute",
+    right: 2,
+    bottom: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: ACCENT,
+    borderWidth: 2,
+    borderColor: BG,
   },
-  emptyContainer: { flex: 1, justifyContent: "center", marginTop: 100 },
-  empty: {
-    color: "#333",
-    textAlign: "center",
-    fontFamily: fonts.heavy,
-    fontSize: 20,
-    lineHeight: 28,
+
+  friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
+  mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
+
+  emptyContainer: { flex: 1, justifyContent: "center", marginTop: 90, paddingHorizontal: 10 },
+  emptyCard: {
+    backgroundColor: SURFACE,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 18,
   },
+  emptyTitle: { color: TEXT, textAlign: "center", fontFamily: fonts.heavy, fontSize: 18 },
+  emptyText: { color: MUTED, textAlign: "center", fontFamily: fonts.book, fontSize: 14, marginTop: 8, lineHeight: 20 },
+
   popupOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.94)",
+    backgroundColor: "rgba(0,0,0,0.78)",
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 18,
   },
   popupContent: {
-    width: width * 0.88,
-    backgroundColor: "#111",
-    maxHeight: "85%",
-    borderRadius: 32,
-    padding: 24,
+    width: width * 0.90,
+    maxHeight: "86%",
+    backgroundColor: "rgba(18,18,18,0.96)",
+    borderRadius: 28,
+    padding: 22,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#222",
+    borderColor: BORDER,
   },
-  interestsScroll: {
-    maxHeight: 140,
-    width: "100%",
-  },
-  closeBtn: { position: "absolute", top: 20, right: 20, zIndex: 1 },
+  closeBtn: { position: "absolute", top: 16, right: 16, padding: 8, zIndex: 2 },
+
   largeAvatar: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    marginBottom: 16,
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    marginTop: 10,
+    marginBottom: 14,
     borderWidth: 2,
-    borderColor: ACCENT,
+    borderColor: "rgba(125,255,166,0.35)",
   },
-  popupName: { color: "white", fontSize: 26, fontFamily: fonts.black },
+  popupName: { color: TEXT, fontSize: 24, fontFamily: fonts.heavy, letterSpacing: 0.2 },
+
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1a1a1a",
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 20,
-    marginTop: 8,
+    paddingVertical: 7,
+    borderRadius: 999,
+    marginTop: 10,
+    marginBottom: 18,
   },
   statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  statusText: { color: "white", fontSize: 13, fontFamily: fonts.heavy },
-  interestsContainer: { width: "100%", marginBottom: 20 },
-  sectionLabel: {
-    color: "#444",
-    fontSize: 11,
-    fontFamily: fonts.black,
-    textTransform: "uppercase",
-    marginBottom: 10,
-    letterSpacing: 1,
-  },
-  interestsWrapper: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    paddingBottom: 4,
-  },
-  interestRect: {
-    backgroundColor: "#1a1a1a",
-    borderWidth: 1,
-    borderColor: "#222",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 6,
-    marginBottom: 6,
-  },
-  interestText: { color: "white", fontFamily: fonts.medium, fontSize: 13 },
-  noInterestsText: {
-    color: "#333",
-    fontSize: 13,
-    fontFamily: fonts.book,
-    fontStyle: "italic",
-  },
-  memoBox: {
-    backgroundColor: "black",
-    padding: 18,
-    borderRadius: 20,
+  statusText: { color: TEXT, fontSize: 13, fontFamily: fonts.book },
+
+  memoBoxAccent: {
     width: "100%",
-    marginBottom: 15,
+    backgroundColor: "rgba(125,255,166,0.05)",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(125,255,166,0.22)",
+    padding: 16,
+    marginBottom: 14,
+  },
+  memoTitleAccent: {
+    color: ACCENT,
+    fontSize: 11,
+    fontFamily: fonts.heavy,
+    textTransform: "uppercase",
+    marginBottom: 6,
+    letterSpacing: 0.6,
+  },
+
+  memoBox: {
+    width: "100%",
+    backgroundColor: SURFACE,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 16,
+    marginTop: 10,
   },
   memoTitle: {
-    color: "#666",
+    color: MUTED2,
     fontSize: 11,
-    fontFamily: fonts.black,
+    fontFamily: fonts.heavy,
     textTransform: "uppercase",
     marginBottom: 6,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  memoText: {
-    color: "white",
-    fontSize: 15,
-    fontFamily: fonts.medium,
-    lineHeight: 20,
+  memoText: { color: TEXT, fontSize: 15, fontFamily: fonts.book, lineHeight: 20 },
+
+  interestsContainer: { width: "100%", marginTop: 10, marginBottom: 10 },
+  sectionLabel: {
+    color: MUTED2,
+    fontSize: 11,
+    fontFamily: fonts.heavy,
+    textTransform: "uppercase",
+    marginBottom: 10,
+    letterSpacing: 0.9,
   },
-  removeBtn: { marginTop: 15, padding: 10 },
+  interestsScroll: { maxHeight: 150, width: "100%" },
+  interestsWrapper: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", paddingBottom: 4 },
+  interestPill: {
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  interestText: { color: TEXT, fontFamily: fonts.book, fontSize: 13 },
+  noInterestsText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, fontStyle: "italic", textAlign: "center" },
+
+  removeBtn: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12 },
   removeBtnText: { color: "#ff453a", fontFamily: fonts.heavy, fontSize: 14 },
-  modalBody: { flex: 1, backgroundColor: "black", padding: 20 },
-  searchBarRow: {
+
+  // Search modal
+  modalBody: { flex: 1, backgroundColor: BG, padding: 20 },
+  searchHeader: {
+    marginTop: 44,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-    marginBottom: 20,
-    marginTop: 40,
+    justifyContent: "space-between",
+    alignItems: "flex-end",
   },
-  input: {
-    flex: 1,
-    backgroundColor: "#111",
-    color: "white",
-    padding: 14,
-    borderRadius: 14,
+  searchTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
+  cancelText: { color: ACCENT, fontFamily: fonts.book, fontSize: 16 },
+
+  searchInputWrap: { marginTop: 14, marginBottom: 12 },
+  searchInput: {
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    color: TEXT,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
     fontFamily: fonts.medium,
     fontSize: 16,
   },
-  cancelText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 16 },
-  searchResult: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 15,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#222",
-  },
-  emailDetail: { color: "#666", fontSize: 13, fontFamily: fonts.book },
+
+  searchResult: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14 },
+  emailDetail: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 2 },
+
   addBtn: {
     backgroundColor: ACCENT,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 14,
   },
-  addBtnText: { color: "black", fontFamily: fonts.black, fontSize: 14 },
+  addBtnText: { color: "#061006", fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 0.2 },
 });
