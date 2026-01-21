@@ -1,7 +1,8 @@
 import { ACCENT, BG, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
+  Animated,
   Image,
   SafeAreaView,
   StatusBar,
@@ -25,6 +26,30 @@ export default function SpontaneousHangouts({
   step = 2,
   totalSteps = 4,
 }: Props) {
+  const topFade = useRef(new Animated.Value(0)).current;
+  const graphicFade = useRef(new Animated.Value(0)).current;
+  const bottomFade = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.stagger(120, [
+      Animated.timing(topFade, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(graphicFade, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bottomFade, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
@@ -34,31 +59,32 @@ export default function SpontaneousHangouts({
         </View>
 
         <TouchableOpacity
-          onPress={() => (onNext ? onNext() : router.push("/(auth)/getting-started"))}
+          onPress={() => (onSkip ? onSkip() : router.push("/(auth)/getting-started"))}
           activeOpacity={0.7}
           style={styles.skip}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
           <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
 
-        <View style={styles.topCopy}>
+        <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
           <Text style={styles.title}>Spontaneous hangouts start here.</Text>
           <View style={styles.divider} />
           <Text style={styles.sub}>
             Synq shows when friends are free to meet up —
             {"\n"}so plans actually happen.
           </Text>
-        </View>
+        </Animated.View>
 
-        <View style={styles.graphicWrap}>
+        <Animated.View style={[styles.graphicWrap, { opacity: graphicFade }]}>
           <Image
             source={require("./synq-network.png")}
             style={styles.network}
             resizeMode="contain"
           />
-        </View>
+        </Animated.View>
 
-        <View style={styles.bottom}>
+        <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
           <TouchableOpacity
             onPress={() => (onNext ? onNext() : router.push("/(auth)/next"))}
             activeOpacity={0.85}
@@ -67,7 +93,7 @@ export default function SpontaneousHangouts({
             <Text style={styles.nextText}>Continue</Text>
           </TouchableOpacity>
 
-          <View style={styles.dots}>
+          <View style={styles.dots} accessibilityLabel={`Step ${step} of ${totalSteps}`}>
             {Array.from({ length: totalSteps }).map((_, i) => {
               const active = i + 1 === step;
               return (
@@ -81,7 +107,7 @@ export default function SpontaneousHangouts({
               );
             })}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
@@ -102,10 +128,11 @@ const styles = StyleSheet.create({
   },
   skip: { position: "absolute", top: 14, right: 18, zIndex: 10 },
   skipText: {
-    color: MUTED,
+    color: "rgba(255,255,255,0.55)", 
     fontFamily: fonts.book,
     fontSize: 16,
   },
+
   topCopy: { paddingTop: 86 },
   title: {
     color: TEXT,
@@ -155,12 +182,15 @@ const styles = StyleSheet.create({
     color: ACCENT,
     fontFamily: fonts.heavy,
     fontSize: 18,
+    letterSpacing: 0.2,
   },
 
   dots: {
     flexDirection: "row",
     gap: 8,
     marginTop: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
   dot: { width: 7, height: 7, borderRadius: 99 },
   dotInactive: { backgroundColor: "rgba(255,255,255,0.18)" },

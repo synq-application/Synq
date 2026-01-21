@@ -1,7 +1,8 @@
 import { ACCENT, BG, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
+  Animated,
   Image,
   SafeAreaView,
   StatusBar,
@@ -25,6 +26,30 @@ export default function MakePlansScreen({
   step = 1,
   totalSteps = 4,
 }: Props) {
+  const topFade = useRef(new Animated.Value(0)).current;
+  const orbFade = useRef(new Animated.Value(0)).current;
+  const bottomFade = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.stagger(120, [
+      Animated.timing(topFade, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(orbFade, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bottomFade, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
@@ -32,8 +57,9 @@ export default function MakePlansScreen({
         <View pointerEvents="none" style={styles.bgSvgWrap}>
           <SvgXml xml={synqSvg} width="120%" height="120%" />
         </View>
+
         <TouchableOpacity
-          onPress={() => (onNext ? onNext() : router.push("/(auth)/getting-started"))}
+          onPress={() => (onSkip ? onSkip() : router.push("/(auth)/getting-started"))}
           activeOpacity={0.7}
           style={styles.skip}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -41,23 +67,22 @@ export default function MakePlansScreen({
           <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
 
-        <View style={styles.topCopy}>
+        <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
           <Text style={styles.title}>Make plans, not posts.</Text>
           <View style={styles.divider} />
           <Text style={styles.sub}>
             Synq shows when your friends are{"\n"}so hanging out actually happens.
           </Text>
-        </View>
+        </Animated.View>
 
-        <View style={styles.orbWrap}>
+        <Animated.View style={[styles.orbWrap, { opacity: orbFade }]}>
           <Image
-            // source={require("../../../assets/onboarding/synq-orb.png")}
             style={styles.orb}
             resizeMode="contain"
           />
-        </View>
+        </Animated.View>
 
-        <View style={styles.bottom}>
+        <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
           <TouchableOpacity
             onPress={() => (onNext ? onNext() : router.push("/(auth)/welcome"))}
             activeOpacity={0.85}
@@ -65,6 +90,7 @@ export default function MakePlansScreen({
           >
             <Text style={styles.nextText}>Next</Text>
           </TouchableOpacity>
+
           <View style={styles.dots} accessibilityLabel={`Step ${step} of ${totalSteps}`}>
             {Array.from({ length: totalSteps }).map((_, i) => {
               const active = i + 1 === step;
@@ -76,7 +102,7 @@ export default function MakePlansScreen({
               );
             })}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );

@@ -1,14 +1,15 @@
 import { ACCENT, BG, MUTED, TEXT, fonts, synqSvg } from "@/constants/Variables";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
-    Image,
-    SafeAreaView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Animated,
+  Image,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SvgXml } from "react-native-svg";
 
@@ -25,6 +26,30 @@ export default function SeeWhenFriendsAvailable({
   step = 3,
   totalSteps = 4,
 }: Props) {
+  const topFade = useRef(new Animated.Value(0)).current;
+  const phoneFade = useRef(new Animated.Value(0)).current;
+  const bottomFade = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.stagger(120, [
+      Animated.timing(topFade, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(phoneFade, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bottomFade, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
@@ -32,20 +57,34 @@ export default function SeeWhenFriendsAvailable({
         <View pointerEvents="none" style={styles.bgSvgWrap}>
           <SvgXml xml={synqSvg} width="120%" height="120%" />
         </View>
-        <TouchableOpacity onPress={onSkip} activeOpacity={0.7} style={styles.skip}>
+
+        <TouchableOpacity
+          onPress={() => (onSkip ? onSkip() : router.push("/(auth)/getting-started"))}
+          activeOpacity={0.7}
+          style={styles.skip}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
           <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
-        <View style={styles.topCopy}>
+
+        <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
           <Text style={styles.title}>See when friends{"\n"}are available.</Text>
           <View style={styles.divider} />
           <Text style={styles.sub}>
             Tap the Synq button to see{"\n"}who’s free to hang out.
           </Text>
-        </View>
-        <View pointerEvents="none" style={styles.phoneWrap}>
-          <Image source={require("./chat.png")} style={styles.phone} resizeMode="contain" />
-        </View>
-        <View style={styles.bottom}>
+        </Animated.View>
+
+        {/* Phone graphic */}
+        <Animated.View pointerEvents="none" style={[styles.phoneWrap, { opacity: phoneFade }]}>
+          <Image
+            //source={require("./chat.png")}
+            style={styles.phone}
+            resizeMode="contain"
+          />
+        </Animated.View>
+
+        <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
           <TouchableOpacity
             onPress={() => (onNext ? onNext() : router.push("/(auth)/getting-started"))}
             activeOpacity={0.85}
@@ -65,7 +104,7 @@ export default function SeeWhenFriendsAvailable({
               );
             })}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
@@ -84,8 +123,14 @@ const styles = StyleSheet.create({
     opacity: 0.35,
     transform: [{ rotate: "-8deg" }],
   },
+
   skip: { position: "absolute", top: 14, right: 18, zIndex: 10 },
-  skipText: { color: MUTED, fontFamily: fonts.book, fontSize: 16 },
+  skipText: {
+    color: "rgba(255,255,255,0.55)", // matches your other screens
+    fontFamily: fonts.book,
+    fontSize: 16,
+  },
+
   topCopy: {
     paddingTop: 86,
     paddingHorizontal: 22,
@@ -120,9 +165,10 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   phone: {
-    width: 490,  
-    height: 660, 
+    width: 490,
+    height: 660,
   },
+
   bottom: {
     position: "absolute",
     left: 0,
@@ -141,15 +187,22 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 5
+    zIndex: 5,
   },
   nextText: {
     color: ACCENT,
     fontFamily: fonts.heavy,
     fontSize: 18,
+    letterSpacing: 0.2,
   },
 
-  dots: { flexDirection: "row", gap: 8, marginTop: 14 },
+  dots: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   dot: { width: 7, height: 7, borderRadius: 99 },
   dotInactive: { backgroundColor: "rgba(255,255,255,0.18)" },
   dotActive: { backgroundColor: ACCENT },
