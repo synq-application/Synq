@@ -64,7 +64,6 @@ export default function SynqScreen() {
   const [showOptionsList, setShowOptionsList] = useState(false);
   const [currentCategory, setCurrentCategory] = useState('');
   const flatListRef = useRef<FlatList>(null);
-
   const [hasUnread, setHasUnread] = useState(false);
 
   const markChatRead = async (chatId: string) => {
@@ -503,18 +502,14 @@ export default function SynqScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
-
         {status === 'active' && (
           <View style={{ flex: 1 }}>
             <View style={styles.activeHeader}>
               <TouchableOpacity onPress={() => setIsInboxVisible(true)} style={styles.headerIconContainer}>
                 <Ionicons name="chatbubbles-outline" size={28} color="white" />
-                {/* ✅ UPDATED: badge only when there are unread messages */}
                 {hasUnread && <View style={styles.badge} />}
               </TouchableOpacity>
-
               <Text style={styles.headerTitle}>Synq is active</Text>
-
               <TouchableOpacity onPress={() => setIsEditModalVisible(true)} style={styles.headerIconContainer}>
                 <Ionicons name="create-outline" size={28} color={ACCENT} />
               </TouchableOpacity>
@@ -526,7 +521,7 @@ export default function SynqScreen() {
               ListEmptyComponent={
                 <>
                   <Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 22 }}>
-                    No free friends right now :/
+                    No free friends right now.
                   </Text>
                   <Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 18 }}>
                     In the meantime, add more connections to increase the chances of having overlapping free time!
@@ -677,7 +672,6 @@ export default function SynqScreen() {
                   renderItem={({ item }) => {
                     const isMe = item.senderId === auth.currentUser?.uid;
                     const isSystemIdea = item.text.includes('✨ Synq AI Suggestion') || item.venueImage;
-
                     const currentChat = allChats.find((c) => c.id === activeChatId);
                     const senderAvatar = currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
 
