@@ -20,3 +20,19 @@ export const fonts = {
   medium: Platform.OS === "ios" ? "Avenir-Medium" : "sans-serif",
   book: Platform.OS === "ios" ? "Avenir-Book" : "sans-serif",
 };
+export const SURFACE = "rgba(255,255,255,0.06)";
+export const BORDER = "rgba(255,255,255,0.08)";
+export const MUTED2 = "rgba(255,255,255,0.45)";
+export const MUTED3 = "rgba(255,255,255,0.25)";
+
+export interface Friend {
+  id: string;
+  displayName?: string;
+  email?: string;
+  imageurl?: string;
+  status?: "available" | "inactive";
+  memo?: string;
+  monthlyMemo?: string;
+  interests?: string[];
+  mutualCount?: number;
+}

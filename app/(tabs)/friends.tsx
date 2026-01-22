@@ -1,4 +1,4 @@
-import { ACCENT, BG, fonts, MUTED, TEXT } from "@/constants/Variables";
+import { ACCENT, BG, BORDER, fonts, Friend, MUTED, MUTED2, MUTED3, SURFACE, TEXT } from "@/constants/Variables";
 import {
   collection,
   deleteDoc,
@@ -28,30 +28,17 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
-
 const { width } = Dimensions.get("window");
 
-const SURFACE = "rgba(255,255,255,0.06)";
-const BORDER = "rgba(255,255,255,0.08)";
-const MUTED2 = "rgba(255,255,255,0.45)";
-const MUTED3 = "rgba(255,255,255,0.25)";
-
-interface Friend {
-  id: string;
-  displayName?: string;
-  email?: string;
-  imageurl?: string;
-  status?: "available" | "inactive";
-  memo?: string;
-  monthlyMemo?: string;
-  interests?: string[];
-  mutualCount?: number;
-}
 
 export default function FriendsScreen() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+
+  // ✅ CHANGES: prevent initial spinner/flash by rendering skeleton rows until first load completes
+  const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(true);
+  const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -59,6 +46,13 @@ export default function FriendsScreen() {
     const friendsRef = collection(db, "users", myId, "friends");
 
     const unsubFriends = onSnapshot(friendsRef, async (snapshot) => {
+      // ✅ CHANGES:
+      // - first time: keep skeleton on screen
+      // - subsequent updates: refresh silently (no big spinner)
+      const firstLoad = isFriendsInitialLoading;
+      if (firstLoad) setIsFriendsInitialLoading(true);
+      else setIsFriendsRefreshing(true);
+
       try {
         const myFriendIds = snapshot.docs.map((d) => d.id);
 
@@ -71,7 +65,9 @@ export default function FriendsScreen() {
               collection(db, "users", fDoc.id, "friends")
             );
             const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
-            const mutuals = theirFriendIds.filter((id) => myFriendIds.includes(id));
+            const mutuals = theirFriendIds.filter((id) =>
+              myFriendIds.includes(id)
+            );
 
             return {
               id: fDoc.id,
@@ -84,13 +80,18 @@ export default function FriendsScreen() {
         const sortedFriends = friendsList.sort((a, b) =>
           (a.displayName || "").localeCompare(b.displayName || "")
         );
+
         setFriends(sortedFriends);
       } catch (err) {
         console.error("Error fetching friend data:", err);
+      } finally {
+        setIsFriendsInitialLoading(false);
+        setIsFriendsRefreshing(false);
       }
     });
 
     return () => unsubFriends();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const removeFriend = async (friendId: string) => {
@@ -102,8 +103,12 @@ export default function FriendsScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await deleteDoc(doc(db, "users", auth.currentUser!.uid, "friends", friendId));
-            await deleteDoc(doc(db, "users", friendId, "friends", auth.currentUser!.uid));
+            await deleteDoc(
+              doc(db, "users", auth.currentUser!.uid, "friends", friendId)
+            );
+            await deleteDoc(
+              doc(db, "users", friendId, "friends", auth.currentUser!.uid)
+            );
             setSelectedFriend(null);
           } catch (e) {
             console.error(e);
@@ -112,6 +117,70 @@ export default function FriendsScreen() {
       },
     ]);
   };
+
+  // ✅ CHANGES: skeleton row renderer (keeps layout stable instead of flashing a spinner)
+  const renderSkeletonRow = (key: string) => (
+    <View key={key} style={styles.friendRow}>
+      <View style={[styles.avatar, { backgroundColor: "#151515" }]} />
+      <View style={{ flex: 1 }}>
+        <View
+          style={{
+            height: 14,
+            width: "55%",
+            backgroundColor: "#1f1f1f",
+            borderRadius: 8,
+            marginBottom: 8,
+          }}
+        />
+        <View
+          style={{
+            height: 12,
+            width: "38%",
+            backgroundColor: "#1a1a1a",
+            borderRadius: 8,
+          }}
+        />
+      </View>
+      <View
+        style={{
+          height: 12,
+          width: 12,
+          backgroundColor: "transparent",
+        }}
+      />
+    </View>
+  );
+
+  const renderFriendRow = ({ item }: { item: Friend }) => (
+    <TouchableOpacity
+      style={styles.friendRow}
+      onPress={() => setSelectedFriend(item)}
+      activeOpacity={0.75}
+    >
+      <View style={styles.avatar}>
+        {item.imageurl ? (
+          <Image source={{ uri: item.imageurl }} style={styles.img} />
+        ) : (
+          <Icon name="person" size={22} color={MUTED3} />
+        )}
+        {item.status === "available" && <View style={styles.activeDotAvatar} />}
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <Text style={styles.friendName}>{item.displayName || "User"}</Text>
+        <Text style={styles.mutualText}>
+          {item.mutualCount || 0} mutual{" "}
+          {item.mutualCount === 1 ? "friend" : "friends"}
+        </Text>
+      </View>
+
+      <Icon
+        name="chevron-forward"
+        size={18}
+        color="rgba(255,255,255,0.25)"
+      />
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
@@ -134,47 +203,67 @@ export default function FriendsScreen() {
 
       <View style={styles.headerDivider} />
 
-      <FlatList
-        data={friends}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.friendRow} onPress={() => setSelectedFriend(item)} activeOpacity={0.75}>
-            <View style={styles.avatar}>
-              {item.imageurl ? (
-                <Image source={{ uri: item.imageurl }} style={styles.img} />
-              ) : (
-                <Icon name="person" size={22} color={MUTED3} />
-              )}
-              {item.status === "available" && <View style={styles.activeDotAvatar} />}
-            </View>
+      {/* ✅ CHANGES:
+          - first load: skeleton list (no spinner flash)
+          - later updates: keep list visible (optional subtle refresh indicator below)
+      */}
+      {isFriendsInitialLoading ? (
+        <View style={{ paddingBottom: 20 }}>
+          {renderSkeletonRow("sk-1")}
+          <View style={styles.separator} />
+          {renderSkeletonRow("sk-2")}
+          <View style={styles.separator} />
+          {renderSkeletonRow("sk-3")}
+          <View style={styles.separator} />
+          {renderSkeletonRow("sk-4")}
+          <View style={styles.separator} />
+          {renderSkeletonRow("sk-5")}
+        </View>
+      ) : (
+        <>
+          <FlatList
+            data={friends}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            renderItem={renderFriendRow}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyTitle}>No friends yet</Text>
+                  <Text style={styles.emptyText}>
+                    Tap the + to find people and send a request.
+                  </Text>
+                </View>
+              </View>
+            }
+          />
 
-            <View style={{ flex: 1 }}>
-              <Text style={styles.friendName}>{item.displayName || "User"}</Text>
-              <Text style={styles.mutualText}>
-                {item.mutualCount || 0} mutual {item.mutualCount === 1 ? "friend" : "friends"}
+          {/* Optional: tiny/subtle indicator on background refreshes */}
+          {isFriendsRefreshing ? (
+            <View style={{ paddingVertical: 8, alignItems: "center" }}>
+              <Text style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>
+                Updating…
               </Text>
             </View>
-
-            <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.25)" />
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No friends yet</Text>
-              <Text style={styles.emptyText}>Tap the + to find people and send a request.</Text>
-            </View>
-          </View>
-        }
-      />
+          ) : null}
+        </>
+      )}
 
       {/* Friend Profile Modal */}
-      <Modal visible={!!selectedFriend} transparent animationType="fade" onRequestClose={() => setSelectedFriend(null)}>
+      <Modal
+        visible={!!selectedFriend}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedFriend(null)}
+      >
         <View style={styles.popupOverlay}>
           <View style={styles.popupContent}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setSelectedFriend(null)} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setSelectedFriend(null)}
+              activeOpacity={0.7}
+            >
               <Icon name="close" size={22} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
 
@@ -185,13 +274,20 @@ export default function FriendsScreen() {
               style={styles.largeAvatar}
             />
 
-            <Text style={styles.popupName}>{selectedFriend?.displayName || "User"}</Text>
+            <Text style={styles.popupName}>
+              {selectedFriend?.displayName || "User"}
+            </Text>
 
             <View style={styles.statusBadge}>
               <View
                 style={[
                   styles.statusDot,
-                  { backgroundColor: selectedFriend?.status === "available" ? ACCENT : "rgba(255,255,255,0.22)" },
+                  {
+                    backgroundColor:
+                      selectedFriend?.status === "available"
+                        ? ACCENT
+                        : "rgba(255,255,255,0.22)",
+                  },
                 ]}
               />
               <Text style={styles.statusText}>
@@ -217,7 +313,7 @@ export default function FriendsScreen() {
                 nestedScrollEnabled
               >
                 {selectedFriend?.interests && selectedFriend.interests.length > 0 ? (
-                  selectedFriend.interests.map((interest, i) => (
+                  selectedFriend.interests.map((interest: string, i: number) => (
                     <View key={i} style={styles.interestPill}>
                       <Text style={styles.interestText}>{interest}</Text>
                     </View>
@@ -235,7 +331,11 @@ export default function FriendsScreen() {
               </View>
             ) : null}
 
-            <TouchableOpacity style={styles.removeBtn} onPress={() => removeFriend(selectedFriend!.id)} activeOpacity={0.75}>
+            <TouchableOpacity
+              style={styles.removeBtn}
+              onPress={() => removeFriend(selectedFriend!.id)}
+              activeOpacity={0.75}
+            >
               <Text style={styles.removeBtnText}>Remove Friend</Text>
             </TouchableOpacity>
           </View>
