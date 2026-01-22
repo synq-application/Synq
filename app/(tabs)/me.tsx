@@ -1,3 +1,4 @@
+import { ACCENT } from '@/constants/Variables';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { signOut as firebaseSignOut } from 'firebase/auth';
@@ -13,7 +14,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -30,9 +30,6 @@ import QRCode from 'react-native-qrcode-svg';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { presetActivities, stateAbbreviations } from '../../assets/Mocks';
 import { auth, db, storage } from "../../src/lib/firebase";
-
-const ACCENT = "#7DFFA6";
-const { width } = Dimensions.get('window');
 const allActivities = Object.values(presetActivities).flat();
 
 type Connection = {
