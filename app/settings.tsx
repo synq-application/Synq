@@ -103,7 +103,7 @@ export default function SettingsScreen() {
 
         <Text style={styles.groupTitle}>More</Text>
         <View style={styles.group}>
-          <SettingItem label="About us" onPress={() => {}} />
+          <SettingItem label="About us" onPress={() => router.push('/about-us')} />
           <SettingItem label="Privacy policy" onPress={() => {}} />
           <SettingItem label="Terms and conditions" onPress={() => {}} />
           <SettingItem label="Feedback" onPress={() => {}} />
