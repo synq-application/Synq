@@ -44,6 +44,67 @@ exports.onMessageSent = onDocumentCreated({
         logger.error("Error in onMessageSent:", error);
     }
 });
+exports.deleteMyAccount = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Must be logged in.");
+    }
+
+    const uid = request.auth.uid;
+    const db = admin.firestore();
+
+    const deleteCollectionInChunks = async (colRef, chunkSize = 400) => {
+      while (true) {
+        const snap = await colRef.limit(chunkSize).get();
+        if (snap.empty) break;
+
+        const batch = db.batch();
+        snap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    };
+
+    try {
+      const myFriendsRef = db.collection("users").doc(uid).collection("friends");
+      const myFriendsSnap = await myFriendsRef.get();
+      const friendIds = myFriendsSnap.docs.map((d) => d.id);
+
+      for (let i = 0; i < friendIds.length; i += 400) {
+        const chunk = friendIds.slice(i, i + 400);
+        const batch = db.batch();
+
+        chunk.forEach((fid) => {
+          batch.delete(db.collection("users").doc(fid).collection("friends").doc(uid));
+          batch.delete(db.collection("users").doc(uid).collection("friends").doc(fid));
+        });
+
+        await batch.commit();
+      }
+
+      const chatsSnap = await db
+        .collection("chats")
+        .where("participants", "array-contains", uid)
+        .get();
+
+      for (const chatDoc of chatsSnap.docs) {
+        const chatId = chatDoc.id;
+        const msgsRef = db.collection("chats").doc(chatId).collection("messages");
+        await deleteCollectionInChunks(msgsRef, 400);
+        await db.collection("chats").doc(chatId).delete();
+      }
+      await deleteCollectionInChunks(db.collection("users").doc(uid).collection("friendRequests"), 400);
+      await deleteCollectionInChunks(db.collection("users").doc(uid).collection("notificationLocks"), 400);
+      await db.collection("users").doc(uid).delete();
+      await admin.auth().deleteUser(uid);
+
+      return { ok: true };
+    } catch (error) {
+      logger.error("Error in deleteMyAccount:", error);
+      throw new HttpsError("internal", error?.message || "Failed to delete account.");
+    }
+  }
+);
 
 exports.onFriendRequestSent = onDocumentCreated({
     document: "users/{userId}/friendRequests/{requestId}",
@@ -57,7 +118,6 @@ exports.onFriendRequestSent = onDocumentCreated({
         const recipientData = recipientDoc.data();
 
         if (recipientData?.pushToken) {
-            // senderDisplayName should be passed when you addDoc to friendRequests in your app
             const senderName = requestData.senderName || "A user";
             
             await axios.post("https://exp.host/--/api/v2/push/send", {
@@ -88,7 +148,6 @@ exports.onFriendAccepted = onDocumentCreated({
 
   const friendDocData = friendSnap.data() || {};
 
-  // ✅ Only send the push if THIS doc creation is the "accept" side that should notify
   if (friendDocData.notifyOnCreate !== true) {
     logger.info("Skipping friend accepted notification (notifyOnCreate != true).", {
       userId,
@@ -97,8 +156,7 @@ exports.onFriendAccepted = onDocumentCreated({
     return;
   }
 
-  // ✅ Optional idempotency guard: prevent duplicates if function retries
-  const notifId = `${userId}_accepted_${friendId}`; // stable id
+  const notifId = `${userId}_accepted_${friendId}`; 
   const notifRef = admin
     .firestore()
     .collection("users")
@@ -129,7 +187,6 @@ exports.onFriendAccepted = onDocumentCreated({
       data: { type: "friend_accepted", fromUserId: userId },
     });
 
-    // write lock AFTER successful send
     await notifRef.set({
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       from: userId,
