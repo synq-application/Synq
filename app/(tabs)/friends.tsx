@@ -30,13 +30,10 @@ import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
 const { width } = Dimensions.get("window");
 
-
 export default function FriendsScreen() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
-
-  // ✅ CHANGES: prevent initial spinner/flash by rendering skeleton rows until first load completes
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(true);
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
 
@@ -46,9 +43,6 @@ export default function FriendsScreen() {
     const friendsRef = collection(db, "users", myId, "friends");
 
     const unsubFriends = onSnapshot(friendsRef, async (snapshot) => {
-      // ✅ CHANGES:
-      // - first time: keep skeleton on screen
-      // - subsequent updates: refresh silently (no big spinner)
       const firstLoad = isFriendsInitialLoading;
       if (firstLoad) setIsFriendsInitialLoading(true);
       else setIsFriendsRefreshing(true);
@@ -91,7 +85,6 @@ export default function FriendsScreen() {
     });
 
     return () => unsubFriends();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const removeFriend = async (friendId: string) => {
@@ -118,7 +111,6 @@ export default function FriendsScreen() {
     ]);
   };
 
-  // ✅ CHANGES: skeleton row renderer (keeps layout stable instead of flashing a spinner)
   const renderSkeletonRow = (key: string) => (
     <View key={key} style={styles.friendRow}>
       <View style={[styles.avatar, { backgroundColor: "#151515" }]} />
@@ -141,13 +133,7 @@ export default function FriendsScreen() {
           }}
         />
       </View>
-      <View
-        style={{
-          height: 12,
-          width: 12,
-          backgroundColor: "transparent",
-        }}
-      />
+      <View style={{ height: 12, width: 12 }} />
     </View>
   );
 
@@ -163,7 +149,6 @@ export default function FriendsScreen() {
         ) : (
           <Icon name="person" size={22} color={MUTED3} />
         )}
-        {item.status === "available" && <View style={styles.activeDotAvatar} />}
       </View>
 
       <View style={{ flex: 1 }}>
@@ -185,13 +170,8 @@ export default function FriendsScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-
-      {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Friends</Text>
-        </View>
-
+        <Text style={styles.headerTitle}>Friends</Text>
         <TouchableOpacity
           onPress={() => setSearchModalVisible(true)}
           activeOpacity={0.7}
@@ -203,21 +183,14 @@ export default function FriendsScreen() {
 
       <View style={styles.headerDivider} />
 
-      {/* ✅ CHANGES:
-          - first load: skeleton list (no spinner flash)
-          - later updates: keep list visible (optional subtle refresh indicator below)
-      */}
       {isFriendsInitialLoading ? (
         <View style={{ paddingBottom: 20 }}>
-          {renderSkeletonRow("sk-1")}
-          <View style={styles.separator} />
-          {renderSkeletonRow("sk-2")}
-          <View style={styles.separator} />
-          {renderSkeletonRow("sk-3")}
-          <View style={styles.separator} />
-          {renderSkeletonRow("sk-4")}
-          <View style={styles.separator} />
-          {renderSkeletonRow("sk-5")}
+          {["1", "2", "3", "4", "5"].map((k) => (
+            <React.Fragment key={k}>
+              {renderSkeletonRow(k)}
+              <View style={styles.separator} />
+            </React.Fragment>
+          ))}
         </View>
       ) : (
         <>
@@ -238,19 +211,16 @@ export default function FriendsScreen() {
               </View>
             }
           />
-
-          {/* Optional: tiny/subtle indicator on background refreshes */}
-          {isFriendsRefreshing ? (
+          {isFriendsRefreshing && (
             <View style={{ paddingVertical: 8, alignItems: "center" }}>
               <Text style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>
                 Updating…
               </Text>
             </View>
-          ) : null}
+          )}
         </>
       )}
 
-      {/* Friend Profile Modal */}
       <Modal
         visible={!!selectedFriend}
         transparent
@@ -269,7 +239,9 @@ export default function FriendsScreen() {
 
             <Image
               source={{
-                uri: selectedFriend?.imageurl || "https://www.gravatar.com/avatar/?d=mp",
+                uri:
+                  selectedFriend?.imageurl ||
+                  "https://www.gravatar.com/avatar/?d=mp",
               }}
               style={styles.largeAvatar}
             />
@@ -278,58 +250,27 @@ export default function FriendsScreen() {
               {selectedFriend?.displayName || "User"}
             </Text>
 
-            <View style={styles.statusBadge}>
-              <View
-                style={[
-                  styles.statusDot,
-                  {
-                    backgroundColor:
-                      selectedFriend?.status === "available"
-                        ? ACCENT
-                        : "rgba(255,255,255,0.22)",
-                  },
-                ]}
-              />
-              <Text style={styles.statusText}>
-                {selectedFriend?.status === "available" ? "Available now" : "Inactive"}
-              </Text>
-            </View>
-
-            {selectedFriend?.monthlyMemo ? (
-              <View style={styles.memoBoxAccent}>
-                <Text style={styles.memoTitleAccent}>Monthly Memo</Text>
-                <Text style={styles.memoText}>{selectedFriend.monthlyMemo}</Text>
-              </View>
-            ) : null}
-
-            {/* Interests */}
             <View style={styles.interestsContainer}>
               <Text style={styles.sectionLabel}>Interests</Text>
-
               <ScrollView
                 style={styles.interestsScroll}
                 contentContainerStyle={styles.interestsWrapper}
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled
               >
-                {selectedFriend?.interests && selectedFriend.interests.length > 0 ? (
+                {selectedFriend?.interests?.length ? (
                   selectedFriend.interests.map((interest: string, i: number) => (
                     <View key={i} style={styles.interestPill}>
                       <Text style={styles.interestText}>{interest}</Text>
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.noInterestsText}>No interests listed</Text>
+                  <Text style={styles.noInterestsText}>
+                    No interests listed
+                  </Text>
                 )}
               </ScrollView>
             </View>
-
-            {selectedFriend?.memo ? (
-              <View style={styles.memoBox}>
-                <Text style={styles.memoTitle}>Current Memo</Text>
-                <Text style={styles.memoText}>{selectedFriend.memo}</Text>
-              </View>
-            ) : null}
 
             <TouchableOpacity
               style={styles.removeBtn}
@@ -350,6 +291,7 @@ export default function FriendsScreen() {
     </View>
   );
 }
+
 
 function SearchModal({
   visible,
@@ -512,7 +454,6 @@ function SearchModal({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
-
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -522,12 +463,9 @@ const styles = StyleSheet.create({
   headerTitle: { color: TEXT, fontSize: 32, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   headerSub: { color: MUTED, fontSize: 14, fontFamily: fonts.book, marginTop: 6 },
   headerAction: { paddingLeft: 12, paddingVertical: 6 },
-
   headerDivider: { marginTop: 16, height: 1, backgroundColor: BORDER },
-
   friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
   separator: { height: 1, backgroundColor: BORDER, width: "100%" },
-
   avatar: {
     width: 52,
     height: 52,
@@ -540,21 +478,8 @@ const styles = StyleSheet.create({
     marginRight: 14,
   },
   img: { width: 52, height: 52, borderRadius: 26 },
-  activeDotAvatar: {
-    position: "absolute",
-    right: 2,
-    bottom: 2,
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: ACCENT,
-    borderWidth: 2,
-    borderColor: BG,
-  },
-
   friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
   mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
-
   emptyContainer: { flex: 1, justifyContent: "center", marginTop: 90, paddingHorizontal: 10 },
   emptyCard: {
     backgroundColor: SURFACE,
@@ -565,7 +490,6 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { color: TEXT, textAlign: "center", fontFamily: fonts.heavy, fontSize: 18 },
   emptyText: { color: MUTED, textAlign: "center", fontFamily: fonts.book, fontSize: 14, marginTop: 8, lineHeight: 20 },
-
   popupOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.78)",
@@ -584,7 +508,6 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
   },
   closeBtn: { position: "absolute", top: 16, right: 16, padding: 8, zIndex: 2 },
-
   largeAvatar: {
     width: 108,
     height: 108,
@@ -595,59 +518,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(125,255,166,0.35)",
   },
   popupName: { color: TEXT, fontSize: 24, fontFamily: fonts.heavy, letterSpacing: 0.2 },
-
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    marginTop: 10,
-    marginBottom: 18,
-  },
-  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  statusText: { color: TEXT, fontSize: 13, fontFamily: fonts.book },
-
-  memoBoxAccent: {
-    width: "100%",
-    backgroundColor: "rgba(125,255,166,0.05)",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(125,255,166,0.22)",
-    padding: 16,
-    marginBottom: 14,
-  },
-  memoTitleAccent: {
-    color: ACCENT,
-    fontSize: 11,
-    fontFamily: fonts.heavy,
-    textTransform: "uppercase",
-    marginBottom: 6,
-    letterSpacing: 0.6,
-  },
-
-  memoBox: {
-    width: "100%",
-    backgroundColor: SURFACE,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: 16,
-    marginTop: 10,
-  },
-  memoTitle: {
-    color: MUTED2,
-    fontSize: 11,
-    fontFamily: fonts.heavy,
-    textTransform: "uppercase",
-    marginBottom: 6,
-    letterSpacing: 0.6,
-  },
-  memoText: { color: TEXT, fontSize: 15, fontFamily: fonts.book, lineHeight: 20 },
-
   interestsContainer: { width: "100%", marginTop: 10, marginBottom: 10 },
   sectionLabel: {
     color: MUTED2,
@@ -671,11 +541,8 @@ const styles = StyleSheet.create({
   },
   interestText: { color: TEXT, fontFamily: fonts.book, fontSize: 13 },
   noInterestsText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, fontStyle: "italic", textAlign: "center" },
-
   removeBtn: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12 },
   removeBtnText: { color: "#ff453a", fontFamily: fonts.heavy, fontSize: 14 },
-
-  // Search modal
   modalBody: { flex: 1, backgroundColor: BG, padding: 20 },
   searchHeader: {
     marginTop: 44,
@@ -685,7 +552,6 @@ const styles = StyleSheet.create({
   },
   searchTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   cancelText: { color: ACCENT, fontFamily: fonts.book, fontSize: 16 },
-
   searchInputWrap: { marginTop: 14, marginBottom: 12 },
   searchInput: {
     backgroundColor: SURFACE,
@@ -698,10 +564,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 16,
   },
-
   searchResult: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14 },
   emailDetail: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 2 },
-
   addBtn: {
     backgroundColor: ACCENT,
     paddingHorizontal: 18,
