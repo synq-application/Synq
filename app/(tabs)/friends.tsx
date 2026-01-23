@@ -87,6 +87,20 @@ export default function FriendsScreen() {
     return () => unsubFriends();
   }, []);
 
+  const formatLocation = (friend: any) => {
+    if (!friend) return "";
+    const direct = friend.location ?? friend.currentLocation;
+    if (typeof direct === "string") {
+      const cleaned = direct.trim();
+      return cleaned ? cleaned : "";
+    }
+    const city = (friend.city ?? "").toString().trim();
+    const state = (friend.state ?? "").toString().trim();
+    const cityState = [city, state].filter(Boolean).join(", ");
+    return cityState;
+  };
+
+
   const removeFriend = async (friendId: string) => {
     if (!auth.currentUser) return;
     Alert.alert("Remove Friend", "Are you sure you want to remove this friend?", [
@@ -250,6 +264,21 @@ export default function FriendsScreen() {
               {selectedFriend?.displayName || "User"}
             </Text>
 
+            {(() => {
+              const loc = formatLocation(selectedFriend);
+              if (!loc) return null;
+
+              return (
+                <Text style={styles.popupLocation}>
+                  <Icon
+                    name="location-outline"
+                    size={14}
+                    color="rgba(255,255,255,0.35)"
+                  />{" "}
+                  <Text style={styles.popupLocationText}>{loc}</Text>
+                </Text>
+              );
+            })()}
             <View style={styles.interestsContainer}>
               <Text style={styles.sectionLabel}>Interests</Text>
               <ScrollView
@@ -291,7 +320,6 @@ export default function FriendsScreen() {
     </View>
   );
 }
-
 
 function SearchModal({
   visible,
@@ -518,6 +546,8 @@ const styles = StyleSheet.create({
     borderColor: "rgba(125,255,166,0.35)",
   },
   popupName: { color: TEXT, fontSize: 24, fontFamily: fonts.heavy, letterSpacing: 0.2 },
+  popupLocation: { marginTop: 6, color: "rgba(255,255,255,0.35)", fontSize: 13, fontFamily: fonts.book },
+  popupLocationText: { color: "rgba(255,255,255,0.35)", fontSize: 13, fontFamily: fonts.book },
   interestsContainer: { width: "100%", marginTop: 10, marginBottom: 10 },
   sectionLabel: {
     color: MUTED2,
