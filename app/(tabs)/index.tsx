@@ -40,6 +40,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import { SynqStatus, formatTime } from '../helpers';
+import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
 
 export default function SynqScreen() {
@@ -430,9 +431,9 @@ export default function SynqScreen() {
       const otherParticipants = currentChat.participants.filter((pId: string) => pId !== myId);
       otherParticipants.forEach(async (pId: string) => {
         const mySideFriendDoc = doc(db, 'users', myId, 'friends', pId);
-        await updateDoc(mySideFriendDoc, { synqCount: increment(1) }).catch(() => {});
+        await updateDoc(mySideFriendDoc, { synqCount: increment(1) }).catch(() => { });
         const theirSideFriendDoc = doc(db, 'users', pId, 'friends', myId);
-        await updateDoc(theirSideFriendDoc, { synqCount: increment(1) }).catch(() => {});
+        await updateDoc(theirSideFriendDoc, { synqCount: increment(1) }).catch(() => { });
       });
     } catch (e) {
       console.error('Failed to send message', e);
@@ -838,30 +839,19 @@ export default function SynqScreen() {
           </View>
         </Modal>
 
-        <Modal visible={isEditModalVisible} transparent animationType="fade">
-          <TouchableWithoutFeedback onPress={() => setIsEditModalVisible(false)}>
-            <View style={styles.centeredModalOverlay}>
-              <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <View style={styles.editPanel}>
-                  <Text style={styles.panelTitle}>Edit your Synq</Text>
-                  <TextInput style={styles.panelInput} value={memo} onChangeText={setMemo} />
-                  <TouchableOpacity
-                    style={styles.saveBtn}
-                    onPress={async () => {
-                      await updateDoc(doc(db, 'users', auth.currentUser!.uid), { memo });
-                      setIsEditModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.saveBtnText}>Update Memo</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.endSynqBtn} onPress={endSynq}>
-                    <Text style={styles.endSynqBtnText}>Deactivate Synq</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
+        <EditSynqModal
+          visible={isEditModalVisible}
+          onClose={() => setIsEditModalVisible(false)}
+          memo={memo}
+          setMemo={setMemo}
+          styles={styles}
+          onSaveMemo={async () => {
+            await updateDoc(doc(db, "users", auth.currentUser!.uid), { memo });
+            setIsEditModalVisible(false);
+          }}
+          onEndSynq={endSynq}
+        />
+
       </View>
     </TouchableWithoutFeedback>
   );
