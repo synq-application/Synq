@@ -35,8 +35,6 @@ export const storage = getStorage(app);
 const isExpoGo =
   Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-console.log('expo? ', isExpoGo)
-
 if (isExpoGo) {
   auth.settings.appVerificationDisabledForTesting = true;
 }

@@ -2,14 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import {
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const ACCENT = "#7DFFA6";
@@ -43,7 +43,7 @@ export default function AboutUsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={26} color="black" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>About</Text>
+        <Text style={styles.headerTitle}>About Us</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>

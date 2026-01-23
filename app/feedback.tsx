@@ -2,18 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Linking,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const ACCENT = "#7DFFA6";
@@ -31,7 +31,7 @@ const FEEDBACK_EMAIL = "synqapp@gmail.com";
 export default function FeedbackScreen() {
   const [type, setType] = useState<"Feedback" | "Bug" | "Feature Request">("Feedback");
   const [message, setMessage] = useState("");
-  const [email, setEmail] = useState(""); // optional for user follow-up
+  const [email, setEmail] = useState(""); 
 
   const subject = useMemo(() => `Synq ${type}`, [type]);
 
