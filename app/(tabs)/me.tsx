@@ -1,4 +1,4 @@
-import { ACCENT } from "@/constants/Variables";
+import { ACCENT, fonts } from "@/constants/Variables";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
@@ -293,7 +293,6 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.synqsContainer}>
-          {/* ✅ CHANGES: no initial spinner flash — show placeholders until first load completes */}
           {!hasLoadedConnections ? (
             [0, 1, 2].map((i) => (
               <View key={i} style={styles.connItem}>
@@ -345,10 +344,6 @@ export default function ProfileScreen() {
           ) : (
             <Text style={styles.emptyText}>Start messaging to see your top synqs.</Text>
           )}
-
-          {/* Optional: if you STILL want an indicator during refreshes (not first load),
-              you can keep a tiny one somewhere subtle. Leaving off by default. */}
-          {/* {hasLoadedConnections && loadingConnections ? <ActivityIndicator color={ACCENT} /> : null} */}
         </View>
       </View>
 
@@ -509,13 +504,6 @@ export default function ProfileScreen() {
   );
 }
 
-const fonts = {
-  black: Platform.OS === 'ios' ? 'Avenir-Black' : 'sans-serif-condensed',
-  heavy: Platform.OS === 'ios' ? 'Avenir-Heavy' : 'sans-serif-medium',
-  medium: Platform.OS === 'ios' ? 'Avenir-Medium' : 'sans-serif',
-  book: Platform.OS === 'ios' ? 'Avenir-Book' : 'sans-serif',
-};
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "black" },
   scrollContent: { paddingBottom: 160 },
@@ -529,7 +517,7 @@ const styles = StyleSheet.create({
   profileImg: { width: '100%', height: '100%' },
   defaultAvatarContainer: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   qrToggle: { position: 'absolute', bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
-  nameText: { color: ACCENT, fontSize: 32, fontFamily: fonts.black, marginTop: 20 },
+  nameText: { color: ACCENT, fontSize: 30, fontFamily: fonts.black, marginTop: 20 },
   locationText: { color: 'white', opacity: 0.6, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1.5, marginTop: 4, fontFamily: fonts.heavy },
   memoText: { color: '#888', fontStyle: 'italic', marginTop: 12, paddingHorizontal: 40, textAlign: 'center', fontFamily: fonts.medium, lineHeight: 20, fontSize: 16 },
   section: { marginTop: 30, paddingHorizontal: 25 },
