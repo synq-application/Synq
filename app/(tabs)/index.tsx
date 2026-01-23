@@ -40,6 +40,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import { SynqStatus, formatTime } from '../helpers';
+import InactiveSynqView from '../synq-screens/InactiveSynqView';
 
 export default function SynqScreen() {
   const [memo, setMemo] = useState('');
@@ -88,13 +89,11 @@ export default function SynqScreen() {
         await markChatRead(data.chatId);
       }
     });
-
     return () => subscription.remove();
   }, []);
 
   useEffect(() => {
     if (!auth.currentUser) return;
-
     const init = async () => {
       try {
         const userRef = doc(db, 'users', auth.currentUser!.uid);
@@ -133,9 +132,7 @@ export default function SynqScreen() {
     return onSnapshot(q, (snap) => {
       const chats = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setAllChats(chats);
-
       const myId = auth.currentUser!.uid;
-
       const anyUnread = chats.some((c: any) => {
         const updatedAtMs = c.updatedAt?.toMillis?.() ?? 0;
         const lastReadMs = c.lastReadBy?.[myId]?.toMillis?.() ?? 0;
@@ -565,32 +562,20 @@ export default function SynqScreen() {
             </View>
           </View>
         )}
-
         {(status === 'activating' || status === 'finding') && (
           <View style={styles.activatingContainer}>
             <Text style={styles.unifiedTitle}>{status === 'activating' ? 'Synq activated...' : 'Finding connections...'}</Text>
             <Image source={require('../../assets/pulse.gif')} style={styles.gifLarge} resizeMode="contain" />
           </View>
         )}
-
-        {status === 'idle' && (
-          <View style={styles.inactiveCenter}>
-            <Text style={styles.mainTitle}>Ready to activate Synq?</Text>
-            <TextInput
-              style={styles.memoInput}
-              value={memo}
-              onChangeText={setMemo}
-              placeholder="Optional memo: Happy Hour anyone?"
-              placeholderTextColor="#444"
-              blurOnSubmit={true}
-            />
-            <TouchableOpacity onPress={startSynq} style={styles.pulseBox} activeOpacity={0.8}>
-              <Image source={require('../../assets/pulse.gif')} style={styles.gifLarge} resizeMode="contain" />
-              <Text style={styles.tapToActivate}>Tap when you're free to meet up</Text>
-            </TouchableOpacity>
-          </View>
+        {status === "idle" && (
+          <InactiveSynqView
+            memo={memo}
+            setMemo={setMemo}
+            onStartSynq={startSynq}
+            styles={styles}
+          />
         )}
-
         <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
