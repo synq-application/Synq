@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { initializeApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
@@ -31,7 +32,12 @@ export const auth = initializeAuth(app, {
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-if (__DEV__) {
+const isExpoGo =
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+console.log('expo? ', isExpoGo)
+
+if (isExpoGo) {
   auth.settings.appVerificationDisabledForTesting = true;
 }
 
