@@ -105,7 +105,7 @@ export default function SettingsScreen() {
         <View style={styles.group}>
           <SettingItem label="About us" onPress={() => router.push('/about-us')} />
           <SettingItem label="Privacy policy" onPress={() => router.push('/privacy-policy')} />
-          <SettingItem label="Terms and conditions" onPress={() => {}} />
+          <SettingItem label="Terms and conditions" onPress={() => router.push('/terms-conditions')} />
           <SettingItem label="Feedback" onPress={() => {}} />
         </View>
       </ScrollView>
