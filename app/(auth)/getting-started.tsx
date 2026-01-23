@@ -16,22 +16,17 @@ export default function GetStartedScreen() {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
       <View style={styles.container}>
-        {/* Background */}
         <View pointerEvents="none" style={styles.bgSvgWrap}>
           <SvgXml xml={synqSvg} width="120%" height="120%" />
         </View>
-
-        {/* Copy */}
         <View style={styles.topCopy}>
-          <Text style={styles.kicker}>Ready when you are</Text>
           <Text style={styles.title}>Let’s Synq.</Text>
           <Text style={styles.sub}>
-            Turn it on when you’re free.{"\n"}
-            See which friends are free too.
+            Less scrolling, more time with the people{"\n"}
+            you care about.
           </Text>
         </View>
 
-        {/* CTA */}
         <View style={styles.bottom}>
           <View style={styles.ctaCard}>
             <TouchableOpacity
@@ -66,24 +61,13 @@ const styles = StyleSheet.create({
     left: -55,
     right: -55,
     bottom: -55,
-    opacity: 0.22,
+    opacity: 0.28,
     transform: [{ rotate: "-10deg" }],
   },
-
   topCopy: {
-    paddingTop: 96,
+    paddingTop: 120,
     paddingHorizontal: 22,
   },
-
-  kicker: {
-    color: "rgba(255,255,255,0.6)",
-    fontFamily: fonts.book,
-    fontSize: 13,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-    marginBottom: 10,
-  },
-
   title: {
     color: TEXT,
     fontFamily: fonts.heavy,
@@ -91,7 +75,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.8,
     lineHeight: 48,
   },
-
   sub: {
     marginTop: 14,
     color: "rgba(255,255,255,0.78)",
@@ -100,7 +83,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     width: "92%",
   },
-
   bottom: {
     position: "absolute",
     left: 0,
@@ -108,7 +90,6 @@ const styles = StyleSheet.create({
     bottom: 28,
     paddingHorizontal: 18,
   },
-
   ctaCard: {
     borderRadius: 26,
     padding: 16,

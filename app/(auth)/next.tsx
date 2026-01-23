@@ -130,13 +130,11 @@ export default function SeeWhenFriendsAvailable({
         </TouchableOpacity>
 
         <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
-          {/* concise, brand-aligned */}
-          <Text style={styles.title}>Make it happen.</Text>
+          <Text style={styles.title}>Connect in the moment.</Text>
           <View style={styles.divider} />
-          <Text style={styles.sub}>Tap to Synq. Connect in the moment.</Text>
+          <Text style={styles.sub}>Tap when you're free. See who else is. Make it happen.</Text>
         </Animated.View>
 
-        {/* HERO: centered pulse + subtle vibration */}
         <Animated.View
           pointerEvents="none"
           style={[

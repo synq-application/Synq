@@ -73,7 +73,7 @@ export default function SpontaneousHangouts({
           <Text style={styles.title}>Plans that actually happen.</Text>
           <View style={styles.divider} />
           <Text style={styles.sub}>
-           No guessing, no waiting—connect when it works.
+           No guesswork, no waiting. Just spontaneous connections with friends.
           </Text>
         </Animated.View>
 
