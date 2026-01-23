@@ -50,7 +50,6 @@ export default function SettingsScreen() {
 
   const openSystemSettings = async () => {
     try {
-      // RN 0.71+ supports this; fallback below for older versions.
       if (typeof (Linking as any).openSettings === "function") {
         await (Linking as any).openSettings();
         return;
@@ -64,7 +63,7 @@ export default function SettingsScreen() {
   const signOut = async () => {
     try {
       await auth.signOut();
-      router.replace("/"); // adjust if your auth route is different
+      router.reload; 
     } catch {
       Alert.alert("Sign out failed", "Please try again.");
     }
@@ -113,12 +112,16 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="black" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
-      </View>
+
+<View style={styles.header}>
+  <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+    <Ionicons name="chevron-back" size={28} color="black" />
+  </TouchableOpacity>
+
+  <Text style={styles.headerTitle}>Settings</Text>
+</View>
+
+
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.userSection}>
@@ -144,52 +147,44 @@ export default function SettingsScreen() {
         <View style={styles.group}>
           <SettingItem label="About us" onPress={() => router.push("/about-us")} />
           <SettingItem label="Privacy policy" onPress={() => router.push("/privacy-policy")} />
-          <SettingItem
-            label="Terms and conditions"
-            onPress={() => router.push("/terms-conditions")}
-          />
+          <SettingItem label="Terms and conditions" onPress={() => router.push("/terms-conditions")} />
           <SettingItem label="Feedback" onPress={() => router.push("/feedback")} />
           <StaticItem label="Version" value={appVersion} />
         </View>
 
-        {/* <Text style={styles.groupTitle}>Danger zone</Text>
+        <Text style={styles.groupTitle}>Danger zone</Text>
         <View style={styles.group}>
-          <SettingItem
-            label="Delete account"
-            danger
-            onPress={() => router.push("/delete-account")}
-          />
-        </View> */}
+          <SettingItem label="Delete account" danger onPress={() => router.push("/delete-account")} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BACKGROUND,
-  },
-  header: {
-    height: 80,
-    backgroundColor: ACCENT,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  backButton: {
-    marginRight: 15,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontFamily: fonts.heavy,
-    color: "black",
-    marginBottom: 2,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
+  container: { flex: 1, backgroundColor: BACKGROUND },
+header: {
+  height: 80,
+  backgroundColor: ACCENT,
+  flexDirection: "row",
+  alignItems: "flex-end",
+  paddingHorizontal: 20,
+  paddingBottom: 20,
+},
+
+backButton: {
+  marginRight: 8,
+  justifyContent: "center",
+},
+
+headerTitle: {
+  fontSize: 24,
+  fontFamily: fonts.heavy,
+  color: "black",
+  lineHeight: 28, 
+},
+  scrollContent: { paddingBottom: 40 },
+
   userSection: {
     flexDirection: "row",
     alignItems: "center",
@@ -210,6 +205,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: fonts.heavy,
   },
+
   groupTitle: {
     color: "#666",
     fontSize: 14,
@@ -227,6 +223,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 25,
   },
+
   item: {
     flexDirection: "row",
     alignItems: "center",
@@ -236,10 +233,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: "#252525",
   },
-  itemLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  itemLeft: { flexDirection: "row", alignItems: "center" },
   itemLabel: {
     color: "white",
     fontSize: 16,
@@ -250,6 +244,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fonts.medium,
   },
+
   dangerText: {
     color: "#FF5A5F",
     fontFamily: fonts.heavy,
