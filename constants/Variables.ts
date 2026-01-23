@@ -19,6 +19,7 @@ export const fonts = {
   heavy: Platform.OS === "ios" ? "Avenir-Heavy" : "sans-serif-medium",
   medium: Platform.OS === "ios" ? "Avenir-Medium" : "sans-serif",
   book: Platform.OS === "ios" ? "Avenir-Book" : "sans-serif",
+  black: Platform.OS === 'ios' ? 'Avenir-Black' : 'sans-serif-condensed',
 };
 export const SURFACE = "rgba(255,255,255,0.06)";
 export const BORDER = "rgba(255,255,255,0.08)";
