@@ -36,3 +36,10 @@ export interface Friend {
   interests?: string[];
   mutualCount?: number;
 }
+
+export const popularNow = [
+  { label: "Farmers Markets", icon: "leaf" },
+  { label: "Museums", icon: "business" },
+  { label: "Sports Bars", icon: "beer" },
+  { label: "Hiking", icon: "trail-sign" },
+];

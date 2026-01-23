@@ -37,7 +37,7 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS } from '../../constants/Variables';
+import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, popularNow } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import { SynqStatus, formatTime } from '../helpers';
 import EditSynqModal from '../synq-screens/EditSynqModal';
@@ -530,22 +530,22 @@ export default function SynqScreen() {
   };
 
   const firstName = (fullName: string) =>
-  (fullName || "").trim().split(/\s+/)[0];
+    (fullName || "").trim().split(/\s+/)[0];
 
-const getChatTitle = (chat: any) => {
-  if (!chat || !auth.currentUser || !chat.participantNames) return 'Synq Chat';
-  const myId = auth.currentUser.uid;
+  const getChatTitle = (chat: any) => {
+    if (!chat || !auth.currentUser || !chat.participantNames) return 'Synq Chat';
+    const myId = auth.currentUser.uid;
 
-  const otherNames = Object.entries(chat.participantNames)
-    .filter(([uid]) => uid !== myId)
-    .map(([_, name]) => firstName(name as string));
+    const otherNames = Object.entries(chat.participantNames)
+      .filter(([uid]) => uid !== myId)
+      .map(([_, name]) => firstName(name as string));
 
-  if (otherNames.length === 0) return 'Just You';
-  if (otherNames.length === 1) return `You & ${otherNames[0]}`;
+    if (otherNames.length === 0) return 'Just You';
+    if (otherNames.length === 1) return `You & ${otherNames[0]}`;
 
-  const lastFriend = otherNames.pop();
-  return `You, ${otherNames.join(', ')} & ${lastFriend}`;
-};
+    const lastFriend = otherNames.pop();
+    return `You, ${otherNames.join(', ')} & ${lastFriend}`;
+  };
 
   const renderAvatarStack = (images: any) => {
     if (!images)
@@ -683,10 +683,10 @@ const getChatTitle = (chat: any) => {
                       await markChatRead(item.id);
                     }}
                   >
-                   <View style={styles.avatarColumn}>
-                    {renderAvatarStack(item.participantImages)}
-                  </View>
-                   <View style={styles.inboxTextCol}>
+                    <View style={styles.avatarColumn}>
+                      {renderAvatarStack(item.participantImages)}
+                    </View>
+                    <View style={styles.inboxTextCol}>
                       <Text style={styles.whiteBold}>{getChatTitle(item)}</Text>
                       <Text style={styles.grayText} numberOfLines={1}>
                         {item.lastMessage}
@@ -842,50 +842,64 @@ const getChatTitle = (chat: any) => {
                             </View>
 
                             <ScrollView contentContainerStyle={{ padding: 20 }}>
-                              <Text style={styles.sectionHeader}>Mutual Interests</Text>
-                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
-                                {(mutualInterests.length ? mutualInterests : ['🍽️ Going out to eat', '☕ Coffee', '🚶 Walk', '🍔 Grab a bite']).map((item) => {
-                                  const emoji = getLeadingEmoji(item) ?? '🙂';
-                                  return (
-                                    <TouchableOpacity
-                                      key={item}
-                                      style={styles.ideaCircle}
-                                      onPress={() => triggerAISuggestion(item)}
-                                    >
-                                      <View style={styles.circlePlaceholder}>
-                                        <Text style={{ fontSize: 28 }}>{emoji}</Text>
-                                      </View>
-                                      <Text style={styles.circleText}>{item.replace(emoji, '').trim()}</Text>
-                                    </TouchableOpacity>
-                                  );
-                                })}
-                              </ScrollView>
-
-
+                              {!!mutualInterests.length && (
+                                <>
+                                  <Text style={styles.sectionHeader}>Mutual Interests</Text>
+                                  <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    style={styles.scrollRow}
+                                  >
+                                    {mutualInterests.map((item) => {
+                                      const emoji = getLeadingEmoji(item) ?? "🙂";
+                                      return (
+                                        <TouchableOpacity
+                                          key={item}
+                                          style={styles.ideaCircle}
+                                          onPress={() => triggerAISuggestion(item)}
+                                        >
+                                          <View style={styles.circlePlaceholder}>
+                                            <Text style={{ fontSize: 28 }}>{emoji}</Text>
+                                          </View>
+                                          <Text style={styles.circleText}>
+                                            {item.replace(emoji, "").trim()}
+                                          </Text>
+                                        </TouchableOpacity>
+                                      );
+                                    })}
+                                  </ScrollView>
+                                </>
+                              )}
 
                               <Text style={styles.sectionHeader}>Popular Now</Text>
                               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
-                                {['Brunch', 'Farmers Markets', 'Museums', 'Bars'].map((item) => (
-                                  <TouchableOpacity key={item} style={styles.ideaCircle} onPress={() => triggerAISuggestion(item)}>
+                                {popularNow.map((item) => (
+                                  <TouchableOpacity
+                                    key={item.label}
+                                    style={styles.ideaCircle}
+                                    onPress={() => triggerAISuggestion(item.label)}
+                                  >
                                     <View style={[styles.circlePlaceholder, { borderColor: ACCENT }]}>
                                       <Ionicons
-                                        name={item.includes('Brunch') ? 'restaurant' : item.includes('Markets') ? 'cart' : item.includes('Museums') ? 'business' : 'wine'}
+                                        name={item.icon as any}
                                         size={30}
                                         color={ACCENT}
                                       />
                                     </View>
-                                    <Text style={styles.circleText}>{item}</Text>
+                                    <Text style={styles.circleText}>{item.label}</Text>
                                   </TouchableOpacity>
                                 ))}
                               </ScrollView>
 
+
                               {isAILoading && (
-                                <View style={{ marginTop: 20, alignItems: 'center' }}>
+                                <View style={{ marginTop: 20, alignItems: "center" }}>
                                   <ActivityIndicator color={ACCENT} />
-                                  <Text style={{ color: 'white', marginTop: 8 }}>Synq AI is thinking...</Text>
+                                  <Text style={{ color: "white", marginTop: 8 }}>Synq AI is thinking...</Text>
                                 </View>
                               )}
                             </ScrollView>
+
                           </>
                         ) : (
                           <View style={{ flex: 1 }}>
@@ -1150,17 +1164,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   avatarColumn: {
-  width: 60,             
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-avatarStack: {
-  width: 50,
-  height: 50,
-  position: 'relative',
-},
-inboxTextCol: {
-  flex: 1,
-  marginLeft: 14, 
-},
+    width: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarStack: {
+    width: 50,
+    height: 50,
+    position: 'relative',
+  },
+  inboxTextCol: {
+    flex: 1,
+    marginLeft: 14,
+  },
 });
