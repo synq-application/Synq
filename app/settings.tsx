@@ -92,7 +92,6 @@ export default function SettingsScreen() {
         <Text style={styles.groupTitle}>Account Settings</Text>
         <View style={styles.group}>
          <SettingItem label="Edit profile" onPress={() => router.push('/edit-profile')} />
-          <SettingItem label="Change password" onPress={() => {}} />
           <SettingItem 
             label="Push notifications" 
             isSwitch 
@@ -106,7 +105,7 @@ export default function SettingsScreen() {
           <SettingItem label="About us" onPress={() => router.push('/about-us')} />
           <SettingItem label="Privacy policy" onPress={() => router.push('/privacy-policy')} />
           <SettingItem label="Terms and conditions" onPress={() => router.push('/terms-conditions')} />
-          <SettingItem label="Feedback" onPress={() => {}} />
+          <SettingItem label="Feedback" onPress={() => router.push('/feedback')} />
         </View>
       </ScrollView>
     </SafeAreaView>
