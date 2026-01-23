@@ -67,6 +67,16 @@ export default function SynqScreen() {
   const [currentCategory, setCurrentCategory] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const [hasUnread, setHasUnread] = useState(false);
+  const [mutualInterests, setMutualInterests] = useState<string[]>([]);
+
+  const getLeadingEmoji = (text: string) => {
+    if (!text) return null;
+    const firstChar = Array.from(text.trim())[0];
+    if (/\p{Extended_Pictographic}/u.test(firstChar)) {
+      return firstChar;
+    }
+    return null;
+  };
 
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
@@ -80,6 +90,67 @@ export default function SynqScreen() {
       console.error('Failed to mark chat read', e);
     }
   };
+
+  const normalizeInterest = (s: string) => (s || '').trim();
+
+  const intersectMany = (lists: string[][]) => {
+    if (!lists.length) return [];
+    const base = new Set(lists[0].map(normalizeInterest).filter(Boolean));
+    for (let i = 1; i < lists.length; i++) {
+      const next = new Set(lists[i].map(normalizeInterest).filter(Boolean));
+      for (const val of Array.from(base)) {
+        if (!next.has(val)) base.delete(val);
+      }
+    }
+    return Array.from(base);
+  };
+
+  const computeMutualInterestsForChat = async (chatId: string) => {
+    if (!auth.currentUser) return [];
+    const me = auth.currentUser.uid;
+
+    const chat = allChats.find((c) => c.id === chatId);
+    if (!chat) return [];
+
+    const myInterests: string[] = (userProfile?.interests || [])
+      .map(normalizeInterest)
+      .filter(Boolean);
+
+    if (!myInterests.length) return [];
+
+    const otherIds: string[] = (chat.participants || []).filter((id: string) => id !== me);
+    if (!otherIds.length) return [];
+
+    const snaps = await Promise.all(
+      otherIds.map((uid: string) => getDoc(doc(db, 'users', uid)))
+    );
+
+    const othersLists: string[][] = snaps
+      .filter((s) => s.exists())
+      .map((s) =>
+        ((s.data()?.interests || []) as string[])
+          .map(normalizeInterest)
+          .filter(Boolean)
+      );
+
+    const mutual = intersectMany([myInterests, ...othersLists]);
+    return mutual.slice(0, 10);
+  };
+
+  useEffect(() => {
+    if (!isExploreVisible || !activeChatId) return;
+
+    (async () => {
+      try {
+        const mutual = await computeMutualInterestsForChat(activeChatId);
+        setMutualInterests(mutual);
+      } catch (e) {
+        console.error('Failed to compute mutual interests', e);
+        setMutualInterests([]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExploreVisible, activeChatId]);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('openChat', async (data) => {
@@ -747,19 +818,24 @@ export default function SynqScreen() {
                             <ScrollView contentContainerStyle={{ padding: 20 }}>
                               <Text style={styles.sectionHeader}>Mutual Interests</Text>
                               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
-                                {['Coffee', 'Yoga', 'Concerts', 'Hiking'].map((item) => (
-                                  <TouchableOpacity key={item} style={styles.ideaCircle} onPress={() => triggerAISuggestion(item)}>
-                                    <View style={styles.circlePlaceholder}>
-                                      <Ionicons
-                                        name={item === 'Coffee' ? 'cafe' : item === 'Yoga' ? 'body' : item === 'Concerts' ? 'musical-notes' : 'trail-sign'}
-                                        size={30}
-                                        color="white"
-                                      />
-                                    </View>
-                                    <Text style={styles.circleText}>{item}</Text>
-                                  </TouchableOpacity>
-                                ))}
+                                {(mutualInterests.length ? mutualInterests : ['🍽️ Going out to eat', '☕ Coffee', '🚶 Walk', '🍔 Grab a bite']).map((item) => {
+                                  const emoji = getLeadingEmoji(item) ?? '🙂';
+                                  return (
+                                    <TouchableOpacity
+                                      key={item}
+                                      style={styles.ideaCircle}
+                                      onPress={() => triggerAISuggestion(item)}
+                                    >
+                                      <View style={styles.circlePlaceholder}>
+                                        <Text style={{ fontSize: 28 }}>{emoji}</Text>
+                                      </View>
+                                      <Text style={styles.circleText}>{item.replace(emoji, '').trim()}</Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
                               </ScrollView>
+
+
 
                               <Text style={styles.sectionHeader}>Popular Now</Text>
                               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
@@ -790,7 +866,7 @@ export default function SynqScreen() {
                             <View style={styles.modalHeader}>
                               <TouchableOpacity onPress={() => setShowOptionsList(false)} style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Ionicons name="chevron-back" size={24} color={ACCENT} />
-                                <Text style={[styles.modalTitle, { color: ACCENT, marginLeft: 8 }]}>{currentCategory} Spots</Text>
+                                <Text style={[styles.modalTitle, { color: "white", marginLeft: 8 }]}>{currentCategory} Spots</Text>
                               </TouchableOpacity>
                               <TouchableOpacity onPress={() => setIsExploreVisible(false)}>
                                 <Ionicons name="close-circle" size={32} color="#444" />
@@ -818,7 +894,8 @@ export default function SynqScreen() {
                             />
 
                             <TouchableOpacity
-                              style={[styles.sendIdeaBtn, !selectedOption && { opacity: 0.5 }]}
+                               style={selectedOption ? styles.sendIdeaBtnEnabled : styles.sendIdeaBtn}
+                              //style={[styles.sendIdeaBtn, !selectedOption && { opacity: 0.5 }]}
                               disabled={!selectedOption}
                               onPress={() => {
                                 sendAISuggestionToChat();
@@ -851,11 +928,11 @@ export default function SynqScreen() {
           }}
           onEndSynq={endSynq}
         />
-
       </View>
     </TouchableWithoutFeedback>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
@@ -996,7 +1073,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   sendIdeaBtn: { backgroundColor: '#8E8E93', margin: 20, padding: 18, borderRadius: 12, alignItems: 'center' },
-  sendIdeaText: { color: 'white', fontFamily: 'Avenir-Black', fontSize: 16 },
+  sendIdeaBtnEnabled: { backgroundColor: ACCENT, margin: 20, padding: 18, borderRadius: 12, alignItems: 'center' },
+  sendIdeaText: { color: 'black', fontFamily: 'Avenir-Black', fontSize: 16 },
   inChatAICardContainer: { paddingHorizontal: 20, marginVertical: 10 },
   inChatAICard: { backgroundColor: '#1C1C1E', borderRadius: 20, padding: 20, borderLeftWidth: 4, borderLeftColor: ACCENT },
   aiCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
