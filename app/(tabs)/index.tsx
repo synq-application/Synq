@@ -529,17 +529,23 @@ export default function SynqScreen() {
     ]);
   };
 
-  const getChatTitle = (chat: any) => {
-    if (!chat || !auth.currentUser || !chat.participantNames) return 'Synq Chat';
-    const myId = auth.currentUser.uid;
-    const otherNames = Object.entries(chat.participantNames)
-      .filter(([uid]) => uid !== myId)
-      .map(([_, name]) => name as string);
-    if (otherNames.length === 0) return 'Just You';
-    if (otherNames.length === 1) return `You & ${otherNames[0]}`;
-    const lastFriend = otherNames.pop();
-    return `You, ${otherNames.join(', ')} & ${lastFriend}`;
-  };
+  const firstName = (fullName: string) =>
+  (fullName || "").trim().split(/\s+/)[0];
+
+const getChatTitle = (chat: any) => {
+  if (!chat || !auth.currentUser || !chat.participantNames) return 'Synq Chat';
+  const myId = auth.currentUser.uid;
+
+  const otherNames = Object.entries(chat.participantNames)
+    .filter(([uid]) => uid !== myId)
+    .map(([_, name]) => firstName(name as string));
+
+  if (otherNames.length === 0) return 'Just You';
+  if (otherNames.length === 1) return `You & ${otherNames[0]}`;
+
+  const lastFriend = otherNames.pop();
+  return `You, ${otherNames.join(', ')} & ${lastFriend}`;
+};
 
   const renderAvatarStack = (images: any) => {
     if (!images)
@@ -677,8 +683,10 @@ export default function SynqScreen() {
                       await markChatRead(item.id);
                     }}
                   >
+                   <View style={styles.avatarColumn}>
                     {renderAvatarStack(item.participantImages)}
-                    <View style={{ flex: 1, marginLeft: Object.keys(item.participantImages || {}).length > 2 ? 35 : 15 }}>
+                  </View>
+                   <View style={styles.inboxTextCol}>
                       <Text style={styles.whiteBold}>{getChatTitle(item)}</Text>
                       <Text style={styles.grayText} numberOfLines={1}>
                         {item.lastMessage}
@@ -724,19 +732,32 @@ export default function SynqScreen() {
                   ref={flatListRef}
                   data={messages}
                   keyExtractor={(item) => item.id}
+                  keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+                  keyboardShouldPersistTaps="handled"
+                  onScrollBeginDrag={() => Keyboard.dismiss()}
+                  onMomentumScrollBegin={() => Keyboard.dismiss()}
+
                   onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                   onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+
                   renderItem={({ item }) => {
                     const isMe = item.senderId === auth.currentUser?.uid;
-                    const isSystemIdea = item.text.includes('✨ Synq AI Suggestion') || item.venueImage;
+                    const isSystemIdea = item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
                     const currentChat = allChats.find((c) => c.id === activeChatId);
-                    const senderAvatar = currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
+                    const senderAvatar =
+                      currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
 
                     if (isSystemIdea) {
                       return (
                         <View style={styles.centeredIdeaContainer}>
                           <View style={styles.ideaBubble}>
-                            {item.venueImage && <Image source={{ uri: item.venueImage }} style={styles.ideaImage} resizeMode="cover" />}
+                            {item.venueImage && (
+                              <Image
+                                source={{ uri: item.venueImage }}
+                                style={styles.ideaImage}
+                                resizeMode="cover"
+                              />
+                            )}
                             <Text style={styles.ideaText}>{item.text}</Text>
                           </View>
                           <Text style={styles.timestampCentered}>{formatTime(item.createdAt)}</Text>
@@ -745,11 +766,16 @@ export default function SynqScreen() {
                     }
 
                     return (
-                      <View style={[styles.msgContainer, isMe ? { alignItems: 'flex-end' } : { alignItems: 'flex-start' }]}>
-                        <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+                      <View
+                        style={[
+                          styles.msgContainer,
+                          isMe ? { alignItems: "flex-end" } : { alignItems: "flex-start" },
+                        ]}
+                      >
+                        <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
                           {!isMe && <Image source={{ uri: senderAvatar }} style={styles.chatAvatar} />}
                           <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
-                            <Text style={{ color: isMe ? 'black' : 'white', fontSize: 16 }}>{item.text}</Text>
+                            <Text style={{ color: isMe ? "black" : "white", fontSize: 16 }}>{item.text}</Text>
                           </View>
                         </View>
                         <Text style={[styles.timestampOutside, isMe ? { marginRight: 4 } : { marginLeft: 44 }]}>
@@ -894,8 +920,7 @@ export default function SynqScreen() {
                             />
 
                             <TouchableOpacity
-                               style={selectedOption ? styles.sendIdeaBtnEnabled : styles.sendIdeaBtn}
-                              //style={[styles.sendIdeaBtn, !selectedOption && { opacity: 0.5 }]}
+                              style={selectedOption ? styles.sendIdeaBtnEnabled : styles.sendIdeaBtn}
                               disabled={!selectedOption}
                               onPress={() => {
                                 sendAISuggestionToChat();
@@ -933,9 +958,8 @@ export default function SynqScreen() {
   );
 }
 
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'black' },
+  container: { flex: 1, backgroundColor: "#070707" },
   darkFill: { flex: 1, backgroundColor: 'black', justifyContent: 'center' },
   activeHeader: {
     flexDirection: 'row',
@@ -944,7 +968,7 @@ const styles = StyleSheet.create({
     paddingTop: 70,
     paddingBottom: 20,
     alignItems: 'center',
-    backgroundColor: 'black',
+    backgroundColor: "#070707",
     height: 140
   },
   headerTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Heavy', textAlign: 'center' },
@@ -1007,11 +1031,10 @@ const styles = StyleSheet.create({
   centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
   modalBg: { flex: 1, backgroundColor: 'black' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
-  modalTitle: { color: 'white', fontSize: 18, fontFamily: 'Avenir-Black' },
+  modalTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Medium' },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
   inboxItem: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#111' },
   inboxCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
-  avatarStack: { width: 50, height: 50, position: 'relative' },
   stackedPhoto: { width: 40, height: 40, borderRadius: 20, position: 'absolute', borderWidth: 2, borderColor: 'black' },
   msgContainer: { marginBottom: 15 },
   chatAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
@@ -1126,4 +1149,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
   },
+  avatarColumn: {
+  width: 60,             
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+avatarStack: {
+  width: 50,
+  height: 50,
+  position: 'relative',
+},
+inboxTextCol: {
+  flex: 1,
+  marginLeft: 14, 
+},
 });
