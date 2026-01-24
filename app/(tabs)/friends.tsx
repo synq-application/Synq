@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 14,
     borderWidth: 2,
-    borderColor: "rgba(125,255,166,0.35)",
+    borderColor: ACCENT,
   },
   popupName: { color: TEXT, fontSize: 24, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   popupLocation: { marginTop: 6, color: "rgba(255,255,255,0.35)", fontSize: 13, fontFamily: fonts.book },
