@@ -587,73 +587,71 @@ export default function SynqScreen() {
   const activeChat = allChats.find((c) => c.id === activeChatId);
 
   const resolveAvatar = (url?: any) => {
-  if (typeof url === "string" && url.trim().startsWith("http")) {
-    return url;
-  }
-  return DEFAULT_AVATAR;
-};
+    if (typeof url === "string" && url.trim().startsWith("http")) {
+      return url;
+    }
+    return DEFAULT_AVATAR;
+  };
 
-const renderAvatarStack = (images: any) => {
-  if (!images) {
-    return (
-      <View style={styles.inboxCircle}>
-        <Ionicons name="people" size={20} color={ACCENT} />
-      </View>
-    );
-  }
+  const renderAvatarStack = (images: any) => {
+    if (!images) {
+      return (
+        <View style={styles.inboxCircle}>
+          <Ionicons name="people" size={20} color={ACCENT} />
+        </View>
+      );
+    }
 
-  const others = Object.entries(images)
-    .filter(([uid]) => uid !== auth.currentUser?.uid)
-    .map(([_, url]) => resolveAvatar(url));
+    const others = Object.entries(images)
+      .filter(([uid]) => uid !== auth.currentUser?.uid)
+      .map(([_, url]) => resolveAvatar(url));
 
-  if (others.length === 1) {
-    return (
-      <View style={styles.singleAvatarWrap}>
-        <Image
-          source={{ uri: others[0] }}
-          style={styles.singleAvatar}
-        />
-      </View>
-    );
-  }
-
-  const displayImages = others.slice(0, 4);
-
-  if (displayImages.length === 0) {
-    return (
-      <View style={styles.inboxCircle}>
-        <Ionicons name="people" size={20} color={ACCENT} />
-      </View>
-    );
-  }
-
-  const OFFSETS = [
-    { x: 0, y: 6, z: 4 },
-    { x: 18, y: -2, z: 3 },
-    { x: 34, y: 10, z: 2 },
-    { x: 14, y: 22, z: 1 },
-  ];
-
-  return (
-    <View style={styles.avatarCluster}>
-      {displayImages.map((uri, index) => {
-        const o = OFFSETS[index] ?? { x: index * 14, y: 0, z: 1 };
-        return (
+    if (others.length === 1) {
+      return (
+        <View style={styles.singleAvatarWrap}>
           <Image
-            key={`${uri}-${index}`}
-            source={{ uri }}
-            style={[
-              styles.clusterPhoto,
-              { left: o.x, top: o.y, zIndex: o.z },
-            ]}
+            source={{ uri: others[0] }}
+            style={styles.singleAvatar}
           />
-        );
-      })}
-    </View>
-  );
-};
+        </View>
+      );
+    }
 
+    const displayImages = others.slice(0, 4);
 
+    if (displayImages.length === 0) {
+      return (
+        <View style={styles.inboxCircle}>
+          <Ionicons name="people" size={20} color={ACCENT} />
+        </View>
+      );
+    }
+
+    const OFFSETS = [
+      { x: 0, y: 6, z: 4 },
+      { x: 18, y: -2, z: 3 },
+      { x: 34, y: 10, z: 2 },
+      { x: 14, y: 22, z: 1 },
+    ];
+
+    return (
+      <View style={styles.avatarCluster}>
+        {displayImages.map((uri, index) => {
+          const o = OFFSETS[index] ?? { x: index * 14, y: 0, z: 1 };
+          return (
+            <Image
+              key={`${uri}-${index}`}
+              source={{ uri }}
+              style={[
+                styles.clusterPhoto,
+                { left: o.x, top: o.y, zIndex: o.z },
+              ]}
+            />
+          );
+        })}
+      </View>
+    );
+  };
 
   if (loading) return <View style={styles.darkFill}><ActivityIndicator color={ACCENT} /></View>;
 
@@ -900,8 +898,8 @@ const renderAvatarStack = (images: any) => {
                   placeholder="Message..."
                   placeholderTextColor="#666"
                   multiline
-                  textAlignVertical="top"    
-                  scrollEnabled           
+                  textAlignVertical="top"
+                  scrollEnabled
                   returnKeyType="default"
                 />
                 <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}>
@@ -1259,49 +1257,39 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
   },
-
-singleAvatarWrap: {
-  width: 56,
-  height: 56,
-  alignItems: "center",
-  justifyContent: "center",
-},
-
-singleAvatar: {
-  width: 52,
-  height: 52,
-  borderRadius: 24,
-  borderWidth: 2,
-  borderColor: "black",
-  backgroundColor: "#1C1C1E",
-},
-
-avatarColumn: {
-  width: 60,
-  alignItems: "center",
-  justifyContent: "center",
-},
-
-avatarCluster: {
-  width: 64,
-  height: 56,
-  position: "relative",
-},
-
-clusterPhoto: {
-  width: 34,
-  height: 34,
-  borderRadius: 17,
-  position: "absolute",
-  borderWidth: 2,
-  borderColor: "black",
-  backgroundColor: "#1C1C1E",
-},
-
-
-
-
-
+  singleAvatarWrap: {
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  singleAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: "black",
+    backgroundColor: "#1C1C1E",
+  },
+  avatarColumn: {
+    width: 60,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarCluster: {
+    width: 64,
+    height: 56,
+    position: "relative",
+  },
+  clusterPhoto: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    position: "absolute",
+    borderWidth: 2,
+    borderColor: "black",
+    backgroundColor: "#1C1C1E",
+  },
   avatarStack: {
     width: 50,
     height: 50,
