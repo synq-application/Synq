@@ -39,7 +39,7 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, popularNow } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
-import { SynqStatus, formatTime } from '../helpers';
+import { SynqStatus, formatTime, getLeadingEmoji } from '../helpers';
 import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
 
@@ -68,15 +68,6 @@ export default function SynqScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [hasUnread, setHasUnread] = useState(false);
   const [mutualInterests, setMutualInterests] = useState<string[]>([]);
-
-  const getLeadingEmoji = (text: string) => {
-    if (!text) return null;
-    const firstChar = Array.from(text.trim())[0];
-    if (/\p{Extended_Pictographic}/u.test(firstChar)) {
-      return firstChar;
-    }
-    return null;
-  };
 
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
@@ -532,20 +523,62 @@ export default function SynqScreen() {
   const firstName = (fullName: string) =>
     (fullName || "").trim().split(/\s+/)[0];
 
+  const wrapChatTitle = (text: string, maxChars = 30) => {
+    const tokens = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+
+    for (const token of tokens) {
+      const testLine = currentLine
+        ? `${currentLine} ${token}`
+        : token;
+
+      if (testLine.length <= maxChars) {
+        currentLine = testLine;
+      } else {
+        lines.push(currentLine);
+        currentLine = token;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines.join('\n');
+  };
+
   const getChatTitle = (chat: any) => {
-    if (!chat || !auth.currentUser || !chat.participantNames) return 'Synq Chat';
-    const myId = auth.currentUser.uid;
+    if (!chat) return 'Synq Chat';
+
+    // 🔹 User-defined name always wins
+    if (chat.customName?.trim()) {
+      return wrapChatTitle(chat.customName.trim(), 25);
+    }
+
+    // 🔹 Otherwise fallback to auto-generated
+    const myId = auth.currentUser?.uid;
 
     const otherNames = Object.entries(chat.participantNames)
       .filter(([uid]) => uid !== myId)
       .map(([_, name]) => firstName(name as string));
 
     if (otherNames.length === 0) return 'Just You';
-    if (otherNames.length === 1) return `You & ${otherNames[0]}`;
 
-    const lastFriend = otherNames.pop();
-    return `You, ${otherNames.join(', ')} & ${lastFriend}`;
+    let title = '';
+
+    if (otherNames.length === 1) {
+      title = `You & ${otherNames[0]}`;
+    } else {
+      const names = [...otherNames];
+      const lastFriend = names.pop();
+      title = `You, ${names.join(', ')} & ${lastFriend}`;
+    }
+
+    return wrapChatTitle(title, 25);
   };
+
+  const activeChat = allChats.find((c) => c.id === activeChatId);
 
   const renderAvatarStack = (images: any) => {
     if (!images)
@@ -703,17 +736,21 @@ export default function SynqScreen() {
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.modalTitle}>{activeChatId && getChatTitle(allChats.find((c) => c.id === activeChatId))}</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setIsExploreVisible(true);
-                  }}
-                  hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
-                  style={[styles.aiTrigger, { marginLeft: 10 }]}
-                >
-                  <Ionicons name="sparkles" size={20} color={ACCENT} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={styles.modalTitle}>
+                    {activeChat ? getChatTitle(activeChat) : 'Synq Chat'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setIsExploreVisible(true);
+                    }}
+                    hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
+                    style={[styles.aiTrigger, { marginLeft: 10 }]}
+                  >
+                    <Ionicons name="sparkles" size={20} color={ACCENT} />
+                  </TouchableOpacity>
+                </View>
               </View>
               <TouchableOpacity
                 onPress={() => {
@@ -736,10 +773,8 @@ export default function SynqScreen() {
                   keyboardShouldPersistTaps="handled"
                   onScrollBeginDrag={() => Keyboard.dismiss()}
                   onMomentumScrollBegin={() => Keyboard.dismiss()}
-
                   onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                   onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-
                   renderItem={({ item }) => {
                     const isMe = item.senderId === auth.currentUser?.uid;
                     const isSystemIdea = item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
@@ -985,7 +1020,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#070707",
     height: 140
   },
-  headerTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Heavy', textAlign: 'center' },
+  headerTitle: { color: 'white', fontSize: 24, fontFamily: 'Avenir-Heavy', textAlign: 'center' },
   headerIconContainer: { width: 40, alignItems: 'center', justifyContent: 'center' },
   badge: {
     position: 'absolute',

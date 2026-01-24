@@ -18,3 +18,11 @@ export const getChatTitle = (chat: any, myId: string) => {
   return `You, ${otherNames.join(", ")} & ${last}`;
 };
 
+  export const getLeadingEmoji = (text: string) => {
+    if (!text) return null;
+    const firstChar = Array.from(text.trim())[0];
+    if (/\p{Extended_Pictographic}/u.test(firstChar)) {
+      return firstChar;
+    }
+    return null;
+  };
