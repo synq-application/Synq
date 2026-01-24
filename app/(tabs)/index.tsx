@@ -189,7 +189,7 @@ export default function SynqScreen() {
     const q = query(
       collection(db, "chats"),
       where("participants", "array-contains", auth.currentUser!.uid),
-      orderBy("createdAt", "desc") 
+      orderBy("createdAt", "desc")
     );
 
     return onSnapshot(q, (snap) => {
@@ -849,17 +849,21 @@ export default function SynqScreen() {
 
               <View style={styles.inputRow}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, styles.inputMultiline]}
                   value={inputText}
                   onChangeText={setInputText}
                   placeholder="Message..."
                   placeholderTextColor="#666"
-                  multiline={false}
+                  multiline
+                  textAlignVertical="top"    
+                  scrollEnabled           
+                  returnKeyType="default"
                 />
                 <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}>
                   <Ionicons name="send" size={18} color="black" />
                 </TouchableOpacity>
               </View>
+
             </KeyboardAvoidingView>
 
             {isExploreVisible && (
@@ -1097,7 +1101,13 @@ const styles = StyleSheet.create({
   myBubble: { backgroundColor: ACCENT },
   theirBubble: { backgroundColor: '#1C1C1E' },
   timestampOutside: { color: '#444', fontSize: 11, marginTop: 4, fontFamily: 'Avenir' },
-  inputRow: { flexDirection: 'row', padding: 20, paddingBottom: 40, backgroundColor: 'black', alignItems: 'center' },
+  inputRow: { flexDirection: 'row', alignItems: "flex-end", padding: 20, paddingBottom: 40, backgroundColor: 'black' },
+  inputMultiline: {
+    paddingTop: 12,
+    paddingBottom: 12,
+    minHeight: 45,
+    maxHeight: 120,
+  },
   input: { flex: 1, backgroundColor: '#1C1C1E', borderRadius: 25, paddingHorizontal: 20, paddingVertical: 12, color: 'white', fontSize: 16, marginRight: 10 },
   sendBtn: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: ACCENT, justifyContent: 'center', alignItems: 'center' },
   aiTrigger: {
