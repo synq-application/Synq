@@ -187,13 +187,20 @@ export default function SynqScreen() {
     init();
 
     const q = query(
-      collection(db, 'chats'),
-      where('participants', 'array-contains', auth.currentUser!.uid),
-      orderBy('createdAt', 'desc')
+      collection(db, "chats"),
+      where("participants", "array-contains", auth.currentUser!.uid),
+      orderBy("createdAt", "desc") 
     );
 
     return onSnapshot(q, (snap) => {
-      const chats = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const chats = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+
+      chats.sort((a, b) => {
+        const aMs = a.updatedAt?.toMillis?.() ?? a.createdAt?.toMillis?.() ?? 0;
+        const bMs = b.updatedAt?.toMillis?.() ?? b.createdAt?.toMillis?.() ?? 0;
+        return bMs - aMs;
+      });
+
       setAllChats(chats);
       const myId = auth.currentUser!.uid;
       const anyUnread = chats.some((c: any) => {
@@ -456,6 +463,7 @@ export default function SynqScreen() {
           participantNames: nameMap,
           participantImages: imgMap,
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
           lastMessage: 'Synq established!'
         });
         setActiveChatId(chatRef.id);
@@ -551,12 +559,10 @@ export default function SynqScreen() {
   const getChatTitle = (chat: any) => {
     if (!chat) return 'Synq Chat';
 
-    // 🔹 User-defined name always wins
     if (chat.customName?.trim()) {
       return wrapChatTitle(chat.customName.trim(), 25);
     }
 
-    // 🔹 Otherwise fallback to auto-generated
     const myId = auth.currentUser?.uid;
 
     const otherNames = Object.entries(chat.participantNames)
