@@ -283,7 +283,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             onPress={() =>
               Alert.alert(
-                "Synq Score",
+                "Top Synqs",
                 "Your Top Synqs are the people you message most! Every message sent increases your score."
               )
             }
