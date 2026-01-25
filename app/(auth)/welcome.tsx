@@ -8,9 +8,13 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
-import { PanGestureHandler, State } from "react-native-gesture-handler";
+import {
+  PanGestureHandler,
+  State,
+  type PanGestureHandlerGestureEvent,
+} from "react-native-gesture-handler";
 import { SvgXml } from "react-native-svg";
 
 type Props = {
@@ -29,19 +33,29 @@ export default function SpontaneousHangouts({
   const topFade = useRef(new Animated.Value(0)).current;
   const graphicFade = useRef(new Animated.Value(0)).current;
   const bottomFade = useRef(new Animated.Value(0)).current;
-  const SWIPE_BACK_DISTANCE = 60;
-  const SWIPE_BACK_VELOCITY = 700;
-  const didSwipeBack = useRef(false);
+  const SWIPE_DISTANCE = 70;
+  const SWIPE_VELOCITY = 800;
+  const locked = useRef(false);
 
-  const onPanStateChange = (e: any) => {
+  const goNext = () => (onNext ? onNext() : router.push("/(auth)/next"));
+  const goBack = () => router.back();
+
+  const onPanStateChange = (e: PanGestureHandlerGestureEvent) => {
     const { state, translationX, velocityX } = e.nativeEvent;
 
-    if (state === State.BEGAN) didSwipeBack.current = false;
+    if (state === State.BEGAN) locked.current = false;
 
-    if (state === State.END && !didSwipeBack.current) {
-      if (translationX > SWIPE_BACK_DISTANCE || velocityX > SWIPE_BACK_VELOCITY) {
-        didSwipeBack.current = true;
-        router.back();
+    if (state === State.END && !locked.current) {
+      if (translationX < -SWIPE_DISTANCE || velocityX < -SWIPE_VELOCITY) {
+        locked.current = true;
+        if (step < totalSteps) goNext();
+        return;
+      }
+
+      if (translationX > SWIPE_DISTANCE || velocityX > SWIPE_VELOCITY) {
+        locked.current = true;
+        if (step > 1) goBack();
+        return;
       }
     }
   };
@@ -69,8 +83,7 @@ export default function SpontaneousHangouts({
   return (
     <PanGestureHandler
       onHandlerStateChange={onPanStateChange}
-      activeOffsetX={[-15, 15]}
-      failOffsetY={[-15, 15]}
+      activeOffsetX={[-20, 20]} 
     >
       <SafeAreaView style={styles.safe}>
         <StatusBar barStyle="light-content" />
@@ -80,9 +93,7 @@ export default function SpontaneousHangouts({
           </View>
 
           <TouchableOpacity
-            onPress={() =>
-              onSkip ? onSkip() : router.push("/(auth)/getting-started")
-            }
+            onPress={() => (onSkip ? onSkip() : router.push("/(auth)/getting-started"))}
             activeOpacity={0.7}
             style={styles.skip}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -98,31 +109,20 @@ export default function SpontaneousHangouts({
             </Text>
           </Animated.View>
 
-          <Animated.View style={[styles.graphicWrap, { opacity: graphicFade }]}>
-          </Animated.View>
+          <Animated.View style={[styles.graphicWrap, { opacity: graphicFade }]} />
 
           <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
-            <TouchableOpacity
-              onPress={() => (onNext ? onNext() : router.push("/(auth)/next"))}
-              activeOpacity={0.85}
-              style={styles.nextBtn}
-            >
+            <TouchableOpacity onPress={goNext} activeOpacity={0.85} style={styles.nextBtn}>
               <Text style={styles.nextText}>Continue</Text>
             </TouchableOpacity>
 
-            <View
-              style={styles.dots}
-              accessibilityLabel={`Step ${step} of ${totalSteps}`}
-            >
+            <View style={styles.dots} accessibilityLabel={`Step ${step} of ${totalSteps}`}>
               {Array.from({ length: totalSteps }).map((_, i) => {
                 const active = i + 1 === step;
                 return (
                   <View
                     key={i}
-                    style={[
-                      styles.dot,
-                      active ? styles.dotActive : styles.dotInactive,
-                    ]}
+                    style={[styles.dot, active ? styles.dotActive : styles.dotInactive]}
                   />
                 );
               })}
@@ -179,10 +179,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  network: {
-    width: 300,
-    height: 800,
   },
 
   bottom: {

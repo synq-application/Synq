@@ -12,6 +12,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import {
+  PanGestureHandler,
+  State,
+  type PanGestureHandlerGestureEvent,
+} from "react-native-gesture-handler";
 import { SvgXml } from "react-native-svg";
 
 type Props = {
@@ -31,22 +36,57 @@ export default function SeeWhenFriendsAvailable({
   const pulseFade = useRef(new Animated.Value(0)).current;
   const bottomFade = useRef(new Animated.Value(0)).current;
 
-  // subtle visual vibration + a gentle “breath”
   const jitter = useRef(new Animated.Value(0)).current;
   const breathe = useRef(new Animated.Value(0)).current;
 
-  // stop haptics immediately on navigate/unmount
   const hapticsActiveRef = useRef(true);
 
+  const SWIPE_DISTANCE = 70;
+  const SWIPE_VELOCITY = 800;
+  const locked = useRef(false);
+
+  const stopHapticsNow = () => {
+    hapticsActiveRef.current = false;
+  };
+
+  const handleNext = () => {
+    stopHapticsNow();
+    onNext ? onNext() : router.push("/(auth)/getting-started");
+  };
+
+  const handleSkip = () => {
+    stopHapticsNow();
+    onSkip ? onSkip() : router.push("/(auth)/getting-started");
+  };
+
+  const onPanStateChange = (e: PanGestureHandlerGestureEvent) => {
+    const { state, translationX, velocityX } = e.nativeEvent;
+
+    if (state === State.BEGAN) locked.current = false;
+
+    if (state === State.END && !locked.current) {
+      if (translationX < -SWIPE_DISTANCE || velocityX < -SWIPE_VELOCITY) {
+        locked.current = true;
+        if (step < totalSteps) handleNext();
+        return;
+      }
+
+      if (translationX > SWIPE_DISTANCE || velocityX > SWIPE_VELOCITY) {
+        locked.current = true;
+        stopHapticsNow();
+        if (step > 1) router.back();
+        return;
+      }
+    }
+  };
+
   useEffect(() => {
-    // enter animations
     Animated.stagger(120, [
       Animated.timing(topFade, { toValue: 1, duration: 520, useNativeDriver: true }),
       Animated.timing(pulseFade, { toValue: 1, duration: 480, useNativeDriver: true }),
       Animated.timing(bottomFade, { toValue: 1, duration: 520, useNativeDriver: true }),
     ]).start();
 
-    // tiny jitter loop (energy)
     const jitterLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(jitter, { toValue: 1, duration: 90, useNativeDriver: true }),
@@ -56,7 +96,6 @@ export default function SeeWhenFriendsAvailable({
     );
     jitterLoop.start();
 
-    // gentle “breathing” scale (premium, not gimmicky)
     const breatheLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(breathe, { toValue: 1, duration: 900, useNativeDriver: true }),
@@ -65,7 +104,6 @@ export default function SeeWhenFriendsAvailable({
     );
     breatheLoop.start();
 
-    // REAL haptics loop: tap…tap…pause (feels like a pulse)
     hapticsActiveRef.current = true;
 
     const runHaptics = async () => {
@@ -94,83 +132,78 @@ export default function SeeWhenFriendsAvailable({
     };
   }, [topFade, pulseFade, bottomFade, jitter, breathe]);
 
-  const handleNext = () => {
-    // stop haptics immediately so they don’t bleed into next screen
-    hapticsActiveRef.current = false;
-    onNext ? onNext() : router.push("/(auth)/getting-started");
-  };
-
-  const handleSkip = () => {
-    hapticsActiveRef.current = false;
-    onSkip ? onSkip() : router.push("/(auth)/getting-started");
-  };
-
   const jitterX = jitter.interpolate({ inputRange: [-1, 1], outputRange: [-1.2, 1.2] });
   const jitterY = jitter.interpolate({ inputRange: [-1, 1], outputRange: [0.8, -0.8] });
   const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1.035] });
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" />
-      <View style={styles.container}>
-        <View pointerEvents="none" style={styles.bgSvgWrap}>
-          <SvgXml xml={synqSvg} width="120%" height="120%" />
-        </View>
+    <PanGestureHandler
+      onHandlerStateChange={onPanStateChange}
+      activeOffsetX={[-20, 20]}
+    >
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.container}>
+          <View pointerEvents="none" style={styles.bgSvgWrap}>
+            <SvgXml xml={synqSvg} width="120%" height="120%" />
+          </View>
 
-        {/* quiet zone behind copy so text always reads clean */}
-        <View pointerEvents="none" style={styles.topOverlay} />
+          <View pointerEvents="none" style={styles.topOverlay} />
 
-        <TouchableOpacity
-          onPress={handleSkip}
-          activeOpacity={0.7}
-          style={styles.skip}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
-
-        <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
-          <Text style={styles.title}>Connect in the moment.</Text>
-          <View style={styles.divider} />
-          <Text style={styles.sub}>Tap when you're free. See who else is. {`\n`}Make it happen.</Text>
-        </Animated.View>
-
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.pulseWrap,
-            {
-              opacity: pulseFade,
-              transform: [{ translateX: jitterX }, { translateY: jitterY }, { scale }],
-            },
-          ]}
-        >
-          <Image
-            source={require("../../assets/pulse.gif")}
-            style={styles.pulse}
-            resizeMode="contain"
-          />
-        </Animated.View>
-
-        <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
-          <TouchableOpacity onPress={handleNext} activeOpacity={0.88} style={styles.nextBtn}>
-            <Text style={styles.nextText}>Continue</Text>
+          <TouchableOpacity
+            onPress={handleSkip}
+            activeOpacity={0.7}
+            style={styles.skip}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Text style={styles.skipText}>Skip</Text>
           </TouchableOpacity>
 
-          <View style={styles.dots} accessibilityLabel={`Step ${step} of ${totalSteps}`}>
-            {Array.from({ length: totalSteps }).map((_, i) => {
-              const active = i + 1 === step;
-              return (
-                <View
-                  key={i}
-                  style={[styles.dot, active ? styles.dotActive : styles.dotInactive]}
-                />
-              );
-            })}
-          </View>
-        </Animated.View>
-      </View>
-    </SafeAreaView>
+          <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
+            <Text style={styles.title}>Connect in the moment.</Text>
+            <View style={styles.divider} />
+            <Text style={styles.sub}>
+              Tap when you're free. See who else is. {`\n`}Make it happen.
+            </Text>
+          </Animated.View>
+
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.pulseWrap,
+              {
+                opacity: pulseFade,
+                transform: [{ translateX: jitterX }, { translateY: jitterY }, { scale }],
+              },
+            ]}
+          >
+            <Image
+              source={require("../../assets/pulse.gif")}
+              style={styles.pulse}
+              resizeMode="contain"
+            />
+          </Animated.View>
+
+          <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
+            <TouchableOpacity onPress={handleNext} activeOpacity={0.88} style={styles.nextBtn}>
+              <Text style={styles.nextText}>Continue</Text>
+            </TouchableOpacity>
+
+            <View style={styles.dots} accessibilityLabel={`Step ${step} of ${totalSteps}`}>
+              {Array.from({ length: totalSteps }).map((_, i) => {
+                const active = i + 1 === step;
+                return (
+                  <View
+                    key={i}
+                    style={[styles.dot, active ? styles.dotActive : styles.dotInactive]}
+                  />
+                );
+              })}
+            </View>
+          </Animated.View>
+        </View>
+      </SafeAreaView>
+    </PanGestureHandler>
   );
 }
 
@@ -181,7 +214,6 @@ function sleep(ms: number) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG },
   container: { flex: 1, backgroundColor: BG },
-
   bgSvgWrap: {
     position: "absolute",
     top: -45,
@@ -191,13 +223,12 @@ const styles = StyleSheet.create({
     opacity: 0.28,
     transform: [{ rotate: "-10deg" }],
   },
-
   topOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: 260
+    height: 260,
   },
 
   skip: { position: "absolute", top: 14, right: 18, zIndex: 10 },
@@ -228,14 +259,13 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
-  // true hero centering
   pulseWrap: {
     position: "absolute",
     top: "35%",
     left: 0,
     right: 0,
     alignItems: "center",
-    marginTop: 10, // tiny optical correction (feels centered with header + CTA)
+    marginTop: 10,
     zIndex: 2,
   },
   pulse: {
