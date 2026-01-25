@@ -1069,7 +1069,6 @@ export default function SynqScreen() {
             await updateDoc(doc(db, "users", auth.currentUser!.uid), { memo });
             setIsEditModalVisible(false);
           }}
-          onEndSynq={endSynq}
         />
       </View>
     </TouchableWithoutFeedback>
@@ -1102,6 +1101,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'black'
   },
+  closeBtn: {
+  position: "absolute",
+  top: 12,
+  right: 12,
+  zIndex: 10,
+},
   friendCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1115,7 +1120,7 @@ const styles = StyleSheet.create({
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
   whiteBold: { color: 'white', fontSize: 17, fontFamily: 'Avenir-Medium' },
   grayText: { color: '#666', fontSize: 13, marginTop: 2 },
-  footer: { padding: 25, paddingBottom: 150 },
+  footer: { padding: 25, paddingBottom: 80 },
   btn: { backgroundColor: ACCENT, padding: 18, borderRadius: 20, alignItems: 'center' },
   btnText: { fontSize: 16, color: 'black', fontFamily: 'Avenir-Medium' },
   deactivateLink: { marginTop: 20, alignSelf: 'center', padding: 10 },
