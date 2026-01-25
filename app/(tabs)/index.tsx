@@ -37,7 +37,7 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, OFFSETS, popularNow } from '../../constants/Variables';
+import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, MUTED, OFFSETS, popularNow } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import { SynqStatus, formatTime, getLeadingEmoji } from '../helpers';
 import { openInMaps } from '../map-utils';
@@ -974,26 +974,29 @@ export default function SynqScreen() {
                               )}
 
                               <Text style={styles.sectionHeader}>Popular Now</Text>
-                              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollRow}>
+
+                              <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={styles.scrollRow}
+                              >
                                 {popularNow.map((item) => (
                                   <TouchableOpacity
                                     key={item.label}
                                     style={styles.ideaCircle}
                                     onPress={() => triggerAISuggestion(item.label)}
                                   >
-                                    <View style={[styles.circlePlaceholder, { borderColor: ACCENT }]}>
-                                      <Ionicons
-                                        name={item.icon as any}
-                                        size={30}
-                                        color={ACCENT}
+                                    <View style={styles.imageCircle}>
+                                      <Image
+                                        source={item.image}
+                                        style={styles.circleImage}
                                       />
                                     </View>
-                                    <Text style={styles.circleText}>{item.label}</Text>
+
+                                    <Text style={{ fontSize: 13, fontFamily: 'Avenir-Medium', color: 'white', marginTop: 10 }}>{item.label}</Text>
                                   </TouchableOpacity>
                                 ))}
                               </ScrollView>
-
-
                               {isAILoading && (
                                 <View style={{ marginTop: 20, alignItems: "center" }}>
                                   <ActivityIndicator color={ACCENT} />
@@ -1244,7 +1247,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: ACCENT,
     padding: 12,
-    alignItems: 'stretch',     
+    alignItems: 'stretch',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -1312,4 +1315,18 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 14,
   },
+  imageCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: MUTED,
+    backgroundColor: "#111",
+  },
+  circleImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  }
 });
