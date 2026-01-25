@@ -11,10 +11,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { PanGestureHandler, State } from "react-native-gesture-handler";
 import { SvgXml } from "react-native-svg";
+
 
 type Props = {
   onNext?: () => void;
+  onPrev?: () => void;
   onSkip?: () => void;
   step?: number;
   totalSteps?: number;
@@ -22,6 +25,7 @@ type Props = {
 
 export default function MakePlansScreen({
   onNext,
+  onPrev,
   onSkip,
   step = 1,
   totalSteps = 4,
@@ -29,92 +33,99 @@ export default function MakePlansScreen({
   const topFade = useRef(new Animated.Value(0)).current;
   const orbFade = useRef(new Animated.Value(0)).current;
   const bottomFade = useRef(new Animated.Value(0)).current;
+  const SWIPE_DISTANCE = 60;
+  const SWIPE_VELOCITY = 700;
+  const locked = useRef(false);
+
+  const goNext = () => (onNext ? onNext() : router.push("/(auth)/welcome"));
+  const goPrev = () => (onPrev ? onPrev() : router.back());
+
+  const onPanStateChange = (e: any) => {
+    const { state, translationX, velocityX } = e.nativeEvent;
+
+    if (state === State.BEGAN) locked.current = false;
+
+    if (state === State.END && !locked.current) {
+      if (translationX < -SWIPE_DISTANCE || velocityX < -SWIPE_VELOCITY) {
+        locked.current = true;
+        if (step < totalSteps) goNext();
+        return;
+      }
+
+      if (translationX > SWIPE_DISTANCE || velocityX > SWIPE_VELOCITY) {
+        locked.current = true;
+        if (step > 1) goPrev();
+        return;
+      }
+    }
+  };
 
   useEffect(() => {
     Animated.stagger(120, [
-      Animated.timing(topFade, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(orbFade, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(bottomFade, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
+      Animated.timing(topFade, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(orbFade, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(bottomFade, { toValue: 1, duration: 500, useNativeDriver: true }),
     ]).start();
   }, [topFade, orbFade, bottomFade]);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" />
-      <View style={styles.container}>
-        <View pointerEvents="none" style={styles.bgSvgWrap}>
-          <SvgXml xml={synqSvg} width="120%" height="120%" />
-        </View>
+    <PanGestureHandler
+      onHandlerStateChange={onPanStateChange}
+      activeOffsetX={[-15, 15]}  
+      failOffsetY={[-15, 15]} 
+    >
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.container}>
+          <View pointerEvents="none" style={styles.bgSvgWrap}>
+            <SvgXml xml={synqSvg} width="120%" height="120%" />
+          </View>
 
-        <TouchableOpacity
-          onPress={() =>
-            onSkip ? onSkip() : router.push("/(auth)/getting-started")
-          }
-          activeOpacity={0.7}
-          style={styles.skip}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
-
-        <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
-          <Text style={styles.title}>
-            Turn spare moments{"\n"}into shared ones.
-          </Text>
-
-          <View style={styles.divider} />
-
-          <Text style={styles.sub}>
-            A social tool that shows you which friends are free—right now.
-          </Text>
-        </Animated.View>
-
-        <Animated.View style={[styles.orbWrap, { opacity: orbFade }]}>
-          <Image
-            style={styles.orb}
-            resizeMode="contain"
-            // source={require("../../assets/orb.png")}
-          />
-        </Animated.View>
-
-        <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
           <TouchableOpacity
-            onPress={() => (onNext ? onNext() : router.push("/(auth)/welcome"))}
-            activeOpacity={0.85}
-            style={styles.nextBtn}
+            onPress={() => (onSkip ? onSkip() : router.push("/(auth)/getting-started"))}
+            activeOpacity={0.7}
+            style={styles.skip}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Text style={styles.nextText}>Next</Text>
+            <Text style={styles.skipText}>Skip</Text>
           </TouchableOpacity>
 
-          <View
-            style={styles.dots}
-            accessibilityLabel={`Step ${step} of ${totalSteps}`}
-          >
-            {Array.from({ length: totalSteps }).map((_, i) => {
-              const active = i + 1 === step;
-              return (
-                <View
-                  key={i}
-                  style={[styles.dot, active ? styles.dotActive : styles.dotInactive]}
-                />
-              );
-            })}
-          </View>
-        </Animated.View>
-      </View>
-    </SafeAreaView>
+          <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
+            <Text style={styles.title}>Turn spare moments{"\n"}into shared ones.</Text>
+            <View style={styles.divider} />
+            <Text style={styles.sub}>
+              A social tool that shows you which friends are free—right now.
+            </Text>
+          </Animated.View>
+
+          <Animated.View style={[styles.orbWrap, { opacity: orbFade }]}>
+            <Image style={styles.orb} resizeMode="contain" />
+          </Animated.View>
+
+          <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
+            <TouchableOpacity
+              onPress={goNext}
+              activeOpacity={0.85}
+              style={styles.nextBtn}
+            >
+              <Text style={styles.nextText}>Next</Text>
+            </TouchableOpacity>
+
+            <View style={styles.dots} accessibilityLabel={`Step ${step} of ${totalSteps}`}>
+              {Array.from({ length: totalSteps }).map((_, i) => {
+                const active = i + 1 === step;
+                return (
+                  <View
+                    key={i}
+                    style={[styles.dot, active ? styles.dotActive : styles.dotInactive]}
+                  />
+                );
+              })}
+            </View>
+          </Animated.View>
+        </View>
+      </SafeAreaView>
+    </PanGestureHandler>
   );
 }
 
