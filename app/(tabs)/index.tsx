@@ -701,10 +701,26 @@ export default function SynqScreen() {
                   <Image source={{ uri: item.imageurl || DEFAULT_AVATAR }} style={styles.friendImg} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.whiteBold}>{item.displayName}</Text>
+
+                    {item.city && (
+                      <View style={styles.locationRow}>
+                        <Ionicons
+                          name="location-sharp"
+                          size={14}
+                          color="#999"
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text style={styles.locationText}>
+                          {item.state ? `${item.city}, ${item.state}` : item.city}
+                        </Text>
+                      </View>
+                    )}
+
                     <Text style={styles.grayText} numberOfLines={1}>
                       {item.memo}
                     </Text>
                   </View>
+
                   {selectedFriends.includes(item.id) && <Ionicons name="checkmark-circle" size={24} color={ACCENT} />}
                 </TouchableOpacity>
               )}
@@ -1102,11 +1118,11 @@ const styles = StyleSheet.create({
     borderColor: 'black'
   },
   closeBtn: {
-  position: "absolute",
-  top: 12,
-  right: 12,
-  zIndex: 10,
-},
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 10,
+  },
   friendCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1120,6 +1136,7 @@ const styles = StyleSheet.create({
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
   whiteBold: { color: 'white', fontSize: 17, fontFamily: 'Avenir-Medium' },
   grayText: { color: '#666', fontSize: 13, marginTop: 2 },
+  locationText: { color: '#666', fontSize: 12, marginTop: 2 },
   footer: { padding: 25, paddingBottom: 80 },
   btn: { backgroundColor: ACCENT, padding: 18, borderRadius: 20, alignItems: 'center' },
   btnText: { fontSize: 16, color: 'black', fontFamily: 'Avenir-Medium' },
@@ -1272,6 +1289,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
     lineHeight: 20,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
   },
   timestampCentered: {
     color: '#666',
