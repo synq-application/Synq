@@ -13,7 +13,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: ACCENT,
         tabBarInactiveTintColor: "rgba(255,255,255,0.4)",
         tabBarShowLabel: true,
-        tabBarLabelStyle: { fontSize: 12, marginBottom: -5 }, 
+        tabBarLabelStyle: { fontSize: 12, marginBottom: -5 },
       }}
     >
       <Tabs.Screen
@@ -27,17 +27,17 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="index" 
+        name="index"
         options={{
-          title: "", 
+          title: "",
           tabBarIcon: ({ focused }) => (
             <View style={[
-              styles.synqButton, 
+              styles.synqButton,
               focused && styles.synqButtonActive
             ]}>
-              <Image 
-                source={require('../../assets/SYNQ-2.png')} 
-                style={styles.synqIcon} 
+              <Image
+                source={require('../../assets/SYNQ-2.png')}
+                style={styles.synqIcon}
               />
             </View>
           ),
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#081212",
     borderTopWidth: 0,
     height: Platform.OS === "ios" ? 85 : 70,
-    position: 'absolute', 
+    position: 'absolute',
     bottom: 20,
     left: 20,
     right: 20,
@@ -82,19 +82,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     position: 'absolute',
-    top: -20, 
+    top: -20,
     borderWidth: 2,
-    borderColor: ACCENT, 
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 0 }, 
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 15,
+    borderColor: "#FFF",
+    shadowColor: "#FFF",
     elevation: 15,
   },
   synqButtonActive: {
-    transform: [{ scale: 1.1 }], 
-    borderColor: "#FFF",
-    shadowColor: "#FFF",
+    transform: [{ scale: 1.1 }],
+    borderColor: ACCENT,
+    shadowColor: ACCENT,
   },
   synqIcon: {
     width: 100,
