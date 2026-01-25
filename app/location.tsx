@@ -1,4 +1,3 @@
-// app/location.tsx
 import { useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
 import { useState } from "react";
@@ -31,27 +30,24 @@ export default function LocationDetails() {
     try {
       setLoading(true);
       
-      // Save data to Firestore
       await setDoc(doc(db, "users", auth.currentUser.uid), {
         city: city.trim(),
         state: state.trim().toUpperCase(),
         locationDisplay: `${city.trim()}, ${state.trim().toUpperCase()}`
       }, { merge: true });
 
-      // Update local state and force navigation to tabs
       refreshAuth();
-      router.replace("/(tabs)"); 
-      
+      router.push("/add-interests");
     } catch (e: any) {
       console.error(e);
       Alert.alert("Error", "Could not save location.");
-      setLoading(false); // Stop the infinite spinner on error
+      setLoading(false);
     }
   };
 
   const handleSkip = () => {
     refreshAuth();
-    router.replace("/(tabs)");
+    router.push("/add-interests");
   };
 
   return (
