@@ -37,9 +37,10 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, popularNow } from '../../constants/Variables';
+import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, OFFSETS, popularNow } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import { SynqStatus, formatTime, getLeadingEmoji } from '../helpers';
+import { openInMaps } from '../map-utils';
 import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
 
@@ -82,6 +83,16 @@ export default function SynqScreen() {
     }
   };
 
+  const parseIdeaText = (text: string) => {
+    const lines = (text || "")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const name = lines[0] || "";
+    const address = lines.slice(1).join(" ") || "";
+    return { name, address };
+  };
   const normalizeInterest = (s: string) => (s || '').trim();
 
   const intersectMany = (lists: string[][]) => {
@@ -627,13 +638,6 @@ export default function SynqScreen() {
       );
     }
 
-    const OFFSETS = [
-      { x: 0, y: 6, z: 4 },
-      { x: 18, y: -2, z: 3 },
-      { x: 34, y: 10, z: 2 },
-      { x: 14, y: 22, z: 1 },
-    ];
-
     return (
       <View style={styles.avatarCluster}>
         {displayImages.map((uri, index) => {
@@ -830,25 +834,35 @@ export default function SynqScreen() {
                     const currentChat = allChats.find((c) => c.id === activeChatId);
                     const senderAvatar =
                       currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
-
                     if (isSystemIdea) {
+                      const { name, address } = parseIdeaText(item.text);
+
                       return (
                         <View style={styles.centeredIdeaContainer}>
-                          <View style={styles.ideaBubble}>
-                            {item.venueImage && (
-                              <Image
-                                source={{ uri: item.venueImage }}
-                                style={styles.ideaImage}
-                                resizeMode="cover"
-                              />
-                            )}
-                            <Text style={styles.ideaText}>{item.text}</Text>
+                          <View style={{ width: "85%", alignSelf: "center" }}>
+                            <TouchableOpacity
+                              activeOpacity={0.9}
+                              onPress={() => {
+                                openInMaps({ name, address });
+                              }}
+                            >
+                              <View style={[styles.ideaBubble, { width: "100%" }]}>
+                                {item.venueImage ? (
+                                  <Image
+                                    source={{ uri: item.venueImage }}
+                                    style={styles.ideaImage}
+                                    resizeMode="cover"
+                                  />
+                                ) : null}
+                                <Text style={styles.ideaText}>{item.text}</Text>
+                              </View>
+                            </TouchableOpacity>
                           </View>
+
                           <Text style={styles.timestampCentered}>{formatTime(item.createdAt)}</Text>
                         </View>
                       );
                     }
-
                     return (
                       <View
                         style={[
@@ -1012,7 +1026,7 @@ export default function SynqScreen() {
                                 >
                                   <Image source={{ uri: item.imageUrl || item.imageurl || 'https://via.placeholder.com/150' }} style={styles.venueImage} />
                                   <View style={{ flex: 1, marginLeft: 12 }}>
-                                    <Text style={styles.venueName}>{item.name}</Text>
+                                    <Text style={styles.venueName}>{item.name}!</Text>
                                     <Text style={styles.venueRating}>{item.rating} stars</Text>
                                     <Text style={styles.venueDesc}>{item.location}</Text>
                                   </View>
@@ -1020,7 +1034,6 @@ export default function SynqScreen() {
                                 </TouchableOpacity>
                               )}
                             />
-
                             <TouchableOpacity
                               style={selectedOption ? styles.sendIdeaBtnEnabled : styles.sendIdeaBtn}
                               disabled={!selectedOption}
@@ -1231,13 +1244,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: ACCENT,
     padding: 12,
-    width: '85%',
-    alignItems: 'center',
+    alignItems: 'stretch',     
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+    overflow: "hidden",
   },
   ideaImage: {
     width: '100%',

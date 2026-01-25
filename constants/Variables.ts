@@ -44,3 +44,10 @@ export const popularNow = [
   { label: "Sports Bars", icon: "beer" },
   { label: "Hiking", icon: "trail-sign" },
 ];
+
+export const OFFSETS = [
+      { x: 0, y: 6, z: 4 },
+      { x: 18, y: -2, z: 3 },
+      { x: 34, y: 10, z: 2 },
+      { x: 14, y: 22, z: 1 },
+    ];
