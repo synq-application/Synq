@@ -280,8 +280,6 @@ export default function ProfileScreen() {
             <Text style={styles.locationText}>{locationLower}</Text>
           </View>
         )}
-
-        <Text style={styles.memoText}>{memo}</Text>
       </View>
 
       <View style={styles.section}>
@@ -521,11 +519,9 @@ const styles = StyleSheet.create({
     borderColor: "black",
   },
   badgeText: { color: "white", fontSize: 10, fontFamily: fonts.black },
-
   profileSection: { alignItems: "center", marginTop: 10 },
   qrContainer: { width: 200, height: 200, justifyContent: "center", alignItems: "center" },
   qrBg: { position: "absolute", opacity: 0.4, backgroundColor: "white", borderRadius: 25, padding: 10 },
-
   imageWrapper: {
     width: 160,
     height: 160,
@@ -540,7 +536,6 @@ const styles = StyleSheet.create({
   },
   profileImg: { width: "100%", height: "100%" },
   defaultAvatarContainer: { width: "100%", height: "100%", justifyContent: "center", alignItems: "center" },
-
   qrToggle: { position: "absolute", bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
   nameText: { color: ACCENT, fontSize: 30, fontFamily: fonts.black, marginTop: 20 },
   locationRow: {
@@ -559,28 +554,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1.0,
     fontFamily: fonts.medium,
   },
-  memoText: {
-    color: "#888",
-    fontStyle: "italic",
-    marginTop: 12,
-    paddingHorizontal: 40,
-    textAlign: "center",
-    fontFamily: fonts.medium,
-    lineHeight: 20,
-    fontSize: 16,
-  },
-
   section: { marginTop: 30, paddingHorizontal: 25 },
   sectionTitle: { color: "white", fontSize: 20, fontFamily: fonts.black, marginBottom: 15 },
-
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 20 },
   connItem: { alignItems: "center", width: 80 },
   imageCircle: { width: 72, height: 72, borderRadius: 36, justifyContent: "center", alignItems: "center", position: "relative" },
   connImg: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#222" },
   connDefaultAvatar: { justifyContent: "center", alignItems: "center", backgroundColor: "#1a1a1a" },
-
   crown: {
     position: "absolute",
     bottom: 0,
