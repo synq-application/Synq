@@ -3,14 +3,14 @@ import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
-  Image,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
+import { PanGestureHandler, State } from "react-native-gesture-handler";
 import { SvgXml } from "react-native-svg";
 
 type Props = {
@@ -29,6 +29,22 @@ export default function SpontaneousHangouts({
   const topFade = useRef(new Animated.Value(0)).current;
   const graphicFade = useRef(new Animated.Value(0)).current;
   const bottomFade = useRef(new Animated.Value(0)).current;
+  const SWIPE_BACK_DISTANCE = 60;
+  const SWIPE_BACK_VELOCITY = 700;
+  const didSwipeBack = useRef(false);
+
+  const onPanStateChange = (e: any) => {
+    const { state, translationX, velocityX } = e.nativeEvent;
+
+    if (state === State.BEGAN) didSwipeBack.current = false;
+
+    if (state === State.END && !didSwipeBack.current) {
+      if (translationX > SWIPE_BACK_DISTANCE || velocityX > SWIPE_BACK_VELOCITY) {
+        didSwipeBack.current = true;
+        router.back();
+      }
+    }
+  };
 
   useEffect(() => {
     Animated.stagger(120, [
@@ -51,69 +67,70 @@ export default function SpontaneousHangouts({
   }, [topFade, graphicFade, bottomFade]);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" />
-      <View style={styles.container}>
-        <View pointerEvents="none" style={styles.bgSvgWrap}>
-          <SvgXml xml={synqSvg} width="120%" height="120%" />
-        </View>
+    <PanGestureHandler
+      onHandlerStateChange={onPanStateChange}
+      activeOffsetX={[-15, 15]}
+      failOffsetY={[-15, 15]}
+    >
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.container}>
+          <View pointerEvents="none" style={styles.bgSvgWrap}>
+            <SvgXml xml={synqSvg} width="120%" height="120%" />
+          </View>
 
-        <TouchableOpacity
-          onPress={() =>
-            onSkip ? onSkip() : router.push("/(auth)/getting-started")
-          }
-          activeOpacity={0.7}
-          style={styles.skip}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
-
-        <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
-          <Text style={styles.title}>Plans that actually happen.</Text>
-          <View style={styles.divider} />
-          <Text style={styles.sub}>
-           No guesswork, no waiting. Just spontaneous connections with friends.
-          </Text>
-        </Animated.View>
-
-        <Animated.View style={[styles.graphicWrap, { opacity: graphicFade }]}>
-          <Image
-           //source={require("./synq-network.png")}
-            style={styles.network}
-            resizeMode="contain"
-          />
-        </Animated.View>
-
-        <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
           <TouchableOpacity
-            onPress={() => (onNext ? onNext() : router.push("/(auth)/next"))}
-            activeOpacity={0.85}
-            style={styles.nextBtn}
+            onPress={() =>
+              onSkip ? onSkip() : router.push("/(auth)/getting-started")
+            }
+            activeOpacity={0.7}
+            style={styles.skip}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Text style={styles.nextText}>Continue</Text>
+            <Text style={styles.skipText}>Skip</Text>
           </TouchableOpacity>
 
-          <View
-            style={styles.dots}
-            accessibilityLabel={`Step ${step} of ${totalSteps}`}
-          >
-            {Array.from({ length: totalSteps }).map((_, i) => {
-              const active = i + 1 === step;
-              return (
-                <View
-                  key={i}
-                  style={[
-                    styles.dot,
-                    active ? styles.dotActive : styles.dotInactive,
-                  ]}
-                />
-              );
-            })}
-          </View>
-        </Animated.View>
-      </View>
-    </SafeAreaView>
+          <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
+            <Text style={styles.title}>Plans that actually happen.</Text>
+            <View style={styles.divider} />
+            <Text style={styles.sub}>
+              No guesswork, no waiting. Just spontaneous connections with friends.
+            </Text>
+          </Animated.View>
+
+          <Animated.View style={[styles.graphicWrap, { opacity: graphicFade }]}>
+          </Animated.View>
+
+          <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>
+            <TouchableOpacity
+              onPress={() => (onNext ? onNext() : router.push("/(auth)/next"))}
+              activeOpacity={0.85}
+              style={styles.nextBtn}
+            >
+              <Text style={styles.nextText}>Continue</Text>
+            </TouchableOpacity>
+
+            <View
+              style={styles.dots}
+              accessibilityLabel={`Step ${step} of ${totalSteps}`}
+            >
+              {Array.from({ length: totalSteps }).map((_, i) => {
+                const active = i + 1 === step;
+                return (
+                  <View
+                    key={i}
+                    style={[
+                      styles.dot,
+                      active ? styles.dotActive : styles.dotInactive,
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          </Animated.View>
+        </View>
+      </SafeAreaView>
+    </PanGestureHandler>
   );
 }
 
