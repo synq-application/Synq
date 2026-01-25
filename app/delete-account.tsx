@@ -1,22 +1,23 @@
+import { ACCENT } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { signOut } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { auth } from "../src/lib/firebase";
 
-const ACCENT = "#7DFFA6";
 const BACKGROUND = "black";
 const SURFACE = "#161616";
 
@@ -29,39 +30,40 @@ const fonts = {
 export default function DeleteAccountScreen() {
   const [busy, setBusy] = useState(false);
 
-  const runDelete = async () => {
-    if (!auth.currentUser?.uid) {
-      Alert.alert("Not signed in", "Please sign in again and try deleting your account.");
-      return;
+const runDelete = async () => {
+  if (!auth.currentUser?.uid) {
+    Alert.alert("Not signed in", "Please sign in again and try deleting your account.");
+    return;
+  }
+
+  setBusy(true);
+  try {
+    const functions = getFunctions(undefined, "us-central1");
+    const deleteMyAccount = httpsCallable(functions, "deleteMyAccount");
+    await deleteMyAccount({});
+    await signOut(auth);
+
+    Alert.alert("Account deleted", "Your account has been deleted.");
+    router.replace("/");
+
+  } catch (e: any) {
+    const code = String(e?.code || "");
+    const msg = String(e?.message || e);
+
+    if (code.includes("unauthenticated")) {
+      Alert.alert("Please sign in again", "Your session expired. Sign in and try again.");
+    } else if (code.includes("not-found")) {
+      Alert.alert(
+        "Delete not available yet",
+        "The deleteMyAccount function isn’t deployed. Deploy it and try again."
+      );
+    } else {
+      Alert.alert("Couldn’t delete account", msg);
     }
-
-    setBusy(true);
-    try {
-      const functions = getFunctions(undefined, "us-central1");
-      const deleteMyAccount = httpsCallable(functions, "deleteMyAccount");
-      await deleteMyAccount({});
-
-      Alert.alert("Account deleted", "Your account has been deleted.");
-      router.reload; 
-    } catch (e: any) {
-      const code = String(e?.code || "");
-      const msg = String(e?.message || e);
-
-      if (code.includes("unauthenticated")) {
-        Alert.alert("Please sign in again", "Your session expired. Sign in and try again.");
-      } else if (code.includes("not-found")) {
-        Alert.alert(
-          "Delete not available yet",
-          "The deleteMyAccount function isn’t deployed. Deploy it and try again."
-        );
-      } else {
-        Alert.alert("Couldn’t delete account", msg);
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
+  } finally {
+    setBusy(false);
+  }
+};
   const confirmDelete = () => {
     Alert.alert(
       "Delete account?",
@@ -76,7 +78,6 @@ export default function DeleteAccountScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={26} color="black" />
@@ -109,12 +110,6 @@ export default function DeleteAccountScreen() {
           <View style={styles.bulletRow}>
             <Text style={styles.bulletDot}>•</Text>
             <Text style={styles.bulletText}>Chats and messages you’re part of</Text>
-          </View>
-
-          <View style={styles.note}>
-            <Text style={styles.noteText}>
-              If this fails, confirm the Cloud Function is deployed to us-central1.
-            </Text>
           </View>
         </View>
 
@@ -185,7 +180,6 @@ const styles = StyleSheet.create({
     color: "#BDBDBD",
     lineHeight: 20,
   },
-
   card: {
     backgroundColor: SURFACE,
     marginHorizontal: 20,
@@ -200,7 +194,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
   },
-
   bulletRow: { flexDirection: "row", marginBottom: 10 },
   bulletDot: { color: ACCENT, marginRight: 10, fontSize: 18, lineHeight: 22 },
   bulletText: {
@@ -210,22 +203,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     flex: 1,
   },
-
-  note: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: "#101010",
-    borderWidth: 1,
-    borderColor: "#242424",
-  },
-  noteText: {
-    color: "#A8A8A8",
-    fontFamily: fonts.medium,
-    fontSize: 12.5,
-    lineHeight: 18,
-  },
-
   deleteBtn: {
     marginTop: 18,
     marginHorizontal: 20,
@@ -243,6 +220,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.black,
     fontSize: 16,
   },
-
   footerSpace: { height: 24 },
 });
