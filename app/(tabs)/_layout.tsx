@@ -30,13 +30,11 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: "",
+          tabBarShowLabel: false,
           tabBarIcon: ({ focused }) => (
-            <View style={[
-              styles.synqButton,
-              focused && styles.synqButtonActive
-            ]}>
+            <View style={[styles.synqButton, focused && styles.synqButtonActive]}>
               <Image
-                source={require('../../assets/SYNQ-2.png')}
+                source={require("../../assets/SYNQ-2.png")}
                 style={styles.synqIcon}
               />
             </View>
@@ -60,45 +58,36 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: "#081212",
-    borderTopWidth: 0,
-    height: Platform.OS === "ios" ? 85 : 70,
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    borderRadius: 25,
+    borderTopColor: "rgba(255,255,255,0.1)",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    height: Platform.OS === "ios" ? 90 : 70,
     paddingBottom: Platform.OS === "ios" ? 25 : 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 5,
   },
   synqButton: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
-    position: 'absolute',
-    top: -20,
+    marginBottom: Platform.OS === "ios" ? 30 : 20,
     borderWidth: 2,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
     borderColor: "#FFF",
     shadowColor: "#FFF",
-    elevation: 15,
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 10,
   },
+
   synqButtonActive: {
     transform: [{ scale: 1.1 }],
     borderColor: ACCENT,
     shadowColor: ACCENT,
   },
+
   synqIcon: {
     width: 100,
     height: 80,
-    resizeMode: 'contain',
-  }
+    resizeMode: "contain",
+  },
 });

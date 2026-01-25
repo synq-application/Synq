@@ -1029,7 +1029,7 @@ export default function SynqScreen() {
                                 >
                                   <Image source={{ uri: item.imageUrl || item.imageurl || 'https://via.placeholder.com/150' }} style={styles.venueImage} />
                                   <View style={{ flex: 1, marginLeft: 12 }}>
-                                    <Text style={styles.venueName}>{item.name}!</Text>
+                                    <Text style={styles.venueName}>{item.name}</Text>
                                     <Text style={styles.venueRating}>{item.rating} stars</Text>
                                     <Text style={styles.venueDesc}>{item.location}</Text>
                                   </View>
