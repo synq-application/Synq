@@ -50,7 +50,6 @@ exports.deleteMyAccount = onCall(
     if (!request.auth?.uid) {
       throw new HttpsError("unauthenticated", "Must be logged in.");
     }
-
     const uid = request.auth.uid;
     const db = admin.firestore();
 
@@ -133,10 +132,6 @@ exports.onFriendRequestSent = onDocumentCreated({
     }
 });
 
-/**
- * TRIGGER: Friend Request Accepted
- * Watches the 'friends' subcollection for new connections.
- */
 exports.onFriendAccepted = onDocumentCreated({
   document: "users/{userId}/friends/{friendId}",
   region: "us-central1",
@@ -198,10 +193,6 @@ exports.onFriendAccepted = onDocumentCreated({
   }
 });
 
-
-/**
- * CALLABLE: AI Suggestions
- */
 exports.getSynqSuggestions = onCall(
     {
         secrets: ["GEMINI_API_KEY", "GOOGLE_MAPS_API_KEY"],
@@ -270,4 +261,4 @@ exports.getSynqSuggestions = onCall(
             throw new HttpsError("internal", error?.message || "Unknown error");
         }
     }
-);
+)

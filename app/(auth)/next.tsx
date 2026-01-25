@@ -132,7 +132,7 @@ export default function SeeWhenFriendsAvailable({
         <Animated.View style={[styles.topCopy, { opacity: topFade }]}>
           <Text style={styles.title}>Connect in the moment.</Text>
           <View style={styles.divider} />
-          <Text style={styles.sub}>Tap when you're free. See who else is. Make it happen.</Text>
+          <Text style={styles.sub}>Tap when you're free. See who else is. {`\n`}Make it happen.</Text>
         </Animated.View>
 
         <Animated.View
