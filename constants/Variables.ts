@@ -1,4 +1,4 @@
-import { ImageSourcePropType, Platform } from "react-native";
+import { Platform } from "react-native";
 export const ACCENT = "#7DFFA6";
 export const DEFAULT_AVATAR = 'https://www.gravatar.com/avatar/?d=mp';
 export const EXPIRATION_HOURS = 12;
@@ -37,12 +37,11 @@ export interface Friend {
   mutualCount?: number;
 }
 
-export const popularNow: { label: string; image: ImageSourcePropType }[] = [
-  { label: "Farmers Market", image: require("../../synq/assets/images/farmers-market.jpeg") },
-  { label: "Museums", image: require("../../synq/assets/images/museum.jpeg") },
-  { label: "Sports Bars", image: require("../../synq/assets/images/sports-bar.jpg") },
-  { label: "Coffee Shops", image: require("../../synq/assets/images/coffee.jpeg") },
-  { label: "Fine Dining", image: require("../../synq/assets/images/fine-dining.jpg") },
+export const popularNow = [
+  { label: "Farmers Market", image: require("./farmers-market.jpeg") },
+  { label: "Museums", image: require("./museum.jpeg") },
+  { label: "Sports Bars", image: require("./sports-bar.jpg") },
+  { label: "Coffee Shops", image: require("./coffee.jpeg") },
 ];
 
 export const OFFSETS = [
