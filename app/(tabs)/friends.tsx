@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   img: { width: 52, height: 52, borderRadius: 26 },
   friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
   mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
-  emptyContainer: { flex: 1, justifyContent: "center", marginTop: 90, paddingHorizontal: 10 },
+  emptyContainer: { flex: 1, justifyContent: "center", marginTop: 30, paddingHorizontal: 10 },
   emptyCard: {
     backgroundColor: SURFACE,
     borderRadius: 22,
