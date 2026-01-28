@@ -236,7 +236,6 @@ export default function LocationDetails() {
           </TouchableOpacity>
         )}
       </View>
-
       <TouchableOpacity
         disabled={!canContinue}
         onPress={saveLocation}
