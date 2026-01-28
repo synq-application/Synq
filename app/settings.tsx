@@ -145,10 +145,10 @@ export default function SettingsScreen() {
 
         <Text style={styles.groupTitle}>More</Text>
         <View style={styles.group}>
-          <SettingItem label="About us" onPress={() => router.push("/about-us")} />
-          <SettingItem label="Privacy policy" onPress={() => router.push("/privacy-policy")} />
-          <SettingItem label="Terms and conditions" onPress={() => router.push("/terms-conditions")} />
-          <SettingItem label="Feedback" onPress={() => router.push("/feedback")} />
+          <SettingItem label="About us" onPress={() => router.push("/profile-settings/about-us")} />
+          <SettingItem label="Privacy policy" onPress={() => router.push("/profile-settings/privacy-policy")} />
+          <SettingItem label="Terms and conditions" onPress={() => router.push("/profile-settings/terms-conditions")} />
+          <SettingItem label="Feedback" onPress={() => router.push("/profile-settings/feedback")} />
           <StaticItem label="Version" value={appVersion} />
         </View>
 
