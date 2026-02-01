@@ -1,4 +1,15 @@
-import { ACCENT, BG, BORDER, fonts, Friend, MUTED, MUTED2, MUTED3, SURFACE, TEXT } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BORDER,
+  fonts,
+  Friend,
+  MUTED,
+  MUTED2,
+  MUTED3,
+  SURFACE,
+  TEXT,
+} from "@/constants/Variables";
 import {
   collection,
   deleteDoc,
@@ -28,6 +39,7 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
+
 const { width } = Dimensions.get("window");
 
 export default function FriendsScreen() {
@@ -39,6 +51,7 @@ export default function FriendsScreen() {
 
   useEffect(() => {
     if (!auth.currentUser) return;
+
     const myId = auth.currentUser.uid;
     const friendsRef = collection(db, "users", myId, "friends");
 
@@ -52,22 +65,33 @@ export default function FriendsScreen() {
 
         const friendsList: Friend[] = await Promise.all(
           snapshot.docs.map(async (fDoc) => {
-            const uSnap = await getDoc(doc(db, "users", fDoc.id));
-            const data = uSnap.data();
+            const friendId = fDoc.id;
+            const uSnap = await getDoc(doc(db, "users", friendId));
+
+            if (!uSnap.exists()) {
+              console.warn("[FriendsScreen] friend user doc missing:", friendId);
+              return {
+                id: friendId,
+                displayName: "Unknown",
+                mutualCount: 0,
+              } as Friend;
+            }
+
+            const data = uSnap.data() as any;
 
             const theirFriendsSnap = await getDocs(
-              collection(db, "users", fDoc.id, "friends")
+              collection(db, "users", friendId, "friends")
             );
             const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
-            const mutuals = theirFriendIds.filter((id) =>
-              myFriendIds.includes(id)
-            );
+            const mutuals = theirFriendIds.filter((id) => myFriendIds.includes(id));
 
-            return {
-              id: fDoc.id,
+            const friendObj = {
+              id: friendId,
               ...(data as any),
               mutualCount: mutuals.length,
             } as Friend;
+
+            return friendObj;
           })
         );
 
@@ -77,14 +101,17 @@ export default function FriendsScreen() {
 
         setFriends(sortedFriends);
       } catch (err) {
-        console.error("Error fetching friend data:", err);
+        console.error("[FriendsScreen] Error fetching friend data:", err);
       } finally {
         setIsFriendsInitialLoading(false);
         setIsFriendsRefreshing(false);
       }
     });
 
-    return () => unsubFriends();
+    return () => {
+      unsubFriends();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const formatLocation = (friend: any) => {
@@ -100,7 +127,6 @@ export default function FriendsScreen() {
     return cityState;
   };
 
-
   const removeFriend = async (friendId: string) => {
     if (!auth.currentUser) return;
     Alert.alert("Remove Friend", "Are you sure you want to remove this friend?", [
@@ -110,15 +136,11 @@ export default function FriendsScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await deleteDoc(
-              doc(db, "users", auth.currentUser!.uid, "friends", friendId)
-            );
-            await deleteDoc(
-              doc(db, "users", friendId, "friends", auth.currentUser!.uid)
-            );
+            await deleteDoc(doc(db, "users", auth.currentUser!.uid, "friends", friendId));
+            await deleteDoc(doc(db, "users", friendId, "friends", auth.currentUser!.uid));
             setSelectedFriend(null);
           } catch (e) {
-            console.error(e);
+            console.error("[FriendsScreen] removeFriend error:", e);
           }
         },
       },
@@ -151,43 +173,56 @@ export default function FriendsScreen() {
     </View>
   );
 
-  const renderFriendRow = ({ item }: { item: Friend }) => (
-    <TouchableOpacity
-      style={styles.friendRow}
-      onPress={() => setSelectedFriend(item)}
-      activeOpacity={0.75}
-    >
-      <View style={styles.avatar}>
-        {item.imageurl ? (
-          <Image source={{ uri: item.imageurl }} style={styles.img} />
-        ) : (
-          <Icon name="person" size={22} color={MUTED3} />
-        )}
-      </View>
+  const renderFriendRow = ({ item }: { item: Friend }) => {
+    return (
+      <TouchableOpacity
+        style={styles.friendRow}
+        onPress={() => {
+          setSelectedFriend(item);
+        }}
+        activeOpacity={0.75}
+      >
+        <View style={styles.avatar}>
+          {(item as any)?.imageurl ? (
+            <Image
+              source={{ uri: (item as any).imageurl }}
+              style={styles.img}
+              onError={(e) =>
+                console.log(
+                  "[FriendsScreen] avatar image FAILED:",
+                  item.id,
+                  (item as any).imageurl,
+                  e.nativeEvent
+                )
+              }
+            />
+          ) : (
+            <Icon name="person" size={22} color={MUTED3} />
+          )}
+        </View>
 
-      <View style={{ flex: 1 }}>
-        <Text style={styles.friendName}>{item.displayName || "User"}</Text>
-        <Text style={styles.mutualText}>
-          {item.mutualCount || 0} mutual{" "}
-          {item.mutualCount === 1 ? "friend" : "friends"}
-        </Text>
-      </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.friendName}>{item.displayName || "User"}</Text>
+          <Text style={styles.mutualText}>
+            {item.mutualCount || 0} mutual {item.mutualCount === 1 ? "friend" : "friends"}
+          </Text>
+        </View>
 
-      <Icon
-        name="chevron-forward"
-        size={18}
-        color="rgba(255,255,255,0.25)"
-      />
-    </TouchableOpacity>
-  );
+        <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.25)" />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Friends</Text>
         <TouchableOpacity
-          onPress={() => setSearchModalVisible(true)}
+          onPress={() => {
+            setSearchModalVisible(true);
+          }}
           activeOpacity={0.7}
           style={styles.headerAction}
         >
@@ -218,18 +253,15 @@ export default function FriendsScreen() {
               <View style={styles.emptyContainer}>
                 <View style={styles.emptyCard}>
                   <Text style={styles.emptyTitle}>No friends yet</Text>
-                  <Text style={styles.emptyText}>
-                    Tap the + to find people and send a request.
-                  </Text>
+                  <Text style={styles.emptyText}>Tap the + to find people and send a request.</Text>
                 </View>
               </View>
             }
           />
+
           {isFriendsRefreshing && (
             <View style={{ paddingVertical: 8, alignItems: "center" }}>
-              <Text style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>
-                Updating…
-              </Text>
+              <Text style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>Updating…</Text>
             </View>
           )}
         </>
@@ -239,13 +271,17 @@ export default function FriendsScreen() {
         visible={!!selectedFriend}
         transparent
         animationType="fade"
-        onRequestClose={() => setSelectedFriend(null)}
+        onRequestClose={() => {
+          setSelectedFriend(null);
+        }}
       >
         <View style={styles.popupOverlay}>
           <View style={styles.popupContent}>
             <TouchableOpacity
               style={styles.closeBtn}
-              onPress={() => setSelectedFriend(null)}
+              onPress={() => {
+                setSelectedFriend(null);
+              }}
               activeOpacity={0.7}
             >
               <Icon name="close" size={22} color="rgba(255,255,255,0.8)" />
@@ -254,15 +290,21 @@ export default function FriendsScreen() {
             <Image
               source={{
                 uri:
-                  selectedFriend?.imageurl ||
+                  (selectedFriend as any)?.imageurl ||
                   "https://www.gravatar.com/avatar/?d=mp",
               }}
               style={styles.largeAvatar}
+              onError={(e) =>
+                console.log(
+                  "[FriendsScreen] modal image FAILED:",
+                  selectedFriend?.id,
+                  (selectedFriend as any)?.imageurl,
+                  e.nativeEvent
+                )
+              }
             />
 
-            <Text style={styles.popupName}>
-              {selectedFriend?.displayName || "User"}
-            </Text>
+            <Text style={styles.popupName}>{selectedFriend?.displayName || "User"}</Text>
 
             {(() => {
               const loc = formatLocation(selectedFriend);
@@ -270,15 +312,12 @@ export default function FriendsScreen() {
 
               return (
                 <Text style={styles.popupLocation}>
-                  <Icon
-                    name="location-outline"
-                    size={14}
-                    color="rgba(255,255,255,0.35)"
-                  />{" "}
+                  <Icon name="location-outline" size={14} color="rgba(255,255,255,0.35)" />{" "}
                   <Text style={styles.popupLocationText}>{loc}</Text>
                 </Text>
               );
             })()}
+
             <View style={styles.interestsContainer}>
               <Text style={styles.sectionLabel}>Interests</Text>
               <ScrollView
@@ -294,9 +333,7 @@ export default function FriendsScreen() {
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.noInterestsText}>
-                    No interests listed
-                  </Text>
+                  <Text style={styles.noInterestsText}>No interests listed</Text>
                 )}
               </ScrollView>
             </View>
@@ -314,7 +351,9 @@ export default function FriendsScreen() {
 
       <SearchModal
         visible={searchModalVisible}
-        onClose={() => setSearchModalVisible(false)}
+        onClose={() => {
+          setSearchModalVisible(false);
+        }}
         currentFriends={friends.map((f) => f.id)}
       />
     </View>
@@ -343,29 +382,32 @@ function SearchModal({
 
   const searchUsers = async (val: string) => {
     setQueryText(val);
+
     if (val.length < 3) {
       setResults([]);
       return;
     }
 
     setIsSearching(true);
+
     try {
       const usersRef = collection(db, "users");
       const snap = await getDocs(usersRef);
+      const mapped = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
 
-      const filtered = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() } as any))
-        .filter(
-          (u) =>
-            u.id !== auth.currentUser?.uid &&
-            !currentFriends.includes(u.id) &&
-            (u.displayName?.toLowerCase().includes(val.toLowerCase()) ||
-              u.email?.toLowerCase().includes(val.toLowerCase()))
+      const filtered = mapped.filter((u) => {
+        const nameMatch = u.displayName?.toLowerCase().includes(val.toLowerCase());
+        const emailMatch = u.email?.toLowerCase().includes(val.toLowerCase());
+
+        return (
+          u.id !== auth.currentUser?.uid &&
+          !currentFriends.includes(u.id) &&
+          (nameMatch || emailMatch)
         );
-
+      });
       setResults(filtered);
     } catch (e) {
-      console.error("Search failed", e);
+      console.error("[SearchModal] Search failed", e);
     } finally {
       setIsSearching(false);
     }
@@ -378,7 +420,7 @@ function SearchModal({
       Keyboard.dismiss();
 
       const meSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
-      const meData = meSnap.exists() ? meSnap.data() : {};
+      const meData = meSnap.exists() ? (meSnap.data() as any) : {};
 
       const requestDocRef = doc(
         db,
@@ -406,7 +448,7 @@ function SearchModal({
       Alert.alert("Sent!", `Invite sent to ${targetUser.displayName}`);
       onClose();
     } catch (e: any) {
-      console.error(e);
+      console.error("[SearchModal] sendInvite error:", e);
       Alert.alert("Error", "Could not send invite.");
     }
   };
@@ -448,7 +490,18 @@ function SearchModal({
                 <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                   <View style={styles.avatar}>
                     {item.imageurl ? (
-                      <Image source={{ uri: item.imageurl }} style={styles.img} />
+                      <Image
+                        source={{ uri: item.imageurl }}
+                        style={styles.img}
+                        onError={(e) =>
+                          console.log(
+                            "[SearchModal] result image FAILED:",
+                            item.id,
+                            item.imageurl,
+                            e.nativeEvent
+                          )
+                        }
+                      />
                     ) : (
                       <Icon name="person" size={22} color={MUTED3} />
                     )}
@@ -459,7 +512,11 @@ function SearchModal({
                   </View>
                 </View>
 
-                <TouchableOpacity onPress={() => sendInvite(item)} style={styles.addBtn} activeOpacity={0.8}>
+                <TouchableOpacity
+                  onPress={() => sendInvite(item)}
+                  style={styles.addBtn}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.addBtnText}>Add</Text>
                 </TouchableOpacity>
               </View>
@@ -526,7 +583,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   popupContent: {
-    width: width * 0.90,
+    width: width * 0.9,
     maxHeight: "86%",
     backgroundColor: "rgba(18,18,18,0.96)",
     borderRadius: 28,
@@ -604,11 +661,6 @@ const styles = StyleSheet.create({
   },
   searchResult: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14 },
   emailDetail: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 2 },
-  addBtn: {
-    backgroundColor: ACCENT,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 14,
-  },
+  addBtn: { backgroundColor: ACCENT, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 14 },
   addBtnText: { color: "#061006", fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 0.2 },
 });
