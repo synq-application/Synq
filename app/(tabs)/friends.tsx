@@ -11,15 +11,15 @@ import {
   TEXT,
 } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
   onSnapshot,
   serverTimestamp,
-  setDoc,
+  setDoc
 } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
@@ -30,13 +30,12 @@ import {
   Image,
   Keyboard,
   Modal,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
@@ -44,9 +43,9 @@ import { auth, db } from "../../src/lib/firebase";
 const { width } = Dimensions.get("window");
 
 export default function FriendsScreen() {
+  const router = useRouter();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
-  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(true);
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
 
@@ -114,39 +113,6 @@ export default function FriendsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const formatLocation = (friend: any) => {
-    if (!friend) return "";
-    const direct = friend.location ?? friend.currentLocation;
-    if (typeof direct === "string") {
-      const cleaned = direct.trim();
-      return cleaned ? cleaned : "";
-    }
-    const city = (friend.city ?? "").toString().trim();
-    const state = (friend.state ?? "").toString().trim();
-    const cityState = [city, state].filter(Boolean).join(", ");
-    return cityState;
-  };
-
-  const removeFriend = async (friendId: string) => {
-    if (!auth.currentUser) return;
-    Alert.alert("Remove friend", "Are you sure you want to remove this friend?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteDoc(doc(db, "users", auth.currentUser!.uid, "friends", friendId));
-            await deleteDoc(doc(db, "users", friendId, "friends", auth.currentUser!.uid));
-            setSelectedFriend(null);
-          } catch (e) {
-            console.error("[FriendsScreen] removeFriend error:", e);
-          }
-        },
-      },
-    ]);
-  };
-
   const renderSkeletonRow = (key: string) => (
     <View key={key} style={styles.friendRow}>
       <View style={[styles.avatar, { backgroundColor: "#151515" }]} />
@@ -177,9 +143,12 @@ export default function FriendsScreen() {
     return (
       <TouchableOpacity
         style={styles.friendRow}
-        onPress={() => {
-          setSelectedFriend(item);
-        }}
+          onPress={() => {
+            router.push({
+              pathname: "/friend-profile",
+              params: { friendId: item.id },
+            });
+          }}
         activeOpacity={0.75}
       >
         <View style={styles.avatar}>
@@ -258,80 +227,6 @@ export default function FriendsScreen() {
           )}
         </>
       )}
-
-      <Modal
-        visible={!!selectedFriend}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setSelectedFriend(null);
-        }}
-      >
-        <View style={styles.popupOverlay}>
-          <View style={styles.popupContent}>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => {
-                setSelectedFriend(null);
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close-circle" size={28} color="#444" />
-            </TouchableOpacity>
-
-            <Image
-              source={{
-                uri:
-                  (selectedFriend as any)?.imageurl ||
-                  "https://www.gravatar.com/avatar/?d=mp",
-              }}
-              style={styles.largeAvatar}
-            />
-
-            <Text style={styles.popupName}>{selectedFriend?.displayName || "User"}</Text>
-
-            {(() => {
-              const loc = formatLocation(selectedFriend);
-              if (!loc) return null;
-
-              return (
-                <Text style={styles.popupLocation}>
-                  <Icon name="location-outline" size={14} color="rgba(255,255,255,0.35)" />{" "}
-                  <Text style={styles.popupLocationText}>{loc}</Text>
-                </Text>
-              );
-            })()}
-
-            <View style={styles.interestsContainer}>
-              <Text style={styles.sectionLabel}>Interests</Text>
-              <ScrollView
-                style={styles.interestsScroll}
-                contentContainerStyle={styles.interestsWrapper}
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled
-              >
-                {selectedFriend?.interests?.length ? (
-                  selectedFriend.interests.map((interest: string, i: number) => (
-                    <View key={i} style={styles.interestPill}>
-                      <Text style={styles.interestText}>{interest}</Text>
-                    </View>
-                  ))
-                ) : (
-                  <Text style={styles.noInterestsText}>No interests listed</Text>
-                )}
-              </ScrollView>
-            </View>
-
-            <TouchableOpacity
-              style={styles.removeBtn}
-              onPress={() => removeFriend(selectedFriend!.id)}
-              activeOpacity={0.75}
-            >
-              <Text style={styles.removeBtnText}>Remove friend</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <SearchModal
         visible={searchModalVisible}

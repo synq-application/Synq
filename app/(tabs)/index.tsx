@@ -39,7 +39,7 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, MUTED, OFFSETS, popularNow } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
-import { SynqStatus, formatTime, getLeadingEmoji } from '../helpers';
+import { formatTime, getLeadingEmoji, SynqStatus } from '../helpers';
 import { openInMaps } from '../map-utils';
 import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
@@ -672,7 +672,7 @@ export default function SynqScreen() {
               </TouchableOpacity>
               <Text style={styles.headerTitle}>Synq is active</Text>
               <TouchableOpacity onPress={() => setIsEditModalVisible(true)} style={styles.headerIconContainer}>
-                <Ionicons name="create-outline" size={28} color={ACCENT} />
+                <Ionicons name="create-outline" size={26} color="white" />
               </TouchableOpacity>
             </View>
 
