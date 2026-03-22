@@ -141,7 +141,7 @@ export default function NotificationsScreen() {
             <Ionicons name="checkmark" size={18} color="black" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleRequest(item, false)} style={styles.denyBtn}>
-            <Ionicons name="close" size={18} color="white" />
+            <Ionicons name="close-circle" size={28} color="#444" />
           </TouchableOpacity>
         </View>
       </View>

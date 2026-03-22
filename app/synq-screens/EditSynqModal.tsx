@@ -38,7 +38,7 @@ export default function EditSynqModal({
                 style={styles.closeBtn}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close" size={22} color="#999" />
+                <Ionicons name="close-circle" size={28} color="#444" />
               </TouchableOpacity>
 
               <Text style={styles.panelTitle}>Edit memo</Text>

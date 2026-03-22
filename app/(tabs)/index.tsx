@@ -828,7 +828,7 @@ export default function SynqScreen() {
                   setShowOptionsList(false);
                 }}
               >
-                <Ionicons name="close-circle" size={30} color="#444" />
+                <Ionicons name="close-circle" size={28} color="#444" />
               </TouchableOpacity>
             </View>
 
@@ -908,7 +908,7 @@ export default function SynqScreen() {
                         <Ionicons name="sparkles" size={16} color={ACCENT} style={{ marginRight: 8 }} />
                         <Text style={styles.aiCardTitleSmall}>Synq Suggestion</Text>
                         <TouchableOpacity style={{ marginLeft: 'auto' }} onPress={() => setShowAICard(false)}>
-                          <Ionicons name="close" size={20} color="#666" />
+                          <Ionicons name="close-circle" size={28} color="#444" />
                         </TouchableOpacity>
                       </View>
                       <Text style={styles.aiCardBodySmall}>{aiResponse}</Text>
@@ -955,7 +955,7 @@ export default function SynqScreen() {
                             <View style={styles.modalHeader}>
                               <Text style={styles.modalTitle}>Explore Ideas</Text>
                               <TouchableOpacity onPress={() => setIsExploreVisible(false)}>
-                                <Ionicons name="close-circle" size={32} color="#444" />
+                                <Ionicons name="close-circle" size={28} color="#444" />
                               </TouchableOpacity>
                             </View>
 
@@ -1030,7 +1030,7 @@ export default function SynqScreen() {
                                 <Text style={[styles.modalTitle, { color: "white", marginLeft: 8 }]}>{currentCategory}</Text>
                               </TouchableOpacity>
                               <TouchableOpacity onPress={() => setIsExploreVisible(false)}>
-                                <Ionicons name="close-circle" size={32} color="#444" />
+                                <Ionicons name="close-circle" size={28} color="#444" />
                               </TouchableOpacity>
                             </View>
 

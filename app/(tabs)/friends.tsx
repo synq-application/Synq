@@ -129,7 +129,7 @@ export default function FriendsScreen() {
 
   const removeFriend = async (friendId: string) => {
     if (!auth.currentUser) return;
-    Alert.alert("Remove Friend", "Are you sure you want to remove this friend?", [
+    Alert.alert("Remove friend", "Are you sure you want to remove this friend?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Remove",
@@ -218,7 +218,7 @@ export default function FriendsScreen() {
           activeOpacity={0.7}
           style={styles.headerAction}
         >
-          <Icon name="add-circle-outline" size={30} color="white" />
+          <Icon name="add-circle-outline" size={30} color={ACCENT} />
         </TouchableOpacity>
       </View>
 
@@ -276,7 +276,7 @@ export default function FriendsScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Icon name="close" size={22} color="rgba(255,255,255,0.8)" />
+              <Ionicons name="close-circle" size={28} color="#444" />
             </TouchableOpacity>
 
             <Image
@@ -327,7 +327,7 @@ export default function FriendsScreen() {
               onPress={() => removeFriend(selectedFriend!.id)}
               activeOpacity={0.75}
             >
-              <Text style={styles.removeBtnText}>Remove Friend</Text>
+              <Text style={styles.removeBtnText}>Remove friend</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -512,7 +512,7 @@ function SearchModal({
         <View style={styles.searchHeader}>
           <Text style={styles.searchTitle}>Add Friends</Text>
           <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="close" size={26} color={TEXT} />
+            <Ionicons name="close-circle" size={28} color="#444" />
           </TouchableOpacity>
         </View>
 

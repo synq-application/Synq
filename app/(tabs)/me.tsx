@@ -1,4 +1,5 @@
 import { ACCENT, fonts } from "@/constants/Variables";
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
@@ -226,7 +227,7 @@ export default function ProfileScreen() {
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Icon name="notifications-outline" size={26} color={ACCENT} />
+          <Icon name="notifications-outline" size={26} color="white" />
           {requestCount > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{requestCount}</Text>
@@ -235,7 +236,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push("/settings")}>
-          <Icon name="settings-outline" size={26} color={ACCENT} />
+          <Icon name="settings-outline" size={26} color="white" />
         </TouchableOpacity>
       </View>
 
@@ -374,7 +375,7 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <View style={styles.rowBetween}>
-          <Text style={styles.sectionTitle}>Monthly Memo</Text>
+          <Text style={styles.sectionTitle}>Monthly memo</Text>
           <TouchableOpacity onPress={openMemoModal}>
             <Icon name="create-outline" size={18} color={ACCENT} />
           </TouchableOpacity>
@@ -467,9 +468,9 @@ export default function ProfileScreen() {
           />
           <View style={styles.interestContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Monthly Memo</Text>
+              <Text style={styles.modalTitle}>Monthly memo</Text>
               <Pressable onPressIn={() => setShowMemoModal(false)} hitSlop={10}>
-                <Icon name="close" size={24} color="white" />
+                <Ionicons name="close-circle" size={28} color="#444" />
               </Pressable>
             </View>
 
@@ -484,7 +485,7 @@ export default function ProfileScreen() {
             />
 
             <Pressable onPressIn={saveMonthlyMemo} style={styles.saveBtn}>
-              <Text style={styles.saveBtnText}>Save Memo</Text>
+              <Text style={styles.saveBtnText}>Save memo</Text>
             </Pressable>
           </View>
         </View>
@@ -496,7 +497,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "black" },
   scrollContent: { paddingBottom: 160 },
-
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -504,7 +504,6 @@ const styles = StyleSheet.create({
     marginTop: 60,
     alignItems: "center",
   },
-
   badge: {
     position: "absolute",
     right: -4,
@@ -573,41 +572,30 @@ const styles = StyleSheet.create({
     borderColor: "black",
     zIndex: 10,
   },
-
   connName: { color: "white", fontSize: 12, marginTop: 10, textAlign: "center", fontFamily: fonts.heavy },
   emptyText: { color: "#333", fontFamily: fonts.medium, fontSize: 14 },
-
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
   interestRect: { backgroundColor: "#111", borderWidth: 1, borderColor: "#222", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, marginBottom: 8 },
   interestText: { color: "white", fontFamily: fonts.heavy, fontSize: 13 },
-
   addRect: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: ACCENT, borderStyle: "dashed", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 4 },
-
   monthlyMemoBox: { backgroundColor: "#111", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#222" },
   monthlyMemoSubtitle: { color: "#555", fontSize: 11, fontFamily: fonts.black, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 },
   monthlyMemoContent: { color: "white", fontSize: 16, fontFamily: fonts.medium, lineHeight: 24 },
-
   signOutBtn: { alignSelf: "center", marginTop: 50, paddingVertical: 14, paddingHorizontal: 60, borderRadius: 25, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
   signOutText: { color: "#666", fontFamily: fonts.heavy, fontSize: 13, letterSpacing: 2, textTransform: "uppercase" },
-
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" },
   qrModalBox: { backgroundColor: "white", padding: 25, borderRadius: 40 },
-
   interestContent: { backgroundColor: "#0a0a0a", width: "100%", height: "85%", marginTop: "auto", borderTopLeftRadius: 40, borderTopRightRadius: 40, padding: 30, alignItems: "center" },
-
   modalHeader: { flexDirection: "row", justifyContent: "space-between", width: "100%", alignItems: "center", marginBottom: 25 },
   modalTitle: { color: "white", fontSize: 26, fontFamily: fonts.black },
-
   searchBarContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#1a1a1a", borderRadius: 18, width: "100%", marginBottom: 20, borderWidth: 1, borderColor: "#333" },
   searchInput: { flex: 1, color: "white", padding: 14, fontFamily: fonts.medium, fontSize: 16 },
-
   interestGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", paddingBottom: 30 },
   chip: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 30, backgroundColor: "#111", borderWidth: 1, borderColor: "#222", margin: 6 },
   chipActive: { backgroundColor: ACCENT, borderColor: ACCENT },
   chipText: { color: "#555", fontFamily: fonts.heavy },
   chipTextActive: { color: "black" },
-
   monthlyMemoInputShort: {
     width: "100%",
     height: 160,
@@ -622,7 +610,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#222",
   },
-
   saveBtn: { backgroundColor: ACCENT, width: "100%", padding: 20, borderRadius: 22, marginBottom: 20, alignItems: "center" },
   saveBtnText: { color: "black", fontFamily: fonts.black, fontSize: 17 },
 });
