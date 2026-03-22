@@ -398,8 +398,8 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <View style={styles.rowBetween}>
           <Text style={styles.sectionTitle}>Monthly memo</Text>
-          <TouchableOpacity onPress={openMemoModal}>
-            <Icon name="create-outline" size={18} color={ACCENT} />
+          <TouchableOpacity onPress={openMemoModal} style={{ marginBottom: 10}}>
+            <Icon name="create-outline" size={22} color="white" />
           </TouchableOpacity>
         </View>
 
