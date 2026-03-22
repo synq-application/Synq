@@ -48,6 +48,7 @@ export default function FriendsScreen() {
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(true);
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -110,69 +111,53 @@ export default function FriendsScreen() {
     return () => {
       unsubFriends();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const filteredFriends = friends.filter((f) =>
+    (f.displayName || "")
+      .toLowerCase()
+      .includes(searchText.toLowerCase())
+  );
 
   const renderSkeletonRow = (key: string) => (
     <View key={key} style={styles.friendRow}>
       <View style={[styles.avatar, { backgroundColor: "#151515" }]} />
       <View style={{ flex: 1 }}>
-        <View
-          style={{
-            height: 14,
-            width: "55%",
-            backgroundColor: "#1f1f1f",
-            borderRadius: 8,
-            marginBottom: 8,
-          }}
-        />
-        <View
-          style={{
-            height: 12,
-            width: "38%",
-            backgroundColor: "#1a1a1a",
-            borderRadius: 8,
-          }}
-        />
+        <View style={{ height: 14, width: "55%", backgroundColor: "#1f1f1f", borderRadius: 8, marginBottom: 8 }} />
+        <View style={{ height: 12, width: "38%", backgroundColor: "#1a1a1a", borderRadius: 8 }} />
       </View>
       <View style={{ height: 12, width: 12 }} />
     </View>
   );
 
-  const renderFriendRow = ({ item }: { item: Friend }) => {
-    return (
-      <TouchableOpacity
-        style={styles.friendRow}
-          onPress={() => {
-            router.push({
-              pathname: "/friend-profile",
-              params: { friendId: item.id },
-            });
-          }}
-        activeOpacity={0.75}
-      >
-        <View style={styles.avatar}>
-          {(item as any)?.imageurl ? (
-            <Image
-              source={{ uri: (item as any).imageurl }}
-              style={styles.img}
-            />
-          ) : (
-            <Icon name="person" size={22} color={MUTED3} />
-          )}
-        </View>
+  const renderFriendRow = ({ item }: { item: Friend }) => (
+    <TouchableOpacity
+      style={styles.friendRow}
+      onPress={() =>
+        router.push({
+          pathname: "/friend-profile",
+          params: { friendId: item.id },
+        })
+      }
+    >
+      <View style={styles.avatar}>
+        {(item as any)?.imageurl ? (
+          <Image source={{ uri: (item as any).imageurl }} style={styles.img} />
+        ) : (
+          <Icon name="person" size={22} color={MUTED3} />
+        )}
+      </View>
 
-        <View style={{ flex: 1 }}>
-          <Text style={styles.friendName}>{item.displayName || "User"}</Text>
-          <Text style={styles.mutualText}>
-            {item.mutualCount || 0} mutual {item.mutualCount === 1 ? "friend" : "friends"}
-          </Text>
-        </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.friendName}>{item.displayName || "User"}</Text>
+        <Text style={styles.mutualText}>
+          {item.mutualCount || 0} mutual {item.mutualCount === 1 ? "friend" : "friends"}
+        </Text>
+      </View>
 
-        <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.25)" />
-      </TouchableOpacity>
-    );
-  };
+      <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.25)" />
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
@@ -180,59 +165,47 @@ export default function FriendsScreen() {
 
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Friends</Text>
-        <TouchableOpacity
-          onPress={() => {
-            setSearchModalVisible(true);
-          }}
-          activeOpacity={0.7}
-          style={styles.headerAction}
-        >
+        <TouchableOpacity onPress={() => setSearchModalVisible(true)}>
           <Icon name="add-circle-outline" size={30} color={ACCENT} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.headerDivider} />
 
+      {/* 🔥 ADDED SEARCH BAR */}
+      <View style={styles.searchBarWrap}>
+        <Ionicons name="search-outline" size={18} color={MUTED2} />
+        <TextInput
+          placeholder="Search friends..."
+          placeholderTextColor="rgba(255,255,255,0.3)"
+          style={styles.searchBarInput}
+          value={searchText}
+          onChangeText={setSearchText}
+        />
+        {searchText.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchText("")}>
+            <Ionicons name="close-circle" size={18} color={MUTED2} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       {isFriendsInitialLoading ? (
         <View style={{ paddingBottom: 20 }}>
-          {["1", "2", "3", "4", "5"].map((k) => (
-            <React.Fragment key={k}>
-              {renderSkeletonRow(k)}
-              <View style={styles.separator} />
-            </React.Fragment>
-          ))}
+          {["1", "2", "3"].map((k) => renderSkeletonRow(k))}
         </View>
       ) : (
         <>
           <FlatList
-            data={friends}
+            data={filteredFriends} // 🔥 changed
             keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingBottom: 20 }}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
             renderItem={renderFriendRow}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyTitle}>No friends yet</Text>
-                  <Text style={styles.emptyText}>Tap the + to find people and send a request.</Text>
-                </View>
-              </View>
-            }
           />
-
-          {isFriendsRefreshing && (
-            <View style={{ paddingVertical: 8, alignItems: "center" }}>
-              <Text style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>Updating…</Text>
-            </View>
-          )}
         </>
       )}
 
       <SearchModal
         visible={searchModalVisible}
-        onClose={() => {
-          setSearchModalVisible(false);
-        }}
+        onClose={() => setSearchModalVisible(false)}
         currentFriends={friends.map((f) => f.id)}
       />
     </View>
@@ -425,7 +398,6 @@ function SearchModal({
         {!queryText && suggested.length > 0 && (
           <View style={{ marginBottom: 10, marginTop: 10 }}>
             <Text style={styles.sectionLabel}>Suggested</Text>
-
             <FlatList
               data={suggested}
               keyExtractor={(item) => item.id}
@@ -633,4 +605,23 @@ const styles = StyleSheet.create({
   emailDetail: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 2 },
   addBtn: { backgroundColor: ACCENT, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 14 },
   addBtnText: { color: "#061006", fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 0.2 },
+  searchBarWrap: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: SURFACE,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: BORDER,
+  paddingHorizontal: 12,
+  paddingVertical: 12,
+  marginTop: 14,
+  marginBottom: 6,
+},
+searchBarInput: {
+  flex: 1,
+  color: TEXT,
+  marginLeft: 8,
+  fontFamily: fonts.medium,
+  fontSize: 15,
+},
 });
