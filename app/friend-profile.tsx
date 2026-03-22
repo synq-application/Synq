@@ -9,7 +9,12 @@ import {
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+} from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -30,8 +35,10 @@ export default function FriendProfile() {
 
   const [friend, setFriend] = useState<any>(null);
   const [mutualFriends, setMutualFriends] = useState<any[]>([]);
+  const [lastSynq, setLastSynq] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /* ---------- FETCH FRIEND ---------- */
   useEffect(() => {
     const fetchFriend = async () => {
       try {
@@ -45,11 +52,13 @@ export default function FriendProfile() {
     fetchFriend();
   }, []);
 
+  /* ---------- FETCH MUTUAL FRIENDS ---------- */
   useEffect(() => {
-    if (!friendId || !auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!friendId || !user) return;
 
     const fetchMutuals = async () => {
-      const myId = auth.currentUser!.uid;
+      const myId = user.uid;
 
       const myFriendsSnap = await getDocs(
         collection(db, "users", myId, "friends")
@@ -78,6 +87,46 @@ export default function FriendProfile() {
     fetchMutuals();
   }, [friendId]);
 
+  /* ---------- FETCH LAST SYNQ ---------- */
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user || !friendId) return;
+
+    const fetchLastSynq = async () => {
+      const ref = doc(
+        db,
+        "users",
+        user.uid,
+        "friends",
+        friendId as string
+      );
+
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.lastSynqAt?.toDate) {
+          setLastSynq(data.lastSynqAt.toDate());
+        }
+      }
+    };
+
+    fetchLastSynq();
+  }, [friendId]);
+
+  /* ---------- FORMAT TIME ---------- */
+  const formatLastSynq = (date: Date) => {
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diff < 60) return "Just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+
+    return date.toLocaleDateString();
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -98,12 +147,15 @@ export default function FriendProfile() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+
+        {/* Back */}
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Icon name="chevron-back" size={22} color={TEXT} />
           </TouchableOpacity>
         </View>
 
+        {/* Profile */}
         <View style={styles.header}>
           <Image
             source={{
@@ -125,14 +177,14 @@ export default function FriendProfile() {
             </View>
           )}
 
-          {mutualFriends.length > 0 && (
-            <Text style={styles.mutualCount}>
-              {mutualFriends.length} mutual friend
-              {mutualFriends.length !== 1 && "s"}
+          {lastSynq && (
+            <Text style={styles.lastSynqText}>
+              Last synq: {formatLastSynq(lastSynq)}
             </Text>
           )}
         </View>
 
+        {/* 🔥 Mutual Friends (no count text now) */}
         {mutualFriends.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mutual Friends</Text>
@@ -145,26 +197,22 @@ export default function FriendProfile() {
               {mutualFriends.map((item) => {
                 const scale = new Animated.Value(1);
 
-                const handlePressIn = () => {
-                  Animated.spring(scale, {
-                    toValue: 0.92,
-                    useNativeDriver: true,
-                  }).start();
-                };
-
-                const handlePressOut = () => {
-                  Animated.spring(scale, {
-                    toValue: 1,
-                    useNativeDriver: true,
-                  }).start();
-                };
-
                 return (
                   <View key={item.id} style={styles.connItem}>
                     <TouchableOpacity
                       activeOpacity={0.9}
-                      onPressIn={handlePressIn}
-                      onPressOut={handlePressOut}
+                      onPressIn={() =>
+                        Animated.spring(scale, {
+                          toValue: 0.92,
+                          useNativeDriver: true,
+                        }).start()
+                      }
+                      onPressOut={() =>
+                        Animated.spring(scale, {
+                          toValue: 1,
+                          useNativeDriver: true,
+                        }).start()
+                      }
                       onPress={() =>
                         router.push({
                           pathname: "/friend-profile",
@@ -205,8 +253,10 @@ export default function FriendProfile() {
           </View>
         )}
 
+        {/* Interests */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Interests</Text>
+
           <View style={styles.interestsWrapper}>
             {friend.interests?.length ? (
               friend.interests.map((interest: string, i: number) => (
@@ -275,11 +325,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.book,
   },
 
-  mutualCount: {
-    color: ACCENT,
+  lastSynqText: {
+    color: "rgba(255,255,255,0.4)",
     marginTop: 6,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: 13,
   },
 
   section: { marginTop: 30 },
@@ -305,10 +355,10 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    justifyContent: "center",
-    alignItems: "center",
     borderWidth: 2,
     borderColor: ACCENT,
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   connImg: {

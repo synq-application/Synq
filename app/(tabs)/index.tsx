@@ -512,9 +512,17 @@ export default function SynqScreen() {
       const otherParticipants = currentChat.participants.filter((pId: string) => pId !== myId);
       otherParticipants.forEach(async (pId: string) => {
         const mySideFriendDoc = doc(db, 'users', myId, 'friends', pId);
-        await updateDoc(mySideFriendDoc, { synqCount: increment(1) }).catch(() => { });
         const theirSideFriendDoc = doc(db, 'users', pId, 'friends', myId);
-        await updateDoc(theirSideFriendDoc, { synqCount: increment(1) }).catch(() => { });
+
+        await updateDoc(mySideFriendDoc, {
+          synqCount: increment(1),
+          lastSynqAt: serverTimestamp(),
+        }).catch(() => { });
+
+        await updateDoc(theirSideFriendDoc, {
+          synqCount: increment(1),
+          lastSynqAt: serverTimestamp(),
+        }).catch(() => { });
       });
     } catch (e) {
       console.error('Failed to send message', e);
