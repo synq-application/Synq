@@ -28,6 +28,7 @@ import { auth, db, storage } from "../../src/lib/firebase";
 const allActivities = Object.values(presetActivities).flat();
 
 type Connection = {
+  id: string;
   name: string;
   imageUrl: string | null;
   synqCount: number;
@@ -86,6 +87,7 @@ export default function ProfileScreen() {
             const friendSnap = await getDoc(doc(db, "users", friendDoc.id));
             if (friendSnap.exists()) {
               return {
+                id: friendDoc.id,
                 name: friendSnap.data().displayName || "User",
                 imageUrl: friendSnap.data().imageurl || null,
                 synqCount: friendDoc.data().synqCount || 0,
@@ -325,22 +327,40 @@ export default function ProfileScreen() {
             ))
           ) : connections.length > 0 ? (
             connections.slice(0, 3).map((item, i) => (
-              <View key={i} style={styles.connItem}>
-                <View style={[styles.imageCircle, { borderColor: ACCENT, borderWidth: 2 }]}>
-                  {item.imageUrl ? (
-                    <Image source={{ uri: item.imageUrl }} style={styles.connImg} />
-                  ) : (
-                    <View style={[styles.connImg, styles.connDefaultAvatar]}>
-                      <Icon name="person" size={24} color="rgba(255,255,255,0.2)" />
-                    </View>
-                  )}
-
-                  {i === 0 && (
-                    <View style={styles.crown}>
-                      <Icon name="star" size={10} color="black" />
-                    </View>
-                  )}
-                </View>
+              <View key={item.id || i} style={styles.connItem}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/friend-profile",
+                      params: { friendId: item.id },
+                    })
+                  }
+                >
+                  <View
+                    style={[
+                      styles.imageCircle,
+                      { borderColor: ACCENT, borderWidth: 2 },
+                    ]}
+                  >
+                    {item.imageUrl ? (
+                      <Image source={{ uri: item.imageUrl }} style={styles.connImg} />
+                    ) : (
+                      <View style={[styles.connImg, styles.connDefaultAvatar]}>
+                        <Icon
+                          name="person"
+                          size={24}
+                          color="rgba(255,255,255,0.2)"
+                        />
+                      </View>
+                    )}
+                    {i === 0 && (
+                      <View style={styles.crown}>
+                        <Icon name="star" size={10} color="black" />
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
 
                 <Text style={styles.connName} numberOfLines={1}>
                   {item.name.split(" ")[0]}
@@ -348,7 +368,9 @@ export default function ProfileScreen() {
               </View>
             ))
           ) : (
-            <Text style={styles.emptyText}>Start messaging to see your top synqs.</Text>
+            <Text style={styles.emptyText}>
+              Start messaging to see your top synqs.
+            </Text>
           )}
         </View>
       </View>
