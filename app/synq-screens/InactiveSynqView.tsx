@@ -1,10 +1,10 @@
 import React from "react";
 import {
-    Image,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Image,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type Props = {
@@ -22,12 +22,12 @@ export default function InactiveSynqView({
 }: Props) {
   return (
     <View style={styles.inactiveCenter}>
-      <Text style={styles.mainTitle}>Ready to activate Synq?</Text>
+      <Text style={styles.mainTitle}>Tap when you're free</Text>
       <TextInput
         style={styles.memoInput}
         value={memo}
         onChangeText={setMemo}
-        placeholder="Optional memo: Happy Hour anyone?"
+        placeholder="Optional memo: Let's grab a coffee!"
         placeholderTextColor="#444"
         blurOnSubmit
       />
@@ -41,9 +41,6 @@ export default function InactiveSynqView({
           style={styles.gifLarge}
           resizeMode="contain"
         />
-        <Text style={styles.tapToActivate}>
-          Tap when you're free to meet up
-        </Text>
       </TouchableOpacity>
     </View>
   );

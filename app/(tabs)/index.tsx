@@ -1027,7 +1027,7 @@ export default function SynqScreen() {
                             <View style={styles.modalHeader}>
                               <TouchableOpacity onPress={() => setShowOptionsList(false)} style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Ionicons name="chevron-back" size={24} color={ACCENT} />
-                                <Text style={[styles.modalTitle, { color: "white", marginLeft: 8 }]}>{currentCategory} Spots</Text>
+                                <Text style={[styles.modalTitle, { color: "white", marginLeft: 8 }]}>{currentCategory}</Text>
                               </TouchableOpacity>
                               <TouchableOpacity onPress={() => setIsExploreVisible(false)}>
                                 <Ionicons name="close-circle" size={32} color="#444" />
@@ -1144,7 +1144,7 @@ const styles = StyleSheet.create({
   deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: 'Avenir-Medium', opacity: 0.9 },
   activatingContainer: { flex: 1, backgroundColor: 'black', alignItems: 'center', justifyContent: 'center' },
   unifiedTitle: { color: 'white', fontSize: 28, fontFamily: 'Avenir', marginBottom: 50, textAlign: 'center' },
-  gifLarge: { width: 250, height: 250 },
+  gifLarge: { width: 350, height: 350, marginTop: 50 },
   inactiveCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
   mainTitle: { color: 'white', fontSize: 32, textAlign: 'center', fontFamily: 'Avenir' },
   memoInput: {
@@ -1155,13 +1155,12 @@ const styles = StyleSheet.create({
     width: '100%',
     textAlign: 'center',
     marginVertical: 40,
-    paddingBottom: 10,
-    fontStyle: 'italic'
+    paddingBottom: 10
   },
   pulseBox: { width: 250, height: 300, justifyContent: 'center', alignItems: 'center' },
   tapToActivate: {
-    color: ACCENT,
-    fontSize: 22,
+    color: 'gray',
+    fontSize: 19,
     fontFamily: 'Avenir-Medium',
     marginTop: -10,
     opacity: 0.8,
@@ -1251,11 +1250,11 @@ const styles = StyleSheet.create({
   aiCardBodySmall: { color: 'white', fontSize: 15, fontFamily: 'Avenir', lineHeight: 22, marginBottom: 15 },
   aiShareBtnSmall: { backgroundColor: ACCENT, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
   aiShareBtnText: { color: 'black', fontSize: 14, fontFamily: 'Avenir-Heavy' },
-  editPanel: { width: '100%', backgroundColor: '#161616', borderRadius: 32, padding: 32, alignItems: 'center' },
-  panelTitle: { color: 'white', fontSize: 22, marginBottom: 24, fontFamily: 'Avenir-Black' },
-  panelInput: { width: '100%', backgroundColor: "black", color: 'white', padding: 18, borderRadius: 16, marginBottom: 20, textAlign: 'center' },
+  editPanel: { width: '100%', backgroundColor: '#161616', borderRadius: 32, padding: 32, alignItems: 'center', height: 300 },
+  panelTitle: { color: 'white', fontSize: 22, marginBottom: 24, fontFamily: 'Avenir-Medium' },
+  panelInput: { width: '100%', backgroundColor: "black", color: 'white', padding: 18, borderRadius: 16, marginBottom: 20, textAlign: 'center', height: 100 },
   saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 12 },
-  saveBtnText: { color: 'black', fontSize: 16, fontFamily: 'Avenir-Black' },
+  saveBtnText: { color: 'black', fontSize: 16, fontFamily: 'Avenir-Medium' },
   endSynqBtn: { width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FF453A' },
   endSynqBtnText: { color: '#FF453A', fontSize: 16 },
   centeredIdeaContainer: {

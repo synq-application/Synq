@@ -10,6 +10,7 @@ import {
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
+import { Ionicons } from "@expo/vector-icons";
 import {
   collection,
   deleteDoc,
@@ -69,7 +70,6 @@ export default function FriendsScreen() {
             const uSnap = await getDoc(doc(db, "users", friendId));
 
             if (!uSnap.exists()) {
-              console.warn("[FriendsScreen] friend user doc missing:", friendId);
               return {
                 id: friendId,
                 displayName: "Unknown",
@@ -187,14 +187,6 @@ export default function FriendsScreen() {
             <Image
               source={{ uri: (item as any).imageurl }}
               style={styles.img}
-              onError={(e) =>
-                console.log(
-                  "[FriendsScreen] avatar image FAILED:",
-                  item.id,
-                  (item as any).imageurl,
-                  e.nativeEvent
-                )
-              }
             />
           ) : (
             <Icon name="person" size={22} color={MUTED3} />
@@ -226,7 +218,7 @@ export default function FriendsScreen() {
           activeOpacity={0.7}
           style={styles.headerAction}
         >
-          <Icon name="add-circle-outline" size={30} color={ACCENT} />
+          <Icon name="add-circle-outline" size={30} color="white" />
         </TouchableOpacity>
       </View>
 
@@ -294,14 +286,6 @@ export default function FriendsScreen() {
                   "https://www.gravatar.com/avatar/?d=mp",
               }}
               style={styles.largeAvatar}
-              onError={(e) =>
-                console.log(
-                  "[FriendsScreen] modal image FAILED:",
-                  selectedFriend?.id,
-                  (selectedFriend as any)?.imageurl,
-                  e.nativeEvent
-                )
-              }
             />
 
             <Text style={styles.popupName}>{selectedFriend?.displayName || "User"}</Text>
@@ -359,7 +343,6 @@ export default function FriendsScreen() {
     </View>
   );
 }
-
 function SearchModal({
   visible,
   onClose,
@@ -371,6 +354,7 @@ function SearchModal({
 }) {
   const [queryText, setQueryText] = useState("");
   const [results, setResults] = useState<any[]>([]);
+  const [suggested, setSuggested] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
@@ -378,6 +362,60 @@ function SearchModal({
     setQueryText("");
     setResults([]);
     setIsSearching(false);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !auth.currentUser) return;
+
+    const fetchSuggested = async () => {
+      try {
+        const myId = auth.currentUser!.uid;
+
+        const myFriendsSnap = await getDocs(
+          collection(db, "users", myId, "friends")
+        );
+        const myFriendIds = myFriendsSnap.docs.map((d) => d.id);
+
+        const usersSnap = await getDocs(collection(db, "users"));
+        const users = usersSnap.docs.map(
+          (d) => ({ id: d.id, ...d.data() } as any)
+        );
+
+        const suggestions: any[] = [];
+
+        for (const user of users) {
+          if (
+            user.id === myId ||
+            currentFriends.includes(user.id)
+          ) continue;
+
+          const theirFriendsSnap = await getDocs(
+            collection(db, "users", user.id, "friends")
+          );
+
+          const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
+
+          const mutuals = theirFriendIds.filter((id) =>
+            myFriendIds.includes(id)
+          );
+
+          if (mutuals.length > 0) {
+            suggestions.push({
+              ...user,
+              mutualCount: mutuals.length,
+            });
+          }
+        }
+
+        suggestions.sort((a, b) => b.mutualCount - a.mutualCount);
+
+        setSuggested(suggestions.slice(0, 8));
+      } catch (e) {
+        console.error("[Suggested] error:", e);
+      }
+    };
+
+    fetchSuggested();
   }, [visible]);
 
   const searchUsers = async (val: string) => {
@@ -393,11 +431,17 @@ function SearchModal({
     try {
       const usersRef = collection(db, "users");
       const snap = await getDocs(usersRef);
-      const mapped = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
+      const mapped = snap.docs.map(
+        (d) => ({ id: d.id, ...d.data() } as any)
+      );
 
       const filtered = mapped.filter((u) => {
-        const nameMatch = u.displayName?.toLowerCase().includes(val.toLowerCase());
-        const emailMatch = u.email?.toLowerCase().includes(val.toLowerCase());
+        const nameMatch = u.displayName
+          ?.toLowerCase()
+          .includes(val.toLowerCase());
+        const emailMatch = u.email
+          ?.toLowerCase()
+          .includes(val.toLowerCase());
 
         return (
           u.id !== auth.currentUser?.uid &&
@@ -405,6 +449,7 @@ function SearchModal({
           (nameMatch || emailMatch)
         );
       });
+
       setResults(filtered);
     } catch (e) {
       console.error("[SearchModal] Search failed", e);
@@ -419,8 +464,12 @@ function SearchModal({
     try {
       Keyboard.dismiss();
 
-      const meSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
-      const meData = meSnap.exists() ? (meSnap.data() as any) : {};
+      const meSnap = await getDoc(
+        doc(db, "users", auth.currentUser.uid)
+      );
+      const meData = meSnap.exists()
+        ? (meSnap.data() as any)
+        : {};
 
       const requestDocRef = doc(
         db,
@@ -430,7 +479,10 @@ function SearchModal({
         auth.currentUser.uid
       );
 
-      const senderName = meData?.displayName || auth.currentUser.displayName || "Someone";
+      const senderName =
+        meData?.displayName ||
+        auth.currentUser.displayName ||
+        "Someone";
       const senderImageUrl = meData?.imageurl || null;
 
       await setDoc(requestDocRef, {
@@ -448,7 +500,6 @@ function SearchModal({
       Alert.alert("Sent!", `Invite sent to ${targetUser.displayName}`);
       onClose();
     } catch (e: any) {
-      console.error("[SearchModal] sendInvite error:", e);
       Alert.alert("Error", "Could not send invite.");
     }
   };
@@ -459,9 +510,9 @@ function SearchModal({
         <StatusBar barStyle="light-content" />
 
         <View style={styles.searchHeader}>
-          <Text style={styles.searchTitle}>Add friends</Text>
+          <Text style={styles.searchTitle}>Add Friends</Text>
           <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Ionicons name="close" size={26} color={TEXT} />
           </TouchableOpacity>
         </View>
 
@@ -475,6 +526,51 @@ function SearchModal({
             autoCapitalize="none"
           />
         </View>
+
+        {!queryText && suggested.length > 0 && (
+          <View style={{ marginBottom: 10, marginTop: 10 }}>
+            <Text style={styles.sectionLabel}>Suggested</Text>
+
+            <FlatList
+              data={suggested}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={true}
+              showsVerticalScrollIndicator={false}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              renderItem={({ item }) => (
+                <View style={styles.searchResult}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                    <View style={styles.avatar}>
+                      {item.imageurl ? (
+                        <Image source={{ uri: item.imageurl }} style={styles.img} />
+                      ) : (
+                        <Icon name="person" size={22} color={MUTED3} />
+                      )}
+                    </View>
+
+                    <View style={{ paddingRight: 12 }}>
+                      <Text style={styles.friendName}>
+                        {item.displayName || "User"}
+                      </Text>
+                      <Text style={styles.mutualText}>
+                        {item.mutualCount} mutual{" "}
+                        {item.mutualCount === 1 ? "friend" : "friends"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => sendInvite(item)}
+                    style={styles.addBtn}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.addBtnText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+          </View>
+        )}
 
         {isSearching ? (
           <ActivityIndicator color={ACCENT} style={{ marginTop: 20 }} />
@@ -490,24 +586,15 @@ function SearchModal({
                 <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                   <View style={styles.avatar}>
                     {item.imageurl ? (
-                      <Image
-                        source={{ uri: item.imageurl }}
-                        style={styles.img}
-                        onError={(e) =>
-                          console.log(
-                            "[SearchModal] result image FAILED:",
-                            item.id,
-                            item.imageurl,
-                            e.nativeEvent
-                          )
-                        }
-                      />
+                      <Image source={{ uri: item.imageurl }} style={styles.img} />
                     ) : (
                       <Icon name="person" size={22} color={MUTED3} />
                     )}
                   </View>
                   <View style={{ paddingRight: 12 }}>
-                    <Text style={styles.friendName}>{item.displayName || "User"}</Text>
+                    <Text style={styles.friendName}>
+                      {item.displayName || "User"}
+                    </Text>
                     <Text style={styles.emailDetail}>{item.email}</Text>
                   </View>
                 </View>
@@ -515,28 +602,17 @@ function SearchModal({
                 <TouchableOpacity
                   onPress={() => sendInvite(item)}
                   style={styles.addBtn}
-                  activeOpacity={0.8}
                 >
                   <Text style={styles.addBtnText}>Add</Text>
                 </TouchableOpacity>
               </View>
             )}
-            ListEmptyComponent={
-              queryText.length >= 3 ? (
-                <View style={{ paddingTop: 24 }}>
-                  <Text style={{ color: MUTED2, textAlign: "center", fontFamily: fonts.book }}>
-                    No results found.
-                  </Text>
-                </View>
-              ) : null
-            }
           />
         )}
       </View>
     </Modal>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
   header: {
@@ -608,9 +684,8 @@ const styles = StyleSheet.create({
   interestsContainer: { width: "100%", marginTop: 10, marginBottom: 10 },
   sectionLabel: {
     color: MUTED2,
-    fontSize: 11,
+    fontSize: 16,
     fontFamily: fonts.heavy,
-    textTransform: "uppercase",
     marginBottom: 10,
     letterSpacing: 0.9,
   },
@@ -640,10 +715,10 @@ const styles = StyleSheet.create({
   removeBtnText: { color: "#ff453a", fontFamily: fonts.heavy, fontSize: 14 },
   modalBody: { flex: 1, backgroundColor: BG, padding: 20 },
   searchHeader: {
-    marginTop: 44,
+    marginTop: 20,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-end",
+    alignItems: "center",
   },
   searchTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   cancelText: { color: ACCENT, fontFamily: fonts.book, fontSize: 16 },

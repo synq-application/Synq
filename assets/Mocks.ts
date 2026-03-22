@@ -1,6 +1,5 @@
 
 export const presetActivities = {
-  // Original & Basics
   walking: { id: 289, name: "🚶 Walking" },
   concerts: { id: 158, name: "🎸 Concerts" },
   hiking: { id: 28, name: "🥾 Hiking" },
@@ -10,27 +9,19 @@ export const presetActivities = {
   cooking: { id: 66, name: "👨‍🍳 Cooking" },
   shopping: { id: 67, name: "🛍️ Shopping" },
   football: { id: 69, name: "🏈 Football" },
-
-  // Nightlife & Social
   nightlife: { id: 301, name: "🍸 Cocktails & Bars" },
   dancing: { id: 302, name: "💃 Dancing" },
   karaoke: { id: 303, name: "🎤 Karaoke" },
   wine: { id: 304, name: "🍷 Wine Tasting" },
-
-  // Sports & Wellness
   gym: { id: 305, name: "🏋️ Weightlifting" },
   running: { id: 306, name: "🏃 Running" },
   pickleball: { id: 307, name: "🏓 Pickleball" },
   tennis: { id: 308, name: "🎾 Tennis" },
-
-  // Creative & Gaming
   gaming: { id: 310, name: "🎮 Video Games" },
-  boardgames: { id: 311, name: "🎲 Board Games" },
+  boardgames: { id: 311, name: "🎲 Board games" },
   photography: { id: 312, name: "📸 Photography" },
   museums: { id: 313, name: "🎨 Art & Museums" },
   movies: { id: 314, name: "🍿 Movies" },
-
-  // Niche/Low Stakes
   thrifting: { id: 315, name: "🧥 Thrifting" },
   reading: { id: 316, name: "📚 Reading" },
   dogs: { id: 317, name: "🐕 Dog Park" },

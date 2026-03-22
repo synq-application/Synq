@@ -41,7 +41,7 @@ export default function EditSynqModal({
                 <Ionicons name="close" size={22} color="#999" />
               </TouchableOpacity>
 
-              <Text style={styles.panelTitle}>Edit your Synq</Text>
+              <Text style={styles.panelTitle}>Edit memo</Text>
 
               <TextInput
                 style={styles.panelInput}
@@ -50,7 +50,7 @@ export default function EditSynqModal({
               />
 
               <TouchableOpacity style={styles.saveBtn} onPress={onSaveMemo}>
-                <Text style={styles.saveBtnText}>Update Memo</Text>
+                <Text style={styles.saveBtnText}>Update</Text>
               </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>
