@@ -7,12 +7,13 @@ import {
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
-import { db } from "@/src/lib/firebase";
+import { auth, db } from "@/src/lib/firebase";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Image,
   ScrollView,
   StyleSheet,
@@ -28,17 +29,14 @@ export default function FriendProfile() {
   const router = useRouter();
 
   const [friend, setFriend] = useState<any>(null);
+  const [mutualFriends, setMutualFriends] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchFriend = async () => {
       try {
         const snap = await getDoc(doc(db, "users", friendId as string));
-        if (snap.exists()) {
-          setFriend(snap.data());
-        }
-      } catch (e) {
-        console.error("[FriendProfile]", e);
+        if (snap.exists()) setFriend(snap.data());
       } finally {
         setLoading(false);
       }
@@ -46,6 +44,39 @@ export default function FriendProfile() {
 
     fetchFriend();
   }, []);
+
+  useEffect(() => {
+    if (!friendId || !auth.currentUser) return;
+
+    const fetchMutuals = async () => {
+      const myId = auth.currentUser!.uid;
+
+      const myFriendsSnap = await getDocs(
+        collection(db, "users", myId, "friends")
+      );
+      const myFriendIds = myFriendsSnap.docs.map((d) => d.id);
+
+      const theirFriendsSnap = await getDocs(
+        collection(db, "users", friendId as string, "friends")
+      );
+      const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
+
+      const mutualIds = theirFriendIds.filter((id) =>
+        myFriendIds.includes(id)
+      );
+
+      const mutualData = await Promise.all(
+        mutualIds.map(async (id) => {
+          const snap = await getDoc(doc(db, "users", id));
+          return snap.exists() ? { id, ...snap.data() } : null;
+        })
+      );
+
+      setMutualFriends(mutualData.filter(Boolean));
+    };
+
+    fetchMutuals();
+  }, [friendId]);
 
   if (loading) {
     return (
@@ -66,16 +97,9 @@ export default function FriendProfile() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Icon name="chevron-back" size={22} color={TEXT} />
           </TouchableOpacity>
         </View>
@@ -94,17 +118,95 @@ export default function FriendProfile() {
             {friend.displayName || "User"}
           </Text>
 
-          {locationText ? (
+          {locationText && (
             <View style={styles.locationRow}>
               <Icon name="location-outline" size={14} color={MUTED2} />
               <Text style={styles.locationText}>{locationText}</Text>
             </View>
-          ) : null}
+          )}
+
+          {mutualFriends.length > 0 && (
+            <Text style={styles.mutualCount}>
+              {mutualFriends.length} mutual friend
+              {mutualFriends.length !== 1 && "s"}
+            </Text>
+          )}
         </View>
 
-        <View style={styles.divider} />
+        {mutualFriends.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Mutual Friends</Text>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.synqsContainer}
+            >
+              {mutualFriends.map((item) => {
+                const scale = new Animated.Value(1);
+
+                const handlePressIn = () => {
+                  Animated.spring(scale, {
+                    toValue: 0.92,
+                    useNativeDriver: true,
+                  }).start();
+                };
+
+                const handlePressOut = () => {
+                  Animated.spring(scale, {
+                    toValue: 1,
+                    useNativeDriver: true,
+                  }).start();
+                };
+
+                return (
+                  <View key={item.id} style={styles.connItem}>
+                    <TouchableOpacity
+                      activeOpacity={0.9}
+                      onPressIn={handlePressIn}
+                      onPressOut={handlePressOut}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/friend-profile",
+                          params: { friendId: item.id },
+                        })
+                      }
+                    >
+                      <Animated.View
+                        style={[
+                          styles.imageCircle,
+                          { transform: [{ scale }] },
+                        ]}
+                      >
+                        {item.imageurl ? (
+                          <Image
+                            source={{ uri: item.imageurl }}
+                            style={styles.connImg}
+                          />
+                        ) : (
+                          <View style={styles.connDefaultAvatar}>
+                            <Icon
+                              name="person"
+                              size={22}
+                              color="rgba(255,255,255,0.2)"
+                            />
+                          </View>
+                        )}
+                      </Animated.View>
+                    </TouchableOpacity>
+
+                    <Text style={styles.connName} numberOfLines={1}>
+                      {item.displayName?.split(" ")[0] || "User"}
+                    </Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>INTERESTS</Text>
+          <Text style={styles.sectionTitle}>Interests</Text>
           <View style={styles.interestsWrapper}>
             {friend.interests?.length ? (
               friend.interests.map((interest: string, i: number) => (
@@ -119,30 +221,20 @@ export default function FriendProfile() {
             )}
           </View>
         </View>
-        <View style={{ height: 40 }} />
+
+        <View style={{ height: 50 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: BG,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  topBar: {
-    marginTop: 6,
-    marginBottom: 10,
-  },
+  safeArea: { flex: 1, backgroundColor: BG },
+  container: { flex: 1, paddingHorizontal: 20 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+
+  topBar: { marginTop: 6, marginBottom: 10 },
+
   backBtn: {
     width: 38,
     height: 38,
@@ -153,10 +245,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    alignItems: "center",
-    marginTop: 10,
-  },
+
+  header: { alignItems: "center", marginTop: 10 },
+
   avatar: {
     width: 120,
     height: 120,
@@ -165,43 +256,89 @@ const styles = StyleSheet.create({
     borderColor: ACCENT,
     marginBottom: 16,
   },
+
   name: {
     color: TEXT,
     fontSize: 26,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
   },
+
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 6,
   },
+
   locationText: {
     color: MUTED2,
-    fontSize: 14,
     marginLeft: 4,
     fontFamily: fonts.book,
   },
-  divider: {
-    height: 1,
-    backgroundColor: BORDER,
-    marginTop: 24,
-    marginBottom: 20,
+
+  mutualCount: {
+    color: ACCENT,
+    marginTop: 6,
+    fontFamily: fonts.medium,
+    fontSize: 14,
   },
-  section: {
-    marginBottom: 30,
-  },
+
+  section: { marginTop: 30 },
+
   sectionTitle: {
-    color: MUTED2,
-    fontSize: 11,
+    color: TEXT,
+    fontSize: 18,
     fontFamily: fonts.heavy,
-    letterSpacing: 1.2,
-    marginBottom: 14,
+    marginBottom: 15,
   },
+
+  synqsContainer: {
+    flexDirection: "row",
+    gap: 20,
+  },
+
+  connItem: {
+    alignItems: "center",
+    width: 80,
+  },
+
+  imageCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: ACCENT,
+  },
+
+  connImg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+
+  connDefaultAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#1a1a1a",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  connName: {
+    color: TEXT,
+    fontSize: 12,
+    marginTop: 10,
+    textAlign: "center",
+    fontFamily: fonts.heavy,
+  },
+
   interestsWrapper: {
     flexDirection: "row",
     flexWrap: "wrap",
   },
+
   pill: {
     backgroundColor: SURFACE,
     borderWidth: 1,
@@ -212,14 +349,15 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
+
   pillText: {
     color: TEXT,
     fontSize: 13,
     fontFamily: fonts.book,
   },
+
   emptyText: {
     color: MUTED2,
     fontStyle: "italic",
-    fontFamily: fonts.book,
   },
 });
