@@ -9,23 +9,23 @@ export const presetActivities = {
   cooking: { id: 66, name: "👨‍🍳 Cooking" },
   shopping: { id: 67, name: "🛍️ Shopping" },
   football: { id: 69, name: "🏈 Football" },
-  nightlife: { id: 301, name: "🍸 Cocktails & Bars" },
+  nightlife: { id: 301, name: "🍸 Cocktails & bars" },
   dancing: { id: 302, name: "💃 Dancing" },
   karaoke: { id: 303, name: "🎤 Karaoke" },
-  wine: { id: 304, name: "🍷 Wine Tasting" },
+  wine: { id: 304, name: "🍷 Wine tasting" },
   gym: { id: 305, name: "🏋️ Weightlifting" },
   running: { id: 306, name: "🏃 Running" },
   pickleball: { id: 307, name: "🏓 Pickleball" },
   tennis: { id: 308, name: "🎾 Tennis" },
-  gaming: { id: 310, name: "🎮 Video Games" },
+  gaming: { id: 310, name: "🎮 Video games" },
   boardgames: { id: 311, name: "🎲 Board games" },
   photography: { id: 312, name: "📸 Photography" },
-  museums: { id: 313, name: "🎨 Art & Museums" },
+  museums: { id: 313, name: "🎨 Art & museums" },
   movies: { id: 314, name: "🍿 Movies" },
   thrifting: { id: 315, name: "🧥 Thrifting" },
   reading: { id: 316, name: "📚 Reading" },
-  dogs: { id: 317, name: "🐕 Dog Park" },
-  beach: { id: 318, name: "🏖️ Beach Days" }
+  dogs: { id: 317, name: "🐕 Dog park" },
+  beach: { id: 318, name: "🏖️ Beach days" }
 };
 
 export const stateAbbreviations: { [key: string]: string } = {
