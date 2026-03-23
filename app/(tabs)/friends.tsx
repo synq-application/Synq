@@ -193,7 +193,7 @@ export default function FriendsScreen() {
       ) : (
         <>
           <FlatList
-            data={filteredFriends} // 🔥 changed
+            data={filteredFriends} 
             keyExtractor={(item) => item.id}
             renderItem={renderFriendRow}
           />
@@ -310,19 +310,10 @@ function SearchModal({
         (d) => ({ id: d.id, ...d.data() } as any)
       );
 
-      // 🔥 Log ALL user names
-      console.log(
-        "👥 ALL USER NAMES:",
-        mapped.map((u) =>
-          u.displayName || `${u.firstName || ""} ${u.lastName || ""}`
-        )
-      );
-
       const normalize = (str: string) =>
         str.toLowerCase().trim().replace(/\s+/g, " ");
 
       const search = normalize(val);
-      console.log("🔍 SEARCH INPUT:", search);
 
       const filtered = mapped.filter((u) => {
         const displayName = normalize(u.displayName || "");
@@ -339,8 +330,6 @@ function SearchModal({
           matches
         );
       });
-
-      console.log("✅ FILTERED RESULTS:", filtered);
 
       setResults(filtered);
     } catch (e) {
@@ -371,8 +360,6 @@ function SearchModal({
 
       const meSnap = await getDoc(doc(db, "users", myId));
       const meData = meSnap.exists() ? (meSnap.data() as any) : {};
-      console.log('Me data: ', meData)
-
       const senderName =
         meData?.displayName ||
         auth.currentUser.displayName ||
@@ -388,7 +375,6 @@ function SearchModal({
         status: "pending",
         sentAt: serverTimestamp(),
       };
-      console.log('Payload: ', payload)
       await setDoc(requestDocRef, payload);
 
       Alert.alert("Sent!", `Invite sent to ${targetUser.displayName}`);
