@@ -11,6 +11,7 @@ import { auth, db } from "@/src/lib/firebase";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -28,6 +29,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/Ionicons";
+import ConfirmModal from "./confirm-modal";
 
 export default function FriendProfile() {
   const { friendId } = useLocalSearchParams();
@@ -37,6 +39,7 @@ export default function FriendProfile() {
   const [mutualFriends, setMutualFriends] = useState<any[]>([]);
   const [lastSynq, setLastSynq] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
 
   useEffect(() => {
     const fetchFriend = async () => {
@@ -139,6 +142,21 @@ export default function FriendProfile() {
   const state = friend.state?.trim();
   const locationText =
     friend.location || [city, state].filter(Boolean).join(", ");
+
+  const removeFriend = async () => {
+    const user = auth.currentUser;
+    if (!user || !friendId) return;
+
+    try {
+      await deleteDoc(
+        doc(db, "users", user.uid, "friends", friendId as string)
+      );
+
+      router.back();
+    } catch (e) {
+      console.error("Failed to remove friend", e);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -261,10 +279,31 @@ export default function FriendProfile() {
           </View>
         </View>
 
-        <View style={{ height: 50 }} />
+        <View style={{ marginTop: 30, marginBottom: 40, alignItems: "center" }}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.removeFriendBtn}
+            onPress={() => setShowRemoveModal(true)}
+          >
+            <Text style={styles.removeFriendText}>Remove Friend</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+      <ConfirmModal
+        visible={showRemoveModal}
+        title="Remove Friend"
+        message={`Are you sure you want to remove ${friend.displayName} as a friend?`}
+        confirmText="Remove"
+        destructive
+        onCancel={() => setShowRemoveModal(false)}
+        onConfirm={async () => {
+          setShowRemoveModal(false);
+          await removeFriend();
+        }}
+      />
     </SafeAreaView>
   );
+
 }
 
 const styles = StyleSheet.create({
@@ -388,15 +427,29 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-
   pillText: {
     color: TEXT,
     fontSize: 13,
     fontFamily: fonts.book,
   },
-
   emptyText: {
     color: MUTED2,
     fontStyle: "italic",
+  },
+  removeFriendBtn: {
+    borderWidth: 1,
+    borderColor: "#ff453a",
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,69,58,0.08)",
+  },
+
+  removeFriendText: {
+    color: "#ff453a",
+    fontFamily: fonts.heavy,
+    fontSize: 15,
   },
 });

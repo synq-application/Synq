@@ -196,6 +196,7 @@ export default function FriendsScreen() {
             data={filteredFriends} 
             keyExtractor={(item) => item.id}
             renderItem={renderFriendRow}
+            ListFooterComponent={<View style={{ height: 40 }} />} 
           />
         </>
       )}
@@ -417,13 +418,14 @@ function SearchModal({
         </View>
 
         {!queryText && suggested.length > 0 && (
-          <View style={{ marginBottom: 10, marginTop: 10 }}>
+          <View style={{ marginTop: 10, paddingBottom: 160 }}>
             <Text style={styles.sectionLabel}>Suggested</Text>
             <FlatList
               data={suggested}
               keyExtractor={(item) => item.id}
               scrollEnabled={true}
               showsVerticalScrollIndicator={false}
+              ListFooterComponent={<View style={{ height: 40 }} />} 
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               renderItem={({ item }) => (
                 <View style={styles.searchResult}>
@@ -481,6 +483,8 @@ function SearchModal({
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
+              ListFooterComponent={<View style={{ height: 40 }} />}
+
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             renderItem={({ item }) => (
               <View style={styles.searchResult}>
@@ -528,7 +532,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 78,
+    marginTop: 88,
     alignItems: "center",
   },
   headerTitle: { color: TEXT, fontSize: 32, fontFamily: fonts.heavy, letterSpacing: 0.2 },
