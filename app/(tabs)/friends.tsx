@@ -333,48 +333,58 @@ function SearchModal({
   };
 
   const sendInvite = async (targetUser: any) => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser) {
+      return;
+    }
 
     try {
       Keyboard.dismiss();
 
-      const meSnap = await getDoc(
-        doc(db, "users", auth.currentUser.uid)
-      );
-      const meData = meSnap.exists()
-        ? (meSnap.data() as any)
-        : {};
+      const myId = auth.currentUser.uid;
+      const targetId = targetUser.id;
 
       const requestDocRef = doc(
         db,
         "users",
-        targetUser.id,
+        targetId,
         "friendRequests",
-        auth.currentUser.uid
+        myId
       );
+
+      const meSnap = await getDoc(doc(db, "users", myId));
+      const meData = meSnap.exists() ? (meSnap.data() as any) : {};
 
       const senderName =
         meData?.displayName ||
         auth.currentUser.displayName ||
         "Someone";
+
       const senderImageUrl = meData?.imageurl || null;
 
-      await setDoc(requestDocRef, {
-        senderId: auth.currentUser.uid,
+      const payload = {
+        from: myId,
+        to: targetId,
         senderName,
         senderImageUrl,
-        fromId: auth.currentUser.uid,
-        fromName: senderName,
-        fromImageUrl: senderImageUrl,
         status: "pending",
         sentAt: serverTimestamp(),
-        notifyOnCreate: true,
-      });
+      };
+
+      await setDoc(requestDocRef, payload);
 
       Alert.alert("Sent!", `Invite sent to ${targetUser.displayName}`);
       onClose();
+
     } catch (e: any) {
-      Alert.alert("Error", "Could not send invite.");
+      if (e?.code === "permission-denied") {
+        Alert.alert(
+          "Already sent",
+          "You’ve already sent this user a friend request."
+        );
+        return;
+      }
+
+      Alert.alert("Error", e?.message || "Could not send invite.");
     }
   };
 
