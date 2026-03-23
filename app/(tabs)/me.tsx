@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   profileImg: { width: "100%", height: "100%" },
   defaultAvatarContainer: { width: "100%", height: "100%", justifyContent: "center", alignItems: "center" },
   qrToggle: { position: "absolute", bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
-  nameText: { color: ACCENT, fontSize: 30, fontFamily: fonts.black, marginTop: 20 },
+  nameText: { color: ACCENT, fontSize: 28, fontFamily: fonts.black, marginTop: 12 },
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
   },
   section: { marginTop: 30, paddingHorizontal: 25 },
-  sectionTitle: { color: "white", fontSize: 20, fontFamily: fonts.black, marginBottom: 15 },
+  sectionTitle: { color: "white", fontSize: 20, fontFamily: fonts.heavy, marginBottom: 15 },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 20 },
   connItem: { alignItems: "center", width: 80 },

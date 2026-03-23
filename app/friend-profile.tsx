@@ -38,7 +38,6 @@ export default function FriendProfile() {
   const [lastSynq, setLastSynq] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
 
-  /* ---------- FETCH FRIEND ---------- */
   useEffect(() => {
     const fetchFriend = async () => {
       try {
@@ -52,7 +51,6 @@ export default function FriendProfile() {
     fetchFriend();
   }, []);
 
-  /* ---------- FETCH MUTUAL FRIENDS ---------- */
   useEffect(() => {
     const user = auth.currentUser;
     if (!friendId || !user) return;
@@ -87,7 +85,6 @@ export default function FriendProfile() {
     fetchMutuals();
   }, [friendId]);
 
-  /* ---------- FETCH LAST SYNQ ---------- */
   useEffect(() => {
     const user = auth.currentUser;
     if (!user || !friendId) return;
@@ -114,7 +111,6 @@ export default function FriendProfile() {
     fetchLastSynq();
   }, [friendId]);
 
-  /* ---------- FORMAT TIME ---------- */
   const formatLastSynq = (date: Date) => {
     const now = new Date();
     const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
@@ -147,15 +143,11 @@ export default function FriendProfile() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-
-        {/* Back */}
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Icon name="chevron-back" size={22} color={TEXT} />
           </TouchableOpacity>
         </View>
-
-        {/* Profile */}
         <View style={styles.header}>
           <Image
             source={{
@@ -184,7 +176,6 @@ export default function FriendProfile() {
           )}
         </View>
 
-        {/* 🔥 Mutual Friends (no count text now) */}
         {mutualFriends.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mutual Friends</Text>
@@ -253,10 +244,8 @@ export default function FriendProfile() {
           </View>
         )}
 
-        {/* Interests */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Interests</Text>
-
           <View style={styles.interestsWrapper}>
             {friend.interests?.length ? (
               friend.interests.map((interest: string, i: number) => (
@@ -336,7 +325,7 @@ const styles = StyleSheet.create({
 
   sectionTitle: {
     color: TEXT,
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: fonts.heavy,
     marginBottom: 15,
   },
