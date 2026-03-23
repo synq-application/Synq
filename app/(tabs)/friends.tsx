@@ -169,10 +169,7 @@ export default function FriendsScreen() {
           <Icon name="add-circle-outline" size={30} color={ACCENT} />
         </TouchableOpacity>
       </View>
-
       <View style={styles.headerDivider} />
-
-      {/* 🔥 ADDED SEARCH BAR */}
       <View style={styles.searchBarWrap}>
         <Ionicons name="search-outline" size={18} color={MUTED2} />
         <TextInput
@@ -220,6 +217,7 @@ function SearchModal({
   onClose: () => void;
   currentFriends: string[];
 }) {
+  const router = useRouter();
   const [queryText, setQueryText] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [suggested, setSuggested] = useState<any[]>([]);
@@ -249,33 +247,41 @@ function SearchModal({
           (d) => ({ id: d.id, ...d.data() } as any)
         );
 
-        const suggestions: any[] = [];
+        const suggestionsWithMutuals = await Promise.all(
+          users.map(async (user) => {
+            if (
+              user.id === myId ||
+              currentFriends.includes(user.id)
+            ) return null;
 
-        for (const user of users) {
-          if (
-            user.id === myId ||
-            currentFriends.includes(user.id)
-          ) continue;
+            try {
+              const theirFriendsSnap = await getDocs(
+                collection(db, "users", user.id, "friends")
+              );
 
-          const theirFriendsSnap = await getDocs(
-            collection(db, "users", user.id, "friends")
-          );
+              const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
 
-          const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
+              const mutuals = theirFriendIds.filter((id) =>
+                myFriendIds.includes(id)
+              );
 
-          const mutuals = theirFriendIds.filter((id) =>
-            myFriendIds.includes(id)
-          );
+              if (mutuals.length > 0) {
+                return {
+                  ...user,
+                  mutualCount: mutuals.length,
+                };
+              }
 
-          if (mutuals.length > 0) {
-            suggestions.push({
-              ...user,
-              mutualCount: mutuals.length,
-            });
-          }
-        }
+              return null;
+            } catch {
+              return null;
+            }
+          })
+        );
 
-        suggestions.sort((a, b) => b.mutualCount - a.mutualCount);
+        const suggestions = suggestionsWithMutuals
+          .filter(Boolean)
+          .sort((a: any, b: any) => b.mutualCount - a.mutualCount);
 
         setSuggested(suggestions.slice(0, 8));
       } catch (e) {
@@ -406,7 +412,20 @@ function SearchModal({
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               renderItem={({ item }) => (
                 <View style={styles.searchResult}>
-                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      onClose();
+
+                      setTimeout(() => {
+                        router.push({
+                          pathname: "/friend-profile",
+                          params: { friendId: item.id },
+                        });
+                      }, 250);
+                    }}
+                    style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+                    activeOpacity={0.8}
+                  >
                     <View style={styles.avatar}>
                       {item.imageurl ? (
                         <Image source={{ uri: item.imageurl }} style={styles.img} />
@@ -424,7 +443,7 @@ function SearchModal({
                         {item.mutualCount === 1 ? "friend" : "friends"}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
 
                   <TouchableOpacity
                     onPress={() => sendInvite(item)}
@@ -486,7 +505,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 78,
-    alignItems: "flex-end",
+    alignItems: "center",
   },
   headerTitle: { color: TEXT, fontSize: 32, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   headerSub: { color: MUTED, fontSize: 14, fontFamily: fonts.book, marginTop: 6 },
@@ -606,22 +625,22 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: ACCENT, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 14 },
   addBtnText: { color: "#061006", fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 0.2 },
   searchBarWrap: {
-  flexDirection: "row",
-  alignItems: "center",
-  backgroundColor: SURFACE,
-  borderRadius: 18,
-  borderWidth: 1,
-  borderColor: BORDER,
-  paddingHorizontal: 12,
-  paddingVertical: 12,
-  marginTop: 14,
-  marginBottom: 6,
-},
-searchBarInput: {
-  flex: 1,
-  color: TEXT,
-  marginLeft: 8,
-  fontFamily: fonts.medium,
-  fontSize: 15,
-},
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: SURFACE,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  searchBarInput: {
+    flex: 1,
+    color: TEXT,
+    marginLeft: 8,
+    fontFamily: fonts.medium,
+    fontSize: 15,
+  },
 });

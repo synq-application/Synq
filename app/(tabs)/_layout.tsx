@@ -30,7 +30,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: "",
-          tabBarShowLabel: false,
+          tabBarShowLabel: true,
           tabBarIcon: ({ focused }) => (
             <View style={[styles.synqButton, focused && styles.synqButtonActive]}>
               <Image
