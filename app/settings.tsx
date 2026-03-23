@@ -18,7 +18,6 @@ import {
 } from "react-native";
 import { auth, db } from "../src/lib/firebase";
 
-const ACCENT = "#7DFFA6";
 const BACKGROUND = "black";
 const SURFACE = "#161616";
 
@@ -63,7 +62,7 @@ export default function SettingsScreen() {
   const signOut = async () => {
     try {
       await auth.signOut();
-      router.reload; 
+      router.reload;
     } catch {
       Alert.alert("Sign out failed", "Please try again.");
     }
@@ -112,16 +111,15 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={26} color="#888" />
+        </TouchableOpacity>
 
-<View style={styles.header}>
-  <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-    <Ionicons name="chevron-back" size={28} color="black" />
-  </TouchableOpacity>
-
-  <Text style={styles.headerTitle}>Settings</Text>
-</View>
-
-
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Settings</Text>
+        </View>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.userSection}>
@@ -163,32 +161,37 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BACKGROUND },
-header: {
-  height: 80,
-  backgroundColor: ACCENT,
-  flexDirection: "row",
-  alignItems: "flex-end",
-  paddingHorizontal: 20,
-  paddingBottom: 20,
-},
-
-backButton: {
-  marginRight: 8,
-  justifyContent: "center",
-},
-
-headerTitle: {
-  fontSize: 24,
-  fontFamily: fonts.heavy,
-  color: "black",
-  lineHeight: 28, 
-},
-  scrollContent: { paddingBottom: 40 },
-
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  backButton: {
+    marginRight: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#1F1F1F",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontFamily: fonts.heavy,
+    color: "white",
+  },
+  scrollContent: {
+    paddingBottom: 40,
+    paddingTop: 10,
+  },
   userSection: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: SURFACE,
+    backgroundColor: "#1C1C1E",
+    borderWidth: 1,
+    borderColor: "#2A2A2A",
     margin: 20,
     padding: 15,
     borderRadius: 16,

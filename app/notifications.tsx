@@ -78,7 +78,11 @@ export default function NotificationsScreen() {
         const myImageUrl = meData?.imageurl || DEFAULT_AVATAR;
 
         let senderName = request.fromName || "User";
-        let senderImageUrl = request.fromImageUrl || request.fromImageurl || request.imageurl || null;
+        let senderImageUrl =
+          request.fromImageUrl ||
+          request.fromImageurl ||
+          request.imageurl ||
+          null;
 
         if (!senderImageUrl) {
           const senderSnap = await getDoc(doc(db, "users", request.fromId));
@@ -89,24 +93,32 @@ export default function NotificationsScreen() {
           }
         }
 
-        await setDoc(doc(db, "users", auth.currentUser.uid, "friends", request.fromId), {
-          synqCount: 0,
-          since: serverTimestamp(),
-          displayName: senderName,
-          imageurl: senderImageUrl || DEFAULT_AVATAR,
-        });
+        await setDoc(
+          doc(db, "users", auth.currentUser.uid, "friends", request.fromId),
+          {
+            synqCount: 0,
+            since: serverTimestamp(),
+            displayName: senderName,
+            imageurl: senderImageUrl || DEFAULT_AVATAR,
+          }
+        );
 
-        await setDoc(doc(db, "users", request.fromId, "friends", auth.currentUser.uid), {
-          synqCount: 0,
-          since: serverTimestamp(),
-          displayName: myName,
-          imageurl: myImageUrl,
-        });
+        await setDoc(
+          doc(db, "users", request.fromId, "friends", auth.currentUser.uid),
+          {
+            synqCount: 0,
+            since: serverTimestamp(),
+            displayName: myName,
+            imageurl: myImageUrl,
+          }
+        );
 
         Alert.alert("Success", `You are now connected with ${senderName}!`);
       }
 
-      await deleteDoc(doc(db, "users", auth.currentUser.uid, "friendRequests", request.id));
+      await deleteDoc(
+        doc(db, "users", auth.currentUser.uid, "friendRequests", request.id)
+      );
     } catch (e: any) {
       Alert.alert("Error", `Could not process request: ${e.message}`);
     }
@@ -130,18 +142,27 @@ export default function NotificationsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.rowKicker}>Friend Request</Text>
             <Text style={styles.rowText} numberOfLines={2}>
-              <Text style={styles.boldWhite}>{item.fromName || "Someone"}</Text>
+              <Text style={styles.boldWhite}>
+                {item.fromName || "Someone"}
+              </Text>
               <Text style={styles.grayText}> wants to be your friend.</Text>
             </Text>
           </View>
         </View>
 
         <View style={styles.rowRight}>
-          <TouchableOpacity onPress={() => handleRequest(item, true)} style={styles.acceptBtn}>
+          <TouchableOpacity
+            onPress={() => handleRequest(item, true)}
+            style={styles.acceptBtn}
+          >
             <Ionicons name="checkmark" size={18} color="black" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleRequest(item, false)} style={styles.denyBtn}>
-            <Ionicons name="close-circle" size={28} color="#444" />
+
+          <TouchableOpacity
+            onPress={() => handleRequest(item, false)}
+            style={styles.denyBtn}
+          >
+            <Ionicons name="close" size={18} color="#888" />
           </TouchableOpacity>
         </View>
       </View>
@@ -152,10 +173,16 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={28} color="black" />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <Ionicons name="chevron-back" size={26} color="#888" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
+
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+        </View>
       </View>
 
       {loading ? (
@@ -170,10 +197,16 @@ export default function NotificationsScreen() {
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="notifications-off-outline" size={28} color="#666" />
+                <Ionicons
+                  name="notifications-off-outline"
+                  size={28}
+                  color="#666"
+                />
               </View>
               <Text style={styles.emptyTitle}>All caught up</Text>
-              <Text style={styles.emptySubtitle}>No new notifications right now.</Text>
+              <Text style={styles.emptySubtitle}>
+                No new notifications right now.
+              </Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -188,47 +221,35 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BACKGROUND,
-  },
+  container: { flex: 1, backgroundColor: BACKGROUND },
   header: {
-    height: 80,
-    backgroundColor: ACCENT,
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
   backButton: {
-    marginRight: 15,
+    marginRight: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#1F1F1F",
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: fonts.heavy,
-    color: "black",
-    marginBottom: 2,
+    color: "white",
   },
-
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
   listContent: {
     paddingBottom: 40,
-  },
-
-  sectionHeaderWrap: {
     paddingTop: 10,
   },
-  groupTitle: {
-    color: "#666",
-    fontSize: 14,
-    fontFamily: fonts.medium,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginLeft: 25,
-    marginBottom: 10,
-    marginTop: 10,
-  },
+
   group: {
     backgroundColor: SURFACE,
     marginHorizontal: 20,
@@ -236,6 +257,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 12,
   },
+
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -251,6 +273,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
   },
+
   avatar: {
     width: 44,
     height: 44,
@@ -288,6 +311,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+
   acceptBtn: {
     backgroundColor: ACCENT,
     width: 38,
