@@ -576,7 +576,7 @@ export default function SynqScreen() {
   };
 
   const getChatTitle = (chat: any) => {
-    if (!chat) return 'Synq Chat';
+    if (!chat) return "Synq Chat";
 
     if (chat.customName?.trim()) {
       return wrapChatTitle(chat.customName.trim(), 25);
@@ -584,23 +584,26 @@ export default function SynqScreen() {
 
     const myId = auth.currentUser?.uid;
 
-    const otherNames = Object.entries(chat.participantNames)
+    const otherUsers = Object.entries(chat.participantNames)
       .filter(([uid]) => uid !== myId)
-      .map(([_, name]) => firstName(name as string));
+      .map(([_, name]) => name as string);
 
-    if (otherNames.length === 0) return 'Just You';
+    if (otherUsers.length === 0) return "Just You";
 
-    let title = '';
+    let title = "";
 
-    if (otherNames.length === 1) {
-      title = `You & ${otherNames[0]}`;
-    } else {
-      const names = [...otherNames];
+    if (otherUsers.length === 1) {
+      title = otherUsers[0];
+    }
+    else {
+      const firstNames = otherUsers.map((name) => firstName(name));
+      const names = [...firstNames];
       const lastFriend = names.pop();
-      title = `You, ${names.join(', ')} & ${lastFriend}`;
+
+      title = `${names.join(", ")} & ${lastFriend}`;
     }
 
-    return wrapChatTitle(title, 25);
+    return title;
   };
 
   const activeChat = allChats.find((c) => c.id === activeChatId);
@@ -797,7 +800,13 @@ export default function SynqScreen() {
                       {renderAvatarStack(item.participantImages)}
                     </View>
                     <View style={styles.inboxTextCol}>
-                      <Text style={styles.whiteBold}>{getChatTitle(item)}</Text>
+                      <Text
+                        style={styles.whiteBold}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {getChatTitle(item)}
+                      </Text>
                       <Text style={styles.grayText} numberOfLines={1}>
                         {item.lastMessage}
                       </Text>

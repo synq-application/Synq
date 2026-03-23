@@ -13,7 +13,7 @@ export const getChatTitle = (chat: any, myId: string) => {
     .map(([_, name]) => name as string);
 
   if (otherNames.length === 0) return "Just You";
-  if (otherNames.length === 1) return `You & ${otherNames[0]}`;
+  if (otherNames.length === 1) return `${otherNames[0]}`;
   const last = otherNames.pop();
   return `You, ${otherNames.join(", ")} & ${last}`;
 };
