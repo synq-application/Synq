@@ -44,7 +44,12 @@ export default function NotificationsScreen() {
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    const reqRef = collection(db, "users", auth.currentUser.uid, "friendRequests");
+    const reqRef = collection(
+      db,
+      "users",
+      auth.currentUser.uid,
+      "friendRequests"
+    );
 
     const unsubscribe = onSnapshot(
       reqRef,
@@ -69,32 +74,53 @@ export default function NotificationsScreen() {
     if (!auth.currentUser) return;
 
     try {
-      if (!request.fromId) throw new Error("Missing sender ID.");
+      const myId = auth.currentUser.uid;
+      const senderId = request.from || request.fromId;
+
+      if (!senderId) throw new Error("Missing sender ID.");
 
       if (accept) {
-        const meSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
+        const meSnap = await getDoc(doc(db, "users", myId));
         const meData = meSnap.exists() ? meSnap.data() : {};
-        const myName = meData?.displayName || auth.currentUser.displayName || "User";
+
+        const myName =
+          meData?.displayName ||
+          auth.currentUser.displayName ||
+          "User";
+
         const myImageUrl = meData?.imageurl || DEFAULT_AVATAR;
 
-        let senderName = request.fromName || "User";
+        let senderName =
+          request.senderName ||
+          request.fromName ||
+          "User";
+
         let senderImageUrl =
+          request.senderImageUrl ||
           request.fromImageUrl ||
           request.fromImageurl ||
           request.imageurl ||
           null;
 
-        if (!senderImageUrl) {
-          const senderSnap = await getDoc(doc(db, "users", request.fromId));
+        // fallback fetch if missing
+        if (!senderImageUrl || !senderName) {
+          const senderSnap = await getDoc(doc(db, "users", senderId));
           if (senderSnap.exists()) {
             const senderData = senderSnap.data();
-            senderName = senderName || senderData?.displayName || "User";
-            senderImageUrl = senderData?.imageurl || DEFAULT_AVATAR;
+            senderName =
+              senderName ||
+              senderData?.displayName ||
+              "User";
+            senderImageUrl =
+              senderImageUrl ||
+              senderData?.imageurl ||
+              DEFAULT_AVATAR;
           }
         }
 
+        // ✅ Add to MY friends
         await setDoc(
-          doc(db, "users", auth.currentUser.uid, "friends", request.fromId),
+          doc(db, "users", myId, "friends", senderId),
           {
             synqCount: 0,
             since: serverTimestamp(),
@@ -102,20 +128,10 @@ export default function NotificationsScreen() {
             imageurl: senderImageUrl || DEFAULT_AVATAR,
           }
         );
-
-        await setDoc(
-          doc(db, "users", request.fromId, "friends", auth.currentUser.uid),
-          {
-            synqCount: 0,
-            since: serverTimestamp(),
-            displayName: myName,
-            imageurl: myImageUrl,
-          }
-        );
-
         Alert.alert("Success", `You are now connected with ${senderName}!`);
       }
 
+      // ✅ Remove request
       await deleteDoc(
         doc(db, "users", auth.currentUser.uid, "friendRequests", request.id)
       );
@@ -126,7 +142,11 @@ export default function NotificationsScreen() {
 
   const RequestRow = ({ item }: { item: any }) => {
     const fromImageUrl =
-      item.fromImageUrl || item.fromImageurl || item.imageurl || null;
+      item.senderImageUrl ||
+      item.fromImageUrl ||
+      item.fromImageurl ||
+      item.imageurl ||
+      null;
 
     return (
       <View style={styles.row}>
@@ -143,7 +163,7 @@ export default function NotificationsScreen() {
             <Text style={styles.rowKicker}>Friend Request</Text>
             <Text style={styles.rowText} numberOfLines={2}>
               <Text style={styles.boldWhite}>
-                {item.fromName || "Someone"}
+                {item.senderName || item.fromName || "Someone"}
               </Text>
               <Text style={styles.grayText}> wants to be your friend.</Text>
             </Text>
@@ -172,6 +192,7 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
+
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}

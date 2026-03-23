@@ -295,7 +295,7 @@ function SearchModal({
   const searchUsers = async (val: string) => {
     setQueryText(val);
 
-    if (val.length < 3) {
+    if (val.length < 2) {
       setResults([]);
       return;
     }
@@ -305,24 +305,42 @@ function SearchModal({
     try {
       const usersRef = collection(db, "users");
       const snap = await getDocs(usersRef);
+
       const mapped = snap.docs.map(
         (d) => ({ id: d.id, ...d.data() } as any)
       );
 
+      // 🔥 Log ALL user names
+      console.log(
+        "👥 ALL USER NAMES:",
+        mapped.map((u) =>
+          u.displayName || `${u.firstName || ""} ${u.lastName || ""}`
+        )
+      );
+
+      const normalize = (str: string) =>
+        str.toLowerCase().trim().replace(/\s+/g, " ");
+
+      const search = normalize(val);
+      console.log("🔍 SEARCH INPUT:", search);
+
       const filtered = mapped.filter((u) => {
-        const nameMatch = u.displayName
-          ?.toLowerCase()
-          .includes(val.toLowerCase());
-        const emailMatch = u.email
-          ?.toLowerCase()
-          .includes(val.toLowerCase());
+        const displayName = normalize(u.displayName || "");
+        const fullName = normalize(`${u.firstName || ""} ${u.lastName || ""}`);
+        const email = normalize(u.email || "");
+
+        const matches =
+          displayName.includes(search) ||
+          fullName.includes(search) ||
+          email.includes(search);
 
         return (
           u.id !== auth.currentUser?.uid &&
-          !currentFriends.includes(u.id) &&
-          (nameMatch || emailMatch)
+          matches
         );
       });
+
+      console.log("✅ FILTERED RESULTS:", filtered);
 
       setResults(filtered);
     } catch (e) {
@@ -353,6 +371,7 @@ function SearchModal({
 
       const meSnap = await getDoc(doc(db, "users", myId));
       const meData = meSnap.exists() ? (meSnap.data() as any) : {};
+      console.log('Me data: ', meData)
 
       const senderName =
         meData?.displayName ||
@@ -369,7 +388,7 @@ function SearchModal({
         status: "pending",
         sentAt: serverTimestamp(),
       };
-
+      console.log('Payload: ', payload)
       await setDoc(requestDocRef, payload);
 
       Alert.alert("Sent!", `Invite sent to ${targetUser.displayName}`);
@@ -494,12 +513,21 @@ function SearchModal({
                     <Text style={styles.emailDetail}>{item.email}</Text>
                   </View>
                 </View>
-
                 <TouchableOpacity
-                  onPress={() => sendInvite(item)}
-                  style={styles.addBtn}
+                  onPress={() => {
+                    if (!currentFriends.includes(item.id)) {
+                      sendInvite(item);
+                    }
+                  }}
+                  style={[
+                    styles.addBtn,
+                    currentFriends.includes(item.id) && { opacity: 0.4 }
+                  ]}
+                  disabled={currentFriends.includes(item.id)}
                 >
-                  <Text style={styles.addBtnText}>Add</Text>
+                  <Text style={styles.addBtnText}>
+                    {currentFriends.includes(item.id) ? "Friends" : "Add"}
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
