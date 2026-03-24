@@ -423,7 +423,7 @@ function SearchModal({
         <StatusBar barStyle="light-content" />
 
         <View style={styles.searchHeader}>
-          <Text style={styles.searchTitle}>Add Friends</Text>
+          <Text style={styles.searchTitle}>Add friends</Text>
           <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
             <Ionicons name="close-circle" size={28} color="#444" />
           </TouchableOpacity>
