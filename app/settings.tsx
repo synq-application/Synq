@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import { doc, onSnapshot } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   Image,
   Linking,
   Platform,
@@ -18,6 +17,9 @@ import {
 } from "react-native";
 import { auth, db } from "../src/lib/firebase";
 
+import AlertModal from "./alert-modal";
+import ConfirmModal from "./confirm-modal";
+
 const BACKGROUND = "black";
 const SURFACE = "#161616";
 
@@ -29,6 +31,18 @@ const fonts = {
 
 export default function SettingsScreen() {
   const [userData, setUserData] = useState<any>(null);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title?: string;
+    message: string;
+  } | null>(null);
+
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
+
+  const showAlert = (title: string, message: string) => {
+    setAlertConfig({ title, message });
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     if (!auth.currentUser?.uid) return;
@@ -55,24 +69,21 @@ export default function SettingsScreen() {
       }
       await Linking.openURL("app-settings:");
     } catch {
-      Alert.alert("Unable to open Settings", "Please open your device Settings app.");
+      showAlert("Unable to open Settings", "Please open your device Settings app.");
     }
   };
 
   const signOut = async () => {
     try {
       await auth.signOut();
-      router.reload;
+      router.replace("/"); 
     } catch {
-      Alert.alert("Sign out failed", "Please try again.");
+      showAlert("Sign out failed", "Please try again.");
     }
   };
 
   const confirmSignOut = () => {
-    Alert.alert("Sign out?", "You can sign back in anytime.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: signOut },
-    ]);
+    setShowSignOutModal(true);
   };
 
   const SettingItem = ({
@@ -88,7 +99,9 @@ export default function SettingsScreen() {
   }) => (
     <TouchableOpacity style={styles.item} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.itemLeft}>
-        <Text style={[styles.itemLabel, danger && styles.dangerText]}>{label}</Text>
+        <Text style={[styles.itemLabel, danger && styles.dangerText]}>
+          {label}
+        </Text>
       </View>
 
       {value ? (
@@ -111,6 +124,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={26} color="#888" />
@@ -125,36 +139,86 @@ export default function SettingsScreen() {
         <View style={styles.userSection}>
           <Image
             source={{
-              uri: userData?.imageurl || "https://www.gravatar.com/avatar/?d=mp",
+              uri:
+                userData?.imageurl ||
+                "https://www.gravatar.com/avatar/?d=mp",
             }}
             style={styles.avatar}
           />
           <Text style={styles.userName}>
-            {userData?.displayName || auth.currentUser?.displayName || "User"}
+            {userData?.displayName ||
+              auth.currentUser?.displayName ||
+              "User"}
           </Text>
         </View>
 
         <Text style={styles.groupTitle}>Account</Text>
         <View style={styles.group}>
-          <SettingItem label="Edit profile" onPress={() => router.push("/edit-profile")} />
-          <SettingItem label="Notifications" onPress={openSystemSettings} />
+          <SettingItem
+            label="Edit profile"
+            onPress={() => router.push("/edit-profile")}
+          />
+          <SettingItem
+            label="Notifications"
+            onPress={openSystemSettings}
+          />
           <SettingItem label="Sign out" onPress={confirmSignOut} />
         </View>
 
         <Text style={styles.groupTitle}>More</Text>
         <View style={styles.group}>
-          <SettingItem label="About us" onPress={() => router.push("/profile-settings/about-us")} />
-          <SettingItem label="Privacy policy" onPress={() => router.push("/profile-settings/privacy-policy")} />
-          <SettingItem label="Terms and conditions" onPress={() => router.push("/profile-settings/terms-conditions")} />
-          <SettingItem label="Feedback" onPress={() => router.push("/profile-settings/feedback")} />
+          <SettingItem
+            label="About us"
+            onPress={() => router.push("/profile-settings/about-us")}
+          />
+          <SettingItem
+            label="Privacy policy"
+            onPress={() =>
+              router.push("/profile-settings/privacy-policy")
+            }
+          />
+          <SettingItem
+            label="Terms and conditions"
+            onPress={() =>
+              router.push("/profile-settings/terms-conditions")
+            }
+          />
+          <SettingItem
+            label="Feedback"
+            onPress={() => router.push("/profile-settings/feedback")}
+          />
           <StaticItem label="Version" value={appVersion} />
         </View>
 
         <Text style={styles.groupTitle}>Danger zone</Text>
         <View style={styles.group}>
-          <SettingItem label="Delete account" danger onPress={() => router.push("/delete-account")} />
+          <SettingItem
+            label="Delete account"
+            danger
+            onPress={() => router.push("/delete-account")}
+          />
         </View>
       </ScrollView>
+
+      <ConfirmModal
+        visible={showSignOutModal}
+        title="Sign out?"
+        message="You can sign back in anytime."
+        confirmText="Sign out"
+        destructive
+        onCancel={() => setShowSignOutModal(false)}
+        onConfirm={async () => {
+          setShowSignOutModal(false);
+          await signOut();
+        }}
+      />
+
+      <AlertModal
+        visible={alertVisible}
+        title={alertConfig?.title}
+        message={alertConfig?.message || ""}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 }
