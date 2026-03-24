@@ -195,6 +195,7 @@ export default function FriendsScreen() {
             data={filteredFriends}
             keyExtractor={(item) => item.id}
             renderItem={renderFriendRow}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
             ListFooterComponent={<View style={{ height: 40 }} />}
           />
         </>
@@ -300,58 +301,58 @@ function SearchModal({
   const debounceRef = React.useRef<any>(null);
 
 
-const searchUsers = (val: string) => {
-  setQueryText(val);
+  const searchUsers = (val: string) => {
+    setQueryText(val);
 
-  if (debounceRef.current) {
-    clearTimeout(debounceRef.current);
-  }
-
-  debounceRef.current = setTimeout(async () => {
-    if (val.length < 1) {
-      setResults([]);
-      return;
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
     }
 
-    setIsSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      if (val.length < 1) {
+        setResults([]);
+        return;
+      }
 
-    try {
-      const usersRef = collection(db, "users");
-      const snap = await getDocs(usersRef);
+      setIsSearching(true);
 
-      const mapped = snap.docs.map(
-        (d) => ({ id: d.id, ...d.data() } as any)
-      );
+      try {
+        const usersRef = collection(db, "users");
+        const snap = await getDocs(usersRef);
 
-      const normalize = (str: string) =>
-        str.toLowerCase().trim().replace(/\s+/g, " ");
-
-      const search = normalize(val);
-
-      const filtered = mapped.filter((u) => {
-        const displayName = normalize(u.displayName || "");
-        const fullName = normalize(`${u.firstName || ""} ${u.lastName || ""}`);
-        const email = normalize(u.email || "");
-
-        const matches =
-          displayName.includes(search) ||
-          fullName.includes(search) ||
-          email.includes(search);
-
-        return (
-          u.id !== auth.currentUser?.uid &&
-          matches
+        const mapped = snap.docs.map(
+          (d) => ({ id: d.id, ...d.data() } as any)
         );
-      });
 
-      setResults(filtered);
-    } catch (e) {
-      console.error("[SearchModal] Search failed", e);
-    } finally {
-      setIsSearching(false);
-    }
-  }, 300); // debounce delay (can tweak 250–400)
-};
+        const normalize = (str: string) =>
+          str.toLowerCase().trim().replace(/\s+/g, " ");
+
+        const search = normalize(val);
+
+        const filtered = mapped.filter((u) => {
+          const displayName = normalize(u.displayName || "");
+          const fullName = normalize(`${u.firstName || ""} ${u.lastName || ""}`);
+          const email = normalize(u.email || "");
+
+          const matches =
+            displayName.includes(search) ||
+            fullName.includes(search) ||
+            email.includes(search);
+
+          return (
+            u.id !== auth.currentUser?.uid &&
+            matches
+          );
+        });
+
+        setResults(filtered);
+      } catch (e) {
+        console.error("[SearchModal] Search failed", e);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300); // debounce delay (can tweak 250–400)
+  };
 
   const sendInvite = async (targetUser: any) => {
     if (!auth.currentUser) {
@@ -496,52 +497,52 @@ const searchUsers = (val: string) => {
             />
           </View>
         )}
-<View style={{ flex: 1 }}>
-  <FlatList
-    data={results}
-    keyExtractor={(item) => item.id}
-    keyboardShouldPersistTaps="handled"
-    keyboardDismissMode="on-drag"
-    ListFooterComponent={<View style={{ height: 40 }} />}
-    ItemSeparatorComponent={() => <View style={styles.separator} />}
-    renderItem={({ item }) => (
-      <View style={styles.searchResult}>
-        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-          <View style={styles.avatar}>
-            {item.imageurl ? (
-              <Image source={{ uri: item.imageurl }} style={styles.img} />
-            ) : (
-              <Icon name="person" size={22} color={MUTED3} />
-            )}
-          </View>
-          <View style={{ paddingRight: 12 }}>
-            <Text style={styles.friendName}>
-              {item.displayName || "User"}
-            </Text>
-            <Text style={styles.emailDetail}>{item.email}</Text>
-          </View>
-        </View>
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={results}
+            keyExtractor={(item) => item.id}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            ListFooterComponent={<View style={{ height: 40 }} />}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            renderItem={({ item }) => (
+              <View style={styles.searchResult}>
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <View style={styles.avatar}>
+                    {item.imageurl ? (
+                      <Image source={{ uri: item.imageurl }} style={styles.img} />
+                    ) : (
+                      <Icon name="person" size={22} color={MUTED3} />
+                    )}
+                  </View>
+                  <View style={{ paddingRight: 12 }}>
+                    <Text style={styles.friendName}>
+                      {item.displayName || "User"}
+                    </Text>
+                    <Text style={styles.emailDetail}>{item.email}</Text>
+                  </View>
+                </View>
 
-        <TouchableOpacity
-          onPress={() => {
-            if (!currentFriends.includes(item.id)) {
-              sendInvite(item);
-            }
-          }}
-          style={[
-            styles.addBtn,
-            currentFriends.includes(item.id) && { opacity: 0.4 }
-          ]}
-          disabled={currentFriends.includes(item.id)}
-        >
-          <Text style={styles.addBtnText}>
-            {currentFriends.includes(item.id) ? "Friends" : "Add"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    )}
-  />
-</View>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!currentFriends.includes(item.id)) {
+                      sendInvite(item);
+                    }
+                  }}
+                  style={[
+                    styles.addBtn,
+                    currentFriends.includes(item.id) && { opacity: 0.4 }
+                  ]}
+                  disabled={currentFriends.includes(item.id)}
+                >
+                  <Text style={styles.addBtnText}>
+                    {currentFriends.includes(item.id) ? "Friends" : "Add"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+        </View>
       </View>
       <AlertModal
         visible={alertVisible}
@@ -565,30 +566,27 @@ const styles = StyleSheet.create({
   headerAction: { paddingLeft: 12, paddingVertical: 6 },
   headerDivider: { marginTop: 16, height: 1, backgroundColor: BORDER },
   friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
-  separator: { height: 1, backgroundColor: BORDER, width: "100%" },
-avatar: {
-  width: 52,
-  height: 52,
-  borderRadius: 26,
-  backgroundColor: SURFACE,
-  justifyContent: "center",
-  alignItems: "center",
-  marginRight: 14,
-  borderWidth: 1,
-  borderColor: ACCENT,
-
-  shadowColor: ACCENT,
-  shadowOpacity: 0.18,
-  shadowRadius: 8,
-  shadowOffset: { width: 0, height: 0 },
-  elevation: 6,
-},
-
-img: {
-  width: 48,         
-  height: 48,
-  borderRadius: 24,  
-},
+  separator: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.06)", // 👈 faint
+    marginLeft: 66, // 👈 aligns with text (avatar + spacing)
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: SURFACE,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+    borderWidth: 1,
+    borderColor: BORDER
+  },
+  img: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
   friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
   mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
   emptyContainer: { flex: 1, justifyContent: "center", marginTop: 30, paddingHorizontal: 10 },
