@@ -94,7 +94,7 @@ export default function MakePlansScreen({
             <Text style={styles.title}>Turn spare moments{"\n"}into shared ones.</Text>
             <View style={styles.divider} />
             <Text style={styles.sub}>
-              A social tool that shows you which friends are free—right now.
+              A social tool that shows you which friends are free, right now.
             </Text>
           </Animated.View>
 
