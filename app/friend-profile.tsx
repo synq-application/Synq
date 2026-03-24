@@ -278,6 +278,17 @@ export default function FriendProfile() {
             )}
           </View>
         </View>
+        {friend.monthlyMemo && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Monthly Memo</Text>
+
+            <View style={styles.memoCard}>
+              <Text style={styles.memoText}>
+                {friend.monthlyMemo}
+              </Text>
+            </View>
+          </View>
+        )}
 
         <View style={{ marginTop: 30, marginBottom: 40, alignItems: "center" }}>
           <TouchableOpacity
@@ -451,5 +462,19 @@ const styles = StyleSheet.create({
     color: "#ff453a",
     fontFamily: fonts.heavy,
     fontSize: 15,
+  },
+  memoCard: {
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 18,
+    padding: 16,
+  },
+
+  memoText: {
+    color: TEXT,
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: fonts.medium,
   },
 });
