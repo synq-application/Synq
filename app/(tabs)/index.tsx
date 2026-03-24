@@ -26,7 +26,6 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -40,6 +39,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, MUTED, OFFSETS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import ConfirmModal from '../confirm-modal';
+import ExploreModal from '../explore-modal';
 import { formatTime, SynqStatus } from '../helpers';
 import { openInMaps } from '../map-utils';
 import EditSynqModal from '../synq-screens/EditSynqModal';
@@ -952,154 +952,32 @@ export default function SynqScreen() {
               </View>
 
             </KeyboardAvoidingView>
-
-            {isExploreVisible && (
-              <View style={[StyleSheet.absoluteFill, { zIndex: 1000, backgroundColor: 'rgba(0,0,0,0.85)' }]}>
-                {isThinking && (
-                  <View style={styles.thinkingOverlay}>
-                    <Image
-                      source={require('../../assets/pulse.gif')}
-                      style={styles.thinkingOrb}
-                      resizeMode="contain"
-                    />
-                    <Text style={styles.thinkingText}>
-                      Finding the move...
-                    </Text>
-                  </View>
-                )}
-                <TouchableWithoutFeedback
-                  onPress={() => {
-                    setIsExploreVisible(false);
-                    setShowOptionsList(false);
-                  }}
-                >
-                  <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-                    <TouchableWithoutFeedback>
-                      <View style={styles.explorePanel}>
-                        {!showOptionsList ? (
-                          <>
-                            <View style={styles.modalHeader}>
-                              <Text style={styles.modalTitle}>What’s the vibe?</Text>
-                              <TouchableOpacity onPress={() => setIsExploreVisible(false)}>
-                                <Ionicons name="close-circle" size={28} color="#444" />
-                              </TouchableOpacity>
-                            </View>
-
-                            <ScrollView contentContainerStyle={{ padding: 20 }}>
-                              {[
-                                { label: "Night Out", icon: "wine", value: "bar" },
-                                { label: "Dinner", icon: "restaurant", value: "restaurant" },
-                                { label: "Chill", icon: "cafe", value: "coffee" },
-                                { label: "Outdoors", icon: "leaf", value: "outdoors" },
-                                { label: "Surprise Me", icon: "flash", value: "random" },
-                              ].map((item) => (
-                                <TouchableOpacity
-                                  key={item.label}
-                                  style={styles.vibeCard}
-                                  onPress={async () => {
-                                    Keyboard.dismiss();
-
-                                    setIsThinking(true);
-                                    setTimeout(() => {
-                                      triggerAISuggestion(item.label);
-                                    }, 600);
-                                  }}                                >
-                                  <View style={styles.vibeIcon}>
-                                    <Ionicons name={item.icon as any} size={26} color={ACCENT} />
-                                  </View>
-
-                                  <Text style={styles.vibeText}>{item.label}</Text>
-
-                                  <Ionicons name="chevron-forward" size={18} color="#666" />
-                                </TouchableOpacity>
-                              ))}
-
-                              {isAILoading && (
-                                <View style={{ marginTop: 30, alignItems: "center" }}>
-                                  <ActivityIndicator color={ACCENT} />
-                                  <Text style={{ color: "#888", marginTop: 10 }}>
-                                    Finding something good...
-                                  </Text>
-                                </View>
-                              )}
-                            </ScrollView>
-                          </>
-                        ) : (
-                          <View style={{ flex: 1 }}>
-                            <View style={styles.modalHeader}>
-                              <TouchableOpacity
-                                onPress={() => setShowOptionsList(false)}
-                                style={{ flexDirection: 'row', alignItems: 'center' }}
-                              >
-                                <Ionicons name="chevron-back" size={24} color={ACCENT} />
-                                <Text style={[styles.modalTitle, { marginLeft: 8 }]}>
-                                  {currentCategory}
-                                </Text>
-                              </TouchableOpacity>
-
-                              <TouchableOpacity onPress={() => setIsExploreVisible(false)}>
-                                <Ionicons name="close-circle" size={28} color="#444" />
-                              </TouchableOpacity>
-                            </View>
-
-                            <FlatList
-                              data={aiOptions}
-                              keyExtractor={(item) => item.name}
-                              contentContainerStyle={{ padding: 20 }}
-                              renderItem={({ item }) => (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.venueCard,
-                                    selectedOption?.name === item.name && styles.selectedCard
-                                  ]}
-                                  onPress={() => setSelectedOption(item)}
-                                >
-                                  <Image
-                                    source={{
-                                      uri:
-                                        item.imageUrl ||
-                                        item.imageurl ||
-                                        'https://via.placeholder.com/150'
-                                    }}
-                                    style={styles.venueImage}
-                                  />
-
-                                  <View style={{ flex: 1, marginLeft: 12 }}>
-                                    <Text style={styles.venueName}>{item.name}</Text>
-                                    <Text style={styles.venueRating}>{item.rating} stars</Text>
-                                    <Text style={styles.venueDesc}>{item.location}</Text>
-                                  </View>
-
-                                  {selectedOption?.name === item.name && (
-                                    <Ionicons name="checkmark-circle" size={24} color={ACCENT} />
-                                  )}
-                                </TouchableOpacity>
-                              )}
-                            />
-
-                            <TouchableOpacity
-                              style={
-                                selectedOption
-                                  ? styles.sendIdeaBtnEnabled
-                                  : styles.sendIdeaBtn
-                              }
-                              disabled={!selectedOption}
-                              onPress={() => {
-                                sendAISuggestionToChat();
-                                setIsExploreVisible(false);
-                                setShowOptionsList(false);
-                              }}
-                            >
-                              <Text style={styles.sendIdeaText}>Send Idea</Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                      </View>
-                    </TouchableWithoutFeedback>
-                  </View>
-                </TouchableWithoutFeedback>
-              </View>
-            )}
+<ExploreModal
+  visible={isExploreVisible}
+  onClose={() => {
+    setIsExploreVisible(false);
+    setShowOptionsList(false);
+  }}
+  onBack={() => setShowOptionsList(false)}
+  onSelectVibe={(label: string) => {
+    setIsThinking(true);
+    setTimeout(() => {
+      triggerAISuggestion(label);
+    }, 600);
+  }}
+  isThinking={isThinking}
+  isAILoading={isAILoading}
+  showOptionsList={showOptionsList}
+  aiOptions={aiOptions}
+  selectedOption={selectedOption}
+  setSelectedOption={setSelectedOption}
+  sendAISuggestionToChat={() => {
+    sendAISuggestionToChat();
+    setIsExploreVisible(false);
+    setShowOptionsList(false);
+  }}
+  currentCategory={currentCategory}
+/>
           </View>
         </Modal>
 
@@ -1405,44 +1283,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderWidth: 1,
     borderColor: "#222",
-  },
-
-  vibeIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#1C1C1E",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
-  },
-
-  vibeText: {
-    flex: 1,
-    color: "white",
-    fontSize: 17,
-    fontFamily: "Avenir-Heavy",
-  },
-  thinkingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.92)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 2000,
-  },
-
-  thinkingOrb: {
-    width: 180,
-    height: 180,
-    opacity: 0.9,
-  },
-
-  thinkingText: {
-    color: "#999",
-    fontSize: 16,
-    marginTop: 20,
-    fontFamily: "Avenir-Medium",
-    letterSpacing: 0.5,
   },
   aiChip: {
   flexDirection: "row",
