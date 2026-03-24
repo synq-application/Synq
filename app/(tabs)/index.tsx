@@ -37,16 +37,17 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, MUTED, OFFSETS, popularNow } from '../../constants/Variables';
+import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, MUTED, OFFSETS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import ConfirmModal from '../confirm-modal';
-import { formatTime, getLeadingEmoji, SynqStatus } from '../helpers';
+import { formatTime, SynqStatus } from '../helpers';
 import { openInMaps } from '../map-utils';
 import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
 
 export default function SynqScreen() {
   const [memo, setMemo] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
   const [status, setStatus] = useState<SynqStatus>('idle');
   const [availableFriends, setAvailableFriends] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,8 +72,15 @@ export default function SynqScreen() {
   const [hasUnread, setHasUnread] = useState(false);
   const [mutualInterests, setMutualInterests] = useState<string[]>([]);
   const [showEndSynqModal, setShowEndSynqModal] = useState(false);
-  const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+  const aiPrompts = [
+    "Let Synq pick the move",
+    "Find something fun nearby",
+    "Not sure what to do?",
+    "Let Synq pick the vibe",
+    "Discover something new",
+  ];
 
+  const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
@@ -143,6 +151,16 @@ export default function SynqScreen() {
   };
 
   useEffect(() => {
+    let index = 0;
+
+    const interval = setInterval(() => {
+      index = (index + 1) % aiPrompts.length;
+      setRotatingAIText(aiPrompts[index]);
+    }, 10000); // change every 3s
+
+    return () => clearInterval(interval);
+  }, []);
+  useEffect(() => {
     if (!isExploreVisible || !activeChatId) return;
 
     (async () => {
@@ -169,10 +187,10 @@ export default function SynqScreen() {
     return () => subscription.remove();
   }, []);
   useEffect(() => {
-  if (isExploreVisible) {
-    Keyboard.dismiss();
-  }
-}, [isExploreVisible]);
+    if (isExploreVisible) {
+      Keyboard.dismiss();
+    }
+  }, [isExploreVisible]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -318,7 +336,6 @@ export default function SynqScreen() {
       }, 2000);
     } else if (status === 'finding') {
       timer = setTimeout(async () => {
-        if (availableFriends.length > 0) runSmartMatch(availableFriends);
         Vibration.vibrate(500);
         setStatus('active');
       }, 2000);
@@ -327,26 +344,6 @@ export default function SynqScreen() {
       if (timer) clearTimeout(timer);
     };
   }, [status]);
-
-  const runSmartMatch = (friends: any[]) => {
-    if (!userProfile?.interests || userProfile.interests.length === 0) return;
-    for (const friend of friends) {
-      const common = friend.interests?.filter((interest: string) => userProfile.interests.includes(interest));
-      if (common && common.length > 0) {
-        const sharedItem = common[0];
-        Vibration.vibrate([0, 400, 100, 400]);
-        Alert.alert(
-          'Smart Match Found! ⚡️',
-          `Your friend ${friend.displayName} is looking to hang. You both love ${sharedItem}—want to Synq up?`,
-          [
-            { text: 'Dismiss', style: 'cancel' },
-            { text: 'Chat Now', onPress: () => handleConnectWithId(friend.id) }
-          ]
-        );
-        break;
-      }
-    }
-  };
 
   const triggerAISuggestion = async (category: string) => {
     if (!activeChatId || isAILoading) return;
@@ -388,6 +385,7 @@ export default function SynqScreen() {
       console.error('AI Error:', error);
     } finally {
       setIsAILoading(false);
+      setIsThinking(false)
     }
   };
 
@@ -817,22 +815,25 @@ export default function SynqScreen() {
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={styles.modalTitle}>
-                    {activeChat ? getChatTitle(activeChat) : 'Synq Chat'}
-                  </Text>
-                    <TouchableOpacity
-                      onPress={() => {
-                        Keyboard.dismiss();
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setIsExploreVisible(true);
-                      }}
-                    hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
-                    style={[styles.aiTrigger, { marginLeft: 10 }]}
-                  >
-                    <Ionicons name="sparkles" size={20} color={ACCENT} />
-                  </TouchableOpacity>
-                </View>
+<View>
+  <Text style={styles.modalTitle}>
+    {activeChat ? getChatTitle(activeChat) : 'Synq Chat'}
+  </Text>
+
+  <TouchableOpacity
+    onPress={() => {
+      Keyboard.dismiss();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setIsExploreVisible(true);
+    }}
+    style={styles.aiChip}
+    activeOpacity={0.8}
+  >
+    <Ionicons name="sparkles" size={14} color={ACCENT} />
+    <Text style={styles.aiChipText}>{rotatingAIText}</Text>
+    <Ionicons name="chevron-forward" size={14} color="#666" />
+  </TouchableOpacity>
+</View>
               </View>
               <TouchableOpacity
                 onPress={() => {
@@ -953,7 +954,19 @@ export default function SynqScreen() {
             </KeyboardAvoidingView>
 
             {isExploreVisible && (
-              <View style={[StyleSheet.absoluteFill, { zIndex: 1000, backgroundColor: 'rgba(0,0,0,0.8)' }]}>
+              <View style={[StyleSheet.absoluteFill, { zIndex: 1000, backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+                {isThinking && (
+                  <View style={styles.thinkingOverlay}>
+                    <Image
+                      source={require('../../assets/pulse.gif')}
+                      style={styles.thinkingOrb}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.thinkingText}>
+                      Finding the move...
+                    </Text>
+                  </View>
+                )}
                 <TouchableWithoutFeedback
                   onPress={() => {
                     setIsExploreVisible(false);
@@ -966,82 +979,64 @@ export default function SynqScreen() {
                         {!showOptionsList ? (
                           <>
                             <View style={styles.modalHeader}>
-                              <Text style={styles.modalTitle}>Explore Ideas</Text>
+                              <Text style={styles.modalTitle}>What’s the vibe?</Text>
                               <TouchableOpacity onPress={() => setIsExploreVisible(false)}>
                                 <Ionicons name="close-circle" size={28} color="#444" />
                               </TouchableOpacity>
                             </View>
 
                             <ScrollView contentContainerStyle={{ padding: 20 }}>
-                              {!!mutualInterests.length && (
-                                <>
-                                  <Text style={styles.sectionHeader}>Mutual Interests</Text>
-                                  <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    style={styles.scrollRow}
-                                  >
-                                    {mutualInterests.map((item) => {
-                                      const emoji = getLeadingEmoji(item) ?? "🙂";
-                                      return (
-                                        <TouchableOpacity
-                                          key={item}
-                                          style={styles.ideaCircle}
-                                          onPress={() => triggerAISuggestion(item)}
-                                        >
-                                          <View style={styles.circlePlaceholder}>
-                                            <Text style={{ fontSize: 28 }}>{emoji}</Text>
-                                          </View>
-                                          <Text style={styles.circleText}>
-                                            {item.replace(emoji, "").trim()}
-                                          </Text>
-                                        </TouchableOpacity>
-                                      );
-                                    })}
-                                  </ScrollView>
-                                </>
-                              )}
+                              {[
+                                { label: "Night Out", icon: "wine", value: "bar" },
+                                { label: "Dinner", icon: "restaurant", value: "restaurant" },
+                                { label: "Chill", icon: "cafe", value: "coffee" },
+                                { label: "Outdoors", icon: "leaf", value: "outdoors" },
+                                { label: "Surprise Me", icon: "flash", value: "random" },
+                              ].map((item) => (
+                                <TouchableOpacity
+                                  key={item.label}
+                                  style={styles.vibeCard}
+                                  onPress={async () => {
+                                    Keyboard.dismiss();
 
-                              <Text style={styles.sectionHeader}>Popular Now</Text>
+                                    setIsThinking(true);
+                                    setTimeout(() => {
+                                      triggerAISuggestion(item.label);
+                                    }, 600);
+                                  }}                                >
+                                  <View style={styles.vibeIcon}>
+                                    <Ionicons name={item.icon as any} size={26} color={ACCENT} />
+                                  </View>
 
-                              <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                style={styles.scrollRow}
-                              >
-                                {popularNow.map((item) => (
-                                  <TouchableOpacity
-                                    key={item.label}
-                                    style={styles.ideaCircle}
-                                    onPress={() => triggerAISuggestion(item.label)}
-                                  >
-                                    <View style={styles.imageCircle}>
-                                      <Image
-                                        source={item.image}
-                                        style={styles.circleImage}
-                                      />
-                                    </View>
+                                  <Text style={styles.vibeText}>{item.label}</Text>
 
-                                    <Text style={{ fontSize: 13, fontFamily: 'Avenir-Medium', color: 'white', marginTop: 10 }}>{item.label}</Text>
-                                  </TouchableOpacity>
-                                ))}
-                              </ScrollView>
+                                  <Ionicons name="chevron-forward" size={18} color="#666" />
+                                </TouchableOpacity>
+                              ))}
+
                               {isAILoading && (
-                                <View style={{ marginTop: 20, alignItems: "center" }}>
+                                <View style={{ marginTop: 30, alignItems: "center" }}>
                                   <ActivityIndicator color={ACCENT} />
-                                  <Text style={{ color: "white", marginTop: 8 }}>Synq AI is thinking...</Text>
+                                  <Text style={{ color: "#888", marginTop: 10 }}>
+                                    Finding something good...
+                                  </Text>
                                 </View>
                               )}
                             </ScrollView>
-
                           </>
                         ) : (
                           <View style={{ flex: 1 }}>
                             <View style={styles.modalHeader}>
-                              <TouchableOpacity onPress={() => setShowOptionsList(false)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <TouchableOpacity
+                                onPress={() => setShowOptionsList(false)}
+                                style={{ flexDirection: 'row', alignItems: 'center' }}
+                              >
                                 <Ionicons name="chevron-back" size={24} color={ACCENT} />
-                                <Text style={[styles.modalTitle, { color: "white", marginLeft: 8 }]}>{currentCategory}</Text>
+                                <Text style={[styles.modalTitle, { marginLeft: 8 }]}>
+                                  {currentCategory}
+                                </Text>
                               </TouchableOpacity>
+
                               <TouchableOpacity onPress={() => setIsExploreVisible(false)}>
                                 <Ionicons name="close-circle" size={28} color="#444" />
                               </TouchableOpacity>
@@ -1053,21 +1048,41 @@ export default function SynqScreen() {
                               contentContainerStyle={{ padding: 20 }}
                               renderItem={({ item }) => (
                                 <TouchableOpacity
-                                  style={[styles.venueCard, selectedOption?.name === item.name && styles.selectedCard]}
+                                  style={[
+                                    styles.venueCard,
+                                    selectedOption?.name === item.name && styles.selectedCard
+                                  ]}
                                   onPress={() => setSelectedOption(item)}
                                 >
-                                  <Image source={{ uri: item.imageUrl || item.imageurl || 'https://via.placeholder.com/150' }} style={styles.venueImage} />
+                                  <Image
+                                    source={{
+                                      uri:
+                                        item.imageUrl ||
+                                        item.imageurl ||
+                                        'https://via.placeholder.com/150'
+                                    }}
+                                    style={styles.venueImage}
+                                  />
+
                                   <View style={{ flex: 1, marginLeft: 12 }}>
                                     <Text style={styles.venueName}>{item.name}</Text>
                                     <Text style={styles.venueRating}>{item.rating} stars</Text>
                                     <Text style={styles.venueDesc}>{item.location}</Text>
                                   </View>
-                                  {selectedOption?.name === item.name && <Ionicons name="checkmark-circle" size={24} color={ACCENT} />}
+
+                                  {selectedOption?.name === item.name && (
+                                    <Ionicons name="checkmark-circle" size={24} color={ACCENT} />
+                                  )}
                                 </TouchableOpacity>
                               )}
                             />
+
                             <TouchableOpacity
-                              style={selectedOption ? styles.sendIdeaBtnEnabled : styles.sendIdeaBtn}
+                              style={
+                                selectedOption
+                                  ? styles.sendIdeaBtnEnabled
+                                  : styles.sendIdeaBtn
+                              }
                               disabled={!selectedOption}
                               onPress={() => {
                                 sendAISuggestionToChat();
@@ -1225,15 +1240,6 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, backgroundColor: '#1C1C1E', borderRadius: 25, paddingHorizontal: 20, paddingVertical: 12, color: 'white', fontSize: 16, marginRight: 10 },
   sendBtn: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: ACCENT, justifyContent: 'center', alignItems: 'center' },
-  aiTrigger: {
-    padding: 8,
-    backgroundColor: '#1C1C1E',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
   explorePanel: { height: '85%', backgroundColor: '#0A0A0A', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
   sectionHeader: { color: 'white', fontSize: 18, fontFamily: 'Avenir-Black', marginBottom: 20, paddingHorizontal: 20 },
   scrollRow: { marginBottom: 30, paddingLeft: 20 },
@@ -1389,5 +1395,72 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     resizeMode: "cover",
-  }
+  },
+  vibeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#111",
+    padding: 18,
+    borderRadius: 20,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#222",
+  },
+
+  vibeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#1C1C1E",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+
+  vibeText: {
+    flex: 1,
+    color: "white",
+    fontSize: 17,
+    fontFamily: "Avenir-Heavy",
+  },
+  thinkingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2000,
+  },
+
+  thinkingOrb: {
+    width: 180,
+    height: 180,
+    opacity: 0.9,
+  },
+
+  thinkingText: {
+    color: "#999",
+    fontSize: 16,
+    marginTop: 20,
+    fontFamily: "Avenir-Medium",
+    letterSpacing: 0.5,
+  },
+  aiChip: {
+  flexDirection: "row",
+  alignItems: "center",
+  alignSelf: "flex-start",
+  marginTop: 6,
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 14,
+  backgroundColor: "#111",
+  borderWidth: 1,
+  borderColor: "#1C1C1E",
+},
+
+aiChipText: {
+  color: "#aaa",
+  fontSize: 12,
+  marginHorizontal: 6,
+  fontFamily: "Avenir-Medium",
+},
 });
