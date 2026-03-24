@@ -568,8 +568,8 @@ const styles = StyleSheet.create({
   friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
   separator: {
     height: 1,
-    backgroundColor: "rgba(255,255,255,0.06)", // 👈 faint
-    marginLeft: 66, // 👈 aligns with text (avatar + spacing)
+    backgroundColor: "rgba(255,255,255,0.06)",
+    marginLeft: 66,
   },
   avatar: {
     width: 52,
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 14,
-    borderWidth: 1,
+    borderWidth: .2,
     borderColor: BORDER
   },
   img: {
