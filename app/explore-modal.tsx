@@ -73,7 +73,7 @@ export default function ExploreModal({
 
     return (
         <View style={[StyleSheet.absoluteFill, styles.overlay]}>
-            {isThinking && (
+            {isThinking && ( 
                 <View style={styles.thinkingOverlay}>
                     <Image
                         source={require("../assets/pulse.gif")}
@@ -324,11 +324,12 @@ const styles = StyleSheet.create({
         zIndex: 2000,
     },
     thinkingOrb: {
-        width: 180,
-        height: 180,
+        width: 280,
+        height: 280,
     },
     thinkingText: {
         color: "#999",
         marginTop: 20,
+        fontSize: 26
     },
 });
