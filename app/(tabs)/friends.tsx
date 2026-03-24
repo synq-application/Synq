@@ -23,7 +23,6 @@ import {
 } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Dimensions,
   FlatList,
   Image,
@@ -298,10 +297,18 @@ function SearchModal({
     fetchSuggested();
   }, [visible]);
 
-  const searchUsers = async (val: string) => {
-    setQueryText(val);
+  const debounceRef = React.useRef<any>(null);
 
-    if (val.length < 2) {
+
+const searchUsers = (val: string) => {
+  setQueryText(val);
+
+  if (debounceRef.current) {
+    clearTimeout(debounceRef.current);
+  }
+
+  debounceRef.current = setTimeout(async () => {
+    if (val.length < 1) {
       setResults([]);
       return;
     }
@@ -343,7 +350,8 @@ function SearchModal({
     } finally {
       setIsSearching(false);
     }
-  };
+  }, 300); // debounce delay (can tweak 250–400)
+};
 
   const sendInvite = async (targetUser: any) => {
     if (!auth.currentUser) {
@@ -488,55 +496,52 @@ function SearchModal({
             />
           </View>
         )}
-
-        {isSearching ? (
-          <ActivityIndicator color={ACCENT} style={{ marginTop: 20 }} />
-        ) : (
-          <FlatList
-            data={results}
-            keyExtractor={(item) => item.id}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            ListFooterComponent={<View style={{ height: 40 }} />}
-
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            renderItem={({ item }) => (
-              <View style={styles.searchResult}>
-                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-                  <View style={styles.avatar}>
-                    {item.imageurl ? (
-                      <Image source={{ uri: item.imageurl }} style={styles.img} />
-                    ) : (
-                      <Icon name="person" size={22} color={MUTED3} />
-                    )}
-                  </View>
-                  <View style={{ paddingRight: 12 }}>
-                    <Text style={styles.friendName}>
-                      {item.displayName || "User"}
-                    </Text>
-                    <Text style={styles.emailDetail}>{item.email}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    if (!currentFriends.includes(item.id)) {
-                      sendInvite(item);
-                    }
-                  }}
-                  style={[
-                    styles.addBtn,
-                    currentFriends.includes(item.id) && { opacity: 0.4 }
-                  ]}
-                  disabled={currentFriends.includes(item.id)}
-                >
-                  <Text style={styles.addBtnText}>
-                    {currentFriends.includes(item.id) ? "Friends" : "Add"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+<View style={{ flex: 1 }}>
+  <FlatList
+    data={results}
+    keyExtractor={(item) => item.id}
+    keyboardShouldPersistTaps="handled"
+    keyboardDismissMode="on-drag"
+    ListFooterComponent={<View style={{ height: 40 }} />}
+    ItemSeparatorComponent={() => <View style={styles.separator} />}
+    renderItem={({ item }) => (
+      <View style={styles.searchResult}>
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+          <View style={styles.avatar}>
+            {item.imageurl ? (
+              <Image source={{ uri: item.imageurl }} style={styles.img} />
+            ) : (
+              <Icon name="person" size={22} color={MUTED3} />
             )}
-          />
-        )}
+          </View>
+          <View style={{ paddingRight: 12 }}>
+            <Text style={styles.friendName}>
+              {item.displayName || "User"}
+            </Text>
+            <Text style={styles.emailDetail}>{item.email}</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => {
+            if (!currentFriends.includes(item.id)) {
+              sendInvite(item);
+            }
+          }}
+          style={[
+            styles.addBtn,
+            currentFriends.includes(item.id) && { opacity: 0.4 }
+          ]}
+          disabled={currentFriends.includes(item.id)}
+        >
+          <Text style={styles.addBtnText}>
+            {currentFriends.includes(item.id) ? "Friends" : "Add"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    )}
+  />
+</View>
       </View>
       <AlertModal
         visible={alertVisible}
