@@ -1,6 +1,6 @@
 import { ACCENT } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -43,7 +43,33 @@ export default function ExploreModal({
     sendAISuggestionToChat,
     currentCategory,
 }: Props) {
+    const [pressed, setPressed] = useState<string | null>(null);
+
     if (!visible) return null;
+
+    const vibes = [
+        {
+            label: "Night Out",
+            desc: "Drinks, dancing, late nights",
+        },
+        {
+            label: "Dinner",
+            desc: "Good food & conversation",
+        },
+        {
+            label: "Chill",
+            desc: "Low-key and relaxing",
+        },
+        {
+            label: "Outdoors",
+            desc: "Fresh air & open space",
+        },
+        {
+            label: "Surprise Me",
+            desc: "We’ll pick something for you",
+            special: true,
+        },
+    ];
 
     return (
         <View style={[StyleSheet.absoluteFill, styles.overlay]}>
@@ -67,35 +93,52 @@ export default function ExploreModal({
                                     <View style={styles.header}>
                                         <Text style={styles.title}>What’s the vibe?</Text>
                                         <TouchableOpacity onPress={onClose}>
-                                            <Ionicons name="close-circle" size={28} color="#444" />
+                                            <Ionicons name="close" size={26} color="#666" />
                                         </TouchableOpacity>
                                     </View>
 
+                                    <Text style={styles.subtitle}>
+                                        Pick the energy you’re feeling
+                                    </Text>
+
                                     <ScrollView contentContainerStyle={{ padding: 20 }}>
-                                        {[
-                                            { label: "Night Out", icon: "wine" },
-                                            { label: "Dinner", icon: "restaurant" },
-                                            { label: "Chill", icon: "cafe" },
-                                            { label: "Outdoors", icon: "leaf" },
-                                            { label: "Surprise Me", icon: "flash" },
-                                        ].map((item) => (
-                                            <TouchableOpacity
-                                                key={item.label}
-                                                style={styles.vibeCard}
-                                                onPress={() => {
-                                                    Keyboard.dismiss();
-                                                    onSelectVibe(item.label);
-                                                }}
-                                            >
-                                                <View style={styles.vibeIcon}>
-                                                    <Ionicons name={item.icon as any} size={24} color={ACCENT} />
-                                                </View>
 
-                                                <Text style={styles.vibeText}>{item.label}</Text>
+                                        {vibes.map((item) => {
+                                            const isPressed = pressed === item.label;
 
-                                                <Ionicons name="chevron-forward" size={18} color="#666" />
-                                            </TouchableOpacity>
-                                        ))}
+                                            return (
+                                                <TouchableOpacity
+                                                    key={item.label}
+                                                    activeOpacity={0.9}
+                                                    onPressIn={() => setPressed(item.label)}
+                                                    onPressOut={() => setPressed(null)}
+                                                    onPress={() => {
+                                                        Keyboard.dismiss();
+                                                        onSelectVibe(item.label);
+                                                    }}
+                                                    style={[
+                                                        styles.vibeCard,
+                                                        isPressed && styles.vibeCardPressed,
+                                                        item.special && styles.specialCard,
+                                                    ]}
+                                                >
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={styles.vibeTitle}>
+                                                            {item.label}
+                                                        </Text>
+                                                        <Text style={styles.vibeDesc}>
+                                                            {item.desc}
+                                                        </Text>
+                                                    </View>
+
+                                                    <Ionicons
+                                                        name="chevron-forward"
+                                                        size={18}
+                                                        color="#555"
+                                                    />
+                                                </TouchableOpacity>
+                                            );
+                                        })}
 
                                         {isAILoading && (
                                             <View style={{ marginTop: 30, alignItems: "center" }}>
@@ -118,9 +161,10 @@ export default function ExploreModal({
                                         </TouchableOpacity>
 
                                         <TouchableOpacity onPress={onClose}>
-                                            <Ionicons name="close-circle" size={28} color="#444" />
+                                            <Ionicons name="close" size={26} color="#666" />
                                         </TouchableOpacity>
                                     </View>
+
                                     <FlatList
                                         data={aiOptions}
                                         keyExtractor={(item) => item.name}
@@ -183,34 +227,49 @@ const styles = StyleSheet.create({
     },
     title: {
         color: "white",
-        fontSize: 20,
+        fontSize: 22,
         fontFamily: "Avenir-Heavy",
     },
+    subtitle: {
+        color: "#777",
+        fontSize: 14,
+        marginHorizontal: 20,
+        marginTop: -10,
+        marginBottom: 10,
+    },
+
     vibeCard: {
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: "#111",
         padding: 18,
         borderRadius: 20,
-        marginBottom: 14,
+        marginBottom: 16,
         borderWidth: 1,
-        borderColor: "#222",
+        borderColor: "#1A1A1A",
     },
-    vibeIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: "#1C1C1E",
-        justifyContent: "center",
-        alignItems: "center",
-        marginRight: 12,
+
+    vibeCardPressed: {
+        transform: [{ scale: 0.97 }],
+        borderColor: ACCENT,
     },
-    vibeText: {
-        flex: 1,
+
+    specialCard: {
+        borderColor: "#2A2A2A",
+    },
+
+    vibeTitle: {
         color: "white",
-        fontSize: 16,
+        fontSize: 18,
         fontFamily: "Avenir-Heavy",
     },
+
+    vibeDesc: {
+        color: "#777",
+        fontSize: 13,
+        marginTop: 4,
+    },
+
     venueCard: {
         flexDirection: "row",
         alignItems: "center",
@@ -237,6 +296,7 @@ const styles = StyleSheet.create({
         color: "#888",
         fontSize: 13,
     },
+
     sendBtn: {
         backgroundColor: "#555",
         margin: 20,
@@ -255,6 +315,7 @@ const styles = StyleSheet.create({
         color: "black",
         fontWeight: "bold",
     },
+
     thinkingOverlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: "rgba(0,0,0,0.92)",
