@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     backgroundColor: BG,
-    borderRadius: 22,
+    borderRadius: 14,
     padding: 22,
     borderWidth: 1,
     borderColor: BORDER,
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
 
   confirmBtn: {
     backgroundColor: ACCENT,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 16,
   },

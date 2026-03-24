@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   hero: {
     margin: 20,
     backgroundColor: SURFACE,
-    borderRadius: 18,
+    borderRadius: 14,
     padding: 18,
     borderWidth: 1,
     borderColor: "#202020",
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: SURFACE,
     marginHorizontal: 20,
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 18,
     borderWidth: 1,
     borderColor: "#202020",
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginHorizontal: 20,
     backgroundColor: "#FF4D4F",
-    borderRadius: 16,
+    borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 16,
     flexDirection: "row",
