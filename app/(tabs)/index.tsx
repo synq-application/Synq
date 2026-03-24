@@ -168,6 +168,11 @@ export default function SynqScreen() {
     });
     return () => subscription.remove();
   }, []);
+  useEffect(() => {
+  if (isExploreVisible) {
+    Keyboard.dismiss();
+  }
+}, [isExploreVisible]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -816,11 +821,12 @@ export default function SynqScreen() {
                   <Text style={styles.modalTitle}>
                     {activeChat ? getChatTitle(activeChat) : 'Synq Chat'}
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setIsExploreVisible(true);
-                    }}
+                    <TouchableOpacity
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setIsExploreVisible(true);
+                      }}
                     hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
                     style={[styles.aiTrigger, { marginLeft: 10 }]}
                   >
