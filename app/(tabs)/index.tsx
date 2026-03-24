@@ -815,25 +815,25 @@ export default function SynqScreen() {
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-<View>
-  <Text style={styles.modalTitle}>
-    {activeChat ? getChatTitle(activeChat) : 'Synq Chat'}
-  </Text>
+                <View>
+                  <Text style={styles.modalTitle}>
+                    {activeChat ? getChatTitle(activeChat) : 'Synq Chat'}
+                  </Text>
 
-  <TouchableOpacity
-    onPress={() => {
-      Keyboard.dismiss();
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setIsExploreVisible(true);
-    }}
-    style={styles.aiChip}
-    activeOpacity={0.8}
-  >
-    <Ionicons name="sparkles" size={14} color={ACCENT} />
-    <Text style={styles.aiChipText}>{rotatingAIText}</Text>
-    <Ionicons name="chevron-forward" size={14} color="#666" />
-  </TouchableOpacity>
-</View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setIsExploreVisible(true);
+                    }}
+                    style={styles.aiChip}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="sparkles" size={14} color={ACCENT} />
+                    <Text style={styles.aiChipText}>{rotatingAIText}</Text>
+                    <Ionicons name="chevron-forward" size={14} color="#666" />
+                  </TouchableOpacity>
+                </View>
               </View>
               <TouchableOpacity
                 onPress={() => {
@@ -952,32 +952,32 @@ export default function SynqScreen() {
               </View>
 
             </KeyboardAvoidingView>
-<ExploreModal
-  visible={isExploreVisible}
-  onClose={() => {
-    setIsExploreVisible(false);
-    setShowOptionsList(false);
-  }}
-  onBack={() => setShowOptionsList(false)}
-  onSelectVibe={(label: string) => {
-    setIsThinking(true);
-    setTimeout(() => {
-      triggerAISuggestion(label);
-    }, 600);
-  }}
-  isThinking={isThinking}
-  isAILoading={isAILoading}
-  showOptionsList={showOptionsList}
-  aiOptions={aiOptions}
-  selectedOption={selectedOption}
-  setSelectedOption={setSelectedOption}
-  sendAISuggestionToChat={() => {
-    sendAISuggestionToChat();
-    setIsExploreVisible(false);
-    setShowOptionsList(false);
-  }}
-  currentCategory={currentCategory}
-/>
+            <ExploreModal
+              visible={isExploreVisible}
+              onClose={() => {
+                setIsExploreVisible(false);
+                setShowOptionsList(false);
+              }}
+              onBack={() => setShowOptionsList(false)}
+              onSelectVibe={(label: string) => {
+                setIsThinking(true);
+                setTimeout(() => {
+                  triggerAISuggestion(label);
+                }, 600);
+              }}
+              isThinking={isThinking}
+              isAILoading={isAILoading}
+              showOptionsList={showOptionsList}
+              aiOptions={aiOptions}
+              selectedOption={selectedOption}
+              setSelectedOption={setSelectedOption}
+              sendAISuggestionToChat={() => {
+                sendAISuggestionToChat();
+                setIsExploreVisible(false);
+                setShowOptionsList(false);
+              }}
+              currentCategory={currentCategory}
+            />
           </View>
         </Modal>
 
@@ -1274,33 +1274,23 @@ const styles = StyleSheet.create({
     height: "100%",
     resizeMode: "cover",
   },
-  vibeCard: {
+  aiChip: {
     flexDirection: "row",
     alignItems: "center",
+    alignSelf: "flex-start",
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
     backgroundColor: "#111",
-    padding: 18,
-    borderRadius: 20,
-    marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#222",
+    borderColor: "#1C1C1E",
   },
-  aiChip: {
-  flexDirection: "row",
-  alignItems: "center",
-  alignSelf: "flex-start",
-  marginTop: 6,
-  paddingHorizontal: 10,
-  paddingVertical: 6,
-  borderRadius: 14,
-  backgroundColor: "#111",
-  borderWidth: 1,
-  borderColor: "#1C1C1E",
-},
 
-aiChipText: {
-  color: "#aaa",
-  fontSize: 12,
-  marginHorizontal: 6,
-  fontFamily: "Avenir-Medium",
-},
+  aiChipText: {
+    color: "#aaa",
+    fontSize: 12,
+    marginHorizontal: 6,
+    fontFamily: "Avenir-Medium",
+  },
 });
