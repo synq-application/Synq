@@ -31,7 +31,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Hold on", "Please enter both your email and password.");
+      Alert.alert("Please enter both your email and password.");
       return;
     }
 
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: "rgba(255,255,255,0.06)",
     height: 56,
-    borderRadius: 18,
+    borderRadius: 14,
     paddingHorizontal: 16,
     color: TEXT,
     fontSize: 16,

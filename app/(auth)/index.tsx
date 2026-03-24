@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   nextBtn: {
     width: "88%",
     height: 54,
-    borderRadius: 18,
+    borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",

@@ -111,7 +111,7 @@ export default function EditProfileScreen() {
 
   const fillFromCurrentLocation = async () => {
     try {
-      setLocationUsed(true); // hide the row immediately
+      setLocationUsed(true);
       setLocating(true);
 
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -308,15 +308,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
     color: 'white',
     padding: 15,
-    borderRadius: 12,
+    borderRadius: 14,
     fontSize: 16,
     fontFamily: fonts.medium,
     borderWidth: 1,
     borderColor: '#222'
   },
   row: { flexDirection: 'row' },
-
-  // Location row (same behavior as onboarding: disappears after tap)
   locationRow: {
     marginTop: 6,
     borderRadius: 14,
