@@ -340,7 +340,7 @@ export default function ProfileScreen() {
                   <View
                     style={[
                       styles.imageCircle,
-                      { borderColor: ACCENT, borderWidth: 2 },
+                      { borderColor: ACCENT, borderWidth: 1 },
                     ]}
                   >
                     {item.imageUrl ? (
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     overflow: "hidden",
     borderWidth: 2,
-    borderColor: "white",
+    borderColor: ACCENT,
     backgroundColor: "#1a1a1a",
     justifyContent: "center",
     alignItems: "center",
