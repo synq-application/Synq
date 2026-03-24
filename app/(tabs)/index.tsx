@@ -1182,7 +1182,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textAlign: 'center'
   },
-  centeredModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: 25 },
+centeredModalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.9)',
+  justifyContent: 'center', 
+  alignItems: 'center',
+  padding: 25,
+},
   modalBg: { flex: 1, backgroundColor: 'black' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
   modalTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Medium' },
@@ -1256,10 +1262,39 @@ const styles = StyleSheet.create({
   aiCardBodySmall: { color: 'white', fontSize: 15, fontFamily: 'Avenir', lineHeight: 22, marginBottom: 15 },
   aiShareBtnSmall: { backgroundColor: ACCENT, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
   aiShareBtnText: { color: 'black', fontSize: 14, fontFamily: 'Avenir-Heavy' },
-  editPanel: { width: '100%', backgroundColor: '#161616', borderRadius: 32, padding: 32, alignItems: 'center', height: 300 },
-  panelTitle: { color: 'white', fontSize: 22, marginBottom: 24, fontFamily: 'Avenir-Medium' },
-  panelInput: { width: '100%', backgroundColor: "black", color: 'white', padding: 18, borderRadius: 16, marginBottom: 20, textAlign: 'center', height: 100 },
-  saveBtn: { backgroundColor: ACCENT, width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 12 },
+editPanel: {
+  width: '100%',
+  backgroundColor: '#161616',
+  borderRadius: 28,
+  padding: 24,
+  alignItems: 'stretch',
+},
+panelTitle: {
+  color: 'white',
+  fontSize: 22,
+  fontFamily: 'Avenir-Medium',
+},
+panelInput: {
+  width: '100%',
+  backgroundColor: "#0E0E0E",
+  color: 'white',
+  padding: 16,
+  borderRadius: 16,
+  marginTop: 8,
+  marginBottom: 12,
+  fontSize: 15,
+  minHeight: 80,
+},
+saveBtn: {
+  backgroundColor: ACCENT,
+  width: '80%',
+  padding: 18,
+  borderRadius: 16,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 20,
+  alignSelf: 'center'
+},
   saveBtnText: { color: 'black', fontSize: 16, fontFamily: 'Avenir-Medium' },
   endSynqBtn: { width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FF453A' },
   endSynqBtnText: { color: '#FF453A', fontSize: 16 },
@@ -1390,4 +1425,45 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
     fontFamily: "Avenir-Medium",
   },
+panelSubtext: {
+  color: "rgba(255,255,255,0.55)",
+  fontSize: 14,
+  marginTop: 6,
+  marginBottom: 12,
+},
+
+suggestionWrap: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8, // 👈 cleaner spacing (RN 0.71+)
+},
+suggestionChip: {
+  borderWidth: 1,
+  borderColor: "rgba(255,255,255,0.08)",
+  backgroundColor: "rgba(255,255,255,0.04)",
+  paddingHorizontal: 14,
+  paddingVertical: 10,
+  borderRadius: 999,
+
+  // 👇 KEY FIX
+  alignSelf: "flex-start",
+},
+
+suggestionText: {
+  color: "rgba(255,255,255,0.85)",
+  fontSize: 13,
+},
+
+lockRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  marginTop: 14,
+},
+
+lockText: {
+  color: "rgba(255,255,255,0.30)",
+  fontSize: 12,
+  marginLeft: 6,
+},
 });

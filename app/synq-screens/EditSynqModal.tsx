@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Keyboard,
   Modal,
@@ -27,31 +27,122 @@ export default function EditSynqModal({
   onSaveMemo,
   styles,
 }: Props) {
+  const suggestions = useMemo(
+    () => [
+      "Let’s grab drinks 🍸",
+      "Anyone want to get dinner?",
+      "Coffee run?",
+      "Let’s go out tonight",
+      "Who wants to hang?",
+      "Movie night anyone?",
+      "Down for something fun",
+      "Anyone up for a walk?",
+      "Let’s do happy hour",
+      "Want to grab food?",
+      "Anyone want to workout?"
+    ],
+    []
+  );
+
+  const [visibleSuggestions, setVisibleSuggestions] = useState<string[]>([]);
+
+  const pickSuggestions = () => {
+    const shuffled = [...suggestions]
+      .sort(() => 0.5 - Math.random())
+      .filter((s) => s.toLowerCase() !== memo.toLowerCase());
+
+    setVisibleSuggestions(shuffled.slice(0, 3));
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    pickSuggestions();
+  }, [visible]);
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.centeredModalOverlay}>
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.editPanel}>
+
               <TouchableOpacity
                 onPress={onClose}
                 style={styles.closeBtn}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close-circle" size={28} color="#444" />
+                <Ionicons
+                  name="close"
+                  size={22}
+                  color="rgba(255,255,255,0.4)"
+                />
               </TouchableOpacity>
 
-              <Text style={styles.panelTitle}>Edit memo</Text>
+              <Text style={styles.panelTitle}>Edit synq memo</Text>
 
+              <Text style={styles.panelSubtext}>
+                Share what you’re up to or what you’re down for
+              </Text>
+
+              {/* input */}
               <TextInput
                 style={styles.panelInput}
                 value={memo}
                 onChangeText={setMemo}
+                placeholder="e.g. let’s grab drinks 🍸"
+                placeholderTextColor="rgba(255,255,255,0.25)"
+                multiline
               />
 
-              <TouchableOpacity style={styles.saveBtn} onPress={onSaveMemo}>
-                <Text style={styles.saveBtnText}>Update</Text>
+              <View style={{ 
+                flexDirection: "row", 
+                justifyContent: "space-between", 
+                alignItems: "center",
+                marginBottom: 6
+              }}>
+                <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
+                  Suggested ideas
+                </Text>
+
+                <TouchableOpacity onPress={pickSuggestions}>
+                  <Ionicons
+                    name="shuffle-outline"
+                    size={18}
+                    color="rgba(255,255,255,0.4)"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.suggestionWrap}>
+                {visibleSuggestions.map((s, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={styles.suggestionChip}
+                    onPress={() => setMemo(s)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.suggestionText}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={onSaveMemo}
+              >
+                <Text style={styles.saveBtnText}>Update memo</Text>
               </TouchableOpacity>
+              <View style={styles.lockRow}>
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={14}
+                  color="rgba(255,255,255,0.35)"
+                />
+                <Text style={styles.lockText}>
+                  Only your friends can see this
+                </Text>
+              </View>
+
             </View>
           </TouchableWithoutFeedback>
         </View>
