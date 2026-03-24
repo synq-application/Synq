@@ -19,6 +19,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   DeviceEventEmitter,
   FlatList,
   Image,
@@ -36,7 +37,7 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, MUTED, OFFSETS } from '../../constants/Variables';
+import { ACCENT, aiPrompts, DEFAULT_AVATAR, EXPIRATION_HOURS, MUTED, OFFSETS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
@@ -69,17 +70,11 @@ export default function SynqScreen() {
   const [showOptionsList, setShowOptionsList] = useState(false);
   const [currentCategory, setCurrentCategory] = useState('');
   const flatListRef = useRef<FlatList>(null);
+  const lastTapRef = useRef<{ [key: string]: number }>({});
+  const heartScales = useRef<{ [key: string]: Animated.Value }>({});
   const [hasUnread, setHasUnread] = useState(false);
   const [mutualInterests, setMutualInterests] = useState<string[]>([]);
   const [showEndSynqModal, setShowEndSynqModal] = useState(false);
-  const aiPrompts = [
-    "Let Synq pick the move",
-    "Find something fun nearby",
-    "Not sure what to do?",
-    "Let Synq pick the vibe",
-    "Discover something new",
-  ];
-
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
@@ -105,6 +100,22 @@ export default function SynqScreen() {
     return { name, address };
   };
   const normalizeInterest = (s: string) => (s || '').trim();
+
+  const animateHeart = (messageId: string) => {
+    if (!heartScales.current[messageId]) {
+      heartScales.current[messageId] = new Animated.Value(0);
+    }
+
+    const scale = heartScales.current[messageId];
+
+    scale.setValue(0);
+
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 5,
+    }).start();
+  };
 
   const intersectMany = (lists: string[][]) => {
     if (!lists.length) return [];
@@ -156,7 +167,7 @@ export default function SynqScreen() {
     const interval = setInterval(() => {
       index = (index + 1) % aiPrompts.length;
       setRotatingAIText(aiPrompts[index]);
-    }, 10000); // change every 3s
+    }, 10000);
 
     return () => clearInterval(interval);
   }, []);
@@ -540,6 +551,23 @@ export default function SynqScreen() {
     ]);
   };
 
+  const toggleHeartReaction = async (messageId: string, currentReactions: any) => {
+    if (!auth.currentUser || !activeChatId) return;
+
+    const userId = auth.currentUser.uid;
+    const messageRef = doc(db, "chats", activeChatId, "messages", messageId);
+
+    try {
+      const hasReacted = currentReactions?.[userId] === "heart";
+
+      await updateDoc(messageRef, {
+        [`reactions.${userId}`]: hasReacted ? null : "heart",
+      });
+    } catch (e) {
+      console.error("Failed to toggle reaction", e);
+    }
+  };
+
   const firstName = (fullName: string) =>
     (fullName || "").trim().split(/\s+/)[0];
 
@@ -901,12 +929,58 @@ export default function SynqScreen() {
                         ]}
                       >
                         <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-                          {!isMe && <Image source={{ uri: senderAvatar }} style={styles.chatAvatar} />}
-                          <View style={[styles.bubble, isMe ? styles.myBubble : styles.theirBubble]}>
-                            <Text style={{ color: isMe ? "black" : "white", fontSize: 16 }}>{item.text}</Text>
+                          {!isMe && (
+                            <Image source={{ uri: senderAvatar }} style={styles.chatAvatar} />
+                          )}
+
+                          <View style={{ position: "relative", maxWidth: "75%" }}>
+                            <View
+                              onStartShouldSetResponder={() => true}
+                              onResponderRelease={() => {
+                                const now = Date.now();
+                                const lastTap = lastTapRef.current[item.id];
+
+                                if (lastTap && now - lastTap < 300) {
+                                  toggleHeartReaction(item.id, item.reactions);
+
+                                  // 💥 animate
+                                  animateHeart(item.id);
+
+                                  // 📳 haptic
+                                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }
+
+                                lastTapRef.current[item.id] = now;
+                              }}
+                              style={[
+                                styles.bubble,
+                                isMe ? styles.myBubble : styles.theirBubble,
+                              ]}
+                            >
+                              <Text
+                                style={{
+                                  color: isMe ? "black" : "white",
+                                  fontSize: 16,
+                                }}
+                              >
+                                {item.text}
+                              </Text>
+                            </View>
+                            {item.reactions &&
+                              Object.values(item.reactions).includes("heart") && (
+                                <View style={styles.heartReaction}>
+                                  <Ionicons name="heart" size={12} color="#FF3B30" />
+                                </View>
+                              )}
                           </View>
                         </View>
-                        <Text style={[styles.timestampOutside, isMe ? { marginRight: 4 } : { marginLeft: 44 }]}>
+
+                        <Text
+                          style={[
+                            styles.timestampOutside,
+                            isMe ? { marginRight: 4 } : { marginLeft: 44 },
+                          ]}
+                        >
                           {formatTime(item.createdAt)}
                         </Text>
                       </View>
@@ -1105,7 +1179,7 @@ const styles = StyleSheet.create({
   stackedPhoto: { width: 40, height: 40, borderRadius: 20, position: 'absolute', borderWidth: 2, borderColor: 'black' },
   msgContainer: { marginBottom: 15 },
   chatAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
-  bubble: { padding: 15, borderRadius: 22, maxWidth: '75%' },
+  bubble: { padding: 15, borderRadius: 22 },
   myBubble: { backgroundColor: ACCENT },
   theirBubble: { backgroundColor: '#1C1C1E' },
   timestampOutside: { color: '#444', fontSize: 11, marginTop: 4, fontFamily: 'Avenir' },
@@ -1194,6 +1268,16 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     overflow: "hidden",
+  },
+  heartReaction: {
+    position: "absolute",
+    bottom: -6,
+    right: -6,
+    backgroundColor: "#000",
+    borderRadius: 8,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: "#222",
   },
   ideaImage: {
     width: '100%',

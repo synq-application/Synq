@@ -36,7 +36,14 @@ export interface Friend {
   interests?: string[];
   mutualCount?: number;
 }
-
+export const aiPrompts = [
+    "Let Synq pick the move",
+    "Find something fun nearby",
+    "Not sure what to do?",
+    "Let Synq pick the vibe",
+    "Discover something new",
+  ];
+  
 export const popularNow = [
   { label: "Farmers Market", image: require("./farmers-market.jpeg") },
   { label: "Museums", image: require("./museum.jpeg") },
