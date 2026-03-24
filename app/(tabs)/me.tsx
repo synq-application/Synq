@@ -1,24 +1,22 @@
 import { ACCENT, fonts } from "@/constants/Variables";
-import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
   Modal,
-  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import Icon from "react-native-vector-icons/Ionicons";
@@ -39,7 +37,6 @@ export default function ProfileScreen() {
   const [isQRExpanded, setQRExpanded] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
-  const [showMemoModal, setShowMemoModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [connections, setConnections] = useState<Connection[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
@@ -48,11 +45,54 @@ export default function ProfileScreen() {
   const [state, setState] = useState<string | null>(null);
   const [memo, setMemo] = useState<string>("");
   const [monthlyMemo, setMonthlyMemo] = useState<string>("");
-  const [tempMonthlyMemo, setTempMonthlyMemo] = useState<string>("");
   const [loadingConnections, setLoadingConnections] = useState(false);
   const [hasLoadedConnections, setHasLoadedConnections] = useState(false);
   const [requestCount, setRequestCount] = useState(0);
-  const memoInputRef = useRef<TextInput>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+const [events, setEvents] = useState<
+  { date: string; day: number; title: string }[]
+>([]);
+
+  const [showEventModal, setShowEventModal] = useState(false);
+
+  const [newEvent, setNewEvent] = useState({
+    title: "",
+    date: "",
+    time: "",
+    location: "",
+  });
+
+  const saveEvent = async () => {
+    if (!auth.currentUser) return;
+
+if (!newEvent.title || !newEvent.date) {
+  Alert.alert("Missing info", "Add a title and date");
+  return;
+}
+
+    const formatted = `${newEvent.date} ${newEvent.title}`;
+
+    const updatedMemo = monthlyMemo
+      ? `${monthlyMemo}\n${formatted}`
+      : formatted;
+
+    try {
+      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+        monthlyMemo: updatedMemo,
+      });
+
+      setShowEventModal(false);
+      setSelectedDate(new Date());
+      setNewEvent({
+        title: "",
+        date: "",
+        time: "",
+        location: "",
+      });
+    } catch (e) {
+      Alert.alert("Error", "Could not save event.");
+    }
+  };
 
   useEffect(() => {
     if (!auth.currentUser?.uid) return;
@@ -66,7 +106,9 @@ export default function ProfileScreen() {
         const stateAbbr = stateAbbreviations[userData.state] || userData.state || null;
         setState(stateAbbr);
         setMemo(userData.memo || "");
-        setMonthlyMemo(userData.monthlyMemo || "");
+        const memo = userData.monthlyMemo || "";
+        setMonthlyMemo(memo);
+        setEvents(parseMemoToEvents(memo));
         setInterests(userData.interests || []);
         setSelectedInterests(userData.interests || []);
         setProfileImage(userData?.imageurl || null);
@@ -114,6 +156,37 @@ export default function ProfileScreen() {
       unsubscribeFriends();
     };
   }, []);
+
+const parseMemoToEvents = (memo: string) => {
+  if (!memo) return [];
+
+  return memo
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const parts = line.trim().split(" ");
+
+      if (parts.length < 3) return null;
+
+      const month = parts[0];
+      const day = Number(parts[1]);
+
+      if (isNaN(day)) return null;
+
+      const title = parts.slice(2).join(" ");
+
+      return {
+        date: `${month} ${day}`,
+        day,
+        title,
+      };
+    })
+    // 🔥 THIS IS THE KEY FIX
+    .filter(
+      (event): event is { date: string; day: number; title: string } =>
+        event !== null
+    );
+};
 
   const filteredActivities = allActivities.filter((item) =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -189,25 +262,6 @@ export default function ProfileScreen() {
     } catch (e) {
       Alert.alert("Error", "Could not save interests.");
     }
-  };
-
-  const saveMonthlyMemo = async () => {
-    if (!auth.currentUser) return;
-    setShowMemoModal(false);
-
-    try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        monthlyMemo: tempMonthlyMemo,
-      });
-    } catch (e) {
-      Alert.alert("Error", "Could not save monthly memo.");
-    }
-  };
-
-  const openMemoModal = () => {
-    setTempMonthlyMemo(monthlyMemo);
-    setShowMemoModal(true);
-    setTimeout(() => memoInputRef.current?.focus(), 250);
   };
 
   const accountData = {
@@ -394,28 +448,18 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
-      <View style={styles.section}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionTitle}>Monthly memo</Text>
-          <TouchableOpacity onPress={openMemoModal} style={{ marginBottom: 10}}>
-            <Icon name="create-outline" size={22} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.monthlyMemoBox, { borderColor: monthlyMemo ? ACCENT : "#222" }]}
-          onPress={openMemoModal}
-        >
-          <Text style={styles.monthlyMemoSubtitle}>
-            What's going on this month that you'd like to share? Tap to edit
-          </Text>
-          <Text style={styles.monthlyMemoContent}>
-            {monthlyMemo || "No plans shared yet for this month. Tap to add your first memo!"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
+      {/* <MonthlyMemo
+        ACCENT={ACCENT}
+        fonts={fonts}
+        setShowEventModal={setShowEventModal}
+        showEventModal={showEventModal}
+        newEvent={newEvent}
+        setNewEvent={setNewEvent}
+        saveEvent={saveEvent}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        events={events}
+      /> */}
       <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
@@ -478,37 +522,6 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={saveInterests} style={styles.saveBtn}>
               <Text style={styles.saveBtnText}>Save Changes</Text>
             </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={showMemoModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={{ flex: 1, width: "100%" }}
-            onPressIn={() => setShowMemoModal(false)}
-          />
-          <View style={styles.interestContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Monthly memo</Text>
-              <Pressable onPressIn={() => setShowMemoModal(false)} hitSlop={10}>
-                <Ionicons name="close-circle" size={28} color="#444" />
-              </Pressable>
-            </View>
-
-            <TextInput
-              ref={memoInputRef}
-              style={styles.monthlyMemoInputShort}
-              placeholder="e.g. May 7th - Dupont Farmer's Market..."
-              placeholderTextColor="#444"
-              multiline
-              value={tempMonthlyMemo}
-              onChangeText={setTempMonthlyMemo}
-            />
-
-            <Pressable onPressIn={saveMonthlyMemo} style={styles.saveBtn}>
-              <Text style={styles.saveBtnText}>Save memo</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -601,9 +614,6 @@ const styles = StyleSheet.create({
   interestText: { color: "white", fontFamily: fonts.heavy, fontSize: 13 },
   addRect: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: ACCENT, borderStyle: "dashed", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 4 },
-  monthlyMemoBox: { backgroundColor: "#111", borderRadius: 24, padding: 20, borderWidth: 1, borderColor: "#222" },
-  monthlyMemoSubtitle: { color: "#555", fontSize: 11, fontFamily: fonts.black, textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 },
-  monthlyMemoContent: { color: "white", fontSize: 16, fontFamily: fonts.medium, lineHeight: 24 },
   signOutBtn: { alignSelf: "center", marginTop: 50, paddingVertical: 14, paddingHorizontal: 60, borderRadius: 25, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
   signOutText: { color: "#666", fontFamily: fonts.heavy, fontSize: 13, letterSpacing: 2, textTransform: "uppercase" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" },
@@ -618,20 +628,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: ACCENT, borderColor: ACCENT },
   chipText: { color: "#555", fontFamily: fonts.heavy },
   chipTextActive: { color: "black" },
-  monthlyMemoInputShort: {
-    width: "100%",
-    height: 160,
-    backgroundColor: "#111",
-    color: "white",
-    borderRadius: 20,
-    padding: 20,
-    fontSize: 17,
-    fontFamily: fonts.medium,
-    textAlignVertical: "top",
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#222",
-  },
   saveBtn: { backgroundColor: ACCENT, width: "100%", padding: 20, borderRadius: 22, marginBottom: 20, alignItems: "center" },
   saveBtnText: { color: "black", fontFamily: fonts.black, fontSize: 17 },
 });
