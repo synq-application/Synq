@@ -39,6 +39,7 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 import { ACCENT, DEFAULT_AVATAR, EXPIRATION_HOURS, MUTED, OFFSETS, popularNow } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
+import ConfirmModal from '../confirm-modal';
 import { formatTime, getLeadingEmoji, SynqStatus } from '../helpers';
 import { openInMaps } from '../map-utils';
 import EditSynqModal from '../synq-screens/EditSynqModal';
@@ -69,6 +70,8 @@ export default function SynqScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [hasUnread, setHasUnread] = useState(false);
   const [mutualInterests, setMutualInterests] = useState<string[]>([]);
+  const [showEndSynqModal, setShowEndSynqModal] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<string | null>(null);
 
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
@@ -425,21 +428,8 @@ export default function SynqScreen() {
     setStatus('activating');
   };
 
-  const endSynq = async () => {
-    Alert.alert('End Synq?', 'You will no longer be visible as available.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Deactivate Synq',
-        style: 'destructive',
-        onPress: async () => {
-          if (!auth.currentUser) return;
-          await updateDoc(doc(db, 'users', auth.currentUser!.uid), { status: 'inactive', memo: '' });
-          setMemo('');
-          setStatus('idle');
-          setIsEditModalVisible(false);
-        }
-      }
-    ]);
+  const endSynq = () => {
+    setShowEndSynqModal(true);
   };
 
   const handleConnectWithId = async (friendId: string) => {
@@ -1100,6 +1090,28 @@ export default function SynqScreen() {
           styles={styles}
           onSaveMemo={async () => {
             await updateDoc(doc(db, "users", auth.currentUser!.uid), { memo });
+            setIsEditModalVisible(false);
+          }}
+        />
+        <ConfirmModal
+          visible={showEndSynqModal}
+          title="End Synq?"
+          message="You will no longer be visible as available."
+          confirmText="Deactivate Synq"
+          destructive
+          onCancel={() => setShowEndSynqModal(false)}
+          onConfirm={async () => {
+            setShowEndSynqModal(false);
+
+            if (!auth.currentUser) return;
+
+            await updateDoc(doc(db, "users", auth.currentUser.uid), {
+              status: "inactive",
+              memo: "",
+            });
+
+            setMemo("");
+            setStatus("idle");
             setIsEditModalVisible(false);
           }}
         />

@@ -12,7 +12,6 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   Platform,
@@ -24,6 +23,8 @@ import {
   View,
 } from "react-native";
 import { auth, db } from "../src/lib/firebase";
+
+import AlertModal from "./alert-modal";
 
 const ACCENT = "#7DFFA6";
 const BACKGROUND = "black";
@@ -40,6 +41,17 @@ const fonts = {
 export default function NotificationsScreen() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title?: string;
+    message: string;
+  } | null>(null);
+
+  const showAlert = (title: string, message: string) => {
+    setAlertConfig({ title, message });
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -102,7 +114,6 @@ export default function NotificationsScreen() {
           request.imageurl ||
           null;
 
-        // fallback fetch if missing
         if (!senderImageUrl || !senderName) {
           const senderSnap = await getDoc(doc(db, "users", senderId));
           if (senderSnap.exists()) {
@@ -118,7 +129,6 @@ export default function NotificationsScreen() {
           }
         }
 
-        // ✅ Add to MY friends
         await setDoc(
           doc(db, "users", myId, "friends", senderId),
           {
@@ -128,15 +138,16 @@ export default function NotificationsScreen() {
             imageurl: senderImageUrl || DEFAULT_AVATAR,
           }
         );
-        Alert.alert("Success", `You are now connected with ${senderName}!`);
+
+        showAlert("Success", `You are now connected with ${senderName}!`);
       }
 
-      // ✅ Remove request
       await deleteDoc(
         doc(db, "users", auth.currentUser.uid, "friendRequests", request.id)
       );
+
     } catch (e: any) {
-      Alert.alert("Error", `Could not process request: ${e.message}`);
+      showAlert("Error", `Could not process request: ${e.message}`);
     }
   };
 
@@ -237,10 +248,17 @@ export default function NotificationsScreen() {
           )}
         />
       )}
+
+      {/* ✅ Alert Modal */}
+      <AlertModal
+        visible={alertVisible}
+        title={alertConfig?.title}
+        message={alertConfig?.message || ""}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BACKGROUND },
   header: {
@@ -260,7 +278,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontFamily: fonts.heavy,
     color: "white",
   },
