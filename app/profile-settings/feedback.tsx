@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -15,6 +14,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+import AlertModal from "../alert-modal";
 
 const ACCENT = "#7DFFA6";
 const BACKGROUND = "black";
@@ -31,15 +32,24 @@ const FEEDBACK_EMAIL = "synqapp@gmail.com";
 export default function FeedbackScreen() {
   const [type, setType] = useState<"Feedback" | "Bug" | "Feature Request">("Feedback");
   const [message, setMessage] = useState("");
-  const [email, setEmail] = useState(""); 
+  const [email, setEmail] = useState("");
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title?: string;
+    message: string;
+  } | null>(null);
 
   const subject = useMemo(() => `Synq ${type}`, [type]);
-
   const canSubmit = message.trim().length >= 10;
+
+  const showAlert = (title: string, message: string) => {
+    setAlertConfig({ title, message });
+    setAlertVisible(true);
+  };
 
   const submit = async () => {
     if (!canSubmit) {
-      Alert.alert("Add a bit more", "Please include at least 10 characters of feedback.");
+      showAlert("Add a bit more", "Please include at least 10 characters of feedback.");
       return;
     }
 
@@ -60,20 +70,22 @@ export default function FeedbackScreen() {
 
     try {
       const supported = await Linking.canOpenURL(mailto);
+
       if (!supported) {
-        Alert.alert(
-          "Email not available",
-          "No email app is configured on this device."
-        );
+        showAlert("Email not available", "No email app is configured on this device.");
         return;
       }
+
       await Linking.openURL(mailto);
-      Alert.alert("Thanks!", "Your email app opened with your feedback ready to send.");
+
+      showAlert("Thanks!", "Your email app opened with your feedback ready to send.");
+
       setMessage("");
       setEmail("");
       setType("Feedback");
+
     } catch {
-      Alert.alert("Something went wrong", "We couldn’t open your email app.");
+      showAlert("Something went wrong", "We couldn’t open your email app.");
     }
   };
 
@@ -89,7 +101,9 @@ export default function FeedbackScreen() {
         activeOpacity={0.85}
         style={[styles.chip, active && styles.chipActive]}
       >
-        <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+          {label}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -171,10 +185,16 @@ export default function FeedbackScreen() {
           <View style={styles.footerSpace} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <AlertModal
+        visible={alertVisible}
+        title={alertConfig?.title}
+        message={alertConfig?.message || ""}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BACKGROUND },
 
