@@ -22,6 +22,7 @@ import QRCode from "react-native-qrcode-svg";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
+import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
 
@@ -49,9 +50,9 @@ export default function ProfileScreen() {
   const [hasLoadedConnections, setHasLoadedConnections] = useState(false);
   const [requestCount, setRequestCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
-const [events, setEvents] = useState<
-  { date: string; day: number; title: string }[]
->([]);
+  const [events, setEvents] = useState<
+    { date: string; day: number; title: string }[]
+  >([]);
 
   const [showEventModal, setShowEventModal] = useState(false);
 
@@ -65,10 +66,10 @@ const [events, setEvents] = useState<
   const saveEvent = async () => {
     if (!auth.currentUser) return;
 
-if (!newEvent.title || !newEvent.date) {
-  Alert.alert("Missing info", "Add a title and date");
-  return;
-}
+    if (!newEvent.title || !newEvent.date) {
+      Alert.alert("Missing info", "Add a title and date");
+      return;
+    }
 
     const formatted = `${newEvent.date} ${newEvent.title}`;
 
@@ -92,6 +93,9 @@ if (!newEvent.title || !newEvent.date) {
     } catch (e) {
       Alert.alert("Error", "Could not save event.");
     }
+  };
+  const deleteEvent = (index: number) => {
+    setEvents((prev) => prev.filter((_, i) => i !== index));
   };
 
   useEffect(() => {
@@ -157,36 +161,36 @@ if (!newEvent.title || !newEvent.date) {
     };
   }, []);
 
-const parseMemoToEvents = (memo: string) => {
-  if (!memo) return [];
+  const parseMemoToEvents = (memo: string) => {
+    if (!memo) return [];
 
-  return memo
-    .split("\n")
-    .filter((line) => line.trim().length > 0)
-    .map((line) => {
-      const parts = line.trim().split(" ");
+    return memo
+      .split("\n")
+      .filter((line) => line.trim().length > 0)
+      .map((line) => {
+        const parts = line.trim().split(" ");
 
-      if (parts.length < 3) return null;
+        if (parts.length < 3) return null;
 
-      const month = parts[0];
-      const day = Number(parts[1]);
+        const month = parts[0];
+        const day = Number(parts[1]);
 
-      if (isNaN(day)) return null;
+        if (isNaN(day)) return null;
 
-      const title = parts.slice(2).join(" ");
+        const title = parts.slice(2).join(" ");
 
-      return {
-        date: `${month} ${day}`,
-        day,
-        title,
-      };
-    })
-    // 🔥 THIS IS THE KEY FIX
-    .filter(
-      (event): event is { date: string; day: number; title: string } =>
-        event !== null
-    );
-};
+        return {
+          date: `${month} ${day}`,
+          day,
+          title,
+        };
+      })
+      // 🔥 THIS IS THE KEY FIX
+      .filter(
+        (event): event is { date: string; day: number; title: string } =>
+          event !== null
+      );
+  };
 
   const filteredActivities = allActivities.filter((item) =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -448,18 +452,22 @@ const parseMemoToEvents = (memo: string) => {
           </TouchableOpacity>
         </View>
       </View>
-      {/* <MonthlyMemo
-        ACCENT={ACCENT}
-        fonts={fonts}
-        setShowEventModal={setShowEventModal}
-        showEventModal={showEventModal}
-        newEvent={newEvent}
-        setNewEvent={setNewEvent}
-        saveEvent={saveEvent}
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
-        events={events}
-      /> */}
+      <View>
+        <MonthlyMemo
+          ACCENT={ACCENT}
+          fonts={fonts}
+          setShowEventModal={setShowEventModal}
+          showEventModal={showEventModal}
+          newEvent={newEvent}
+          setNewEvent={setNewEvent}
+          saveEvent={saveEvent}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          events={events}
+          deleteEvent={deleteEvent}
+        />
+      </View>
+
       <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>

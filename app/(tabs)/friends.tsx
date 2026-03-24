@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 14,
-    borderWidth: .2,
+    borderWidth: .8,
     borderColor: BORDER
   },
   img: {
