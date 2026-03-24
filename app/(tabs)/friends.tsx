@@ -165,7 +165,7 @@ export default function FriendsScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Friends</Text>
         <TouchableOpacity onPress={() => setSearchModalVisible(true)}>
-          <Icon name="add-circle-outline" size={30} color={ACCENT} />
+          <Icon name="add-circle-outline" size={30} color="white" />
         </TouchableOpacity>
       </View>
       <View style={styles.headerDivider} />
