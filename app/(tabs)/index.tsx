@@ -968,9 +968,22 @@ export default function SynqScreen() {
                             </View>
                             {item.reactions &&
                               Object.values(item.reactions).includes("heart") && (
-                                <View style={styles.heartReaction}>
+                                <Animated.View
+                                  style={[
+                                    styles.heartReaction,
+                                    {
+                                      transform: [
+                                        {
+                                          scale:
+                                            heartScales.current[item.id] ||
+                                            new Animated.Value(1),
+                                        },
+                                      ],
+                                    },
+                                  ]}
+                                >
                                   <Ionicons name="heart" size={12} color="#FF3B30" />
-                                </View>
+                                </Animated.View>
                               )}
                           </View>
                         </View>
