@@ -24,7 +24,6 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -39,6 +38,7 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
+import AlertModal from "../alert-modal";
 
 const { width } = Dimensions.get("window");
 
@@ -193,10 +193,10 @@ export default function FriendsScreen() {
       ) : (
         <>
           <FlatList
-            data={filteredFriends} 
+            data={filteredFriends}
             keyExtractor={(item) => item.id}
             renderItem={renderFriendRow}
-            ListFooterComponent={<View style={{ height: 40 }} />} 
+            ListFooterComponent={<View style={{ height: 40 }} />}
           />
         </>
       )}
@@ -223,6 +223,11 @@ function SearchModal({
   const [results, setResults] = useState<any[]>([]);
   const [suggested, setSuggested] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title?: string;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -378,19 +383,28 @@ function SearchModal({
       };
       await setDoc(requestDocRef, payload);
 
-      Alert.alert("Sent!", `Invite sent to ${targetUser.displayName}`);
+      setAlertConfig({
+        title: "Sent!",
+        message: `Invite sent to ${targetUser.displayName}`,
+      });
+      setAlertVisible(true);
       onClose();
 
     } catch (e: any) {
       if (e?.code === "permission-denied") {
-        Alert.alert(
-          "Already sent",
-          "You’ve already sent this user a friend request."
-        );
+        setAlertConfig({
+          title: "Already sent",
+          message: "You’ve already sent this user a friend request.",
+        });
+        setAlertVisible(true);
         return;
       }
 
-      Alert.alert("Error", e?.message || "Could not send invite.");
+      setAlertConfig({
+        title: "Error",
+        message: e?.message || "Could not send invite.",
+      });
+      setAlertVisible(true);
     }
   };
 
@@ -425,7 +439,7 @@ function SearchModal({
               keyExtractor={(item) => item.id}
               scrollEnabled={true}
               showsVerticalScrollIndicator={false}
-              ListFooterComponent={<View style={{ height: 40 }} />} 
+              ListFooterComponent={<View style={{ height: 40 }} />}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               renderItem={({ item }) => (
                 <View style={styles.searchResult}>
@@ -483,7 +497,7 @@ function SearchModal({
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
-              ListFooterComponent={<View style={{ height: 40 }} />}
+            ListFooterComponent={<View style={{ height: 40 }} />}
 
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             renderItem={({ item }) => (
@@ -524,6 +538,12 @@ function SearchModal({
           />
         )}
       </View>
+      <AlertModal
+        visible={alertVisible}
+        title={alertConfig?.title}
+        message={alertConfig?.message || ""}
+        onClose={() => setAlertVisible(false)}
+      />
     </Modal>
   );
 }
