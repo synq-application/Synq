@@ -6,7 +6,6 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -17,6 +16,9 @@ import {
   View,
 } from "react-native";
 import { auth } from "../src/lib/firebase";
+
+import AlertModal from "./alert-modal";
+import ConfirmModal from "./confirm-modal";
 
 const BACKGROUND = "black";
 const SURFACE = "#161616";
@@ -29,55 +31,71 @@ const fonts = {
 
 export default function DeleteAccountScreen() {
   const [busy, setBusy] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title?: string;
+    message: string;
+    onClose?: () => void;
+  } | null>(null);
 
-const runDelete = async () => {
-  if (!auth.currentUser?.uid) {
-    Alert.alert("Not signed in", "Please sign in again and try deleting your account.");
-    return;
-  }
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  setBusy(true);
-  try {
-    const functions = getFunctions(undefined, "us-central1");
-    const deleteMyAccount = httpsCallable(functions, "deleteMyAccount");
-    await deleteMyAccount({});
-    await signOut(auth);
+  const showAlert = (title: string, message: string, onClose?: () => void) => {
+    setAlertConfig({ title, message, onClose });
+    setAlertVisible(true);
+  };
 
-    Alert.alert("Account deleted", "Your account has been deleted.");
-    router.replace("/");
-
-  } catch (e: any) {
-    const code = String(e?.code || "");
-    const msg = String(e?.message || e);
-
-    if (code.includes("unauthenticated")) {
-      Alert.alert("Please sign in again", "Your session expired. Sign in and try again.");
-    } else if (code.includes("not-found")) {
-      Alert.alert(
-        "Delete not available yet",
-        "The deleteMyAccount function isn’t deployed. Deploy it and try again."
+  const runDelete = async () => {
+    if (!auth.currentUser?.uid) {
+      showAlert(
+        "Not signed in",
+        "Please sign in again and try deleting your account."
       );
-    } else {
-      Alert.alert("Couldn’t delete account", msg);
+      return;
     }
-  } finally {
-    setBusy(false);
-  }
-};
+
+    setBusy(true);
+    try {
+      const functions = getFunctions(undefined, "us-central1");
+      const deleteMyAccount = httpsCallable(functions, "deleteMyAccount");
+
+      await deleteMyAccount({});
+      await signOut(auth);
+
+      showAlert("Account deleted", "Your account has been deleted.", () => {
+        router.replace("/");
+      });
+
+    } catch (e: any) {
+      const code = String(e?.code || "");
+      const msg = String(e?.message || e);
+
+      if (code.includes("unauthenticated")) {
+        showAlert(
+          "Please sign in again",
+          "Your session expired. Sign in and try again."
+        );
+      } else if (code.includes("not-found")) {
+        showAlert(
+          "Delete not available yet",
+          "The deleteMyAccount function isn’t deployed. Deploy it and try again."
+        );
+      } else {
+        showAlert("Couldn’t delete account", msg);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const confirmDelete = () => {
-    Alert.alert(
-      "Delete account?",
-      "This permanently deletes your Synq account, friends, and chats. This can’t be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: runDelete },
-      ]
-    );
+    setShowConfirm(true);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={26} color="black" />
@@ -131,6 +149,31 @@ const runDelete = async () => {
 
         <View style={styles.footerSpace} />
       </ScrollView>
+
+      {/* ✅ Confirm Modal */}
+      <ConfirmModal
+        visible={showConfirm}
+        title="Delete account?"
+        message="This permanently deletes your Synq account, friends, and chats. This can’t be undone."
+        confirmText="Delete"
+        destructive
+        onCancel={() => setShowConfirm(false)}
+        onConfirm={async () => {
+          setShowConfirm(false);
+          await runDelete();
+        }}
+      />
+
+      {/* ✅ Alert Modal */}
+      <AlertModal
+        visible={alertVisible}
+        title={alertConfig?.title}
+        message={alertConfig?.message || ""}
+        onClose={() => {
+          setAlertVisible(false);
+          alertConfig?.onClose?.();
+        }}
+      />
     </SafeAreaView>
   );
 }
