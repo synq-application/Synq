@@ -590,7 +590,7 @@ const styles = StyleSheet.create({
   profileImg: { width: "100%", height: "100%" },
   defaultAvatarContainer: { width: "100%", height: "100%", justifyContent: "center", alignItems: "center" },
   qrToggle: { position: "absolute", bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
-  nameText: { color: ACCENT, fontSize: 28, fontFamily: fonts.black, marginTop: 12 },
+  nameText: { color: ACCENT, fontSize: 26, fontFamily: fonts.heavy, letterSpacing: 0.2, marginTop: 10 },
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
