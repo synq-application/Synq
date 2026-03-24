@@ -22,6 +22,7 @@ import QRCode from "react-native-qrcode-svg";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
+import AlertModal from "../alert-modal";
 import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
@@ -53,6 +54,9 @@ export default function ProfileScreen() {
   const [events, setEvents] = useState<
     { date: string; day: number; title: string }[]
   >([]);
+  const [alertVisible, setAlertVisible] = useState(false);
+const [alertTitle, setAlertTitle] = useState("");
+const [alertMessage, setAlertMessage] = useState("");
 
   const [showEventModal, setShowEventModal] = useState(false);
 
@@ -347,12 +351,13 @@ export default function ProfileScreen() {
         <View style={styles.rowBetween}>
           <Text style={styles.sectionTitle}>Top Synqs</Text>
           <TouchableOpacity
-            onPress={() =>
-              Alert.alert(
-                "Top Synqs",
-                "Your Top Synqs are the people you message most! Every message sent increases your score."
-              )
-            }
+              onPress={() => {
+                setAlertTitle("Top Synqs");
+                setAlertMessage(
+                  "Your Top Synqs are the people you connect with the most!"
+                );
+                setAlertVisible(true);
+              }}
           >
             <Icon name="information-circle-outline" size={18} color="#444" />
           </TouchableOpacity>
@@ -533,6 +538,12 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+      <AlertModal
+  visible={alertVisible}
+  title={alertTitle}
+  message={alertMessage}
+  onClose={() => setAlertVisible(false)}
+/>
     </ScrollView>
   );
 }
