@@ -5,9 +5,10 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   serverTimestamp,
-  setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
@@ -41,6 +42,7 @@ const fonts = {
 export default function NotificationsScreen() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{
@@ -51,6 +53,27 @@ export default function NotificationsScreen() {
   const showAlert = (title: string, message: string) => {
     setAlertConfig({ title, message });
     setAlertVisible(true);
+  };
+
+  const fetchRequests = async () => {
+    if (!auth.currentUser) return;
+
+    const snap = await getDocs(
+      collection(db, "users", auth.currentUser.uid, "friendRequests")
+    );
+
+    const reqList = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    }));
+
+    setRequests(reqList);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchRequests();
+    setRefreshing(false);
   };
 
   useEffect(() => {
@@ -129,23 +152,34 @@ export default function NotificationsScreen() {
           }
         }
 
-        await setDoc(
-          doc(db, "users", myId, "friends", senderId),
-          {
-            synqCount: 0,
-            since: serverTimestamp(),
-            displayName: senderName,
-            imageurl: senderImageUrl || DEFAULT_AVATAR,
-          }
+        const batch = writeBatch(db);
+
+        batch.set(doc(db, "users", myId, "friends", senderId), {
+          synqCount: 0,
+          since: serverTimestamp(),
+          displayName: senderName,
+          imageurl: senderImageUrl || DEFAULT_AVATAR,
+        });
+
+        batch.set(doc(db, "users", senderId, "friends", myId), {
+          synqCount: 0,
+          since: serverTimestamp(),
+          displayName: myName,
+          imageurl: myImageUrl || DEFAULT_AVATAR,
+        });
+
+        batch.delete(
+          doc(db, "users", myId, "friendRequests", request.id)
         );
 
+        await batch.commit();
+
         showAlert("Success", `You are now connected with ${senderName}!`);
+      } else {
+        await deleteDoc(
+          doc(db, "users", myId, "friendRequests", request.id)
+        );
       }
-
-      await deleteDoc(
-        doc(db, "users", auth.currentUser.uid, "friendRequests", request.id)
-      );
-
     } catch (e: any) {
       showAlert("Error", `Could not process request: ${e.message}`);
     }
@@ -172,7 +206,7 @@ export default function NotificationsScreen() {
 
           <View style={{ flex: 1 }}>
             <Text style={styles.rowKicker}>Friend Request</Text>
-            <Text style={styles.rowText} numberOfLines={2}>
+            <Text style={styles.rowText}>
               <Text style={styles.boldWhite}>
                 {item.senderName || item.fromName || "Someone"}
               </Text>
@@ -226,6 +260,8 @@ export default function NotificationsScreen() {
           data={requests}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <View style={styles.emptyIcon}>
@@ -249,7 +285,6 @@ export default function NotificationsScreen() {
         />
       )}
 
-      {/* ✅ Alert Modal */}
       <AlertModal
         visible={alertVisible}
         title={alertConfig?.title}
@@ -277,18 +312,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  refreshBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#1F1F1F",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: {
     fontSize: 26,
     fontFamily: fonts.heavy,
     color: "white",
   },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-
   listContent: {
     paddingBottom: 40,
     paddingTop: 10,
   },
-
   group: {
     backgroundColor: SURFACE,
     marginHorizontal: 20,
@@ -296,7 +337,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 12,
   },
-
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -312,7 +352,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
   },
-
   avatar: {
     width: 44,
     height: 44,
@@ -328,7 +367,6 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
   },
-
   rowKicker: {
     color: ACCENT,
     fontSize: 10,
@@ -345,12 +383,10 @@ const styles = StyleSheet.create({
   },
   boldWhite: { fontFamily: fonts.heavy, color: "white" },
   grayText: { color: "#aaa", fontFamily: fonts.medium },
-
   rowRight: {
     flexDirection: "row",
     alignItems: "center",
   },
-
   acceptBtn: {
     backgroundColor: ACCENT,
     width: 38,
@@ -370,7 +406,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#333",
   },
-
   emptyWrap: {
     marginTop: 40,
     marginHorizontal: 20,
