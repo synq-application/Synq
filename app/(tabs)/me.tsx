@@ -46,14 +46,13 @@ export default function ProfileScreen() {
   const [city, setCity] = useState<string | null>(null);
   const [state, setState] = useState<string | null>(null);
   const [memo, setMemo] = useState<string>("");
-  const [monthlyMemo, setMonthlyMemo] = useState<string>("");
   const [loadingConnections, setLoadingConnections] = useState(false);
   const [hasLoadedConnections, setHasLoadedConnections] = useState(false);
   const [requestCount, setRequestCount] = useState(0);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [events, setEvents] = useState<
-    { date: string; day: number; title: string }[]
-  >([]);
+const [events, setEvents] = useState<
+  { id: string; date: string; title: string; time?: string }[]
+>([]);
   const [alertVisible, setAlertVisible] = useState(false);
 const [alertTitle, setAlertTitle] = useState("");
 const [alertMessage, setAlertMessage] = useState("");
@@ -67,40 +66,54 @@ const [alertMessage, setAlertMessage] = useState("");
     location: "",
   });
 
-  const saveEvent = async () => {
-    if (!auth.currentUser) return;
+const saveEvent = async (eventOverride?: any) => {
+  if (!auth.currentUser) return;
 
-    if (!newEvent.title || !newEvent.date) {
-      Alert.alert("Missing info", "Add a title and date");
-      return;
-    }
+  const eventToSave = eventOverride || newEvent;
 
-    const formatted = `${newEvent.date} ${newEvent.title}`;
+  if (!eventToSave.title) {
+    Alert.alert("Missing info", "Add a title");
+    return;
+  }
 
-    const updatedMemo = monthlyMemo
-      ? `${monthlyMemo}\n${formatted}`
-      : formatted;
+  const fullDate = `${selectedDate.getFullYear()}-${String(
+    selectedDate.getMonth() + 1
+  ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
 
-    try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        monthlyMemo: updatedMemo,
-      });
-
-      setShowEventModal(false);
-      setSelectedDate(new Date());
-      setNewEvent({
-        title: "",
-        date: "",
-        time: "",
-        location: "",
-      });
-    } catch (e) {
-      Alert.alert("Error", "Could not save event.");
-    }
+  const newItem = {
+    id: Date.now().toString(),
+    date: fullDate,
+    title: eventToSave.title,
+    time: eventToSave.time || "", 
   };
-  const deleteEvent = (index: number) => {
-    setEvents((prev) => prev.filter((_, i) => i !== index));
-  };
+
+  const updatedEvents = [...events, newItem];
+
+  try {
+    await updateDoc(doc(db, "users", auth.currentUser.uid), {
+      events: updatedEvents,
+    });
+
+    setShowEventModal(false);
+    setNewEvent({ title: "", date: "", time: "", location: "" });
+  } catch (e) {
+    Alert.alert("Error", "Could not save event.");
+  }
+};
+
+const deleteEvent = async (id: string) => {
+  if (!auth.currentUser) return;
+
+  const updated = events.filter((e) => e.id !== id);
+
+  try {
+    await updateDoc(doc(db, "users", auth.currentUser.uid), {
+      events: updated,
+    });
+  } catch (e) {
+    Alert.alert("Error", "Could not delete event.");
+  }
+};
 
   useEffect(() => {
     if (!auth.currentUser?.uid) return;
@@ -114,9 +127,7 @@ const [alertMessage, setAlertMessage] = useState("");
         const stateAbbr = stateAbbreviations[userData.state] || userData.state || null;
         setState(stateAbbr);
         setMemo(userData.memo || "");
-        const memo = userData.monthlyMemo || "";
-        setMonthlyMemo(memo);
-        setEvents(parseMemoToEvents(memo));
+        setEvents(userData.events || []);
         setInterests(userData.interests || []);
         setSelectedInterests(userData.interests || []);
         setProfileImage(userData?.imageurl || null);
@@ -164,37 +175,6 @@ const [alertMessage, setAlertMessage] = useState("");
       unsubscribeFriends();
     };
   }, []);
-
-  const parseMemoToEvents = (memo: string) => {
-    if (!memo) return [];
-
-    return memo
-      .split("\n")
-      .filter((line) => line.trim().length > 0)
-      .map((line) => {
-        const parts = line.trim().split(" ");
-
-        if (parts.length < 3) return null;
-
-        const month = parts[0];
-        const day = Number(parts[1]);
-
-        if (isNaN(day)) return null;
-
-        const title = parts.slice(2).join(" ");
-
-        return {
-          date: `${month} ${day}`,
-          day,
-          title,
-        };
-      })
-      // 🔥 THIS IS THE KEY FIX
-      .filter(
-        (event): event is { date: string; day: number; title: string } =>
-          event !== null
-      );
-  };
 
   const filteredActivities = allActivities.filter((item) =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
