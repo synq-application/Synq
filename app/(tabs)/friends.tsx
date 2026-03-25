@@ -431,7 +431,7 @@ function SearchModal({
 
         <View style={styles.searchInputWrap}>
           <TextInput
-            placeholder="Search by name or email..."
+            placeholder="Search by name..."
             placeholderTextColor="rgba(255,255,255,0.25)"
             style={styles.searchInput}
             value={queryText}
