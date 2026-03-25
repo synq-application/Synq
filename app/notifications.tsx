@@ -267,7 +267,7 @@ export default function NotificationsScreen() {
               <View style={styles.emptyIcon}>
                 <Ionicons
                   name="notifications-off-outline"
-                  size={28}
+                  size={34}
                   color="#666"
                 />
               </View>
@@ -425,14 +425,15 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: "white",
-    fontSize: 16,
+    fontSize: 20,
     fontFamily: fonts.heavy,
     marginBottom: 4,
   },
   emptySubtitle: {
     color: "#777",
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: fonts.medium,
     textAlign: "center",
+    marginTop: 8
   },
 });
