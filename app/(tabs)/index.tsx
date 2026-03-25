@@ -769,7 +769,7 @@ export default function SynqScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity onPress={endSynq} style={styles.deactivateLink}>
-                <Text style={styles.deactivateLinkText}>Deactivate Synq</Text>
+                <Text style={styles.deactivateLinkText}>End Synq</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1083,7 +1083,7 @@ export default function SynqScreen() {
           visible={showEndSynqModal}
           title="End Synq?"
           message="You will no longer be visible as available."
-          confirmText="Deactivate Synq"
+          confirmText="End Synq"
           destructive
           onCancel={() => setShowEndSynqModal(false)}
           onConfirm={async () => {
