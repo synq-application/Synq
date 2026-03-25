@@ -37,7 +37,7 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, aiPrompts, DEFAULT_AVATAR, EXPIRATION_HOURS, MUTED, OFFSETS } from '../../constants/Variables';
+import { ACCENT, aiPrompts, DEFAULT_AVATAR, EXPIRATION_HOURS, fonts, MUTED, OFFSETS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
@@ -1161,7 +1161,7 @@ const styles = StyleSheet.create({
   unifiedTitle: { color: 'white', fontSize: 28, fontFamily: 'Avenir', marginBottom: 50, textAlign: 'center' },
   gifLarge: { width: 350, height: 350, marginTop: 50 },
   inactiveCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
-  mainTitle: { color: 'white', fontSize: 32, textAlign: 'center', fontFamily: 'Avenir' },
+  mainTitle: { color: 'white', fontSize: 32, fontFamily: fonts.medium, letterSpacing: 0.2 },
   memoInput: {
     color: 'white',
     fontSize: 18,
