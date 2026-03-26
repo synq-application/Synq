@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from "expo-image";
 import * as Haptics from 'expo-haptics';
 import {
   addDoc,
@@ -657,7 +658,13 @@ export default function SynqScreen() {
         {(status === 'activating' || status === 'finding') && (
           <View style={styles.activatingContainer}>
             <Text style={styles.unifiedTitle}>{status === 'activating' ? 'Synq activated...' : 'Finding connections...'}</Text>
-            <Image source={require('../../assets/pulse.gif')} style={styles.gifLarge} resizeMode="contain" />
+            <ExpoImage
+              source={require('../../assets/pulse.gif')}
+              style={styles.gifLarge}
+              contentFit="contain"
+              transition={0}
+              cachePolicy="memory-disk"
+            />
           </View>
         )}
         {status === "idle" && (

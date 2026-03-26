@@ -1,6 +1,6 @@
+import { Image as ExpoImage } from "expo-image";
 import React from "react";
 import {
-  Image,
   Text,
   TextInput,
   TouchableOpacity,
@@ -36,10 +36,12 @@ export default function InactiveSynqView({
         style={styles.pulseBox}
         activeOpacity={0.8}
       >
-        <Image
+        <ExpoImage
           source={require("../../assets/pulse.gif")}
           style={styles.gifLarge}
-          resizeMode="contain"
+          contentFit="contain"
+          transition={0}
+          cachePolicy="memory-disk"
         />
       </TouchableOpacity>
     </View>

@@ -122,7 +122,10 @@ export default function RootLayout() {
     let mounted = true;
     const preloadAssets = async () => {
       try {
-        await Asset.loadAsync([require("../assets/SYNQ-2.png")]);
+        await Asset.loadAsync([
+          require("../assets/SYNQ-2.png"),
+          require("../assets/pulse.gif"),
+        ]);
       } catch (e) {
         console.error("Asset preload failed:", e);
       } finally {
