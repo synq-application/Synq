@@ -37,14 +37,10 @@ export default function FriendOpenPlans({
 
       {events.map((p) => {
         const d = parseDate(p.date);
+        const canJoin = typeof onPressPlan === "function";
 
         return (
-          <TouchableOpacity
-            key={p.id}
-            style={styles.card}
-            activeOpacity={0.8}
-            onPress={() => onPressPlan?.(p)}
-          >
+          <View key={p.id} style={styles.card}>
             <View style={styles.dateBlock}>
               <Text style={styles.day}>
                 {d
@@ -63,12 +59,18 @@ export default function FriendOpenPlans({
                 {p.location ? ` · ${p.location}` : ""}
               </Text>
             </View>
-            {/* <View style={styles.joinPill}>
-              <Text style={{ color: ACCENT, fontSize: 12 }}>
-                Join
-              </Text>
-            </View> */}
-          </TouchableOpacity>
+            {canJoin && (
+              <TouchableOpacity
+                style={[styles.joinPill, { borderColor: ACCENT }]}
+                activeOpacity={0.85}
+                onPress={() => onPressPlan?.(p)}
+              >
+                <Text style={[styles.joinText, { color: ACCENT, fontFamily: fonts.heavy }]}>
+                  Join
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         );
       })}
     </View>
@@ -131,9 +133,12 @@ const styles = StyleSheet.create({
     borderColor: "#333",
     borderRadius: 14,
     paddingHorizontal: 10,
-    paddingVertical: 10,
+    paddingVertical: 8,
     marginLeft: 8,
-    width: 60,
+    minWidth: 62,
     alignItems: "center",
+  },
+  joinText: {
+    fontSize: 12.5,
   },
 });

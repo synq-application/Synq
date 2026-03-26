@@ -20,6 +20,7 @@ import {
   getDocs,
   serverTimestamp,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
@@ -42,6 +43,7 @@ import {
 import ConfirmModal from "./confirm-modal";
 import { formatLastSynq } from "./helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
+import AlertModal from "./alert-modal";
 
 const isRemoteImageUri = (value: unknown): value is string =>
   typeof value === "string" && /^https?:\/\//i.test(value);
@@ -82,6 +84,40 @@ export default function FriendProfile() {
   const [requestSent, setRequestSent] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState<string | undefined>();
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+
+  const eventKey = (event: any) =>
+    `${String(event?.title || "").trim().toLowerCase()}|${String(event?.date || "").trim()}|${String(
+      event?.time || ""
+    ).trim().toLowerCase()}|${String(event?.location || "").trim().toLowerCase()}`;
+
+  const eventSortValue = (event: any) => {
+    const date = String(event?.date || "");
+    const [y, m, d] = date.split("-").map(Number);
+    const base = new Date(
+      Number.isFinite(y) ? y : 1970,
+      Number.isFinite(m) ? m - 1 : 0,
+      Number.isFinite(d) ? d : 1
+    );
+    const timeText = String(event?.time || "").trim();
+    const timeMatch = timeText.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!timeMatch) return base.getTime();
+    let hours = Number(timeMatch[1]);
+    const minutes = Number(timeMatch[2]);
+    const period = timeMatch[3].toUpperCase();
+    if (period === "PM" && hours !== 12) hours += 12;
+    if (period === "AM" && hours === 12) hours = 0;
+    base.setHours(hours, minutes, 0, 0);
+    return base.getTime();
+  };
 
   useEffect(() => {
     const fetchFriend = async () => {
@@ -256,6 +292,48 @@ export default function FriendProfile() {
     }
   };
 
+  const joinPlan = async (event: {
+    id: string;
+    date: string;
+    title: string;
+    time?: string;
+    location?: string;
+  }) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const meRef = doc(db, "users", user.uid);
+      const meSnap = await getDoc(meRef);
+      const meData = meSnap.exists() ? (meSnap.data() as any) : {};
+      const existingEvents = Array.isArray(meData?.events) ? meData.events : [];
+
+      const exists = existingEvents.some((e: any) => eventKey(e) === eventKey(event));
+      if (exists) {
+        showAlert("Already added", "This plan is already in your open plans.");
+        return;
+      }
+
+      const newEvent = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        title: String(event.title || "").trim(),
+        date: String(event.date || "").trim(),
+        time: String(event.time || "").trim(),
+        location: String(event.location || "").trim(),
+      };
+
+      const nextEvents = [...existingEvents, newEvent].sort(
+        (a: any, b: any) => eventSortValue(a) - eventSortValue(b)
+      );
+
+      await updateDoc(meRef, {
+        events: nextEvents,
+      });
+      showAlert("Added", "Plan added to your open plans.");
+    } catch (e: any) {
+      showAlert("Error", e?.message || "Could not join this plan right now.");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -382,6 +460,7 @@ export default function FriendProfile() {
             events={friend.events || []}
             ACCENT={ACCENT}
             fonts={fonts}
+            onPressPlan={joinPlan}
           />
         </View>
 
@@ -419,6 +498,12 @@ export default function FriendProfile() {
           setShowRemoveModal(false);
           await removeFriend();
         }}
+      />
+      <AlertModal
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
       />
     </SafeAreaView>
   );
