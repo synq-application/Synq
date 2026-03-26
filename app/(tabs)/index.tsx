@@ -37,11 +37,11 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, aiPrompts, DEFAULT_AVATAR, EXPIRATION_HOURS, fonts, MUTED, OFFSETS } from '../../constants/Variables';
+import { ACCENT, aiPrompts, BORDER, DEFAULT_AVATAR, EXPIRATION_HOURS, fonts, MUTED, OFFSETS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
-import { formatTime, SynqStatus } from '../helpers';
+import { formatTime, parseIdeaText, resolveAvatar, SynqStatus, wrapChatTitle } from '../helpers';
 import { openInMaps } from '../map-utils';
 import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
@@ -73,7 +73,6 @@ export default function SynqScreen() {
   const lastTapRef = useRef<{ [key: string]: number }>({});
   const heartScales = useRef<{ [key: string]: Animated.Value }>({});
   const [hasUnread, setHasUnread] = useState(false);
-  const [mutualInterests, setMutualInterests] = useState<string[]>([]);
   const [showEndSynqModal, setShowEndSynqModal] = useState(false);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
   const markChatRead = async (chatId: string) => {
@@ -88,18 +87,6 @@ export default function SynqScreen() {
       console.error('Failed to mark chat read', e);
     }
   };
-
-  const parseIdeaText = (text: string) => {
-    const lines = (text || "")
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean);
-
-    const name = lines[0] || "";
-    const address = lines.slice(1).join(" ") || "";
-    return { name, address };
-  };
-  const normalizeInterest = (s: string) => (s || '').trim();
 
   const animateHeart = (messageId: string) => {
     if (!heartScales.current[messageId]) {
@@ -117,50 +104,6 @@ export default function SynqScreen() {
     }).start();
   };
 
-  const intersectMany = (lists: string[][]) => {
-    if (!lists.length) return [];
-    const base = new Set(lists[0].map(normalizeInterest).filter(Boolean));
-    for (let i = 1; i < lists.length; i++) {
-      const next = new Set(lists[i].map(normalizeInterest).filter(Boolean));
-      for (const val of Array.from(base)) {
-        if (!next.has(val)) base.delete(val);
-      }
-    }
-    return Array.from(base);
-  };
-
-  const computeMutualInterestsForChat = async (chatId: string) => {
-    if (!auth.currentUser) return [];
-    const me = auth.currentUser.uid;
-
-    const chat = allChats.find((c) => c.id === chatId);
-    if (!chat) return [];
-
-    const myInterests: string[] = (userProfile?.interests || [])
-      .map(normalizeInterest)
-      .filter(Boolean);
-
-    if (!myInterests.length) return [];
-
-    const otherIds: string[] = (chat.participants || []).filter((id: string) => id !== me);
-    if (!otherIds.length) return [];
-
-    const snaps = await Promise.all(
-      otherIds.map((uid: string) => getDoc(doc(db, 'users', uid)))
-    );
-
-    const othersLists: string[][] = snaps
-      .filter((s) => s.exists())
-      .map((s) =>
-        ((s.data()?.interests || []) as string[])
-          .map(normalizeInterest)
-          .filter(Boolean)
-      );
-
-    const mutual = intersectMany([myInterests, ...othersLists]);
-    return mutual.slice(0, 10);
-  };
-
   useEffect(() => {
     let index = 0;
 
@@ -171,20 +114,6 @@ export default function SynqScreen() {
 
     return () => clearInterval(interval);
   }, []);
-  useEffect(() => {
-    if (!isExploreVisible || !activeChatId) return;
-
-    (async () => {
-      try {
-        const mutual = await computeMutualInterestsForChat(activeChatId);
-        setMutualInterests(mutual);
-      } catch (e) {
-        console.error('Failed to compute mutual interests', e);
-        setMutualInterests([]);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isExploreVisible, activeChatId]);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('openChat', async (data) => {
@@ -446,12 +375,6 @@ export default function SynqScreen() {
     setShowEndSynqModal(true);
   };
 
-  const handleConnectWithId = async (friendId: string) => {
-    if (!auth.currentUser) return;
-    const participants = [auth.currentUser.uid, friendId].sort();
-    await executeConnection(participants);
-  };
-
   const handleConnect = async () => {
     if (selectedFriends.length === 0 || !auth.currentUser) return;
     const participants = [auth.currentUser.uid, ...selectedFriends].sort();
@@ -571,30 +494,6 @@ export default function SynqScreen() {
   const firstName = (fullName: string) =>
     (fullName || "").trim().split(/\s+/)[0];
 
-  const wrapChatTitle = (text: string, maxChars = 30) => {
-    const tokens = text.split(' ');
-    const lines: string[] = [];
-    let currentLine = '';
-
-    for (const token of tokens) {
-      const testLine = currentLine
-        ? `${currentLine} ${token}`
-        : token;
-
-      if (testLine.length <= maxChars) {
-        currentLine = testLine;
-      } else {
-        lines.push(currentLine);
-        currentLine = token;
-      }
-    }
-
-    if (currentLine) {
-      lines.push(currentLine);
-    }
-
-    return lines.join('\n');
-  };
 
   const getChatTitle = (chat: any) => {
     if (!chat) return "Synq Chat";
@@ -628,13 +527,6 @@ export default function SynqScreen() {
   };
 
   const activeChat = allChats.find((c) => c.id === activeChatId);
-
-  const resolveAvatar = (url?: any) => {
-    if (typeof url === "string" && url.trim().startsWith("http")) {
-      return url;
-    }
-    return DEFAULT_AVATAR;
-  };
 
   const renderAvatarStack = (images: any) => {
     if (!images) {
@@ -925,33 +817,28 @@ export default function SynqScreen() {
                       <View
                         style={[
                           styles.msgContainer,
-                          isMe ? { alignItems: "flex-end" } : { alignItems: "flex-start" },
+                          {
+                            alignItems: isMe ? "flex-end" : "flex-start",
+                          },
                         ]}
                       >
-                        <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "flex-end",
+                          }}
+                        >
+                          {/* Avatar */}
                           {!isMe && (
-                            <Image source={{ uri: senderAvatar }} style={styles.chatAvatar} />
+                            <Image
+                              source={{ uri: senderAvatar }}
+                              style={styles.chatAvatar}
+                            />
                           )}
 
-                          <View style={{ position: "relative", maxWidth: "75%" }}>
+                          {/* Bubble */}
+                          <View style={{ maxWidth: "75%" }}>
                             <View
-                              onStartShouldSetResponder={() => true}
-                              onResponderRelease={() => {
-                                const now = Date.now();
-                                const lastTap = lastTapRef.current[item.id];
-
-                                if (lastTap && now - lastTap < 300) {
-                                  toggleHeartReaction(item.id, item.reactions);
-
-                                  // 💥 animate
-                                  animateHeart(item.id);
-
-                                  // 📳 haptic
-                                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                }
-
-                                lastTapRef.current[item.id] = now;
-                              }}
                               style={[
                                 styles.bubble,
                                 isMe ? styles.myBubble : styles.theirBubble,
@@ -966,33 +853,16 @@ export default function SynqScreen() {
                                 {item.text}
                               </Text>
                             </View>
-                            {item.reactions &&
-                              Object.values(item.reactions).includes("heart") && (
-                                <Animated.View
-                                  style={[
-                                    styles.heartReaction,
-                                    {
-                                      transform: [
-                                        {
-                                          scale:
-                                            heartScales.current[item.id] ||
-                                            new Animated.Value(1),
-                                        },
-                                      ],
-                                    },
-                                  ]}
-                                >
-                                  <Ionicons name="heart" size={12} color="#FF3B30" />
-                                </Animated.View>
-                              )}
                           </View>
                         </View>
-
                         <Text
-                          style={[
-                            styles.timestampOutside,
-                            isMe ? { marginRight: 4 } : { marginLeft: 44 },
-                          ]}
+                          style={{
+                            color: "#444",
+                            fontSize: 11,
+                            marginTop: 4,
+                            marginLeft: isMe ? 0 : 54,
+                            alignSelf: isMe ? "flex-end" : "flex-start",
+                          }}
                         >
                           {formatTime(item.createdAt)}
                         </Text>
@@ -1182,13 +1052,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textAlign: 'center'
   },
-centeredModalOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.9)',
-  justifyContent: 'center', 
-  alignItems: 'center',
-  padding: 25,
-},
+  centeredModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 25,
+  },
   modalBg: { flex: 1, backgroundColor: 'black' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
   modalTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Medium' },
@@ -1197,11 +1067,10 @@ centeredModalOverlay: {
   inboxCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
   stackedPhoto: { width: 40, height: 40, borderRadius: 20, position: 'absolute', borderWidth: 2, borderColor: 'black' },
   msgContainer: { marginBottom: 15 },
-  chatAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
+  chatAvatar: { width: 46, height: 46, borderRadius: 23, borderColor: BORDER, borderWidth: 2, marginRight: 8 },
   bubble: { padding: 15, borderRadius: 22 },
   myBubble: { backgroundColor: ACCENT },
   theirBubble: { backgroundColor: '#1C1C1E' },
-  timestampOutside: { color: '#444', fontSize: 11, marginTop: 4, fontFamily: 'Avenir' },
   inputRow: { flexDirection: 'row', alignItems: "flex-end", padding: 20, paddingBottom: 40, backgroundColor: 'black' },
   inputMultiline: {
     paddingTop: 12,
@@ -1262,39 +1131,39 @@ centeredModalOverlay: {
   aiCardBodySmall: { color: 'white', fontSize: 15, fontFamily: 'Avenir', lineHeight: 22, marginBottom: 15 },
   aiShareBtnSmall: { backgroundColor: ACCENT, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
   aiShareBtnText: { color: 'black', fontSize: 14, fontFamily: 'Avenir-Heavy' },
-editPanel: {
-  width: '100%',
-  backgroundColor: '#161616',
-  borderRadius: 28,
-  padding: 24,
-  alignItems: 'stretch',
-},
-panelTitle: {
-  color: 'white',
-  fontSize: 22,
-  fontFamily: 'Avenir-Medium',
-},
-panelInput: {
-  width: '100%',
-  backgroundColor: "#0E0E0E",
-  color: 'white',
-  padding: 16,
-  borderRadius: 16,
-  marginTop: 8,
-  marginBottom: 12,
-  fontSize: 15,
-  minHeight: 80,
-},
-saveBtn: {
-  backgroundColor: ACCENT,
-  width: '80%',
-  padding: 18,
-  borderRadius: 16,
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginTop: 20,
-  alignSelf: 'center'
-},
+  editPanel: {
+    width: '100%',
+    backgroundColor: '#161616',
+    borderRadius: 28,
+    padding: 24,
+    alignItems: 'stretch',
+  },
+  panelTitle: {
+    color: 'white',
+    fontSize: 22,
+    fontFamily: 'Avenir-Medium',
+  },
+  panelInput: {
+    width: '100%',
+    backgroundColor: "#0E0E0E",
+    color: 'white',
+    padding: 16,
+    borderRadius: 16,
+    marginTop: 8,
+    marginBottom: 12,
+    fontSize: 15,
+    minHeight: 80,
+  },
+  saveBtn: {
+    backgroundColor: ACCENT,
+    width: '80%',
+    padding: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    alignSelf: 'center'
+  },
   saveBtnText: { color: 'black', fontSize: 16, fontFamily: 'Avenir-Medium' },
   endSynqBtn: { width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FF453A' },
   endSynqBtnText: { color: '#FF453A', fontSize: 16 },
@@ -1425,45 +1294,43 @@ saveBtn: {
     marginHorizontal: 6,
     fontFamily: "Avenir-Medium",
   },
-panelSubtext: {
-  color: "rgba(255,255,255,0.55)",
-  fontSize: 14,
-  marginTop: 6,
-  marginBottom: 12,
-},
+  panelSubtext: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 14,
+    marginTop: 6,
+    marginBottom: 12,
+  },
 
-suggestionWrap: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 8, // 👈 cleaner spacing (RN 0.71+)
-},
-suggestionChip: {
-  borderWidth: 1,
-  borderColor: "rgba(255,255,255,0.08)",
-  backgroundColor: "rgba(255,255,255,0.04)",
-  paddingHorizontal: 14,
-  paddingVertical: 10,
-  borderRadius: 999,
+  suggestionWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  suggestionChip: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+  },
 
-  // 👇 KEY FIX
-  alignSelf: "flex-start",
-},
+  suggestionText: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 13,
+  },
 
-suggestionText: {
-  color: "rgba(255,255,255,0.85)",
-  fontSize: 13,
-},
+  lockRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14,
+  },
 
-lockRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "center",
-  marginTop: 14,
-},
-
-lockText: {
-  color: "rgba(255,255,255,0.30)",
-  fontSize: 12,
-  marginLeft: 6,
-},
+  lockText: {
+    color: "rgba(255,255,255,0.30)",
+    fontSize: 12,
+    marginLeft: 6,
+  },
 });

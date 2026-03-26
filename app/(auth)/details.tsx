@@ -18,11 +18,11 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { ACCENT } from "../../constants/Variables";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db, storage } from "../../src/lib/firebase";
 
 const { height } = Dimensions.get("window");
-const ACCENT = "#7DFFA6";
 
 const fonts = {
   black: Platform.OS === "ios" ? "Avenir-Heavy" : "sans-serif-condensed",

@@ -10,10 +10,9 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { ACCENT } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import { useAuthRefresh } from "./_layout";
-
-const ACCENT = "#7DFFA6";
 
 const INTERESTS = [
     "🍽️ Going out to eat",

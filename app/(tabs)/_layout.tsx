@@ -1,8 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { Image, Platform, StyleSheet, View } from "react-native";
-
-const ACCENT = "#7DFFA6";
+import { ACCENT } from "../../constants/Variables";
 
 export default function TabsLayout() {
   return (

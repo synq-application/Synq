@@ -23,6 +23,7 @@ import {
   View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { ACCENT } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 
 Notifications.setNotificationHandler({
@@ -43,7 +44,7 @@ async function registerForPushNotificationsAsync() {
       name: "default",
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#7DFFA6",
+      lightColor: ACCENT,
     });
   }
 

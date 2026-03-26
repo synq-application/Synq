@@ -15,9 +15,8 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { ACCENT } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
-
-const ACCENT = "#7DFFA6";
 
 const fonts = {
   black: Platform.OS === 'ios' ? 'Avenir-Black' : 'sans-serif-condensed',

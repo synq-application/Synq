@@ -23,11 +23,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { ACCENT } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
 
-const ACCENT = "#7DFFA6";
 const BACKGROUND = "black";
 const SURFACE = "#161616";
 const DEFAULT_AVATAR =

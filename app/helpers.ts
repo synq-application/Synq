@@ -1,3 +1,5 @@
+import { DEFAULT_AVATAR } from "@/constants/Variables";
+
 export type SynqStatus = "idle" | "activating" | "finding" | "active";
 
 export const formatTime = (timestamp: any) => {
@@ -18,23 +20,66 @@ export const getChatTitle = (chat: any, myId: string) => {
   return `You, ${otherNames.join(", ")} & ${last}`;
 };
 
-  export const getLeadingEmoji = (text: string) => {
-    if (!text) return null;
-    const firstChar = Array.from(text.trim())[0];
-    if (/\p{Extended_Pictographic}/u.test(firstChar)) {
-      return firstChar;
-    }
-    return null;
-  };
+export const getLeadingEmoji = (text: string) => {
+  if (!text) return null;
+  const firstChar = Array.from(text.trim())[0];
+  if (/\p{Extended_Pictographic}/u.test(firstChar)) {
+    return firstChar;
+  }
+  return null;
+};
 
-  export const formatLastSynq = (date: Date) => {
-      const now = new Date();
-      const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-  
-      if (diff < 60) return "Just now";
-      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-      if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  
-      return date.toLocaleDateString();
-    };
+export const formatLastSynq = (date: Date) => {
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diff < 60) return "Just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+
+  return date.toLocaleDateString();
+};
+
+export const parseIdeaText = (text: string) => {
+  const lines = (text || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const name = lines[0] || "";
+  const address = lines.slice(1).join(" ") || "";
+  return { name, address };
+};
+
+export const resolveAvatar = (url?: any) => {
+  if (typeof url === "string" && url.trim().startsWith("http")) {
+    return url;
+  }
+  return DEFAULT_AVATAR;
+};
+
+export const wrapChatTitle = (text: string, maxChars = 30) => {
+    const tokens = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+
+    for (const token of tokens) {
+      const testLine = currentLine
+        ? `${currentLine} ${token}`
+        : token;
+
+      if (testLine.length <= maxChars) {
+        currentLine = testLine;
+      } else {
+        lines.push(currentLine);
+        currentLine = token;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines.join('\n');
+  };

@@ -14,10 +14,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { ACCENT } from "../../constants/Variables";
 
 import AlertModal from "../alert-modal";
 
-const ACCENT = "#7DFFA6";
 const BACKGROUND = "black";
 const SURFACE = "#161616";
 
