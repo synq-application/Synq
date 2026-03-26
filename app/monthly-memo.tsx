@@ -60,36 +60,23 @@ export default function OpenPlans({
   const formatTime = (d: Date) =>
     d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
-  // ✅ UTC-safe parser
   const parseDate = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);
-    const parsed = new Date(Date.UTC(y, m - 1, d));
-    console.log("PARSE DATE INPUT:", s);
-    console.log("PARSED DATE OBJECT:", parsed);
-    return parsed;
+    return new Date(y, m - 1, d); 
   };
 
   const setDate = (base: Date) => {
     const d = new Date(base);
     d.setHours(selectedDate.getHours());
     d.setMinutes(selectedDate.getMinutes());
-    console.log("SET DATE:", d);
     setSelectedDate(d);
   };
 
   const handleSave = () => {
-    console.log("RAW SELECTED DATE:", selectedDate);
-
-    const year = selectedDate.getUTCFullYear();
-    const month = String(selectedDate.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(selectedDate.getUTCDate()).padStart(2, "0");
-
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(selectedDate.getDate()).padStart(2, "0");
     const localDate = `${year}-${month}-${day}`;
-
-    console.log("UTC YEAR:", year);
-    console.log("UTC MONTH:", month);
-    console.log("UTC DAY:", day);
-    console.log("FINAL SAVED DATE STRING:", localDate);
 
     saveEvent({
       ...newEvent,
@@ -114,37 +101,61 @@ export default function OpenPlans({
         <Text style={styles.empty}>Nothing planned… yet 👀</Text>
       )}
 
-      {events.map((p) => {
-        const d = parseDate(p.date);
+      {[...events]
+        .sort((a, b) => {
+          const baseA = parseDate(a.date);
+          const baseB = parseDate(b.date);
 
-        console.log("RENDER EVENT DATE STRING:", p.date);
-        console.log("RENDER DATE OBJECT:", d);
+          const getMinutes = (time?: string) => {
+            if (!time) return 0;
+            const [t, period] = time.split(" ");
+            let [hours, minutes] = t.split(":").map(Number);
 
-        return (
-          <TouchableOpacity
-            key={p.id}
-            style={styles.card}
-            onLongPress={() => handleDelete(p.id)}
-          >
+            if (period === "PM" && hours !== 12) hours += 12;
+            if (period === "AM" && hours === 12) hours = 0;
+
+            return hours * 60 + minutes;
+          };
+
+          const minutesA = getMinutes(a.time);
+          const minutesB = getMinutes(b.time);
+
+          return (
+            baseA.getTime() + minutesA * 60000 -
+            (baseB.getTime() + minutesB * 60000)
+          );
+        })
+        .map((p) => {
+          const d = parseDate(p.date);
+          return (
+            <TouchableOpacity
+              key={p.id}
+              style={styles.card}
+              onLongPress={() => handleDelete(p.id)}
+            >
             <View style={styles.dateBlock}>
+              <Text style={styles.month}>
+                {d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()}
+              </Text>
+
+              <Text style={styles.date}>{d.getDate()}</Text>
+
               <Text style={styles.day}>
                 {d
                   .toLocaleDateString("en-US", { weekday: "short" })
                   .toUpperCase()}
               </Text>
-              <Text style={styles.date}>{d.getUTCDate()}</Text>
             </View>
-
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title}>{p.title}</Text>
-              <Text style={styles.meta}>
-                {p.time}
-                {p.location ? ` · ${p.location}` : ""}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        );
-      })}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title}>{p.title}</Text>
+                <Text style={styles.meta}>
+                  {p.time}
+                  {p.location ? ` · ${p.location}` : ""}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
 
       <TouchableOpacity
         style={[styles.addBtn, { borderColor: ACCENT }]}
@@ -223,7 +234,6 @@ export default function OpenPlans({
                       textColor="white"
                       onChange={(e, d) => {
                         if (d) {
-                          console.log("PICKED DATE:", d);
                           setDate(d);
                         }
                       }}
@@ -309,4 +319,9 @@ const styles = StyleSheet.create({
   label: { color: "#777", marginBottom: 5, fontSize: 14, fontFamily: fonts.medium },
   dateBtn: { borderWidth: 1, borderColor: "#333", borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
   cancel: { color: "#aaa", fontSize: 14 },
+  month: {
+  color: "#666",
+  fontSize: 10,
+  marginBottom: 2,
+},
 });
