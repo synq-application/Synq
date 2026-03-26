@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -45,19 +45,16 @@ export default function ProfileScreen() {
   const [interests, setInterests] = useState<string[]>([]);
   const [city, setCity] = useState<string | null>(null);
   const [state, setState] = useState<string | null>(null);
-  const [memo, setMemo] = useState<string>("");
-  const [loadingConnections, setLoadingConnections] = useState(false);
   const [hasLoadedConnections, setHasLoadedConnections] = useState(false);
   const [requestCount, setRequestCount] = useState(0);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-const [events, setEvents] = useState<
-  { id: string; date: string; title: string; time?: string }[]
->([]);
+  const [events, setEvents] = useState<
+    { id: string; date: string; title: string; time?: string }[]
+  >([]);
   const [alertVisible, setAlertVisible] = useState(false);
-const [alertTitle, setAlertTitle] = useState("");
-const [alertMessage, setAlertMessage] = useState("");
-const [pendingInterestDelete, setPendingInterestDelete] = useState<string | null>(null);
-const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [pendingInterestDelete, setPendingInterestDelete] = useState<string | null>(null);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const [showEventModal, setShowEventModal] = useState(false);
 
@@ -68,59 +65,57 @@ const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
     location: "",
   });
 
-const saveEvent = async (eventOverride?: any) => {
-  if (!auth.currentUser) return;
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+
+  const saveEvent = async (eventOverride?: any) => {
+    if (!auth.currentUser) return;
 
   const eventToSave = eventOverride || newEvent;
 
-  if (!eventToSave.title) {
-    setAlertTitle("Missing info");
-    setAlertMessage("Add a title");
-    setAlertVisible(true);
-    return;
-  }
+    if (!eventToSave.title) {
+      showAlert("Missing info", "Add a title");
+      return;
+    }
 
-  const newItem = {
-    id: Date.now().toString(),
-    date: eventToSave.date, // ✅ USE CHILD VALUE
-    title: eventToSave.title,
-    time: eventToSave.time || "",
-    location: eventToSave.location || "",
+    const newItem = {
+      id: Date.now().toString(),
+      date: eventToSave.date,
+      title: eventToSave.title,
+      time: eventToSave.time || "",
+      location: eventToSave.location || "",
+    };
+
+    const updatedEvents = [...events, newItem];
+
+    try {
+      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+        events: updatedEvents,
+      });
+
+      setShowEventModal(false);
+      setNewEvent({ title: "", date: "", time: "", location: "" });
+    } catch (e) {
+      showAlert("Error", "Could not save event.");
+    }
   };
 
-  console.log("FINAL EVENT SAVED:", newItem);
+  const deleteEvent = async (id: string) => {
+    if (!auth.currentUser) return;
 
-  const updatedEvents = [...events, newItem];
+    const updated = events.filter((e) => e.id !== id);
 
-  try {
-    await updateDoc(doc(db, "users", auth.currentUser.uid), {
-      events: updatedEvents,
-    });
-
-    setShowEventModal(false);
-    setNewEvent({ title: "", date: "", time: "", location: "" });
-  } catch (e) {
-    setAlertTitle("Error");
-    setAlertMessage("Could not save event.");
-    setAlertVisible(true);
-  }
-};
-
-const deleteEvent = async (id: string) => {
-  if (!auth.currentUser) return;
-
-  const updated = events.filter((e) => e.id !== id);
-
-  try {
-    await updateDoc(doc(db, "users", auth.currentUser.uid), {
-      events: updated,
-    });
-  } catch (e) {
-    setAlertTitle("Error");
-    setAlertMessage("Could not delete event.");
-    setAlertVisible(true);
-  }
-};
+    try {
+      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+        events: updated,
+      });
+    } catch (e) {
+      showAlert("Error", "Could not delete event.");
+    }
+  };
 
   useEffect(() => {
     if (!auth.currentUser?.uid) return;
@@ -133,7 +128,6 @@ const deleteEvent = async (id: string) => {
         setCity(userData.city || null);
         const stateAbbr = stateAbbreviations[userData.state] || userData.state || null;
         setState(stateAbbr);
-        setMemo(userData.memo || "");
         setEvents(userData.events || []);
         setInterests(userData.interests || []);
         setSelectedInterests(userData.interests || []);
@@ -148,32 +142,27 @@ const deleteEvent = async (id: string) => {
 
     const friendsCol = collection(db, "users", auth.currentUser.uid, "friends");
     const unsubscribeFriends = onSnapshot(friendsCol, async (snapshot) => {
-      setLoadingConnections(true);
-      try {
-        const friendsList = await Promise.all(
-          snapshot.docs.map(async (friendDoc) => {
-            const friendSnap = await getDoc(doc(db, "users", friendDoc.id));
-            if (friendSnap.exists()) {
-              return {
-                id: friendDoc.id,
-                name: friendSnap.data().displayName || "User",
-                imageUrl: friendSnap.data().imageurl || null,
-                synqCount: friendDoc.data().synqCount || 0,
-              } as Connection;
-            }
-            return null;
-          })
-        );
+      const friendsList = await Promise.all(
+        snapshot.docs.map(async (friendDoc) => {
+          const friendSnap = await getDoc(doc(db, "users", friendDoc.id));
+          if (friendSnap.exists()) {
+            return {
+              id: friendDoc.id,
+              name: friendSnap.data().displayName || "User",
+              imageUrl: friendSnap.data().imageurl || null,
+              synqCount: friendDoc.data().synqCount || 0,
+            } as Connection;
+          }
+          return null;
+        })
+      );
 
-        const validFriends = (friendsList.filter(Boolean) as Connection[]).sort(
-          (a, b) => b.synqCount - a.synqCount
-        );
+      const validFriends = (friendsList.filter(Boolean) as Connection[]).sort(
+        (a, b) => b.synqCount - a.synqCount
+      );
 
-        setConnections(validFriends);
-        setHasLoadedConnections(true);
-      } finally {
-        setLoadingConnections(false);
-      }
+      setConnections(validFriends);
+      setHasLoadedConnections(true);
     });
 
     return () => {
@@ -183,8 +172,12 @@ const deleteEvent = async (id: string) => {
     };
   }, []);
 
-  const filteredActivities = allActivities.filter((item) =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredActivities = useMemo(
+    () =>
+      allActivities.filter((item) =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      ),
+    [searchQuery]
   );
 
   const handleDeleteInterest = (interestName: string) => {
@@ -221,9 +214,7 @@ const deleteEvent = async (id: string) => {
       await updateDoc(doc(db, "users", auth.currentUser.uid), { imageurl: url });
       setProfileImage(url);
     } catch (e) {
-      setAlertTitle("Error");
-      setAlertMessage("Could not upload image.");
-      setAlertVisible(true);
+      showAlert("Error", "Could not upload image.");
     } finally {
       setIsUploading(false);
     }
@@ -242,9 +233,7 @@ const deleteEvent = async (id: string) => {
       setShowInputModal(false);
       setSearchQuery("");
     } catch (e) {
-      setAlertTitle("Error");
-      setAlertMessage("Could not save interests.");
-      setAlertVisible(true);
+      showAlert("Error", "Could not save interests.");
     }
   };
 
@@ -328,11 +317,10 @@ const deleteEvent = async (id: string) => {
           <Text style={styles.sectionTitle}>Top Synqs</Text>
           <TouchableOpacity
               onPress={() => {
-                setAlertTitle("Top Synqs");
-                setAlertMessage(
+                showAlert(
+                  "Top Synqs",
                   "Your top Synqs are the people you connect with the most!"
                 );
-                setAlertVisible(true);
               }}
           >
             <Icon name="information-circle-outline" size={18} color="#444" />
