@@ -33,6 +33,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
@@ -179,8 +180,9 @@ export default function FriendsScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Friends</Text>
@@ -221,12 +223,13 @@ export default function FriendsScreen() {
         </>
       )}
 
-      <SearchModal
-        visible={searchModalVisible}
-        onClose={() => setSearchModalVisible(false)}
-        currentFriends={friends.map((f) => f.id)}
-      />
-    </View>
+        <SearchModal
+          visible={searchModalVisible}
+          onClose={() => setSearchModalVisible(false)}
+          currentFriends={friends.map((f) => f.id)}
+        />
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 

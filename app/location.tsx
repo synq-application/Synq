@@ -4,10 +4,12 @@ import { doc, setDoc } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { ACCENT, BUTTON_RADIUS } from "../constants/Variables";
@@ -195,77 +197,79 @@ export default function LocationDetails() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Where do you live?</Text>
-      <Text style={styles.subtitle}>
-        This helps friends see who is nearby for a quick Synq.
-      </Text>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Where do you live?</Text>
+        <Text style={styles.subtitle}>
+          This helps friends see who is nearby for a quick Synq.
+        </Text>
 
-      <View style={{ marginTop: 24 }}>
-        <TextInput
-          value={city}
-          onChangeText={setCity}
-          placeholder="City (e.g. Seattle)"
-          placeholderTextColor="rgba(255,255,255,0.35)"
-          style={styles.input}
-        />
+        <View style={{ marginTop: 24 }}>
+          <TextInput
+            value={city}
+            onChangeText={setCity}
+            placeholder="City (e.g. Seattle)"
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            style={styles.input}
+          />
 
-        <TextInput
-          value={state}
-          onChangeText={setState}
-          placeholder="State (e.g. WA)"
-          placeholderTextColor="rgba(255,255,255,0.35)"
-          autoCapitalize="characters"
-          maxLength={2}
-          style={[styles.input, { marginTop: 12 }]}
-        />
+          <TextInput
+            value={state}
+            onChangeText={setState}
+            placeholder="State (e.g. WA)"
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            autoCapitalize="characters"
+            maxLength={2}
+            style={[styles.input, { marginTop: 12 }]}
+          />
 
-        {!locationUsed && (
-          <TouchableOpacity
-            onPress={fillFromCurrentLocation}
-            disabled={loading || locating}
-            activeOpacity={0.85}
-            style={styles.locationRow}
-          >
-            <View style={styles.locationLeft}>
-              <Text style={styles.locationIcon}>📍</Text>
-              <View>
-                <Text style={styles.locationPrimary}>
-                  Use current location
-                </Text>
-                <Text style={styles.locationSecondary}>
-                  Auto-fill your city & state
-                </Text>
+          {!locationUsed && (
+            <TouchableOpacity
+              onPress={fillFromCurrentLocation}
+              disabled={loading || locating}
+              activeOpacity={0.85}
+              style={styles.locationRow}
+            >
+              <View style={styles.locationLeft}>
+                <Text style={styles.locationIcon}>📍</Text>
+                <View>
+                  <Text style={styles.locationPrimary}>
+                    Use current location
+                  </Text>
+                  <Text style={styles.locationSecondary}>
+                    Auto-fill your city & state
+                  </Text>
+                </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        )}
-      </View>
-      <TouchableOpacity
-        disabled={!canContinue}
-        onPress={saveLocation}
-        style={[
-          styles.button,
-          !canContinue && { opacity: 0.5 },
-        ]}
-      >
-        {loading ? (
-          <ActivityIndicator color="black" />
-        ) : (
-          <Text style={styles.buttonText}>Continue</Text>
-        )}
-      </TouchableOpacity>
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity
+          disabled={!canContinue}
+          onPress={saveLocation}
+          style={[
+            styles.button,
+            !canContinue && { opacity: 0.5 },
+          ]}
+        >
+          {loading ? (
+            <ActivityIndicator color="black" />
+          ) : (
+            <Text style={styles.buttonText}>Continue</Text>
+          )}
+        </TouchableOpacity>
 
-      <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-        <Text style={styles.skipText}>Skip for now</Text>
-      </TouchableOpacity>
-      <AlertModal
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        onClose={() => setAlertVisible(false)}
-      />
-    </View>
+        <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
+          <Text style={styles.skipText}>Skip for now</Text>
+        </TouchableOpacity>
+        <AlertModal
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          onClose={() => setAlertVisible(false)}
+        />
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 

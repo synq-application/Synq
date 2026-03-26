@@ -8,6 +8,7 @@ import React, { useMemo, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   Modal,
   ScrollView,
   StatusBar,
@@ -250,7 +251,9 @@ export default function ProfileScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="always"
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      onScrollBeginDrag={Keyboard.dismiss}
     >
       <StatusBar barStyle="light-content" />
 
@@ -472,7 +475,12 @@ export default function ProfileScreen() {
               />
             </View>
 
-            <ScrollView contentContainerStyle={styles.interestGrid} keyboardShouldPersistTaps="always">
+            <ScrollView
+              contentContainerStyle={styles.interestGrid}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              onScrollBeginDrag={Keyboard.dismiss}
+            >
               {filteredActivities.map((item) => {
                 const active = selectedInterests.includes(item.name);
                 return (

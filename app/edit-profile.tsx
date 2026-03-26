@@ -5,6 +5,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -12,6 +13,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View
 } from 'react-native';
 import { ACCENT, BUTTON_RADIUS } from "../constants/Variables";
@@ -209,22 +211,27 @@ export default function EditProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="close-circle" size={28} color="#444" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving}>
-          {saving ? (
-            <ActivityIndicator size="small" color={ACCENT} />
-          ) : (
-            <Text style={styles.saveText}>Save</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="close-circle" size={28} color="#444" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <TouchableOpacity onPress={handleSave} disabled={saving}>
+            {saving ? (
+              <ActivityIndicator size="small" color={ACCENT} />
+            ) : (
+              <Text style={styles.saveText}>Save</Text>
+            )}
+          </TouchableOpacity>
+        </View>
 
-      <ScrollView contentContainerStyle={styles.form}>
+        <ScrollView
+          contentContainerStyle={styles.form}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Display Name</Text>
           <TextInput
@@ -281,18 +288,19 @@ export default function EditProfileScreen() {
             </View>
           </TouchableOpacity>
         )}
-      </ScrollView>
-      <AlertModal
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        onClose={() => {
-          setAlertVisible(false);
-          if (goBackOnClose) router.back();
-          setGoBackOnClose(false);
-        }}
-      />
-    </SafeAreaView>
+        </ScrollView>
+        <AlertModal
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          onClose={() => {
+            setAlertVisible(false);
+            if (goBackOnClose) router.back();
+            setGoBackOnClose(false);
+          }}
+        />
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 }
 

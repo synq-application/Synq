@@ -1,7 +1,17 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { PhoneAuthProvider, signInWithCredential } from "firebase/auth";
 import { useMemo, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
 
 import { BUTTON_RADIUS } from "@/constants/Variables";
 import AlertModal from "../alert-modal";
@@ -36,36 +46,38 @@ export default function Verify() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <View style={styles.inner}>
-        <Text style={styles.title}>Enter code</Text>
-        <Text style={styles.subtitle}>Sent to {phone ?? "your phone"}.</Text>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={styles.inner}>
+          <Text style={styles.title}>Enter code</Text>
+          <Text style={styles.subtitle}>Sent to {phone ?? "your phone"}.</Text>
 
-        <TextInput
-          value={code}
-          onChangeText={setCode}
-          placeholder="123456"
-          placeholderTextColor="rgba(255,255,255,0.4)"
-          keyboardType="number-pad"
-          style={styles.input}
-          maxLength={6}
+          <TextInput
+            value={code}
+            onChangeText={setCode}
+            placeholder="123456"
+            placeholderTextColor="rgba(255,255,255,0.4)"
+            keyboardType="number-pad"
+            style={styles.input}
+            maxLength={6}
+          />
+
+          <Pressable disabled={!canVerify} onPress={verify} style={[styles.button, !canVerify && styles.buttonDisabled]}>
+            <Text style={styles.buttonText}>{loading ? "Verifying..." : "Verify"}</Text>
+          </Pressable>
+
+          <Pressable onPress={() => router.back()} style={{ marginTop: 14 }}>
+            <Text style={styles.back}>Back</Text>
+          </Pressable>
+        </View>
+        <AlertModal
+          visible={alertVisible}
+          title="Invalid code"
+          message={alertMessage}
+          onClose={() => setAlertVisible(false)}
         />
-
-        <Pressable disabled={!canVerify} onPress={verify} style={[styles.button, !canVerify && styles.buttonDisabled]}>
-          <Text style={styles.buttonText}>{loading ? "Verifying..." : "Verify"}</Text>
-        </Pressable>
-
-        <Pressable onPress={() => router.back()} style={{ marginTop: 14 }}>
-          <Text style={styles.back}>Back</Text>
-        </Pressable>
-      </View>
-      <AlertModal
-        visible={alertVisible}
-        title="Invalid code"
-        message={alertMessage}
-        onClose={() => setAlertVisible(false)}
-      />
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 
