@@ -77,6 +77,7 @@ export default function SynqScreen() {
   const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
   const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
+  const [isStartingSynq, setIsStartingSynq] = useState(false);
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
@@ -368,14 +369,21 @@ export default function SynqScreen() {
   };
 
   const startSynq = async () => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || isStartingSynq) return;
     Vibration.vibrate(200);
-    await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-      memo,
-      status: 'available',
-      synqStartedAt: serverTimestamp()
-    });
-    setStatus('activating');
+    setIsStartingSynq(true);
+    try {
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        memo,
+        status: 'available',
+        synqStartedAt: serverTimestamp()
+      });
+      setStatus('activating');
+    } catch (e) {
+      console.error("Failed to start Synq", e);
+    } finally {
+      setIsStartingSynq(false);
+    }
   };
 
   const endSynq = () => {
@@ -683,6 +691,7 @@ export default function SynqScreen() {
             memo={memo}
             setMemo={setMemo}
             onStartSynq={startSynq}
+            isStartingSynq={isStartingSynq}
             styles={styles}
           />
         )}
@@ -1082,7 +1091,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     textAlign: "center",
     lineHeight: 34,
-    marginTop: 160,
+    marginTop: 120,
     maxWidth: 352,
   },
   inlineMetaRow: {

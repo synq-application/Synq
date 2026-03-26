@@ -244,6 +244,9 @@ export default function FriendsScreen() {
             data={filteredFriends}
             keyExtractor={(item) => item.id}
             renderItem={renderFriendRow}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            onScrollBeginDrag={Keyboard.dismiss}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             ListFooterComponent={<View style={{ height: 40 }} />}
           />
@@ -292,6 +295,11 @@ function SearchModal({
     setQueryText("");
     setResults([]);
     setIsSearching(false);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
   }, [visible]);
 
   useEffect(() => {
@@ -605,6 +613,9 @@ function SearchModal({
               keyExtractor={(item) => item.id}
               scrollEnabled={true}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              onScrollBeginDrag={Keyboard.dismiss}
               ListFooterComponent={<View style={{ height: 40 }} />}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               renderItem={({ item }) => (

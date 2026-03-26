@@ -27,6 +27,7 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
+  DEFAULT_AVATAR,
   RADIUS_MD,
   SPACE_3,
   SPACE_4,
@@ -43,8 +44,6 @@ import AlertModal from "./alert-modal";
 
 const BACKGROUND = BG;
 const SURFACE = "rgba(255,255,255,0.06)";
-const DEFAULT_AVATAR =
-  "https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png";
 const isRemoteImageUri = (value: unknown): value is string =>
   typeof value === "string" && /^https?:\/\//i.test(value);
 

@@ -1,4 +1,5 @@
 import { ACCENT, BG, BUTTON_RADIUS, fonts, synqSvg, TEXT } from "@/constants/Variables";
+import { Ionicons } from "@expo/vector-icons";
 import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
 import { router } from "expo-router";
 import { signInWithPhoneNumber } from "firebase/auth";
@@ -106,7 +107,7 @@ export default function Phone() {
 
   const verifyCode = async () => {
     const fullCode = code.join("");
-    if (fullCode.length !== 6 || loading) return;
+    if (fullCode.length !== 6 || loading || !confirm) return;
 
     try {
       setLoading(true);
@@ -140,7 +141,7 @@ export default function Phone() {
         />
 
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
-          <Text style={styles.backText}>Back</Text>
+          <Ionicons name="chevron-back" size={20} color={ACCENT} />
         </TouchableOpacity>
 
         <KeyboardAvoidingView
@@ -276,8 +277,20 @@ const styles = StyleSheet.create({
     opacity: 0.35,
     transform: [{ rotate: "-8deg" }],
   },
-  backBtn: { position: "absolute", top: 60, left: 22, zIndex: 10 },
-  backText: { fontSize: 16, color: ACCENT, fontFamily: fonts.book },
+  backBtn: {
+    position: "absolute",
+    top: 56,
+    left: 18,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
   container: { flex: 1, paddingHorizontal: 22 },
   innerContent: { width: "100%", marginTop: height * 0.20 },
   title: {

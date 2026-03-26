@@ -1,7 +1,8 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import React from "react";
+import { ACCENT } from "@/constants/Variables";
 import {
+  ActivityIndicator,
   Text,
   TextInput,
   TouchableOpacity,
@@ -12,6 +13,7 @@ type Props = {
   memo: string;
   setMemo: (text: string) => void;
   onStartSynq: () => void;
+  isStartingSynq?: boolean;
   styles: any;
 };
 
@@ -19,26 +21,14 @@ export default function InactiveSynqView({
   memo,
   setMemo,
   onStartSynq,
+  isStartingSynq = false,
   styles,
 }: Props) {
   return (
     <View style={styles.inactiveCenter}>
-      <Text style={styles.mainEyebrow}>Currently inactive</Text>
       <Text style={styles.mainSubtitle}>
-        Tap the pulse to go visible to friends who are free right now.
+        Tap the pulse to see friends who are free right now.
       </Text>
-
-      <View style={styles.inlineMetaRow}>
-        <View style={styles.inlineMetaItem}>
-          <Ionicons name="radio-outline" size={17} color="#2BFF88" />
-          <Text style={styles.inlineMetaText}>Visible instantly</Text>
-        </View>
-        <View style={styles.inlineMetaDot} />
-        <View style={styles.inlineMetaItem}>
-          <Ionicons name="time-outline" size={17} color="#2BFF88" />
-          <Text style={styles.inlineMetaText}>End anytime</Text>
-        </View>
-      </View>
 
       <View style={styles.memoCard}>
         <Text style={styles.memoLabel}>Add a quick memo (optional)</Text>
@@ -56,14 +46,19 @@ export default function InactiveSynqView({
         onPress={onStartSynq}
         style={styles.pulseBox}
         activeOpacity={0.8}
+        disabled={isStartingSynq}
       >
-        <ExpoImage
-          source={require("../../assets/pulse.gif")}
-          style={styles.gifLarge}
-          contentFit="contain"
-          transition={0}
-          cachePolicy="memory-disk"
-        />
+        {isStartingSynq ? (
+          <ActivityIndicator color={ACCENT} size="large" />
+        ) : (
+          <ExpoImage
+            source={require("../../assets/pulse.gif")}
+            style={styles.gifLarge}
+            contentFit="contain"
+            transition={0}
+            cachePolicy="memory-disk"
+          />
+        )}
       </TouchableOpacity>
     </View>
   );
