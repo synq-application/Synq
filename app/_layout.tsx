@@ -24,7 +24,7 @@ import {
   View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { ACCENT } from "../constants/Variables";
+import { ACCENT, BG } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import {
   hydrateSocialCachesFromDisk,
@@ -205,7 +205,7 @@ export default function RootLayout() {
       <View
         style={{
           flex: 1,
-          backgroundColor: "black",
+          backgroundColor: BG,
           alignItems: "center",
           justifyContent: "center",
         }}

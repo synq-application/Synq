@@ -1,4 +1,4 @@
-import { ACCENT, fonts } from "@/constants/Variables";
+import { ACCENT, BG, fonts } from "@/constants/Variables";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
@@ -574,7 +574,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "black" },
+  container: { flex: 1, backgroundColor: BG },
   scrollContent: { paddingBottom: 60 },
   header: {
     flexDirection: "row",

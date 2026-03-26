@@ -16,7 +16,7 @@ import {
   TouchableWithoutFeedback,
   View
 } from 'react-native';
-import { ACCENT, BUTTON_RADIUS } from "../constants/Variables";
+import { ACCENT, BG, BUTTON_RADIUS } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import AlertModal from "./alert-modal";
 
@@ -305,8 +305,8 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'black' },
-  darkFill: { flex: 1, backgroundColor: 'black', justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: BG },
+  darkFill: { flex: 1, backgroundColor: BG, justifyContent: 'center', alignItems: 'center' },
 
   header: {
     flexDirection: 'row',

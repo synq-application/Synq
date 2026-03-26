@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { Tabs } from "expo-router";
 import { Platform, StyleSheet, View } from "react-native";
-import { ACCENT } from "../../constants/Variables";
+import { ACCENT, BG } from "../../constants/Variables";
 
 const SYNQ_ICON = require("../../assets/SYNQ-2.png");
 
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#000",
+    backgroundColor: BG,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: Platform.OS === "ios" ? 30 : 20,

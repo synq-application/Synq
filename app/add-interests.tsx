@@ -9,7 +9,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { ACCENT, BUTTON_RADIUS } from "../constants/Variables";
+import { ACCENT, BG, BUTTON_RADIUS } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import AlertModal from "./alert-modal";
 import { useAuthRefresh } from "./_layout";
@@ -148,7 +148,7 @@ export default function InterestsOnboarding() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "black",
+        backgroundColor: BG,
         padding: 24,
         justifyContent: "center",
     },

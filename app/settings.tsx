@@ -15,12 +15,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { BG } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
 
-const BACKGROUND = "black";
+const BACKGROUND = BG;
 const SURFACE = "#161616";
 
 const fonts = {

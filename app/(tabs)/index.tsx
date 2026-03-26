@@ -37,7 +37,7 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, aiPrompts, BORDER, DEFAULT_AVATAR, EXPIRATION_HOURS, fonts, MUTED, OFFSETS } from '../../constants/Variables';
+import { ACCENT, aiPrompts, BG, BORDER, DEFAULT_AVATAR, EXPIRATION_HOURS, fonts, MUTED, OFFSETS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
@@ -996,7 +996,7 @@ export default function SynqScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#070707" },
-  darkFill: { flex: 1, backgroundColor: 'black', justifyContent: 'center' },
+  darkFill: { flex: 1, backgroundColor: BG, justifyContent: 'center' },
   activeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1045,7 +1045,7 @@ const styles = StyleSheet.create({
   btnText: { fontSize: 16, color: 'black', fontFamily: 'Avenir-Medium' },
   deactivateLink: { marginTop: 20, alignSelf: 'center', padding: 10 },
   deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: 'Avenir-Medium', opacity: 0.9 },
-  activatingContainer: { flex: 1, backgroundColor: 'black', alignItems: 'center', justifyContent: 'center' },
+  activatingContainer: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
   unifiedTitle: { color: 'white', fontSize: 28, fontFamily: 'Avenir', marginBottom: 50, textAlign: 'center' },
   gifLarge: { width: 350, height: 350, marginTop: 50 },
   inactiveCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
@@ -1077,7 +1077,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 25,
   },
-  modalBg: { flex: 1, backgroundColor: 'black' },
+  modalBg: { flex: 1, backgroundColor: BG },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
   modalTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Medium' },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
@@ -1089,7 +1089,7 @@ const styles = StyleSheet.create({
   bubble: { padding: 15, borderRadius: 22 },
   myBubble: { backgroundColor: ACCENT },
   theirBubble: { backgroundColor: '#1C1C1E' },
-  inputRow: { flexDirection: 'row', alignItems: "flex-end", padding: 20, paddingBottom: 40, backgroundColor: 'black' },
+  inputRow: { flexDirection: 'row', alignItems: "flex-end", padding: 20, paddingBottom: 40, backgroundColor: BG },
   inputMultiline: {
     paddingTop: 12,
     paddingBottom: 12,
@@ -1208,7 +1208,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: -6,
     right: -6,
-    backgroundColor: "#000",
+    backgroundColor: BG,
     borderRadius: 8,
     padding: 3,
     borderWidth: 1,

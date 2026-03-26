@@ -11,9 +11,9 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { ACCENT } from "../../constants/Variables";
+import { ACCENT, BG } from "../../constants/Variables";
 
-const BACKGROUND = "black";
+const BACKGROUND = BG;
 const SURFACE = "#161616";
 
 const fonts = {

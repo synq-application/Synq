@@ -1,4 +1,4 @@
-import { ACCENT } from "@/constants/Variables";
+import { ACCENT, BG } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { signOut } from "firebase/auth";
@@ -20,7 +20,7 @@ import { auth } from "../src/lib/firebase";
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
 
-const BACKGROUND = "black";
+const BACKGROUND = BG;
 const SURFACE = "#161616";
 
 const fonts = {

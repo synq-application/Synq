@@ -17,7 +17,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { ACCENT, BUTTON_RADIUS } from "../../constants/Variables";
+import { ACCENT, BG, BUTTON_RADIUS } from "../../constants/Variables";
 import AlertModal from "../alert-modal";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db, storage } from "../../src/lib/firebase";
@@ -212,7 +212,7 @@ export default function Details() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "black",
+    backgroundColor: BG,
     paddingHorizontal: 24,
   },
   innerContent: {

@@ -22,12 +22,12 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { ACCENT } from "../constants/Variables";
+import { ACCENT, BG } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
 
-const BACKGROUND = "black";
+const BACKGROUND = BG;
 const SURFACE = "#161616";
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png";
