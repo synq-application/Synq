@@ -326,9 +326,9 @@ const styles = StyleSheet.create({
   header: { alignItems: "center", marginTop: 10 },
 
   avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
     borderWidth: 2,
     borderColor: ACCENT,
     marginBottom: 16,
@@ -350,6 +350,7 @@ const styles = StyleSheet.create({
     color: MUTED2,
     marginLeft: 4,
     fontFamily: fonts.book,
+    fontSize: 16,
   },
 
   lastSynqText: {
