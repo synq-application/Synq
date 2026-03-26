@@ -333,7 +333,7 @@ const deleteEvent = async (id: string) => {
               onPress={() => {
                 setAlertTitle("Top Synqs");
                 setAlertMessage(
-                  "Your Top Synqs are the people you connect with the most!"
+                  "Your top Synqs are the people you connect with the most!"
                 );
                 setAlertVisible(true);
               }}
