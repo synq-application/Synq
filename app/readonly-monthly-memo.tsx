@@ -14,6 +14,7 @@ type Props = {
   ACCENT: string;
   fonts: any;
   onPressPlan?: (event: EventItem) => void;
+  isPlanJoined?: (event: EventItem) => boolean;
 };
 
 export default function FriendOpenPlans({
@@ -21,6 +22,7 @@ export default function FriendOpenPlans({
   ACCENT,
   fonts,
   onPressPlan,
+  isPlanJoined,
 }: Props) {
   const parseDate = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);
@@ -38,6 +40,7 @@ export default function FriendOpenPlans({
       {events.map((p) => {
         const d = parseDate(p.date);
         const canJoin = typeof onPressPlan === "function";
+        const joined = isPlanJoined?.(p) ?? false;
 
         return (
           <View key={p.id} style={styles.card}>
@@ -61,12 +64,23 @@ export default function FriendOpenPlans({
             </View>
             {canJoin && (
               <TouchableOpacity
-                style={[styles.joinPill, { borderColor: ACCENT }]}
+                style={[
+                  styles.joinPill,
+                  joined
+                    ? { borderColor: "rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.08)" }
+                    : { borderColor: ACCENT },
+                ]}
                 activeOpacity={0.85}
                 onPress={() => onPressPlan?.(p)}
+                disabled={joined}
               >
-                <Text style={[styles.joinText, { color: ACCENT, fontFamily: fonts.heavy }]}>
-                  Join
+                <Text
+                  style={[
+                    styles.joinText,
+                    { color: joined ? "rgba(255,255,255,0.75)" : ACCENT, fontFamily: fonts.heavy },
+                  ]}
+                >
+                  {joined ? "Joined" : "Join"}
                 </Text>
               </TouchableOpacity>
             )}

@@ -22,6 +22,8 @@ type EventItem = {
   title: string;
   time?: string;
   location?: string;
+  joinedFromId?: string;
+  joinedFromName?: string;
 };
 
 type Props = {
@@ -124,10 +126,11 @@ export default function OpenPlans({
         })
         .map((p) => {
           const d = parseDate(p.date);
+          const isJoinedPlan = !!p.joinedFromId || !!p.joinedFromName;
           return (
             <TouchableOpacity
               key={p.id}
-              style={styles.card}
+              style={[styles.card, isJoinedPlan && styles.joinedCard]}
               onLongPress={() => handleDelete(p.id)}
             >
             <View style={styles.dateBlock}>
@@ -149,6 +152,11 @@ export default function OpenPlans({
                   {p.time}
                   {p.location ? ` · ${p.location}` : ""}
                 </Text>
+                {isJoinedPlan && (
+                  <Text style={[styles.joinedMeta, { color: ACCENT }]}>
+                    {`${p.joinedFromName || "A friend"} is also going`}
+                  </Text>
+                )}
               </View>
             </TouchableOpacity>
           );
@@ -313,11 +321,17 @@ const styles = StyleSheet.create({
   header: { color: "white", fontSize: 18, fontFamily: fonts.heavy, marginBottom: 14, marginLeft: 10 },
   empty: { color: "#666", marginBottom: 16, marginLeft: 10 },
   card: { backgroundColor: "#0d0d0d", borderRadius: 20, padding: 14, marginBottom: 10, flexDirection: "row" },
+  joinedCard: {
+    borderWidth: 1,
+    borderColor: "rgba(43,255,136,0.35)",
+    backgroundColor: "rgba(43,255,136,0.07)",
+  },
   dateBlock: { width: 48, alignItems: "center", marginRight: 12 },
   day: { color: "#666", fontSize: 10 },
   date: { color: "white", fontSize: 18 },
   title: { color: "white", fontSize: 15 },
   meta: { color: "#777", marginTop: 3, fontSize: 13 },
+  joinedMeta: { marginTop: 6, fontSize: 12.5, fontFamily: fonts.medium },
   addBtn: { padding: 12, alignItems: "center", marginTop: 8 },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" },
   modal: { width: "92%", backgroundColor: "#0a0a0a", padding: 18, borderRadius: 22 },

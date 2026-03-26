@@ -84,6 +84,7 @@ export default function FriendProfile() {
   const [requestSent, setRequestSent] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [joinedPlanKeys, setJoinedPlanKeys] = useState<Record<string, boolean>>({});
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
@@ -118,6 +119,24 @@ export default function FriendProfile() {
     base.setHours(hours, minutes, 0, 0);
     return base.getTime();
   };
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const hydrateJoinedPlans = async () => {
+      try {
+        const meSnap = await getDoc(doc(db, "users", user.uid));
+        const meData = meSnap.exists() ? (meSnap.data() as any) : {};
+        const mine = Array.isArray(meData?.events) ? meData.events : [];
+        const next: Record<string, boolean> = {};
+        mine.forEach((e: any) => {
+          next[eventKey(e)] = true;
+        });
+        setJoinedPlanKeys(next);
+      } catch {}
+    };
+    hydrateJoinedPlans();
+  }, []);
 
   useEffect(() => {
     const fetchFriend = async () => {
@@ -319,6 +338,8 @@ export default function FriendProfile() {
         date: String(event.date || "").trim(),
         time: String(event.time || "").trim(),
         location: String(event.location || "").trim(),
+        joinedFromId: friendKey,
+        joinedFromName: friend?.displayName || "Friend",
       };
 
       const nextEvents = [...existingEvents, newEvent].sort(
@@ -328,6 +349,7 @@ export default function FriendProfile() {
       await updateDoc(meRef, {
         events: nextEvents,
       });
+      setJoinedPlanKeys((prev) => ({ ...prev, [eventKey(event)]: true }));
       showAlert("Added", "Plan added to your open plans.");
     } catch (e: any) {
       showAlert("Error", e?.message || "Could not join this plan right now.");
@@ -461,6 +483,7 @@ export default function FriendProfile() {
             ACCENT={ACCENT}
             fonts={fonts}
             onPressPlan={joinPlan}
+            isPlanJoined={(event) => !!joinedPlanKeys[eventKey(event)]}
           />
         </View>
 
