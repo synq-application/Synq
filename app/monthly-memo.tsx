@@ -1,6 +1,6 @@
 import { fonts } from "@/constants/Variables";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Alert,
   Keyboard,
@@ -35,6 +35,13 @@ type Props = {
   events: EventItem[];
 };
 
+const getInitialDate = () => {
+  const d = new Date();
+  d.setMinutes(0);
+  d.setHours(d.getHours() + 1);
+  return d;
+};
+
 export default function OpenPlans({
   ACCENT,
   showEventModal,
@@ -45,41 +52,51 @@ export default function OpenPlans({
   deleteEvent,
   events,
 }: Props) {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(getInitialDate);
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
-
-  useEffect(() => {
-    const d = new Date();
-    d.setMinutes(0);
-    d.setHours(d.getHours() + 1);
-    setSelectedDate(d);
-  }, []);
 
   const closePickers = () => setPicker(null);
 
   const formatTime = (d: Date) =>
     d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
+  // ✅ UTC-safe parser
   const parseDate = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);
-    return new Date(y, m - 1, d);
+    const parsed = new Date(Date.UTC(y, m - 1, d));
+    console.log("PARSE DATE INPUT:", s);
+    console.log("PARSED DATE OBJECT:", parsed);
+    return parsed;
   };
 
   const setDate = (base: Date) => {
     const d = new Date(base);
     d.setHours(selectedDate.getHours());
     d.setMinutes(selectedDate.getMinutes());
+    console.log("SET DATE:", d);
     setSelectedDate(d);
-    closePickers();
   };
 
   const handleSave = () => {
-    const iso = selectedDate.toISOString();
+    console.log("RAW SELECTED DATE:", selectedDate);
+
+    const year = selectedDate.getUTCFullYear();
+    const month = String(selectedDate.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(selectedDate.getUTCDate()).padStart(2, "0");
+
+    const localDate = `${year}-${month}-${day}`;
+
+    console.log("UTC YEAR:", year);
+    console.log("UTC MONTH:", month);
+    console.log("UTC DAY:", day);
+    console.log("FINAL SAVED DATE STRING:", localDate);
+
     saveEvent({
       ...newEvent,
-      date: iso.split("T")[0],
+      date: localDate,
       time: formatTime(selectedDate),
     });
+
     setShowEventModal(false);
   };
 
@@ -99,6 +116,10 @@ export default function OpenPlans({
 
       {events.map((p) => {
         const d = parseDate(p.date);
+
+        console.log("RENDER EVENT DATE STRING:", p.date);
+        console.log("RENDER DATE OBJECT:", d);
+
         return (
           <TouchableOpacity
             key={p.id}
@@ -107,11 +128,11 @@ export default function OpenPlans({
           >
             <View style={styles.dateBlock}>
               <Text style={styles.day}>
-                {d.toLocaleDateString("en-US", {
-                  weekday: "short",
-                }).toUpperCase()}
+                {d
+                  .toLocaleDateString("en-US", { weekday: "short" })
+                  .toUpperCase()}
               </Text>
-              <Text style={styles.date}>{d.getDate()}</Text>
+              <Text style={styles.date}>{d.getUTCDate()}</Text>
             </View>
 
             <View style={{ flex: 1 }}>
@@ -144,7 +165,7 @@ export default function OpenPlans({
           <View style={styles.overlay}>
             <KeyboardAvoidingView
               behavior={Platform.OS === "ios" ? "padding" : undefined}
-              keyboardVerticalOffset={30} // 🔥 reduced movement
+              keyboardVerticalOffset={30}
               style={{ width: "100%", alignItems: "center" }}
             >
               <View style={styles.modal}>
@@ -201,8 +222,10 @@ export default function OpenPlans({
                       themeVariant="dark"
                       textColor="white"
                       onChange={(e, d) => {
-                        closePickers();
-                        if (d) setDate(d);
+                        if (d) {
+                          console.log("PICKED DATE:", d);
+                          setDate(d);
+                        }
                       }}
                     />
                   )}
@@ -226,12 +249,12 @@ export default function OpenPlans({
                       themeVariant="dark"
                       textColor="white"
                       onChange={(e, t) => {
-                        closePickers();
                         if (t) {
-                          const d = new Date(selectedDate);
-                          d.setHours(t.getHours());
-                          d.setMinutes(t.getMinutes());
-                          setSelectedDate(d);
+                          console.log("PICKED TIME:", t);
+                          const updated = new Date(selectedDate);
+                          updated.setHours(t.getHours());
+                          updated.setMinutes(t.getMinutes());
+                          setSelectedDate(updated);
                         }
                       }}
                     />
@@ -270,78 +293,20 @@ const styles = StyleSheet.create({
   container: { marginTop: 30, width: "92%", alignSelf: "center" },
   header: { color: "white", fontSize: 18, fontFamily: fonts.heavy, marginBottom: 14, marginLeft: 10 },
   empty: { color: "#666", marginBottom: 16, marginLeft: 10 },
-
-  card: {
-    backgroundColor: "#0d0d0d",
-    borderRadius: 20,
-    padding: 14,
-    marginBottom: 10,
-    flexDirection: "row",
-  },
-
+  card: { backgroundColor: "#0d0d0d", borderRadius: 20, padding: 14, marginBottom: 10, flexDirection: "row" },
   dateBlock: { width: 48, alignItems: "center", marginRight: 12 },
   day: { color: "#666", fontSize: 10 },
   date: { color: "white", fontSize: 18 },
-
   title: { color: "white", fontSize: 15 },
   meta: { color: "#777", marginTop: 3, fontSize: 13 },
-
   addBtn: { padding: 12, alignItems: "center", marginTop: 8 },
-
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  modal: {
-    width: "92%",
-    backgroundColor: "#0a0a0a",
-    padding: 18,
-    borderRadius: 22,
-  },
-
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" },
+  modal: { width: "92%", backgroundColor: "#0a0a0a", padding: 18, borderRadius: 22 },
   modalTitle: { color: "white", fontSize: 18, fontFamily: fonts.medium },
-
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
-  },
-
-  row: {
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    gap: 6,
-    marginBottom: 14,
-  },
-
-  input: {
-    backgroundColor: "#111",
-    padding: 14,
-    borderRadius: 12,
-    color: "white",
-    marginBottom: 12,
-    fontSize: 16,
-    fontFamily: fonts.medium,
-  },
-
-  label: {
-    color: "#777",
-    marginBottom: 5,
-    fontSize: 14,
-    fontFamily: fonts.medium,
-  },
-
-  dateBtn: {
-    borderWidth: 1,
-    borderColor: "#333",
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
+  row: { flexDirection: "row", justifyContent: "flex-start", gap: 6, marginBottom: 14 },
+  input: { backgroundColor: "#111", padding: 14, borderRadius: 12, color: "white", marginBottom: 12, fontSize: 16, fontFamily: fonts.medium },
+  label: { color: "#777", marginBottom: 5, fontSize: 14, fontFamily: fonts.medium },
+  dateBtn: { borderWidth: 1, borderColor: "#333", borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
   cancel: { color: "#aaa", fontSize: 14 },
 });

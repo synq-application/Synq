@@ -76,16 +76,15 @@ const saveEvent = async (eventOverride?: any) => {
     return;
   }
 
-  const fullDate = `${selectedDate.getFullYear()}-${String(
-    selectedDate.getMonth() + 1
-  ).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
-
   const newItem = {
     id: Date.now().toString(),
-    date: fullDate,
+    date: eventToSave.date, // ✅ USE CHILD VALUE
     title: eventToSave.title,
-    time: eventToSave.time || "", 
+    time: eventToSave.time || "",
+    location: eventToSave.location || "",
   };
+
+  console.log("FINAL EVENT SAVED:", newItem);
 
   const updatedEvents = [...events, newItem];
 
