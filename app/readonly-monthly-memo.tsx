@@ -142,7 +142,9 @@ const styles = StyleSheet.create({
     borderColor: "#333",
     borderRadius: 14,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 10,
     marginLeft: 8,
+    width: 60,
+    alignItems: "center",
   },
 });
