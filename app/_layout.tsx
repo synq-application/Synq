@@ -25,6 +25,7 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ACCENT } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
+import { warmSocialCachesInBackground } from "../src/lib/socialCache";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -118,6 +119,7 @@ export default function RootLayout() {
       setAuthReady(true);
 
       if (u) {
+        warmSocialCachesInBackground(u.uid);
         const token = await registerForPushNotificationsAsync();
         if (token) {
           try {

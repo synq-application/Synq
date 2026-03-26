@@ -38,15 +38,29 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
+import {
+  friendProfileCacheByUser,
+  friendsListCacheByUser,
+  suggestedCacheByUser,
+  warmFriendsAndConnectionsCache,
+  warmSuggestedCache,
+} from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
 
 const { width } = Dimensions.get("window");
+const isRemoteImageUri = (value: unknown): value is string =>
+  typeof value === "string" && /^https?:\/\//i.test(value);
+
+const sortFriendsByName = (list: Friend[]) =>
+  [...list].sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
 
 export default function FriendsScreen() {
   const router = useRouter();
-  const [friends, setFriends] = useState<Friend[]>([]);
+  const myId = auth.currentUser?.uid ?? "";
+  const cachedFriends = myId ? friendsListCacheByUser[myId] ?? [] : [];
+  const [friends, setFriends] = useState<Friend[]>(cachedFriends);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
-  const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(true);
+  const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
 
@@ -54,44 +68,49 @@ export default function FriendsScreen() {
     if (!auth.currentUser) return;
 
     const myId = auth.currentUser.uid;
+    if (!friendProfileCacheByUser[myId]) {
+      friendProfileCacheByUser[myId] = {};
+    }
     const friendsRef = collection(db, "users", myId, "friends");
 
     const unsubFriends = onSnapshot(friendsRef, async (snapshot) => {
-      const firstLoad = isFriendsInitialLoading;
-      if (firstLoad) setIsFriendsInitialLoading(true);
-      else setIsFriendsRefreshing(true);
+      const friendIds = snapshot.docs.map((d) => d.id);
+      const profileCache = friendProfileCacheByUser[myId];
 
       try {
-        const myFriendIds = snapshot.docs.map((d) => d.id);
+        const cachedVisible = sortFriendsByName(
+          friendIds
+            .map((id) => profileCache[id])
+            .filter(Boolean) as Friend[]
+        );
 
-        const friendsList: Friend[] = await Promise.all(
-          snapshot.docs.map(async (fDoc) => {
-            const friendId = fDoc.id;
-            const uSnap = await getDoc(doc(db, "users", friendId));
+        if (cachedVisible.length > 0) {
+          setFriends(cachedVisible);
+          setIsFriendsInitialLoading(false);
+        } else {
+          setIsFriendsInitialLoading(true);
+        }
+        setIsFriendsRefreshing(cachedVisible.length > 0);
 
-            if (!uSnap.exists()) {
-              return {
-                id: friendId,
-                displayName: "Unknown",
-                mutualCount: 0,
-              } as Friend;
-            }
-
-            const data = uSnap.data() as any;
-            const friendObj = {
+        await warmFriendsAndConnectionsCache(myId);
+        const fetchedFriends: Friend[] = friendIds.map(
+          (friendId) =>
+            profileCache[friendId] ??
+            ({
               id: friendId,
-              ...(data as any),
-              location: data.city + ", " + data.state || "",
-            } as Friend;
-
-            return friendObj;
-          })
+              displayName: "Unknown",
+              mutualCount: 0,
+            } as Friend)
         );
 
-        const sortedFriends = friendsList.sort((a, b) =>
-          (a.displayName || "").localeCompare(b.displayName || "")
-        );
+        const sortedFriends = sortFriendsByName(fetchedFriends);
+        sortedFriends.forEach((friend) => {
+          profileCache[friend.id] = friend;
+          const imageUrl = (friend as any)?.imageurl;
+          if (isRemoteImageUri(imageUrl)) Image.prefetch(imageUrl).catch(() => {});
+        });
 
+        friendsListCacheByUser[myId] = sortedFriends;
         setFriends(sortedFriends);
       } catch (err) {
         console.error("[FriendsScreen] Error fetching friend data:", err);
@@ -134,7 +153,7 @@ export default function FriendsScreen() {
       }
     >
       <View style={styles.avatar}>
-        {(item as any)?.imageurl ? (
+        {isRemoteImageUri((item as any)?.imageurl) ? (
           <Image source={{ uri: (item as any).imageurl }} style={styles.img} />
         ) : (
           <Icon name="person" size={22} color={MUTED3} />
@@ -222,6 +241,9 @@ export default function FriendsScreen() {
           />
         </>
       )}
+      {isFriendsRefreshing && !isFriendsInitialLoading && (
+        <View style={styles.refreshingDot} />
+      )}
 
         <SearchModal
           visible={searchModalVisible}
@@ -247,6 +269,7 @@ function SearchModal({
   const [results, setResults] = useState<any[]>([]);
   const [suggested, setSuggested] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isSuggestedRefreshing, setIsSuggestedRefreshing] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{
     title?: string;
@@ -266,56 +289,25 @@ function SearchModal({
     const fetchSuggested = async () => {
       try {
         const myId = auth.currentUser!.uid;
+        const cachedSuggested = suggestedCacheByUser[myId] ?? [];
+        if (cachedSuggested.length > 0) {
+          setSuggested(cachedSuggested);
+        }
+        setIsSuggestedRefreshing(cachedSuggested.length > 0);
 
-        const myFriendsSnap = await getDocs(
-          collection(db, "users", myId, "friends")
+        await warmSuggestedCache(myId);
+        const nextSuggested = (suggestedCacheByUser[myId] ?? []).filter(
+          (u) => !currentFriends.includes(u.id) && u.id !== myId
         );
-        const myFriendIds = myFriendsSnap.docs.map((d) => d.id);
-
-        const usersSnap = await getDocs(collection(db, "users"));
-        const users = usersSnap.docs.map(
-          (d) => ({ id: d.id, ...d.data() } as any)
-        );
-
-        const suggestionsWithMutuals = await Promise.all(
-          users.map(async (user) => {
-            if (
-              user.id === myId ||
-              currentFriends.includes(user.id)
-            ) return null;
-
-            try {
-              const theirFriendsSnap = await getDocs(
-                collection(db, "users", user.id, "friends")
-              );
-
-              const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
-
-              const mutuals = theirFriendIds.filter((id) =>
-                myFriendIds.includes(id)
-              );
-
-              if (mutuals.length > 0) {
-                return {
-                  ...user,
-                  mutualCount: mutuals.length,
-                };
-              }
-
-              return null;
-            } catch {
-              return null;
-            }
-          })
-        );
-
-        const suggestions = suggestionsWithMutuals
-          .filter(Boolean)
-          .sort((a: any, b: any) => b.mutualCount - a.mutualCount);
-
-        setSuggested(suggestions.slice(0, 8));
+        suggestedCacheByUser[myId] = nextSuggested;
+        nextSuggested.forEach((user) => {
+          if (isRemoteImageUri(user?.imageurl)) Image.prefetch(user.imageurl).catch(() => {});
+        });
+        setSuggested(nextSuggested);
       } catch (e) {
         console.error("[Suggested] error:", e);
+      } finally {
+        setIsSuggestedRefreshing(false);
       }
     };
 
@@ -466,7 +458,10 @@ function SearchModal({
 
         {!queryText && suggested.length > 0 && (
           <View style={{ marginTop: 10, paddingBottom: 160 }}>
-            <Text style={styles.sectionLabel}>Suggested</Text>
+            <View style={styles.suggestedHeaderRow}>
+              <Text style={styles.sectionLabel}>Suggested</Text>
+              {isSuggestedRefreshing && <View style={styles.suggestedRefreshingDot} />}
+            </View>
             <FlatList
               data={suggested}
               keyExtractor={(item) => item.id}
@@ -491,7 +486,7 @@ function SearchModal({
                     activeOpacity={0.8}
                   >
                     <View style={styles.avatar}>
-                      {item.imageurl ? (
+                      {isRemoteImageUri(item.imageurl) ? (
                         <Image source={{ uri: item.imageurl }} style={styles.img} />
                       ) : (
                         <Icon name="person" size={22} color={MUTED3} />
@@ -533,7 +528,7 @@ function SearchModal({
               <View style={styles.searchResult}>
                 <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                   <View style={styles.avatar}>
-                    {item.imageurl ? (
+                    {isRemoteImageUri(item.imageurl) ? (
                       <Image source={{ uri: item.imageurl }} style={styles.img} />
                     ) : (
                       <Icon name="person" size={22} color={MUTED3} />
@@ -728,5 +723,28 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontFamily: fonts.medium,
     fontSize: 15,
+  },
+  suggestedHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  suggestedRefreshingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: ACCENT,
+    opacity: 0.85,
+    marginRight: 2,
+  },
+  refreshingDot: {
+    position: "absolute",
+    top: 78,
+    right: 24,
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: ACCENT,
+    opacity: 0.85,
   },
 });

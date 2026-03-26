@@ -2,7 +2,7 @@ import { ACCENT, fonts } from "@/constants/Variables";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
-import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useMemo, useEffect, useState } from "react";
 import {
@@ -22,6 +22,11 @@ import QRCode from "react-native-qrcode-svg";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
+import {
+  connectionProfileCacheByUser,
+  connectionsCacheByUser,
+  warmFriendsAndConnectionsCache,
+} from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
 import MonthlyMemo from "../monthly-memo";
@@ -34,19 +39,23 @@ type Connection = {
   imageUrl: string | null;
   synqCount: number;
 };
+const isRemoteImageUri = (value: unknown): value is string =>
+  typeof value === "string" && /^https?:\/\//i.test(value);
 
 export default function ProfileScreen() {
+  const myId = auth.currentUser?.uid ?? "";
+  const cachedConnections = myId ? connectionsCacheByUser[myId] ?? [] : [];
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isQRExpanded, setQRExpanded] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [connections, setConnections] = useState<Connection[]>([]);
+  const [connections, setConnections] = useState<Connection[]>(cachedConnections);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [interests, setInterests] = useState<string[]>([]);
   const [city, setCity] = useState<string | null>(null);
   const [state, setState] = useState<string | null>(null);
-  const [hasLoadedConnections, setHasLoadedConnections] = useState(false);
+  const [hasLoadedConnections, setHasLoadedConnections] = useState(cachedConnections.length > 0);
   const [requestCount, setRequestCount] = useState(0);
   const [events, setEvents] = useState<
     { id: string; date: string; title: string; time?: string }[]
@@ -120,8 +129,12 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (!auth.currentUser?.uid) return;
+    const myId = auth.currentUser.uid;
+    if (!connectionProfileCacheByUser[myId]) {
+      connectionProfileCacheByUser[myId] = {};
+    }
 
-    const userDocRef = doc(db, "users", auth.currentUser.uid);
+    const userDocRef = doc(db, "users", myId);
 
     const unsubscribeProfile = onSnapshot(userDocRef, (userDocSnap) => {
       if (userDocSnap.exists()) {
@@ -136,32 +149,44 @@ export default function ProfileScreen() {
       }
     });
 
-    const reqRef = collection(db, "users", auth.currentUser.uid, "friendRequests");
+    const reqRef = collection(db, "users", myId, "friendRequests");
     const unsubscribeRequests = onSnapshot(reqRef, (snap) => {
       setRequestCount(snap.docs.length);
     });
 
-    const friendsCol = collection(db, "users", auth.currentUser.uid, "friends");
+    const friendsCol = collection(db, "users", myId, "friends");
     const unsubscribeFriends = onSnapshot(friendsCol, async (snapshot) => {
-      const friendsList = await Promise.all(
-        snapshot.docs.map(async (friendDoc) => {
-          const friendSnap = await getDoc(doc(db, "users", friendDoc.id));
-          if (friendSnap.exists()) {
-            return {
-              id: friendDoc.id,
-              name: friendSnap.data().displayName || "User",
-              imageUrl: friendSnap.data().imageurl || null,
-              synqCount: friendDoc.data().synqCount || 0,
-            } as Connection;
-          }
-          return null;
+      const profileCache = connectionProfileCacheByUser[myId];
+      const friendDocs = snapshot.docs.map((friendDoc) => ({
+        id: friendDoc.id,
+        synqCount: friendDoc.data().synqCount || 0,
+      }));
+
+      const cachedVisible = friendDocs
+        .map(({ id, synqCount }) => {
+          const cached = profileCache[id];
+          if (!cached) return null;
+          return { ...cached, synqCount } as Connection;
         })
-      );
+        .filter(Boolean) as Connection[];
 
-      const validFriends = (friendsList.filter(Boolean) as Connection[]).sort(
-        (a, b) => b.synqCount - a.synqCount
-      );
-
+      if (cachedVisible.length > 0) {
+        setConnections(cachedVisible.sort((a, b) => b.synqCount - a.synqCount));
+        setHasLoadedConnections(true);
+      }
+      await warmFriendsAndConnectionsCache(myId);
+      const validFriends = friendDocs
+        .map(({ id, synqCount }) => {
+          const profile = profileCache[id];
+          if (!profile) return null;
+          return {
+            ...profile,
+            synqCount,
+          } as Connection;
+        })
+        .filter(Boolean)
+        .sort((a: any, b: any) => b.synqCount - a.synqCount) as Connection[];
+      connectionsCacheByUser[myId] = validFriends;
       setConnections(validFriends);
       setHasLoadedConnections(true);
     });
@@ -286,7 +311,7 @@ export default function ProfileScreen() {
           <TouchableOpacity onPress={pickImage} style={styles.imageWrapper}>
             {isUploading ? (
               <ActivityIndicator color={ACCENT} />
-            ) : profileImage ? (
+            ) : isRemoteImageUri(profileImage) ? (
               <Image source={{ uri: profileImage }} style={styles.profileImg} />
             ) : (
               <View style={styles.defaultAvatarContainer}>
@@ -373,7 +398,7 @@ export default function ProfileScreen() {
                       { borderColor: ACCENT, borderWidth: 1 },
                     ]}
                   >
-                    {item.imageUrl ? (
+                    {isRemoteImageUri(item.imageUrl) ? (
                       <Image source={{ uri: item.imageUrl }} style={styles.connImg} />
                     ) : (
                       <View style={[styles.connImg, styles.connDefaultAvatar]}>
