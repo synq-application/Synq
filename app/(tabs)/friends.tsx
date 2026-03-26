@@ -77,17 +77,10 @@ export default function FriendsScreen() {
             }
 
             const data = uSnap.data() as any;
-
-            const theirFriendsSnap = await getDocs(
-              collection(db, "users", friendId, "friends")
-            );
-            const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
-            const mutuals = theirFriendIds.filter((id) => myFriendIds.includes(id));
-
             const friendObj = {
               id: friendId,
               ...(data as any),
-              mutualCount: mutuals.length,
+              location: data.city + ", " + data.state || "",
             } as Friend;
 
             return friendObj;
@@ -147,11 +140,38 @@ export default function FriendsScreen() {
         )}
       </View>
 
-      <View style={{ flex: 1 }}>
-        <Text style={styles.friendName}>{item.displayName || "User"}</Text>
-        <Text style={styles.mutualText}>
-          {item.mutualCount || 0} mutual {item.mutualCount === 1 ? "friend" : "friends"}
+      <View style={{ flex: 1, justifyContent: "center" }}>
+        <Text
+          style={{
+            color: TEXT,
+            fontSize: 17,
+            marginBottom: 2,
+            fontFamily: fonts.heavy
+          }}
+        >
+          {item.displayName || "User"}
         </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+          }}
+        >
+          <Ionicons
+            name="location-outline"
+            size={12}
+            color="rgba(255,255,255,0.45)"
+            style={{ marginRight: 4 }}
+          />
+          <Text
+            style={{
+              color: "rgba(255,255,255,0.6)",
+              fontSize: 13,
+            }}
+          >
+            {(item as any)?.location || "No location"}
+          </Text>
+        </View>
       </View>
 
       <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.25)" />
@@ -209,6 +229,7 @@ export default function FriendsScreen() {
     </View>
   );
 }
+
 function SearchModal({
   visible,
   onClose,
@@ -572,20 +593,20 @@ const styles = StyleSheet.create({
     marginLeft: 66,
   },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 55,
+    height: 55,
+    borderRadius: 50,
     backgroundColor: SURFACE,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 14,
-    borderWidth: .8,
+    borderWidth: 1,
     borderColor: BORDER
   },
   img: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 55,
+    height: 55,
+    borderRadius: 50,
   },
   friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
   mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
