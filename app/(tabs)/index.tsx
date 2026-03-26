@@ -750,6 +750,12 @@ export default function SynqScreen() {
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <Swipeable
+                  rightThreshold={24}
+                  onSwipeableOpen={(direction) => {
+                    if (direction === "right") {
+                      handleDeleteChat(item.id);
+                    }
+                  }}
                   renderRightActions={() => (
                     <TouchableOpacity style={styles.deleteAction} onPress={() => handleDeleteChat(item.id)}>
                       <Ionicons name="trash" size={24} color="white" />
