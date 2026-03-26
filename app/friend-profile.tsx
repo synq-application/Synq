@@ -380,19 +380,19 @@ const styles = StyleSheet.create({
   },
 
   imageCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 78,
+    height: 78,
+    borderRadius: 38,
     borderWidth: 2,
-    borderColor: ACCENT,
+    borderColor: BORDER,
     justifyContent: "center",
     alignItems: "center",
   },
 
   connImg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 70,
+    height: 70,
+    borderRadius: 34,
   },
 
   connDefaultAvatar: {
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
 
   connName: {
     color: TEXT,
-    fontSize: 12,
+    fontSize: 14,
     marginTop: 10,
     textAlign: "center",
     fontFamily: fonts.heavy,
