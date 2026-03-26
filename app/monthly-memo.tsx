@@ -269,7 +269,7 @@ const DateBtn = ({ label, onPress }: any) => (
 const styles = StyleSheet.create({
   container: { marginTop: 30, width: "92%", alignSelf: "center" },
   header: { color: "white", fontSize: 18, fontFamily: fonts.heavy, marginBottom: 14, marginLeft: 10 },
-  empty: { color: "#666", marginBottom: 16 },
+  empty: { color: "#666", marginBottom: 16, marginLeft: 10 },
 
   card: {
     backgroundColor: "#0d0d0d",
