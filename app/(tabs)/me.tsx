@@ -1,4 +1,14 @@
-import { ACCENT, BG, BUTTON_RADIUS, fonts, MODAL_RADIUS } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BORDER,
+  BUTTON_RADIUS,
+  fonts,
+  MODAL_RADIUS,
+  MUTED2,
+  SURFACE,
+  TEXT,
+} from "@/constants/Variables";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
@@ -84,7 +94,7 @@ export default function ProfileScreen() {
   const saveEvent = async (eventOverride?: any) => {
     if (!auth.currentUser) return;
 
-  const eventToSave = eventOverride || newEvent;
+    const eventToSave = eventOverride || newEvent;
 
     if (!eventToSave.title) {
       showAlert("Missing info", "Add a title");
@@ -625,15 +635,14 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   locationText: {
-    color: "white",
-    opacity: 0.6,
+    color: MUTED2,
     fontSize: 16,
     marginTop: 2,
-    letterSpacing: 1.0,
+    letterSpacing: 1,
     fontFamily: fonts.medium,
   },
   section: { marginTop: 30, paddingHorizontal: 25 },
-  sectionTitle: { color: "white", fontSize: 20, fontFamily: fonts.heavy, marginBottom: 12, letterSpacing: 0.2 },
+  sectionTitle: { color: TEXT, fontSize: 20, fontFamily: fonts.heavy, marginBottom: 12, letterSpacing: 0.2 },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 20 },
   connItem: { alignItems: "center", width: 80 },
@@ -651,11 +660,11 @@ const styles = StyleSheet.create({
     borderColor: "black",
     zIndex: 10,
   },
-  connName: { color: "white", fontSize: 12, marginTop: 10, textAlign: "center", fontFamily: fonts.heavy },
-  emptyText: { color: "#333", fontFamily: fonts.medium, fontSize: 14 },
+  connName: { color: TEXT, fontSize: 12, marginTop: 10, textAlign: "center", fontFamily: fonts.heavy },
+  emptyText: { color: MUTED2, fontFamily: fonts.medium, fontSize: 14 },
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
-  interestRect: { backgroundColor: "#111", borderWidth: 1, borderColor: "#222", borderRadius: BUTTON_RADIUS, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, marginBottom: 8 },
-  interestText: { color: "white", fontFamily: fonts.heavy, fontSize: 13 },
+  interestRect: { backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER, borderRadius: BUTTON_RADIUS, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, marginBottom: 8 },
+  interestText: { color: TEXT, fontFamily: fonts.heavy, fontSize: 13 },
   addRect: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: ACCENT, borderStyle: "dashed", borderRadius: BUTTON_RADIUS, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 4 },
   signOutBtn: { alignSelf: "center", marginTop: 50, paddingVertical: 14, paddingHorizontal: 60, borderRadius: BUTTON_RADIUS + 8, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
@@ -664,9 +673,9 @@ const styles = StyleSheet.create({
   qrModalBox: { backgroundColor: "white", padding: 25, borderRadius: MODAL_RADIUS + 18 },
   interestContent: { backgroundColor: "#0a0a0a", width: "100%", height: "85%", marginTop: "auto", borderTopLeftRadius: MODAL_RADIUS + 18, borderTopRightRadius: MODAL_RADIUS + 18, padding: 30, alignItems: "center" },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", width: "100%", alignItems: "center", marginBottom: 25 },
-  modalTitle: { color: "white", fontSize: 26, fontFamily: fonts.black },
-  searchBarContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#1a1a1a", borderRadius: 18, width: "100%", marginBottom: 20, borderWidth: 1, borderColor: "#333" },
-  searchInput: { flex: 1, color: "white", padding: 14, fontFamily: fonts.medium, fontSize: 16 },
+  modalTitle: { color: TEXT, fontSize: 26, fontFamily: fonts.black },
+  searchBarContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#1a1a1a", borderRadius: 18, width: "100%", marginBottom: 20, borderWidth: 1, borderColor: BORDER },
+  searchInput: { flex: 1, color: TEXT, padding: 14, fontFamily: fonts.medium, fontSize: 16 },
   interestGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", paddingBottom: 30 },
   chip: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 30, backgroundColor: "#111", borderWidth: 1, borderColor: "#222", margin: 6 },
   chipActive: { backgroundColor: ACCENT, borderColor: ACCENT },

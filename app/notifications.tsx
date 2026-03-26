@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
     width: 40,
     height: 40,
-    borderRadius: BUTTON_RADIUS,
+    borderRadius: 20,
     backgroundColor: "#1F1F1F",
     alignItems: "center",
     justifyContent: "center",

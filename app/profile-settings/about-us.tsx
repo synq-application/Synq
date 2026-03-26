@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import {
-  Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -116,7 +115,7 @@ const styles = StyleSheet.create({
   backButton: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
   },

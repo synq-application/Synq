@@ -6,6 +6,7 @@ import {
   fonts,
   MODAL_RADIUS,
   MUTED2,
+  SPACE_5,
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
@@ -384,7 +385,7 @@ export default function FriendProfile() {
           />
         </View>
 
-        <View style={{ marginTop: 30, marginBottom: 40, alignItems: "center" }}>
+        <View style={{ marginTop: SPACE_5, marginBottom: 40, alignItems: "center" }}>
           {isFriend ? (
             <TouchableOpacity
               activeOpacity={0.8}
@@ -484,7 +485,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  section: { marginTop: 30 },
+  section: { marginTop: SPACE_5 },
 
   sectionTitle: {
     color: TEXT,

@@ -30,12 +30,12 @@ export default function InactiveSynqView({
 
       <View style={styles.inlineMetaRow}>
         <View style={styles.inlineMetaItem}>
-          <Ionicons name="radio-outline" size={14} color="#2BFF88" />
+          <Ionicons name="radio-outline" size={17} color="#2BFF88" />
           <Text style={styles.inlineMetaText}>Visible instantly</Text>
         </View>
         <View style={styles.inlineMetaDot} />
         <View style={styles.inlineMetaItem}>
-          <Ionicons name="time-outline" size={14} color="#2BFF88" />
+          <Ionicons name="time-outline" size={17} color="#2BFF88" />
           <Text style={styles.inlineMetaText}>End anytime</Text>
         </View>
       </View>

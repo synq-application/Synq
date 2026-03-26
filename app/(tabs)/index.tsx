@@ -1057,7 +1057,7 @@ const styles = StyleSheet.create({
   deactivateLink: { marginTop: 20, alignSelf: 'center', padding: 10 },
   deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: fonts.medium, opacity: 0.9 },
   activatingContainer: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
-  unifiedTitle: { color: 'white', fontSize: 24, fontFamily: fonts.medium, marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
+  unifiedTitle: { color: 'white', fontSize: 27, fontFamily: fonts.medium, marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
   gifLarge: { width: 280, height: 280 },
   inactiveCenter: {
     flex: 1,
@@ -1068,9 +1068,9 @@ const styles = StyleSheet.create({
   },
   mainEyebrow: {
     position: "absolute",
-    top: 16,
+    top: 96,
     color: MUTED,
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: fonts.heavy,
     textTransform: "uppercase",
     letterSpacing: 1.2,
@@ -1078,11 +1078,11 @@ const styles = StyleSheet.create({
   },
   mainSubtitle: {
     color: "rgba(255,255,255,0.72)",
-    fontSize: 21,
+    fontSize: 26,
     fontFamily: fonts.medium,
     textAlign: "center",
-    lineHeight: 29,
-    marginTop: 32,
+    lineHeight: 34,
+    marginTop: 160,
     maxWidth: 352,
   },
   inlineMetaRow: {
@@ -1105,7 +1105,7 @@ const styles = StyleSheet.create({
   },
   inlineMetaText: {
     color: "rgba(255,255,255,0.62)",
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: fonts.medium,
   },
   memoCard: {
@@ -1121,13 +1121,13 @@ const styles = StyleSheet.create({
   },
   memoLabel: {
     color: "rgba(255,255,255,0.6)",
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: fonts.medium,
     marginBottom: 6,
   },
   memoInput: {
     color: 'white',
-    fontSize: 15,
+    fontSize: 17,
     width: '100%',
     fontFamily: fonts.medium,
     paddingVertical: 6,
@@ -1137,7 +1137,7 @@ const styles = StyleSheet.create({
     height: 320,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 32,
+    marginTop: 12,
   },
   centeredModalOverlay: {
     flex: 1,
