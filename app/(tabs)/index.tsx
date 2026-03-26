@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from "expo-image";
 import {
@@ -78,6 +79,7 @@ export default function SynqScreen() {
   const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
   const [isStartingSynq, setIsStartingSynq] = useState(false);
+  const synqStatusCacheKey = (uid: string) => `synq-status:${uid}`;
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
@@ -139,7 +141,18 @@ export default function SynqScreen() {
     if (!auth.currentUser) return;
     const init = async () => {
       try {
-        const userRef = doc(db, 'users', auth.currentUser!.uid);
+        const uid = auth.currentUser!.uid;
+        const userRef = doc(db, 'users', uid);
+        try {
+          const cachedStatus = await AsyncStorage.getItem(synqStatusCacheKey(uid));
+          if (cachedStatus === "active") {
+            setStatus("active");
+          } else if (cachedStatus === "idle") {
+            setStatus("idle");
+          }
+        } catch {}
+        setLoading(false);
+
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           const data = userSnap.data();
@@ -151,10 +164,15 @@ export default function SynqScreen() {
             if (hoursElapsed > EXPIRATION_HOURS) {
               await updateDoc(userRef, { status: 'inactive', memo: '' });
               setStatus('idle');
+              AsyncStorage.setItem(synqStatusCacheKey(uid), "idle").catch(() => {});
               setMemo('');
             } else {
               setStatus('active');
+              AsyncStorage.setItem(synqStatusCacheKey(uid), "active").catch(() => {});
             }
+          } else {
+            setStatus('idle');
+            AsyncStorage.setItem(synqStatusCacheKey(uid), "idle").catch(() => {});
           }
         }
       } catch (e) {
@@ -182,6 +200,15 @@ export default function SynqScreen() {
       });
 
       setAllChats(chats);
+      chats.forEach((chat: any) => {
+        const images = chat?.participantImages || {};
+        Object.values(images).forEach((url: any) => {
+          const uri = resolveAvatar(url);
+          if (uri) {
+            ExpoImage.prefetch(uri).catch(() => {});
+          }
+        });
+      });
       const myId = auth.currentUser!.uid;
       const anyUnread = chats.some((c: any) => {
         const updatedAtMs = c.updatedAt?.toMillis?.() ?? 0;
@@ -236,6 +263,10 @@ export default function SynqScreen() {
 
           if (data?.status === 'available') {
             friendState.set(fid, { id: fid, ...data });
+            const uri = resolveAvatar(data?.imageurl);
+            if (uri) {
+              ExpoImage.prefetch(uri).catch(() => {});
+            }
           } else {
             friendState.delete(fid);
           }
@@ -378,6 +409,7 @@ export default function SynqScreen() {
         status: 'available',
         synqStartedAt: serverTimestamp()
       });
+      AsyncStorage.setItem(synqStatusCacheKey(auth.currentUser.uid), "active").catch(() => {});
       setStatus('activating');
     } catch (e) {
       console.error("Failed to start Synq", e);
@@ -546,9 +578,11 @@ export default function SynqScreen() {
     if (others.length === 1) {
       return (
         <View style={styles.singleAvatarWrap}>
-          <Image
+          <ExpoImage
             source={{ uri: others[0] }}
             style={styles.singleAvatar}
+            cachePolicy="memory-disk"
+            transition={0}
           />
         </View>
       );
@@ -569,13 +603,15 @@ export default function SynqScreen() {
         {displayImages.map((uri, index) => {
           const o = OFFSETS[index] ?? { x: index * 14, y: 0, z: 1 };
           return (
-            <Image
+            <ExpoImage
               key={`${uri}-${index}`}
               source={{ uri }}
               style={[
                 styles.clusterPhoto,
                 { left: o.x, top: o.y, zIndex: o.z },
               ]}
+              cachePolicy="memory-disk"
+              transition={0}
             />
           );
         })}
@@ -624,7 +660,12 @@ export default function SynqScreen() {
                   }
                   style={[styles.friendCard, selectedFriends.includes(item.id) && { borderColor: ACCENT }]}
                 >
-                  <Image source={{ uri: item.imageurl || DEFAULT_AVATAR }} style={styles.friendImg} />
+                  <ExpoImage
+                    source={{ uri: item.imageurl || DEFAULT_AVATAR }}
+                    style={styles.friendImg}
+                    cachePolicy="memory-disk"
+                    transition={0}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.whiteBold}>{item.displayName}</Text>
 
@@ -1003,6 +1044,7 @@ export default function SynqScreen() {
               status: "inactive",
               memo: "",
             });
+            AsyncStorage.setItem(synqStatusCacheKey(auth.currentUser.uid), "idle").catch(() => {});
 
             setMemo("");
             setStatus("idle");

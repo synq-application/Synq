@@ -10,6 +10,7 @@ import {
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
+import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -27,7 +28,6 @@ import React, { useEffect, useState } from "react";
 import {
   Dimensions,
   FlatList,
-  Image,
   Keyboard,
   Modal,
   StatusBar,
@@ -115,7 +115,7 @@ export default function FriendsScreen() {
         sortedFriends.forEach((friend) => {
           profileCache[friend.id] = friend;
           const imageUrl = (friend as any)?.imageurl;
-          if (isRemoteImageUri(imageUrl)) Image.prefetch(imageUrl).catch(() => {});
+          if (isRemoteImageUri(imageUrl)) ExpoImage.prefetch(imageUrl).catch(() => {});
         });
 
         friendsListCacheByUser[myId] = sortedFriends;
@@ -162,7 +162,12 @@ export default function FriendsScreen() {
     >
       <View style={styles.avatar}>
         {isRemoteImageUri((item as any)?.imageurl) ? (
-          <Image source={{ uri: (item as any).imageurl }} style={styles.img} />
+          <ExpoImage
+            source={{ uri: (item as any).imageurl }}
+            style={styles.img}
+            cachePolicy="memory-disk"
+            transition={0}
+          />
         ) : (
           <Icon name="person" size={22} color={MUTED3} />
         )}
@@ -320,7 +325,7 @@ function SearchModal({
         );
         suggestedCacheByUser[myId] = nextSuggested;
         nextSuggested.forEach((user) => {
-          if (isRemoteImageUri(user?.imageurl)) Image.prefetch(user.imageurl).catch(() => {});
+          if (isRemoteImageUri(user?.imageurl)) ExpoImage.prefetch(user.imageurl).catch(() => {});
         });
         setSuggested(nextSuggested);
         hydratePendingForUsers(nextSuggested.map((u) => u.id));
@@ -635,7 +640,12 @@ function SearchModal({
                   >
                     <View style={styles.avatar}>
                       {isRemoteImageUri(item.imageurl) ? (
-                        <Image source={{ uri: item.imageurl }} style={styles.img} />
+                        <ExpoImage
+                          source={{ uri: item.imageurl }}
+                          style={styles.img}
+                          cachePolicy="memory-disk"
+                          transition={0}
+                        />
                       ) : (
                         <Icon name="person" size={22} color={MUTED3} />
                       )}
@@ -702,7 +712,12 @@ function SearchModal({
                 <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                   <View style={styles.avatar}>
                     {isRemoteImageUri(item.imageurl) ? (
-                      <Image source={{ uri: item.imageurl }} style={styles.img} />
+                      <ExpoImage
+                        source={{ uri: item.imageurl }}
+                        style={styles.img}
+                        cachePolicy="memory-disk"
+                        transition={0}
+                      />
                     ) : (
                       <Icon name="person" size={22} color={MUTED3} />
                     )}

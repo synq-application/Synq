@@ -10,6 +10,7 @@ import {
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
+import { Image as ExpoImage } from "expo-image";
 import { auth, db } from "@/src/lib/firebase";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -26,7 +27,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -508,7 +508,12 @@ export default function FriendProfile() {
         </View>
         <View style={styles.header}>
           {isRemoteImageUri(friend.imageurl) ? (
-            <Image source={{ uri: friend.imageurl }} style={styles.avatar} />
+            <ExpoImage
+              source={{ uri: friend.imageurl }}
+              style={styles.avatar}
+              cachePolicy="memory-disk"
+              transition={0}
+            />
           ) : (
             <View style={[styles.avatar, styles.avatarFallback]}>
               <Icon name="person" size={56} color="rgba(255,255,255,0.28)" />
@@ -575,9 +580,11 @@ export default function FriendProfile() {
                         ]}
                       >
                         {isRemoteImageUri(item.imageurl) ? (
-                          <Image
+                          <ExpoImage
                             source={{ uri: item.imageurl }}
                             style={styles.connImg}
+                            cachePolicy="memory-disk"
+                            transition={0}
                           />
                         ) : (
                           <View style={styles.connDefaultAvatar}>

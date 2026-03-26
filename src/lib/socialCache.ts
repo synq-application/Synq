@@ -1,7 +1,7 @@
 import { Friend } from "@/constants/Variables";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Image as ExpoImage } from "expo-image";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
-import { Image } from "react-native";
 
 import { db } from "./firebase";
 
@@ -30,7 +30,7 @@ const isRemoteImageUri = (value: unknown): value is string =>
 
 const prefetchImage = (url?: string | null) => {
   if (!isRemoteImageUri(url)) return;
-  Image.prefetch(url).catch(() => {});
+  ExpoImage.prefetch(url).catch(() => {});
 };
 
 const sortFriendsByName = (list: Friend[]) =>

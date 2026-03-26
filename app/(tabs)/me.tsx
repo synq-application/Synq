@@ -9,6 +9,7 @@ import {
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
+import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
@@ -17,7 +18,6 @@ import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useMemo, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Keyboard,
   Modal,
   ScrollView,
@@ -322,7 +322,12 @@ export default function ProfileScreen() {
             {isUploading ? (
               <ActivityIndicator color={ACCENT} />
             ) : isRemoteImageUri(profileImage) ? (
-              <Image source={{ uri: profileImage }} style={styles.profileImg} />
+              <ExpoImage
+                source={{ uri: profileImage }}
+                style={styles.profileImg}
+                cachePolicy="memory-disk"
+                transition={0}
+              />
             ) : (
               <View style={styles.defaultAvatarContainer}>
                 <Icon name="person" size={80} color="rgba(255,255,255,0.2)" />
@@ -409,7 +414,12 @@ export default function ProfileScreen() {
                     ]}
                   >
                     {isRemoteImageUri(item.imageUrl) ? (
-                      <Image source={{ uri: item.imageUrl }} style={styles.connImg} />
+                      <ExpoImage
+                        source={{ uri: item.imageUrl }}
+                        style={styles.connImg}
+                        cachePolicy="memory-disk"
+                        transition={0}
+                      />
                     ) : (
                       <View style={[styles.connImg, styles.connDefaultAvatar]}>
                         <Icon
