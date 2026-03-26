@@ -24,6 +24,7 @@ type EventItem = {
   location?: string;
   joinedFromId?: string;
   joinedFromName?: string;
+  joinedFromNames?: string[];
 };
 
 type Props = {
@@ -54,6 +55,17 @@ export default function OpenPlans({
   deleteEvent,
   events,
 }: Props) {
+  const formatAlsoGoing = (event: EventItem) => {
+    const names = (Array.isArray(event.joinedFromNames) && event.joinedFromNames.length > 0
+      ? event.joinedFromNames
+      : [event.joinedFromName].filter(Boolean)) as string[];
+    if (names.length === 0) return "A friend is also going";
+    if (names.length === 1) return `${names[0]} is also going`;
+    if (names.length === 2) return `${names[0]} and ${names[1]} are also going`;
+    const head = names.slice(0, -1).join(", ");
+    const tail = names[names.length - 1];
+    return `${head}, and ${tail} are also going`;
+  };
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -154,7 +166,7 @@ export default function OpenPlans({
                 </Text>
                 {isJoinedPlan && (
                   <Text style={[styles.joinedMeta, { color: ACCENT }]}>
-                    {`${p.joinedFromName || "A friend"} is also going`}
+                    {formatAlsoGoing(p)}
                   </Text>
                 )}
               </View>

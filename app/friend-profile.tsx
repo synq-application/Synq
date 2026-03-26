@@ -1,8 +1,8 @@
 import {
   ACCENT,
   BG,
-  BUTTON_RADIUS,
   BORDER,
+  BUTTON_RADIUS,
   fonts,
   MODAL_RADIUS,
   MUTED2,
@@ -40,10 +40,10 @@ import {
   friendRelationCacheByUser,
   warmFriendsAndConnectionsCache,
 } from "../src/lib/socialCache";
+import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
 import { formatLastSynq } from "./helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
-import AlertModal from "./alert-modal";
 
 const isRemoteImageUri = (value: unknown): value is string =>
   typeof value === "string" && /^https?:\/\//i.test(value);
@@ -317,6 +317,10 @@ export default function FriendProfile() {
     title: string;
     time?: string;
     location?: string;
+    joinedFromId?: string;
+    joinedFromIds?: string[];
+    joinedFromName?: string;
+    joinedFromNames?: string[];
   }) => {
     const user = auth.currentUser;
     if (!user) return;
@@ -325,10 +329,118 @@ export default function FriendProfile() {
       const meSnap = await getDoc(meRef);
       const meData = meSnap.exists() ? (meSnap.data() as any) : {};
       const existingEvents = Array.isArray(meData?.events) ? meData.events : [];
+      const joinerName =
+        String(meData?.displayName || auth.currentUser?.displayName || "Friend").trim();
+      const profileName = String(friend?.displayName || "Friend").trim();
+      const sourceIds = Array.from(
+        new Set(
+          [
+            ...((Array.isArray(event?.joinedFromIds) ? event.joinedFromIds : []).filter(Boolean) as string[]),
+            String(event?.joinedFromId || "").trim(),
+            friendKey,
+            user.uid,
+          ]
+            .map((id) => String(id).trim())
+            .filter(Boolean)
+        )
+      );
+      const sourceNames = Array.from(
+        new Set(
+          [
+            ...((Array.isArray(event?.joinedFromNames) ? event.joinedFromNames : []).filter(Boolean) as string[]),
+            String(event?.joinedFromName || "").trim(),
+            profileName,
+            joinerName,
+          ]
+            .map((n) => n.trim())
+            .filter(Boolean)
+        )
+      );
+
+      const displayNameById: Record<string, string> = {};
+      await Promise.all(
+        sourceIds.map(async (uid) => {
+          try {
+            const s = await getDoc(doc(db, "users", uid));
+            if (s.exists()) {
+              displayNameById[uid] = String((s.data() as any)?.displayName || "").trim();
+            }
+          } catch {}
+        })
+      );
+
+      const syncAttendeesAcrossUsers = async (allAttendeeIds: string[]) => {
+        await Promise.all(
+          allAttendeeIds.map(async (attendeeId) => {
+            try {
+              const attendeeRef = doc(db, "users", attendeeId);
+              const attendeeSnap = await getDoc(attendeeRef);
+              if (!attendeeSnap.exists()) return;
+              const attendeeData = attendeeSnap.data() as any;
+              const attendeeEvents = Array.isArray(attendeeData?.events) ? attendeeData.events : [];
+              let changed = false;
+              const nextAttendeeEvents = attendeeEvents.map((e: any) => {
+                if (eventKey(e) !== eventKey(event)) return e;
+                const existingIds = Array.isArray(e?.joinedFromIds)
+                  ? e.joinedFromIds
+                  : [e?.joinedFromId].filter(Boolean);
+                const mergedIds = Array.from(
+                  new Set(
+                    [...existingIds, ...allAttendeeIds]
+                      .map((id: string) => String(id).trim())
+                      .filter(Boolean)
+                  )
+                );
+                const otherNames = mergedIds
+                  .filter((id) => id !== attendeeId)
+                  .map((id) => displayNameById[id])
+                  .filter(Boolean);
+                const prevNames = Array.isArray(e?.joinedFromNames)
+                  ? e.joinedFromNames
+                  : [e?.joinedFromName].filter(Boolean);
+                const idsChanged = mergedIds.join("|") !== existingIds.join("|");
+                const namesChanged = otherNames.join("|") !== prevNames.join("|");
+                if (!idsChanged && !namesChanged) return e;
+                changed = true;
+                return {
+                  ...e,
+                  joinedFromIds: mergedIds,
+                  joinedFromId: mergedIds[0] || "",
+                  joinedFromNames: otherNames,
+                  joinedFromName: otherNames.join(", "),
+                };
+              });
+              if (changed) {
+                await updateDoc(attendeeRef, { events: nextAttendeeEvents });
+              }
+            } catch {}
+          })
+        );
+      };
 
       const exists = existingEvents.some((e: any) => eventKey(e) === eventKey(event));
       if (exists) {
-        showAlert("Already added", "This plan is already in your open plans.");
+        const updatedExistingEvents = existingEvents.map((e: any) => {
+          if (eventKey(e) !== eventKey(event)) return e;
+          const existingNames = Array.isArray(e?.joinedFromNames)
+            ? e.joinedFromNames
+            : [e?.joinedFromName].filter(Boolean);
+          const mergedNames = Array.from(
+            new Set([...existingNames, ...sourceNames].map((n: string) => String(n).trim()).filter(Boolean))
+          );
+          if (mergedNames.length === existingNames.length) return e;
+          return {
+            ...e,
+            joinedFromIds: sourceIds,
+            joinedFromId: sourceIds[0] || "",
+            joinedFromNames: mergedNames,
+            joinedFromName: mergedNames.join(", "),
+          };
+        });
+        await updateDoc(meRef, { events: updatedExistingEvents });
+        await syncAttendeesAcrossUsers(sourceIds);
+        setJoinedPlanKeys((prev) => ({ ...prev, [eventKey(event)]: true }));
+        showAlert("Updated", "Added this friend to the same joined plan.");
         return;
       }
 
@@ -339,7 +451,9 @@ export default function FriendProfile() {
         time: String(event.time || "").trim(),
         location: String(event.location || "").trim(),
         joinedFromId: friendKey,
-        joinedFromName: friend?.displayName || "Friend",
+        joinedFromIds: sourceIds,
+        joinedFromName: sourceNames.join(", "),
+        joinedFromNames: sourceNames,
       };
 
       const nextEvents = [...existingEvents, newEvent].sort(
@@ -349,6 +463,8 @@ export default function FriendProfile() {
       await updateDoc(meRef, {
         events: nextEvents,
       });
+      await syncAttendeesAcrossUsers(sourceIds);
+
       setJoinedPlanKeys((prev) => ({ ...prev, [eventKey(event)]: true }));
       showAlert("Added", "Plan added to your open plans.");
     } catch (e: any) {
