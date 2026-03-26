@@ -1,6 +1,6 @@
 import { DEFAULT_AVATAR } from "@/constants/Variables";
 
-export type SynqStatus = "idle" | "activating" | "finding" | "active";
+export type SynqStatus = "idle" | "activating" | "finding" | "optimizing" | "active";
 
 export const formatTime = (timestamp: any) => {
   if (!timestamp) return "";

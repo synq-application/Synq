@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image as ExpoImage } from "expo-image";
 import * as Haptics from 'expo-haptics';
+import { Image as ExpoImage } from "expo-image";
 import {
   addDoc,
   collection,
@@ -277,7 +277,12 @@ export default function SynqScreen() {
         setStatus('finding');
       }, 2000);
     } else if (status === 'finding') {
-      timer = setTimeout(async () => {
+      timer = setTimeout(() => {
+        Vibration.vibrate(100);
+        setStatus('optimizing');
+      }, 2000);
+    } else if (status === 'optimizing') {
+      timer = setTimeout(() => {
         Vibration.vibrate(500);
         setStatus('active');
       }, 2000);
@@ -655,9 +660,15 @@ export default function SynqScreen() {
             </View>
           </View>
         )}
-        {(status === 'activating' || status === 'finding') && (
+        {(status === 'activating' || status === 'finding' || status === 'optimizing') && (
           <View style={styles.activatingContainer}>
-            <Text style={styles.unifiedTitle}>{status === 'activating' ? 'Synq activated...' : 'Finding connections...'}</Text>
+            <Text style={styles.unifiedTitle}>
+              {status === 'activating'
+                ? 'Synq activated...'
+                : status === 'finding'
+                  ? 'Finding connections...'
+                  : 'Optimizing your network...'}
+            </Text>
             <ExpoImage
               source={require('../../assets/pulse.gif')}
               style={styles.gifLarge}
@@ -1046,7 +1057,7 @@ const styles = StyleSheet.create({
   deactivateLink: { marginTop: 20, alignSelf: 'center', padding: 10 },
   deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: 'Avenir-Medium', opacity: 0.9 },
   activatingContainer: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
-  unifiedTitle: { color: 'white', fontSize: 28, fontFamily: 'Avenir', marginBottom: 50, textAlign: 'center' },
+  unifiedTitle: { color: 'white', fontSize: 26, fontFamily: 'Avenir', marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
   gifLarge: { width: 280, height: 280 },
   inactiveCenter: {
     flex: 1,
