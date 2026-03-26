@@ -15,13 +15,12 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Platform,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { ACCENT } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
@@ -32,6 +31,8 @@ const BACKGROUND = "black";
 const SURFACE = "#161616";
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png";
+const isRemoteImageUri = (value: unknown): value is string =>
+  typeof value === "string" && /^https?:\/\//i.test(value);
 
 const fonts = {
   black: "Avenir-Black",
@@ -55,6 +56,35 @@ export default function NotificationsScreen() {
     setAlertVisible(true);
   };
 
+  const resolveRequestDisplay = async (request: any) => {
+    const senderId = request.from || request.fromId || request.id;
+    let senderName =
+      request.senderName ||
+      request.fromName ||
+      "Someone";
+    let senderImageUrl =
+      request.senderImageUrl ||
+      request.fromImageUrl ||
+      request.fromImageurl ||
+      request.imageurl ||
+      null;
+
+    try {
+      const senderSnap = await getDoc(doc(db, "users", senderId));
+      if (senderSnap.exists()) {
+        const senderData = senderSnap.data() as any;
+        senderName = senderData?.displayName || senderName;
+        senderImageUrl = senderData?.imageurl || senderImageUrl;
+      }
+    } catch {}
+
+    return {
+      ...request,
+      senderName,
+      senderImageUrl,
+    };
+  };
+
   const fetchRequests = async () => {
     if (!auth.currentUser) return;
 
@@ -67,7 +97,8 @@ export default function NotificationsScreen() {
       ...d.data(),
     }));
 
-    setRequests(reqList);
+    const resolved = await Promise.all(reqList.map(resolveRequestDisplay));
+    setRequests(resolved);
   };
 
   const onRefresh = async () => {
@@ -88,12 +119,13 @@ export default function NotificationsScreen() {
 
     const unsubscribe = onSnapshot(
       reqRef,
-      (snapshot) => {
+      async (snapshot) => {
         const reqList = snapshot.docs.map((d) => ({
           id: d.id,
           ...d.data(),
         }));
-        setRequests(reqList);
+        const resolved = await Promise.all(reqList.map(resolveRequestDisplay));
+        setRequests(resolved);
         setLoading(false);
       },
       (error) => {
@@ -197,10 +229,10 @@ export default function NotificationsScreen() {
       <View style={styles.row}>
         <View style={styles.rowLeft}>
           <View style={styles.avatar}>
-            {fromImageUrl ? (
+            {isRemoteImageUri(fromImageUrl) ? (
               <Image source={{ uri: fromImageUrl }} style={styles.avatarImg} />
             ) : (
-              <Ionicons name="person" size={18} color="#666" />
+              <Image source={{ uri: DEFAULT_AVATAR }} style={styles.avatarImg} />
             )}
           </View>
 
@@ -220,14 +252,14 @@ export default function NotificationsScreen() {
             onPress={() => handleRequest(item, true)}
             style={styles.acceptBtn}
           >
-            <Ionicons name="checkmark" size={18} color="black" />
+            <Ionicons name="checkmark" size={22} color="black" />
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => handleRequest(item, false)}
             style={styles.denyBtn}
           >
-            <Ionicons name="close" size={18} color="#888" />
+            <Ionicons name="close" size={22} color="#888" />
           </TouchableOpacity>
         </View>
       </View>
@@ -341,8 +373,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
     borderBottomWidth: 0.5,
     borderBottomColor: "#252525",
   },
@@ -353,19 +385,19 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: "#222",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: 14,
     overflow: "hidden",
   },
   avatarImg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   rowKicker: {
     color: ACCENT,
@@ -382,25 +414,25 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   boldWhite: { fontFamily: fonts.heavy, color: "white" },
-  grayText: { color: "#aaa", fontFamily: fonts.medium },
+  grayText: { color: "#aaa", fontFamily: fonts.medium, fontSize: 14 },
   rowRight: {
     flexDirection: "row",
     alignItems: "center",
   },
   acceptBtn: {
     backgroundColor: ACCENT,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 8,
+    marginRight: 10,
   },
   denyBtn: {
     backgroundColor: "#222",
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,

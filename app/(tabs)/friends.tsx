@@ -14,12 +14,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   onSnapshot,
   serverTimestamp,
-  setDoc
+  setDoc,
+  writeBatch
 } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
@@ -268,6 +270,9 @@ function SearchModal({
   const [queryText, setQueryText] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [suggested, setSuggested] = useState<any[]>([]);
+  const [pendingRequestIds, setPendingRequestIds] = useState<Record<string, boolean>>({});
+  const [incomingRequestIds, setIncomingRequestIds] = useState<Record<string, boolean>>({});
+  const [acceptedIds, setAcceptedIds] = useState<Record<string, boolean>>({});
   const [isSearching, setIsSearching] = useState(false);
   const [isSuggestedRefreshing, setIsSuggestedRefreshing] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
@@ -304,6 +309,8 @@ function SearchModal({
           if (isRemoteImageUri(user?.imageurl)) Image.prefetch(user.imageurl).catch(() => {});
         });
         setSuggested(nextSuggested);
+        hydratePendingForUsers(nextSuggested.map((u) => u.id));
+        hydrateIncomingForUsers(nextSuggested.map((u) => u.id));
       } catch (e) {
         console.error("[Suggested] error:", e);
       } finally {
@@ -315,7 +322,80 @@ function SearchModal({
   }, [visible]);
 
   const debounceRef = React.useRef<any>(null);
+  const pendingCheckCacheRef = React.useRef<Record<string, boolean>>({});
+  const pendingCheckInFlightRef = React.useRef<Record<string, Promise<boolean>>>({});
+  const incomingCheckCacheRef = React.useRef<Record<string, boolean>>({});
+  const incomingCheckInFlightRef = React.useRef<Record<string, Promise<boolean>>>({});
 
+  const hydratePendingForUsers = async (userIds: string[]) => {
+    if (!auth.currentUser) return;
+    const myId = auth.currentUser.uid;
+    const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+    const checks = uniqueIds.map(async (targetId) => {
+      if (currentFriends.includes(targetId)) {
+        pendingCheckCacheRef.current[targetId] = false;
+        return [targetId, false] as const;
+      }
+      if (pendingCheckCacheRef.current[targetId] !== undefined) {
+        return [targetId, pendingCheckCacheRef.current[targetId]] as const;
+      }
+      if (!pendingCheckInFlightRef.current[targetId]) {
+        pendingCheckInFlightRef.current[targetId] = getDoc(
+          doc(db, "users", targetId, "friendRequests", myId)
+        )
+          .then((snap) => snap.exists())
+          .catch(() => false);
+      }
+      const exists = await pendingCheckInFlightRef.current[targetId];
+      pendingCheckCacheRef.current[targetId] = exists;
+      delete pendingCheckInFlightRef.current[targetId];
+      return [targetId, exists] as const;
+    });
+
+    const resolved = await Promise.all(checks);
+    setPendingRequestIds((prev) => {
+      const next = { ...prev };
+      resolved.forEach(([id, isPending]) => {
+        next[id] = isPending;
+      });
+      return next;
+    });
+  };
+
+  const hydrateIncomingForUsers = async (userIds: string[]) => {
+    if (!auth.currentUser) return;
+    const myId = auth.currentUser.uid;
+    const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+    const checks = uniqueIds.map(async (targetId) => {
+      if (currentFriends.includes(targetId) || acceptedIds[targetId]) {
+        incomingCheckCacheRef.current[targetId] = false;
+        return [targetId, false] as const;
+      }
+      if (incomingCheckCacheRef.current[targetId] !== undefined) {
+        return [targetId, incomingCheckCacheRef.current[targetId]] as const;
+      }
+      if (!incomingCheckInFlightRef.current[targetId]) {
+        incomingCheckInFlightRef.current[targetId] = getDoc(
+          doc(db, "users", myId, "friendRequests", targetId)
+        )
+          .then((snap) => snap.exists())
+          .catch(() => false);
+      }
+      const exists = await incomingCheckInFlightRef.current[targetId];
+      incomingCheckCacheRef.current[targetId] = exists;
+      delete incomingCheckInFlightRef.current[targetId];
+      return [targetId, exists] as const;
+    });
+
+    const resolved = await Promise.all(checks);
+    setIncomingRequestIds((prev) => {
+      const next = { ...prev };
+      resolved.forEach(([id, isIncoming]) => {
+        next[id] = isIncoming;
+      });
+      return next;
+    });
+  };
 
   const searchUsers = (val: string) => {
     setQueryText(val);
@@ -362,6 +442,8 @@ function SearchModal({
         });
 
         setResults(filtered);
+        hydratePendingForUsers(filtered.map((u) => u.id));
+        hydrateIncomingForUsers(filtered.map((u) => u.id));
       } catch (e) {
         console.error("[SearchModal] Search failed", e);
       } finally {
@@ -375,28 +457,20 @@ function SearchModal({
       return;
     }
 
+    const myId = auth.currentUser.uid;
+    const targetId = targetUser.id;
+    const requestDocRef = doc(
+      db,
+      "users",
+      targetId,
+      "friendRequests",
+      myId
+    );
+
     try {
       Keyboard.dismiss();
-
-      const myId = auth.currentUser.uid;
-      const targetId = targetUser.id;
-
-      const requestDocRef = doc(
-        db,
-        "users",
-        targetId,
-        "friendRequests",
-        myId
-      );
-
-      const meSnap = await getDoc(doc(db, "users", myId));
-      const meData = meSnap.exists() ? (meSnap.data() as any) : {};
-      const senderName =
-        meData?.displayName ||
-        auth.currentUser.displayName ||
-        "Someone";
-
-      const senderImageUrl = meData?.imageurl || null;
+      const senderName = auth.currentUser.displayName || "Someone";
+      const senderImageUrl = null;
 
       const payload = {
         from: myId,
@@ -406,14 +480,24 @@ function SearchModal({
         status: "pending",
         sentAt: serverTimestamp(),
       };
-      await setDoc(requestDocRef, payload);
+      pendingCheckCacheRef.current[targetId] = true;
+      setPendingRequestIds((prev) => ({ ...prev, [targetId]: true }));
 
       setAlertConfig({
         title: "Sent!",
         message: `Invite sent to ${targetUser.displayName}`,
       });
       setAlertVisible(true);
-      onClose();
+
+      setDoc(requestDocRef, payload).catch((e: any) => {
+        pendingCheckCacheRef.current[targetId] = false;
+        setPendingRequestIds((prev) => ({ ...prev, [targetId]: false }));
+        setAlertConfig({
+          title: "Error",
+          message: e?.message || "Could not send invite.",
+        });
+        setAlertVisible(true);
+      });
 
     } catch (e: any) {
       if (e?.code === "permission-denied") {
@@ -428,6 +512,54 @@ function SearchModal({
       setAlertConfig({
         title: "Error",
         message: e?.message || "Could not send invite.",
+      });
+      setAlertVisible(true);
+    }
+  };
+
+  const acceptIncomingRequest = async (targetUser: any) => {
+    if (!auth.currentUser) return;
+    const myId = auth.currentUser.uid;
+    const senderId = targetUser.id;
+
+    try {
+      const meSnap = await getDoc(doc(db, "users", myId));
+      const meData = meSnap.exists() ? (meSnap.data() as any) : {};
+      const myName = meData?.displayName || auth.currentUser.displayName || "User";
+      const myImageUrl = meData?.imageurl || null;
+      const senderName = targetUser.displayName || "User";
+      const senderImageUrl = targetUser.imageurl || null;
+
+      const batch = writeBatch(db);
+      batch.set(doc(db, "users", myId, "friends", senderId), {
+        synqCount: 0,
+        since: serverTimestamp(),
+        displayName: senderName,
+        imageurl: senderImageUrl,
+      });
+      batch.set(doc(db, "users", senderId, "friends", myId), {
+        synqCount: 0,
+        since: serverTimestamp(),
+        displayName: myName,
+        imageurl: myImageUrl,
+      });
+      batch.delete(doc(db, "users", myId, "friendRequests", senderId));
+      await batch.commit();
+
+      incomingCheckCacheRef.current[senderId] = false;
+      setIncomingRequestIds((prev) => ({ ...prev, [senderId]: false }));
+      setAcceptedIds((prev) => ({ ...prev, [senderId]: true }));
+      await deleteDoc(doc(db, "users", senderId, "friendRequests", myId)).catch(() => {});
+
+      setAlertConfig({
+        title: "Success",
+        message: `You are now connected with ${senderName}!`,
+      });
+      setAlertVisible(true);
+    } catch (e: any) {
+      setAlertConfig({
+        title: "Error",
+        message: e?.message || "Could not accept request.",
       });
       setAlertVisible(true);
     }
@@ -505,11 +637,35 @@ function SearchModal({
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={() => sendInvite(item)}
-                    style={styles.addBtn}
+                    onPress={() => {
+                      if (incomingRequestIds[item.id]) {
+                        acceptIncomingRequest(item);
+                      } else {
+                        sendInvite(item);
+                      }
+                    }}
+                    style={[
+                      styles.addBtn,
+                      incomingRequestIds[item.id] && styles.acceptOutlineBtn,
+                      pendingRequestIds[item.id] && styles.addBtnDisabled,
+                    ]}
                     activeOpacity={0.8}
+                    disabled={!!pendingRequestIds[item.id] || !!acceptedIds[item.id]}
                   >
-                    <Text style={styles.addBtnText}>Add</Text>
+                    <Text
+                      style={[
+                        styles.addBtnText,
+                        incomingRequestIds[item.id] && styles.acceptOutlineText,
+                      ]}
+                    >
+                      {acceptedIds[item.id]
+                        ? "Friends"
+                        : incomingRequestIds[item.id]
+                          ? "Accept"
+                          : pendingRequestIds[item.id]
+                            ? "Pending"
+                            : "Add"}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -544,18 +700,34 @@ function SearchModal({
 
                 <TouchableOpacity
                   onPress={() => {
-                    if (!currentFriends.includes(item.id)) {
+                    if (incomingRequestIds[item.id]) {
+                      acceptIncomingRequest(item);
+                      return;
+                    }
+                    if (!currentFriends.includes(item.id) && !pendingRequestIds[item.id] && !acceptedIds[item.id]) {
                       sendInvite(item);
                     }
                   }}
                   style={[
                     styles.addBtn,
-                    currentFriends.includes(item.id) && { opacity: 0.4 }
+                    incomingRequestIds[item.id] && styles.acceptOutlineBtn,
+                    (currentFriends.includes(item.id) || pendingRequestIds[item.id] || acceptedIds[item.id]) && styles.addBtnDisabled
                   ]}
-                  disabled={currentFriends.includes(item.id)}
+                  disabled={currentFriends.includes(item.id) || !!pendingRequestIds[item.id] || !!acceptedIds[item.id]}
                 >
-                  <Text style={styles.addBtnText}>
-                    {currentFriends.includes(item.id) ? "Friends" : "Add"}
+                  <Text
+                    style={[
+                      styles.addBtnText,
+                      incomingRequestIds[item.id] && styles.acceptOutlineText,
+                    ]}
+                  >
+                    {currentFriends.includes(item.id) || acceptedIds[item.id]
+                      ? "Friends"
+                      : incomingRequestIds[item.id]
+                        ? "Accept"
+                      : pendingRequestIds[item.id]
+                        ? "Pending"
+                        : "Add"}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -704,7 +876,10 @@ const styles = StyleSheet.create({
   searchResult: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14 },
   emailDetail: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 2 },
   addBtn: { backgroundColor: ACCENT, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 14 },
+  acceptOutlineBtn: { backgroundColor: "transparent", borderWidth: 1, borderColor: ACCENT },
+  addBtnDisabled: { opacity: 0.45, backgroundColor: "#3f3f3f" },
   addBtnText: { color: "#061006", fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 0.2 },
+  acceptOutlineText: { color: ACCENT },
   searchBarWrap: {
     flexDirection: "row",
     alignItems: "center",
