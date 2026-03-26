@@ -30,6 +30,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/Ionicons";
 import ConfirmModal from "./confirm-modal";
+import { formatLastSynq } from "./helpers";
+import MonthlyMemoReadOnly from "./readonly-monthly-memo";
 
 export default function FriendProfile() {
   const { friendId } = useLocalSearchParams();
@@ -113,18 +115,6 @@ export default function FriendProfile() {
 
     fetchLastSynq();
   }, [friendId]);
-
-  const formatLastSynq = (date: Date) => {
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (diff < 60) return "Just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-
-    return date.toLocaleDateString();
-  };
 
   if (loading) {
     return (
@@ -278,17 +268,15 @@ export default function FriendProfile() {
             )}
           </View>
         </View>
-        {friend.monthlyMemo && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Monthly Memo</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Monthly Memo</Text>
 
-            <View style={styles.memoCard}>
-              <Text style={styles.memoText}>
-                {friend.monthlyMemo}
-              </Text>
-            </View>
-          </View>
-        )}
+          <MonthlyMemoReadOnly
+            events={friend.events || []}
+            ACCENT={ACCENT}
+            fonts={fonts}
+          />
+        </View>
 
         <View style={{ marginTop: 30, marginBottom: 40, alignItems: "center" }}>
           <TouchableOpacity
