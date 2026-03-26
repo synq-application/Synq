@@ -784,6 +784,34 @@ export default function SynqScreen() {
                 </Swipeable>
               )}
             />
+            <ConfirmModal
+              visible={showDeleteChatModal}
+              title="Delete Chat"
+              message="Are you sure you want to delete this conversation?"
+              confirmText="Delete"
+              destructive
+              onCancel={() => {
+                setShowDeleteChatModal(false);
+                setPendingDeleteChatId(null);
+              }}
+              onConfirm={async () => {
+                const chatId = pendingDeleteChatId;
+                setShowDeleteChatModal(false);
+                setPendingDeleteChatId(null);
+                if (!chatId) return;
+                if (activeChatId === chatId) {
+                  setIsChatVisible(false);
+                  setActiveChatId(null);
+                }
+                setAllChats((prev) => prev.filter((c) => c.id !== chatId));
+                try {
+                  await deleteDoc(doc(db, "chats", chatId));
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                } catch (e) {
+                  console.error("Failed to delete chat", e);
+                }
+              }}
+            />
           </View>
         </Modal>
 
@@ -1003,29 +1031,6 @@ export default function SynqScreen() {
           onSaveMemo={async () => {
             await updateDoc(doc(db, "users", auth.currentUser!.uid), { memo });
             setIsEditModalVisible(false);
-          }}
-        />
-        <ConfirmModal
-          visible={showDeleteChatModal}
-          title="Delete Chat"
-          message="Are you sure you want to delete this conversation?"
-          confirmText="Delete"
-          destructive
-          onCancel={() => {
-            setShowDeleteChatModal(false);
-            setPendingDeleteChatId(null);
-          }}
-          onConfirm={async () => {
-            const chatId = pendingDeleteChatId;
-            setShowDeleteChatModal(false);
-            setPendingDeleteChatId(null);
-            if (!chatId) return;
-            if (activeChatId === chatId) {
-              setIsChatVisible(false);
-              setActiveChatId(null);
-            }
-            await deleteDoc(doc(db, "chats", chatId));
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }}
         />
         <ConfirmModal
