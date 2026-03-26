@@ -1,10 +1,13 @@
-import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { fonts } from "@/constants/Variables";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
-  FlatList,
   Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,406 +21,272 @@ type EventItem = {
   date: string;
   title: string;
   time?: string;
+  location?: string;
 };
 
-type MonthlyMemoProps = {
+type Props = {
   ACCENT: string;
-  fonts: { heavy: string; medium: string; black: string };
   showEventModal: boolean;
   setShowEventModal: (val: boolean) => void;
   newEvent: { title: string; date: string; time: string; location: string };
   setNewEvent: React.Dispatch<any>;
   saveEvent: (event?: any) => void;
   deleteEvent: (id: string) => void;
-  selectedDate: Date;
-  setSelectedDate: (date: Date) => void;
   events: EventItem[];
 };
 
-export default function MonthlyMemo({
+export default function OpenPlans({
   ACCENT,
-  fonts,
   showEventModal,
   setShowEventModal,
   newEvent,
   setNewEvent,
   saveEvent,
   deleteEvent,
-  selectedDate,
-  setSelectedDate,
   events,
-}: MonthlyMemoProps) {
-  const defaultHour = "1";
-  const defaultMinute = "00";
-  const defaultAmPm = "AM";
+}: Props) {
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [picker, setPicker] = useState<"date" | "time" | null>(null);
 
-  const [pickerMode, setPickerMode] = useState<"date" | "time" | null>(null);
-  const [hour, setHour] = useState(defaultHour);
-  const [minute, setMinute] = useState(defaultMinute);
-  const [ampm, setAmPm] = useState<"AM" | "PM">(defaultAmPm);
+  useEffect(() => {
+    const d = new Date();
+    d.setMinutes(0);
+    d.setHours(d.getHours() + 1);
+    setSelectedDate(d);
+  }, []);
 
-  const daysInMonth = new Date(
-    selectedDate.getFullYear(),
-    selectedDate.getMonth() + 1,
-    0
-  ).getDate();
+  const closePickers = () => setPicker(null);
 
-  const startDay = new Date(
-    selectedDate.getFullYear(),
-    selectedDate.getMonth(),
-    1
-  ).getDay();
+  const formatTime = (d: Date) =>
+    d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
-  const calendarDays = [
-    ...Array(startDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-
-  const parseLocalDate = (dateStr: string) => {
-    const [y, m, d] = dateStr.split("-").map(Number);
+  const parseDate = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
     return new Date(y, m - 1, d);
   };
 
-  const formatFullDate = (date: Date) => {
-    const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
-    const month = date.toLocaleDateString("en-US", { month: "long" });
-    const day = date.getDate();
-    return `${weekday}, ${month} ${day}`;
+  const setDate = (base: Date) => {
+    const d = new Date(base);
+    d.setHours(selectedDate.getHours());
+    d.setMinutes(selectedDate.getMinutes());
+    setSelectedDate(d);
+    closePickers();
   };
 
-  const selectedDayEvents = events.filter((e) => {
-    const d = parseLocalDate(e.date);
-    return (
-      d.getDate() === selectedDate.getDate() &&
-      d.getMonth() === selectedDate.getMonth() &&
-      d.getFullYear() === selectedDate.getFullYear()
-    );
-  });
-
-  const hasEvent = (day: number) =>
-    events.some((e) => {
-      const d = parseLocalDate(e.date);
-      return (
-        d.getDate() === day &&
-        d.getMonth() === selectedDate.getMonth() &&
-        d.getFullYear() === selectedDate.getFullYear()
-      );
+  const handleSave = () => {
+    const iso = selectedDate.toISOString();
+    saveEvent({
+      ...newEvent,
+      date: iso.split("T")[0],
+      time: formatTime(selectedDate),
     });
+    setShowEventModal(false);
+  };
 
-  const handleDelete = (id: string) => {
-    Alert.alert("Delete event", "Are you sure?", [
+  const handleDelete = (id: string) =>
+    Alert.alert("Delete plan", "Are you sure?", [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: () => deleteEvent(id) },
     ]);
-  };
-
-  const resetEvent = () => {
-    setNewEvent({ title: "", date: "", time: "", location: "" });
-    setPickerMode(null);
-    setHour(defaultHour);
-    setMinute(defaultMinute);
-    setAmPm(defaultAmPm);
-  };
-
-  const openModal = () => {
-    setNewEvent((p: any) => ({
-      ...p,
-      date: `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1)
-        .toString()
-        .padStart(2, "0")}-${selectedDate
-          .getDate()
-          .toString()
-          .padStart(2, "0")}`,
-    }));
-    setShowEventModal(true);
-  };
-
-  const ITEM_HEIGHT = 40;
-
-  const renderPicker = (
-    data: string[],
-    selected: string,
-    setValue: (v: string) => void
-  ) => (
-    <FlatList
-      style={{ flex: 1 }}
-      data={data}
-      keyExtractor={(item) => item}
-      snapToInterval={ITEM_HEIGHT}
-      decelerationRate="fast"
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
-      onMomentumScrollEnd={(e) => {
-        const index = Math.round(
-          e.nativeEvent.contentOffset.y / ITEM_HEIGHT
-        );
-        if (data[index]) setValue(data[index]);
-      }}
-      renderItem={({ item }) => (
-        <View style={{ height: ITEM_HEIGHT, justifyContent: "center", alignItems: "center" }}>
-          <Text
-            style={{
-              color: item === selected ? ACCENT : "#555",
-              fontSize: item === selected ? 22 : 16,
-            }}
-          >
-            {item}
-          </Text>
-        </View>
-      )}
-    />
-  );
 
   return (
-    <View style={{ marginTop: 30, width: "95%", alignSelf: "center" }}>
-      <Text style={{ color: "white", fontSize: 20, fontFamily: fonts.heavy, marginLeft: 18 }}>
-        Monthly memo
-      </Text>
-      <Text style={{ color: "gray", fontSize: 14, fontFamily: fonts.medium, marginLeft: 18, marginTop: 5 }}>
-        Let your friends know what you're up to this month.
-      </Text>
-      <View style={styles.card}>
-        <View style={styles.row}>
+    <View style={styles.container}>
+      <Text style={styles.header}>Open plans</Text>
+
+      {!events.length && (
+        <Text style={styles.empty}>Nothing planned… yet 👀</Text>
+      )}
+
+      {events.map((p) => {
+        const d = parseDate(p.date);
+        return (
           <TouchableOpacity
-            onPress={() =>
-              setSelectedDate(
-                new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1)
-              )
-            }
+            key={p.id}
+            style={styles.card}
+            onLongPress={() => handleDelete(p.id)}
           >
-            <Ionicons name="chevron-back" size={20} color="#888" />
+            <View style={styles.dateBlock}>
+              <Text style={styles.day}>
+                {d.toLocaleDateString("en-US", {
+                  weekday: "short",
+                }).toUpperCase()}
+              </Text>
+              <Text style={styles.date}>{d.getDate()}</Text>
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>{p.title}</Text>
+              <Text style={styles.meta}>
+                {p.time}
+                {p.location ? ` · ${p.location}` : ""}
+              </Text>
+            </View>
           </TouchableOpacity>
+        );
+      })}
 
-          <Text style={{ color: "white" }}>
-            {selectedDate.toLocaleString("default", { month: "long" }).toUpperCase()}
-          </Text>
-
-          <TouchableOpacity
-            onPress={() =>
-              setSelectedDate(
-                new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1)
-              )
-            }
-          >
-            <Ionicons name="chevron-forward" size={20} color="#888" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ flexDirection: "row" }}>
-          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-            <Text key={i} style={styles.week}>{d}</Text>
-          ))}
-        </View>
-
-        <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-          {calendarDays.map((day, i) => {
-            if (!day) return <View key={i} style={styles.day} />;
-
-            const isSelected = selectedDate.getDate() === day;
-
-            return (
-              <TouchableOpacity
-                key={i}
-                onPress={() =>
-                  setSelectedDate(
-                    new Date(
-                      selectedDate.getFullYear(),
-                      selectedDate.getMonth(),
-                      day
-                    )
-                  )
-                }
-                style={[
-                  styles.day,
-                  selectedDate.getDate() === day && {
-                    borderWidth: 1.5,
-                    borderColor: ACCENT,
-                    borderRadius: 8,
-                  },
-                ]}
-              >
-                <Text style={{ color: "#777" }}>{day}</Text>
-
-                {hasEvent(day) && (
-                  <View style={[styles.dot, { backgroundColor: ACCENT }]} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        {selectedDayEvents.length > 0 && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={styles.sectionTitle}>
-              {formatFullDate(selectedDate)}
-            </Text>
-
-            {selectedDayEvents.map((e) => {
-              const d = parseLocalDate(e.date);
-              return (
-                <TouchableOpacity
-                  key={e.id}
-                  onLongPress={() => handleDelete(e.id)}
-                  style={styles.eventCard}
-                >
-                  <View style={styles.dateBlock}>
-                    <Text style={styles.dayText}>
-                      {d.toLocaleDateString("en-US", { weekday: "short" })}
-                    </Text>
-                    <Text style={styles.dateText}>{d.getDate()}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: "white", fontSize: 16 }}>{e.title}</Text>
-
-                    {e.time ? (
-                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
-                        <Ionicons name="time-outline" size={12} color="#666" />
-                        <Text style={{ color: "#666", marginLeft: 4, fontSize: 12 }}>
-                          {e.time}
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text style={{ color: "red", marginTop: 4 }}>
-                        (no time saved)
-                      </Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-      </View>
       <TouchableOpacity
         style={[styles.addBtn, { borderColor: ACCENT }]}
-        onPress={openModal}
+        onPress={() => setShowEventModal(true)}
       >
-        <Ionicons name="add" size={18} color={ACCENT} />
-        <Text style={{ color: ACCENT, marginLeft: 8 }}>
-          New event
+        <Text style={{ color: ACCENT, fontSize: 18, fontFamily: fonts.heavy }}>
+          + Add plan
         </Text>
       </TouchableOpacity>
+
       <Modal visible={showEventModal} transparent animationType="fade">
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); setPickerMode(null); }}>
-            <View style={StyleSheet.absoluteFillObject} />
-          </TouchableWithoutFeedback>
-
-          <View style={styles.modal}>
-            <Text style={{ color: "white", fontSize: 26, marginBottom: 16 }}>
-              Add an event
-            </Text>
-
-            <TextInput
-              style={styles.field}
-              placeholder="What’s the plan?"
-              placeholderTextColor="#555"
-              value={newEvent.title}
-              onChangeText={(t) =>
-                setNewEvent((p: any) => ({ ...p, title: t }))
-              }
-            />
-
-            <TouchableOpacity
-              style={styles.field}
-              onPress={() => {
-                Keyboard.dismiss();
-                setPickerMode("time");
-              }}
+        <TouchableWithoutFeedback
+          onPress={() => {
+            Keyboard.dismiss();
+            closePickers();
+          }}
+        >
+          <View style={styles.overlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              keyboardVerticalOffset={30} // 🔥 reduced movement
+              style={{ width: "100%", alignItems: "center" }}
             >
-              <Text style={{ color: "white" }}>
-                {pickerMode === "time"
-                  ? `${hour}:${minute} ${ampm}`
-                  : newEvent.time || "Add time"}
-              </Text>
-            </TouchableOpacity>
+              <View style={styles.modal}>
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <View style={styles.headerRow}>
+                    <Text
+                      onPress={() => setShowEventModal(false)}
+                      style={styles.cancel}
+                    >
+                      Cancel
+                    </Text>
+                    <Text style={styles.modalTitle}>Add a plan</Text>
+                    <Text
+                      onPress={handleSave}
+                      style={{ color: ACCENT, fontSize: 16 }}
+                    >
+                      Post
+                    </Text>
+                  </View>
 
-            {pickerMode === "time" && (
-              <View style={styles.timePicker}>
-                {renderPicker([...Array(12)].map((_, i) => (i + 1).toString()), hour, setHour)}
-                {renderPicker(["00", "15", "30", "45"], minute, setMinute)}
-                {renderPicker(["AM", "PM"], ampm, (v) => setAmPm(v as "AM" | "PM"))}
-                <View style={styles.highlight} />
+                  <TextInput
+                    placeholder="What's the plan?"
+                    placeholderTextColor="#555"
+                    style={styles.input}
+                    value={newEvent.title}
+                    onFocus={closePickers}
+                    onChangeText={(t) =>
+                      setNewEvent((p: any) => ({ ...p, title: t }))
+                    }
+                  />
+
+                  <View style={styles.row}>
+                    <DateBtn label="Today" onPress={() => setDate(new Date())} />
+                    <DateBtn
+                      label="Tomorrow"
+                      onPress={() =>
+                        setDate(new Date(Date.now() + 86400000))
+                      }
+                    />
+                    <DateBtn
+                      label="Pick a date"
+                      onPress={() => setPicker("date")}
+                    />
+                  </View>
+
+                  {picker === "date" && (
+                    <DateTimePicker
+                      value={selectedDate}
+                      mode="date"
+                      display="spinner"
+                      themeVariant="dark"
+                      textColor="white"
+                      onChange={(e, d) => {
+                        closePickers();
+                        if (d) setDate(d);
+                      }}
+                    />
+                  )}
+
+                  <Text style={styles.label}>When?</Text>
+                  <TouchableOpacity
+                    style={styles.input}
+                    onPress={() => setPicker("time")}
+                  >
+                    <Text style={{ color: "white", fontSize: 16 }}>
+                      {selectedDate.toDateString()} ·{" "}
+                      {formatTime(selectedDate)}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {picker === "time" && (
+                    <DateTimePicker
+                      value={selectedDate}
+                      mode="time"
+                      display="spinner"
+                      themeVariant="dark"
+                      textColor="white"
+                      onChange={(e, t) => {
+                        closePickers();
+                        if (t) {
+                          const d = new Date(selectedDate);
+                          d.setHours(t.getHours());
+                          d.setMinutes(t.getMinutes());
+                          setSelectedDate(d);
+                        }
+                      }}
+                    />
+                  )}
+
+                  <Text style={styles.label}>Where?</Text>
+                  <TextInput
+                    placeholder="Add location"
+                    placeholderTextColor="#555"
+                    style={styles.input}
+                    value={newEvent.location}
+                    onFocus={closePickers}
+                    onChangeText={(t) =>
+                      setNewEvent((p: any) => ({ ...p, location: t }))
+                    }
+                  />
+                </ScrollView>
               </View>
-            )}
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => {
-                  resetEvent();
-                  setShowEventModal(false);
-                }}
-              >
-                <Text style={{ color: "#aaa" }}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.createBtn}
-                onPress={() => {
-                  const formattedTime = `${hour}:${minute} ${ampm}`;
-                  saveEvent({ ...newEvent, time: formattedTime });
-                  resetEvent();
-                  setShowEventModal(false);
-                }}
-              >
-                <Text style={{ color: "black" }}>Create</Text>
-              </TouchableOpacity>
-            </View>
+            </KeyboardAvoidingView>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </View>
   );
 }
 
+const DateBtn = ({ label, onPress }: any) => (
+  <TouchableOpacity style={styles.dateBtn} onPress={onPress}>
+    <Text style={{ color: "white", fontSize: 14, fontFamily: fonts.medium }}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
+
 const styles = StyleSheet.create({
-  card: { backgroundColor: "#111", padding: 16, borderRadius: 20, width: "95%", alignSelf: "center", marginTop: 14 },
-  row: { flexDirection: "row", justifyContent: "space-between" },
-  week: { width: "14.28%", textAlign: "center", color: "#444" },
-  day: {
-    width: "14.28%",
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  dot: {
-    position: "absolute",
-    bottom: 6,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  sectionTitle: { color: "#888", marginBottom: 8 },
+  container: { marginTop: 30, width: "92%", alignSelf: "center" },
+  header: { color: "white", fontSize: 18, fontFamily: fonts.heavy, marginBottom: 14, marginLeft: 10 },
+  empty: { color: "#666", marginBottom: 16 },
 
-  eventCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#0a0a0a",
-    borderRadius: 16,
+  card: {
+    backgroundColor: "#0d0d0d",
+    borderRadius: 20,
     padding: 14,
-    marginBottom: 12,
-  },
-
-  dateBlock: {
-    width: 50,
-    alignItems: "center",
-    marginRight: 12,
-  },
-  dayText: { color: "#666", fontSize: 12 },
-  dateText: { color: "white", fontSize: 18 },
-
-  addBtn: {
+    marginBottom: 10,
     flexDirection: "row",
-    justifyContent: "center",
-    padding: 12,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderRadius: 14,
-    marginTop: 14,
-    width: 160,
-    alignSelf: "center",
   },
+
+  dateBlock: { width: 48, alignItems: "center", marginRight: 12 },
+  day: { color: "#666", fontSize: 10 },
+  date: { color: "white", fontSize: 18 },
+
+  title: { color: "white", fontSize: 15 },
+  meta: { color: "#777", marginTop: 3, fontSize: 13 },
+
+  addBtn: { padding: 12, alignItems: "center", marginTop: 8 },
 
   overlay: {
     flex: 1,
@@ -429,45 +298,50 @@ const styles = StyleSheet.create({
   modal: {
     width: "92%",
     backgroundColor: "#0a0a0a",
-    padding: 20,
-    borderRadius: 20,
+    padding: 18,
+    borderRadius: 22,
   },
 
-  field: {
+  modalTitle: { color: "white", fontSize: 18, fontFamily: fonts.medium },
+
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  row: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    gap: 6,
+    marginBottom: 14,
+  },
+
+  input: {
     backgroundColor: "#111",
-    padding: 12,
-    marginTop: 10,
-    borderRadius: 10,
+    padding: 14,
+    borderRadius: 12,
     color: "white",
-  },
-  buttonRow: { flexDirection: "row", marginTop: 20, gap: 10 },
-  cancelBtn: {
-    flex: 1,
-    backgroundColor: "#222",
-    padding: 14,
-    borderRadius: 10,
-    alignItems: "center",
+    marginBottom: 12,
+    fontSize: 16,
+    fontFamily: fonts.medium,
   },
 
-  createBtn: {
-    flex: 1,
-    backgroundColor: "#7DFFA6",
-    padding: 14,
-    borderRadius: 10,
-    alignItems: "center",
+  label: {
+    color: "#777",
+    marginBottom: 5,
+    fontSize: 14,
+    fontFamily: fonts.medium,
   },
 
-  timePicker: { flexDirection: "row", height: 200, marginTop: 20 },
-
-  highlight: {
-    position: "absolute",
-    top: "50%",
-    marginTop: -20,
-    height: 40,
-    width: "100%",
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
+  dateBtn: {
+    borderWidth: 1,
     borderColor: "#333",
-    pointerEvents: "none",
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
+
+  cancel: { color: "#aaa", fontSize: 14 },
 });

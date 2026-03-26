@@ -1,5 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 type EventItem = {
@@ -7,252 +6,143 @@ type EventItem = {
   date: string;
   title: string;
   time?: string;
+  location?: string;
 };
 
 type Props = {
   events: EventItem[];
   ACCENT: string;
   fonts: any;
+  onPressPlan?: (event: EventItem) => void; // for future "interested"
 };
 
-export default function MonthlyMemoReadOnly({
+export default function FriendOpenPlans({
   events,
   ACCENT,
   fonts,
+  onPressPlan,
 }: Props) {
-  const [selectedDate, setSelectedDate] = useState(new Date());
-
-  const daysInMonth = new Date(
-    selectedDate.getFullYear(),
-    selectedDate.getMonth() + 1,
-    0
-  ).getDate();
-
-  const startDay = new Date(
-    selectedDate.getFullYear(),
-    selectedDate.getMonth(),
-    1
-  ).getDay();
-
-  const calendarDays = [
-    ...Array(startDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-
-  const parseLocalDate = (dateStr: string) => {
-    const [y, m, d] = dateStr.split("-").map(Number);
+  const parseDate = (s: string) => {
+    const [y, m, d] = s.split("-").map(Number);
     return new Date(y, m - 1, d);
   };
 
-  const selectedDayEvents = events.filter((e) => {
-    const d = parseLocalDate(e.date);
-    return (
-      d.getDate() === selectedDate.getDate() &&
-      d.getMonth() === selectedDate.getMonth() &&
-      d.getFullYear() === selectedDate.getFullYear()
-    );
-  });
-
-  const hasEvent = (day: number) =>
-    events.some((e) => {
-      const d = parseLocalDate(e.date);
-      return (
-        d.getDate() === day &&
-        d.getMonth() === selectedDate.getMonth() &&
-        d.getFullYear() === selectedDate.getFullYear()
-      );
-    });
-
   return (
-    <View style={styles.card}>
-      {/* HEADER */}
-      <View style={styles.row}>
-        <TouchableOpacity
-          onPress={() =>
-            setSelectedDate(
-              new Date(
-                selectedDate.getFullYear(),
-                selectedDate.getMonth() - 1,
-                1
-              )
-            )
-          }
-        >
-          <Ionicons name="chevron-back" size={20} color="#888" />
-        </TouchableOpacity>
-
-        <Text style={{ color: "white", fontFamily: fonts.heavy }}>
-          {selectedDate
-            .toLocaleString("default", { month: "long" })
-            .toUpperCase()}
+    <View style={styles.container}>
+      {events.length === 0 && (
+        <Text style={styles.empty}>
+          Nothing planned right now 👀
         </Text>
-
-        <TouchableOpacity
-          onPress={() =>
-            setSelectedDate(
-              new Date(
-                selectedDate.getFullYear(),
-                selectedDate.getMonth() + 1,
-                1
-              )
-            )
-          }
-        >
-          <Ionicons name="chevron-forward" size={20} color="#888" />
-        </TouchableOpacity>
-      </View>
-
-      {/* WEEK ROW */}
-      <View style={{ flexDirection: "row" }}>
-        {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-          <Text key={i} style={styles.week}>
-            {d}
-          </Text>
-        ))}
-      </View>
-
-      {/* CALENDAR GRID */}
-      <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-        {calendarDays.map((day, i) => {
-          if (!day) return <View key={i} style={styles.day} />;
-
-          const isSelected = selectedDate.getDate() === day;
-
-          return (
-            <TouchableOpacity
-              key={i}
-              onPress={() =>
-                setSelectedDate(
-                  new Date(
-                    selectedDate.getFullYear(),
-                    selectedDate.getMonth(),
-                    day
-                  )
-                )
-              }
-              style={[
-                styles.day,
-                isSelected && {
-                  borderWidth: 1.5,
-                  borderColor: ACCENT,
-                  borderRadius: 8,
-                },
-              ]}
-            >
-              <Text style={{ color: "#777" }}>{day}</Text>
-
-              {hasEvent(day) && (
-                <View style={[styles.dot, { backgroundColor: ACCENT }]} />
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* EVENTS LIST */}
-      {selectedDayEvents.length > 0 && (
-        <View style={{ marginTop: 14 }}>
-          {selectedDayEvents.map((e) => {
-            const d = parseLocalDate(e.date);
-
-            return (
-              <View key={e.id} style={styles.eventCard}>
-                <View style={styles.dateBlock}>
-                  <Text style={styles.dayText}>
-                    {d.toLocaleDateString("en-US", { weekday: "short" })}
-                  </Text>
-                  <Text style={styles.dateText}>{d.getDate()}</Text>
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: "white", fontSize: 15 }}>
-                    {e.title}
-                  </Text>
-
-                  {!!e.time && (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        marginTop: 4,
-                      }}
-                    >
-                      <Ionicons
-                        name="time-outline"
-                        size={12}
-                        color="#666"
-                      />
-                      <Text style={{ color: "#666", marginLeft: 4 }}>
-                        {e.time}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            );
-          })}
-        </View>
       )}
+
+      {events.map((p) => {
+        const d = parseDate(p.date);
+
+        return (
+          <TouchableOpacity
+            key={p.id}
+            style={styles.card}
+            activeOpacity={0.8}
+            onPress={() => onPressPlan?.(p)}
+          >
+            <View style={styles.dateBlock}>
+              <Text style={styles.day}>
+                {d
+                  .toLocaleDateString("en-US", { weekday: "short" })
+                  .toUpperCase()}
+              </Text>
+              <Text style={styles.date}>{d.getDate()}</Text>
+            </View>
+
+            {/* EVENT INFO */}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.title, { fontFamily: fonts.medium }]}>
+                {p.title}
+              </Text>
+
+              <Text style={styles.meta}>
+                {p.time}
+                {p.location ? ` · ${p.location}` : ""}
+              </Text>
+            </View>
+
+            {/* OPTIONAL ACTION (future) */}
+            <View style={styles.joinPill}>
+              <Text style={{ color: ACCENT, fontSize: 12 }}>
+                Join
+              </Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    width: "92%",
+    alignSelf: "center",
+    marginTop: 20,
+  },
+
+  header: {
+    color: "white",
+    fontSize: 18,
+    marginBottom: 14,
+  },
+
+  empty: {
+    color: "#666",
+    fontSize: 14,
+    marginBottom: 16,
+  },
+
   card: {
-    backgroundColor: "#111",
-    padding: 16,
+    backgroundColor: "#0d0d0d",
     borderRadius: 20,
-  },
-
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    padding: 14,
     marginBottom: 10,
-  },
-
-  week: {
-    width: "14.28%",
-    textAlign: "center",
-    color: "#444",
-  },
-
-  day: {
-    width: "14.28%",
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-
-  dot: {
-    position: "absolute",
-    bottom: 6,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-
-  eventCard: {
     flexDirection: "row",
-    backgroundColor: "#0a0a0a",
-    borderRadius: 14,
-    padding: 12,
-    marginTop: 10,
+    alignItems: "center",
+    marginTop: -10,
+    marginLeft: -20
   },
 
   dateBlock: {
-    width: 44,
+    width: 48,
     alignItems: "center",
-    marginRight: 10,
+    marginRight: 12,
   },
 
-  dayText: {
+  day: {
     color: "#666",
-    fontSize: 11,
+    fontSize: 10,
   },
 
-  dateText: {
+  date: {
     color: "white",
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: "600",
+  },
+
+  title: {
+    color: "white",
+    fontSize: 15,
+  },
+
+  meta: {
+    color: "#777",
+    marginTop: 3,
+    fontSize: 13,
+  },
+
+  joinPill: {
+    borderWidth: 1,
+    borderColor: "#333",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginLeft: 8,
   },
 });

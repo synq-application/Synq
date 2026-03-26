@@ -440,14 +440,11 @@ const deleteEvent = async (id: string) => {
       <View>
         <MonthlyMemo
           ACCENT={ACCENT}
-          fonts={fonts}
           setShowEventModal={setShowEventModal}
           showEventModal={showEventModal}
           newEvent={newEvent}
           setNewEvent={setNewEvent}
           saveEvent={saveEvent}
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
           events={events}
           deleteEvent={deleteEvent}
         />

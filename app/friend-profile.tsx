@@ -269,7 +269,7 @@ export default function FriendProfile() {
           </View>
         </View>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Monthly Memo</Text>
+          <Text style={styles.sectionTitle}>Open plans</Text>
 
           <MonthlyMemoReadOnly
             events={friend.events || []}
