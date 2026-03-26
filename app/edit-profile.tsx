@@ -5,7 +5,6 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -15,8 +14,9 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { ACCENT } from "../constants/Variables";
+import { ACCENT, BUTTON_RADIUS } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
+import AlertModal from "./alert-modal";
 
 const fonts = {
   black: 'Avenir-Black',
@@ -92,6 +92,17 @@ export default function EditProfileScreen() {
   const [locating, setLocating] = useState(false);
   const [locationUsed, setLocationUsed] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState<string | undefined>();
+  const [alertMessage, setAlertMessage] = useState("");
+  const [goBackOnClose, setGoBackOnClose] = useState(false);
+
+  const showAlert = (message: string, title?: string, closeAndGoBack = false) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setGoBackOnClose(closeAndGoBack);
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -115,9 +126,9 @@ export default function EditProfileScreen() {
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Location permission needed",
-          "Enable location access to update your city and state."
+        showAlert(
+          "Enable location access to update your city and state.",
+          "Location permission needed"
         );
         setLocationUsed(false);
         setLocating(false);
@@ -143,7 +154,7 @@ export default function EditProfileScreen() {
       const detectedRegion = (best?.region || "").trim();
 
       if (!detectedCity || !detectedRegion) {
-        Alert.alert("Couldn’t detect city/state", "Please enter it manually.");
+        showAlert("Please enter it manually.", "Couldn’t detect city/state");
         setLocationUsed(false);
         setLocating(false);
         return;
@@ -159,7 +170,7 @@ export default function EditProfileScreen() {
       console.error(e);
       setLocationUsed(false);
       setLocating(false);
-      Alert.alert("Error", "Could not get your current location.");
+      showAlert("Could not get your current location.", "Error");
     }
   };
 
@@ -181,10 +192,9 @@ export default function EditProfileScreen() {
         locationUpdatedAt: new Date().toISOString(),
       });
 
-      Alert.alert("Success", "Profile updated!");
-      router.back();
+      showAlert("Profile updated!", "Success", true);
     } catch (e) {
-      Alert.alert("Error", "Could not save profile.");
+      showAlert("Could not save profile.", "Error");
     } finally {
       setSaving(false);
     }
@@ -272,6 +282,16 @@ export default function EditProfileScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+      <AlertModal
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => {
+          setAlertVisible(false);
+          if (goBackOnClose) router.back();
+          setGoBackOnClose(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -307,7 +327,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
     color: 'white',
     padding: 15,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     fontSize: 16,
     fontFamily: fonts.medium,
     borderWidth: 1,
@@ -316,7 +336,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row' },
   locationRow: {
     marginTop: 6,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     paddingVertical: 12,
     paddingHorizontal: 14,
     backgroundColor: "rgba(255,255,255,0.05)",

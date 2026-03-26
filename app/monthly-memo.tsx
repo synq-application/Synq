@@ -2,7 +2,6 @@ import { fonts } from "@/constants/Variables";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useState } from "react";
 import {
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -15,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import ConfirmModal from "./confirm-modal";
 
 type EventItem = {
   id: string;
@@ -54,6 +54,7 @@ export default function OpenPlans({
 }: Props) {
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const closePickers = () => setPicker(null);
 
@@ -87,11 +88,7 @@ export default function OpenPlans({
     setShowEventModal(false);
   };
 
-  const handleDelete = (id: string) =>
-    Alert.alert("Delete plan", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => deleteEvent(id) },
-    ]);
+  const handleDelete = (id: string) => setDeleteId(id);
 
   return (
     <View style={styles.container}>
@@ -287,6 +284,18 @@ export default function OpenPlans({
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+      <ConfirmModal
+        visible={!!deleteId}
+        title="Delete plan"
+        message="Are you sure?"
+        confirmText="Delete"
+        destructive
+        onCancel={() => setDeleteId(null)}
+        onConfirm={() => {
+          if (deleteId) deleteEvent(deleteId);
+          setDeleteId(null);
+        }}
+      />
     </View>
   );
 }

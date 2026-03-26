@@ -1,11 +1,10 @@
-import { ACCENT, BG, fonts, synqSvg, TEXT } from "@/constants/Variables";
+import { ACCENT, BG, BUTTON_RADIUS, fonts, synqSvg, TEXT } from "@/constants/Variables";
 import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
 import { router } from "expo-router";
 import { signInWithPhoneNumber } from "firebase/auth";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Keyboard,
   KeyboardAvoidingView,
@@ -18,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { SvgXml } from "react-native-svg";
+import AlertModal from "../alert-modal";
 import { app, auth, firebaseConfig } from "../../src/lib/firebase";
 
 const { width, height } = Dimensions.get("window");
@@ -31,6 +31,15 @@ export default function Phone() {
   const inputs = useRef<(TextInput | null)[]>([]);
   const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
   const [loading, setLoading] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState<string | undefined>();
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (message: string, title?: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     if (code.join("").length === 6) verifyCode();
@@ -71,7 +80,7 @@ export default function Phone() {
 
     const digits = phoneNumber.replace(/\D/g, "");
     if (digits.length !== 10) {
-      Alert.alert("Invalid phone", "Please enter a 10-digit phone number.");
+      showAlert("Please enter a 10-digit phone number.", "Invalid phone");
       return;
     }
 
@@ -89,7 +98,7 @@ export default function Phone() {
       setIsCodeSent(true);
       setCode(["", "", "", "", "", ""]);
     } catch (error: any) {
-      Alert.alert("Error", error?.message ?? "Please try again.");
+      showAlert(error?.message ?? "Please try again.", "Error");
     } finally {
       setLoading(false);
     }
@@ -103,7 +112,7 @@ export default function Phone() {
       setLoading(true);
       await confirm.confirm(fullCode);
     } catch (error: any) {
-      Alert.alert("Error", "Invalid code. Please try again.");
+      showAlert("Invalid code. Please try again.", "Error");
       setCode(["", "", "", "", "", ""]);
       inputs.current[0]?.focus();
     } finally {
@@ -245,6 +254,12 @@ export default function Phone() {
             </View>
           )}
         </KeyboardAvoidingView>
+        <AlertModal
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          onClose={() => setAlertVisible(false)}
+        />
       </View>
     </TouchableWithoutFeedback>
   );
@@ -295,7 +310,7 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: "row", marginTop: 28, height: 58 },
   countryWrapper: {
     backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 18,
+    borderRadius: BUTTON_RADIUS,
     marginRight: 10,
     width: 74,
     justifyContent: "center",
@@ -311,7 +326,7 @@ const styles = StyleSheet.create({
   phoneWrapper: {
     flex: 1,
     backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 18,
+    borderRadius: BUTTON_RADIUS,
     justifyContent: "center",
     paddingHorizontal: 16,
     borderWidth: 1,
@@ -333,7 +348,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: ACCENT,
     height: 56,
-    borderRadius: 18,
+    borderRadius: BUTTON_RADIUS,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 26,
@@ -350,7 +365,7 @@ const styles = StyleSheet.create({
     width: width / 8.5,
     height: 58,
     backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 18,
+    borderRadius: BUTTON_RADIUS,
     textAlign: "center",
     fontSize: 22,
     color: TEXT,

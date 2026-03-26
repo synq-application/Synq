@@ -1,10 +1,9 @@
-import { ACCENT, BG, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
+import { ACCENT, BG, BUTTON_RADIUS, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
 import { router } from "expo-router";
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Keyboard,
   Modal,
@@ -16,6 +15,7 @@ import {
   View
 } from "react-native";
 import { SvgXml } from "react-native-svg";
+import AlertModal from "../alert-modal";
 import { auth } from "../../src/lib/firebase";
 
 const { height } = Dimensions.get("window");
@@ -28,10 +28,19 @@ export default function Login() {
 
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState<string | undefined>();
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (message: string, title?: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Please enter both your email and password.");
+      showAlert("Please enter both your email and password.");
       return;
     }
 
@@ -47,7 +56,7 @@ export default function Login() {
       if (error.code === "auth/too-many-requests") {
         errorMessage = "Too many failed attempts. Try resetting your password.";
       }
-      Alert.alert("Login Failed", errorMessage);
+      showAlert(errorMessage, "Login Failed");
     } finally {
       setLoading(false);
     }
@@ -58,12 +67,12 @@ export default function Login() {
     try {
       await sendPasswordResetEmail(auth, resetEmail.trim().toLowerCase());
       setResetModalVisible(false);
-      Alert.alert(
-        "Check your inbox",
-        "If an account exists for this email, a reset link has been sent."
+      showAlert(
+        "If an account exists for this email, a reset link has been sent.",
+        "Check your inbox"
       );
     } catch (e) {
-      Alert.alert("Error", "Could not send reset email.");
+      showAlert("Could not send reset email.", "Error");
     }
   };
 
@@ -173,6 +182,12 @@ export default function Login() {
             </View>
           </TouchableWithoutFeedback>
         </Modal>
+        <AlertModal
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          onClose={() => setAlertVisible(false)}
+        />
       </View>
     </TouchableWithoutFeedback>
   );
@@ -233,7 +248,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     backgroundColor: ACCENT,
     height: 56,
-    borderRadius: 18,
+    borderRadius: BUTTON_RADIUS,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 18,
@@ -275,7 +290,7 @@ const styles = StyleSheet.create({
   modalInput: {
     backgroundColor: "rgba(255,255,255,0.06)",
     height: 56,
-    borderRadius: 18,
+    borderRadius: BUTTON_RADIUS,
     paddingHorizontal: 16,
     color: TEXT,
     fontSize: 16,

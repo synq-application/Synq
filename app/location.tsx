@@ -4,15 +4,15 @@ import { doc, setDoc } from "firebase/firestore";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { ACCENT } from "../constants/Variables";
+import { ACCENT, BUTTON_RADIUS } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
+import AlertModal from "./alert-modal";
 import { useAuthRefresh } from "./_layout";
 
 const US_STATE_ABBREV: Record<string, string> = {
@@ -81,6 +81,15 @@ export default function LocationDetails() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     null
   );
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState<string | undefined>();
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (message: string, title?: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   const canContinue = useMemo(() => {
     return !!city.trim() && !!state.trim() && !loading && !locating;
@@ -95,9 +104,9 @@ export default function LocationDetails() {
         await Location.requestForegroundPermissionsAsync();
 
       if (status !== "granted") {
-        Alert.alert(
-          "Location permission needed",
-          "Enable location access to auto-fill your city and state."
+        showAlert(
+          "Enable location access to auto-fill your city and state.",
+          "Location permission needed"
         );
         setLocationUsed(false);
         setLocating(false);
@@ -128,10 +137,7 @@ export default function LocationDetails() {
       const detectedRegion = (best?.region || "").trim();
 
       if (!detectedCity || !detectedRegion) {
-        Alert.alert(
-          "Couldn’t detect city/state",
-          "Please enter it manually."
-        );
+        showAlert("Please enter it manually.", "Couldn’t detect city/state");
         setLocationUsed(false);
         setLocating(false);
         return;
@@ -148,7 +154,7 @@ export default function LocationDetails() {
       console.error(e);
       setLocationUsed(false);
       setLocating(false);
-      Alert.alert("Error", "Could not get your current location.");
+      showAlert("Could not get your current location.", "Error");
     }
   };
 
@@ -178,7 +184,7 @@ export default function LocationDetails() {
       router.push("/add-interests");
     } catch (e: any) {
       console.error(e);
-      Alert.alert("Error", "Could not save location.");
+      showAlert("Could not save location.", "Error");
       setLoading(false);
     }
   };
@@ -253,6 +259,12 @@ export default function LocationDetails() {
       <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
         <Text style={styles.skipText}>Skip for now</Text>
       </TouchableOpacity>
+      <AlertModal
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 }
@@ -271,7 +283,7 @@ const styles = StyleSheet.create({
     color: "white",
     backgroundColor: "rgba(255,255,255,0.08)",
     height: 52,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     paddingHorizontal: 14,
     fontSize: 16,
     borderWidth: 1,
@@ -280,7 +292,7 @@ const styles = StyleSheet.create({
 
   locationRow: {
     marginTop: 12,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     paddingVertical: 12,
     paddingHorizontal: 14,
     backgroundColor: "rgba(255,255,255,0.05)",
@@ -316,7 +328,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     backgroundColor: ACCENT,
     height: 52,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     alignItems: "center",
     justifyContent: "center",
   },

@@ -1,14 +1,18 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { PhoneAuthProvider, signInWithCredential } from "firebase/auth";
 import { useMemo, useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { BUTTON_RADIUS } from "@/constants/Variables";
+import AlertModal from "../alert-modal";
 import { auth } from "../../src/lib/firebase";
 
 export default function Verify() {
   const { verificationId, phone } = useLocalSearchParams<{ verificationId?: string; phone?: string }>();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
 
   const canVerify = useMemo(() => (verificationId && code.replace(/\D/g, "").length >= 6 && !loading), [verificationId, code, loading]);
 
@@ -24,7 +28,8 @@ export default function Verify() {
       router.replace("/(tabs)");
     } catch (err: any) {
       console.log("verify error", err);
-      Alert.alert("Invalid code", err?.message ?? "Please try again.");
+      setAlertMessage(err?.message ?? "Please try again.");
+      setAlertVisible(true);
     } finally {
       setLoading(false);
     }
@@ -54,6 +59,12 @@ export default function Verify() {
           <Text style={styles.back}>Back</Text>
         </Pressable>
       </View>
+      <AlertModal
+        visible={alertVisible}
+        title="Invalid code"
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -67,7 +78,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.25)",
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     paddingVertical: 14,
     paddingHorizontal: 16,
     color: "white",
@@ -77,7 +88,7 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 18,
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.6)",

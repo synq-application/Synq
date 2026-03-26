@@ -18,7 +18,6 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   DeviceEventEmitter,
   FlatList,
@@ -74,6 +73,8 @@ export default function SynqScreen() {
   const heartScales = useRef<{ [key: string]: Animated.Value }>({});
   const [hasUnread, setHasUnread] = useState(false);
   const [showEndSynqModal, setShowEndSynqModal] = useState(false);
+  const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
+  const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
@@ -457,21 +458,8 @@ export default function SynqScreen() {
   };
 
   const handleDeleteChat = async (chatId: string) => {
-    Alert.alert('Delete Chat', 'Are you sure you want to delete this conversation?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          if (activeChatId === chatId) {
-            setIsChatVisible(false);
-            setActiveChatId(null);
-          }
-          await deleteDoc(doc(db, 'chats', chatId));
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        }
-      }
-    ]);
+    setPendingDeleteChatId(chatId);
+    setShowDeleteChatModal(true);
   };
 
   const toggleHeartReaction = async (messageId: string, currentReactions: any) => {
@@ -947,6 +935,29 @@ export default function SynqScreen() {
           onSaveMemo={async () => {
             await updateDoc(doc(db, "users", auth.currentUser!.uid), { memo });
             setIsEditModalVisible(false);
+          }}
+        />
+        <ConfirmModal
+          visible={showDeleteChatModal}
+          title="Delete Chat"
+          message="Are you sure you want to delete this conversation?"
+          confirmText="Delete"
+          destructive
+          onCancel={() => {
+            setShowDeleteChatModal(false);
+            setPendingDeleteChatId(null);
+          }}
+          onConfirm={async () => {
+            const chatId = pendingDeleteChatId;
+            setShowDeleteChatModal(false);
+            setPendingDeleteChatId(null);
+            if (!chatId) return;
+            if (activeChatId === chatId) {
+              setIsChatVisible(false);
+              setActiveChatId(null);
+            }
+            await deleteDoc(doc(db, "chats", chatId));
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           }}
         />
         <ConfirmModal

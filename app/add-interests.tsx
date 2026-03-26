@@ -3,15 +3,15 @@ import { doc, setDoc } from "firebase/firestore";
 import React, { useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from "react-native";
-import { ACCENT } from "../constants/Variables";
+import { ACCENT, BUTTON_RADIUS } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
+import AlertModal from "./alert-modal";
 import { useAuthRefresh } from "./_layout";
 
 const INTERESTS = [
@@ -45,6 +45,8 @@ export default function InterestsOnboarding() {
 
     const [selected, setSelected] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [alertMessage, setAlertMessage] = useState("");
 
     const canContinue = selected.length > 0 && !loading;
 
@@ -74,7 +76,8 @@ export default function InterestsOnboarding() {
             router.replace("/(tabs)/friends");
         } catch (e: any) {
             console.error(e);
-            Alert.alert("Error", "Could not save interests.");
+            setAlertMessage("Could not save interests.");
+            setAlertVisible(true);
             setLoading(false);
         }
     };
@@ -132,6 +135,12 @@ export default function InterestsOnboarding() {
             <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
                 <Text style={styles.skipText}>Skip for now</Text>
             </TouchableOpacity>
+            <AlertModal
+                visible={alertVisible}
+                title="Error"
+                message={alertMessage}
+                onClose={() => setAlertVisible(false)}
+            />
         </View>
     );
 }
@@ -186,7 +195,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
         backgroundColor: ACCENT,
         height: 52,
-        borderRadius: 14,
+        borderRadius: BUTTON_RADIUS,
         alignItems: "center",
         justifyContent: "center",
     },

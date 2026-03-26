@@ -1,4 +1,12 @@
-import { ACCENT, BG, BORDER, MUTED2, TEXT, fonts } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BORDER,
+  BUTTON_RADIUS,
+  MUTED2,
+  TEXT,
+  fonts,
+} from "@/constants/Variables";
 import React from "react";
 import {
     Modal,
@@ -82,7 +90,7 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     backgroundColor: BG,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     padding: 22,
     borderWidth: 1,
     borderColor: BORDER,
@@ -122,7 +130,7 @@ const styles = StyleSheet.create({
 
   confirmBtn: {
     backgroundColor: ACCENT,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     paddingVertical: 10,
     paddingHorizontal: 16,
   },

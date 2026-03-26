@@ -6,7 +6,6 @@ import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
   Keyboard,
@@ -18,7 +17,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { ACCENT } from "../../constants/Variables";
+import { ACCENT, BUTTON_RADIUS } from "../../constants/Variables";
+import AlertModal from "../alert-modal";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db, storage } from "../../src/lib/firebase";
 
@@ -39,13 +39,22 @@ export default function Details() {
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState<string | undefined>();
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (message: string, title?: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   const canContinue = firstName.trim() && lastName.trim() && !loading && !isUploading;
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Denied", "We need access to your photos.");
+      showAlert("We need access to your photos.", "Permission Denied");
       return;
     }
 
@@ -80,7 +89,7 @@ export default function Details() {
 
       setImage(url);
     } catch (e) {
-      Alert.alert("Error", "Could not upload image.");
+      showAlert("Could not upload image.", "Error");
     } finally {
       setIsUploading(false);
     }
@@ -115,7 +124,7 @@ export default function Details() {
       router.push("/location");
     } catch (e: any) {
       console.error("[Details] saveDetails error:", e);
-      Alert.alert("Error", e?.message ?? "Something went wrong.");
+      showAlert(e?.message ?? "Something went wrong.", "Error");
     } finally {
       setLoading(false);
     }
@@ -188,6 +197,12 @@ export default function Details() {
               <Text style={styles.buttonText}>Continue</Text>
             )}
           </TouchableOpacity>
+          <AlertModal
+            visible={alertVisible}
+            title={alertTitle}
+            message={alertMessage}
+            onClose={() => setAlertVisible(false)}
+          />
         </View>
       </View>
     </TouchableWithoutFeedback>
@@ -249,7 +264,7 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT,
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 3,
@@ -268,7 +283,7 @@ const styles = StyleSheet.create({
     color: "white",
     backgroundColor: "rgba(255,255,255,0.08)",
     height: 52,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     paddingHorizontal: 14,
     fontSize: 16,
     fontFamily: fonts.medium,

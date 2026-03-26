@@ -7,7 +7,6 @@ import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   ScrollView,
@@ -23,6 +22,7 @@ import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
 import AlertModal from "../alert-modal";
+import ConfirmModal from "../confirm-modal";
 import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
@@ -56,6 +56,8 @@ const [events, setEvents] = useState<
   const [alertVisible, setAlertVisible] = useState(false);
 const [alertTitle, setAlertTitle] = useState("");
 const [alertMessage, setAlertMessage] = useState("");
+const [pendingInterestDelete, setPendingInterestDelete] = useState<string | null>(null);
+const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const [showEventModal, setShowEventModal] = useState(false);
 
@@ -72,7 +74,9 @@ const saveEvent = async (eventOverride?: any) => {
   const eventToSave = eventOverride || newEvent;
 
   if (!eventToSave.title) {
-    Alert.alert("Missing info", "Add a title");
+    setAlertTitle("Missing info");
+    setAlertMessage("Add a title");
+    setAlertVisible(true);
     return;
   }
 
@@ -96,7 +100,9 @@ const saveEvent = async (eventOverride?: any) => {
     setShowEventModal(false);
     setNewEvent({ title: "", date: "", time: "", location: "" });
   } catch (e) {
-    Alert.alert("Error", "Could not save event.");
+    setAlertTitle("Error");
+    setAlertMessage("Could not save event.");
+    setAlertVisible(true);
   }
 };
 
@@ -110,7 +116,9 @@ const deleteEvent = async (id: string) => {
       events: updated,
     });
   } catch (e) {
-    Alert.alert("Error", "Could not delete event.");
+    setAlertTitle("Error");
+    setAlertMessage("Could not delete event.");
+    setAlertVisible(true);
   }
 };
 
@@ -180,19 +188,7 @@ const deleteEvent = async (id: string) => {
   );
 
   const handleDeleteInterest = (interestName: string) => {
-    Alert.alert("Remove Interest", `Remove "${interestName}"?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          const updatedInterests = interests.filter((i) => i !== interestName);
-          await updateDoc(doc(db, "users", auth.currentUser!.uid), {
-            interests: updatedInterests,
-          });
-        },
-      },
-    ]);
+    setPendingInterestDelete(interestName);
   };
 
   const pickImage = async () => {
@@ -225,17 +221,16 @@ const deleteEvent = async (id: string) => {
       await updateDoc(doc(db, "users", auth.currentUser.uid), { imageurl: url });
       setProfileImage(url);
     } catch (e) {
-      Alert.alert("Error", "Could not upload image.");
+      setAlertTitle("Error");
+      setAlertMessage("Could not upload image.");
+      setAlertVisible(true);
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", onPress: () => firebaseSignOut(auth) },
-    ]);
+    setShowSignOutConfirm(true);
   };
 
   const saveInterests = async () => {
@@ -247,7 +242,9 @@ const deleteEvent = async (id: string) => {
       setShowInputModal(false);
       setSearchQuery("");
     } catch (e) {
-      Alert.alert("Error", "Could not save interests.");
+      setAlertTitle("Error");
+      setAlertMessage("Could not save interests.");
+      setAlertVisible(true);
     }
   };
 
@@ -520,6 +517,37 @@ const deleteEvent = async (id: string) => {
   message={alertMessage}
   onClose={() => setAlertVisible(false)}
 />
+      <ConfirmModal
+        visible={!!pendingInterestDelete}
+        title="Remove Interest"
+        message={
+          pendingInterestDelete
+            ? `Remove "${pendingInterestDelete}"?`
+            : "Remove this interest?"
+        }
+        confirmText="Delete"
+        destructive
+        onCancel={() => setPendingInterestDelete(null)}
+        onConfirm={async () => {
+          if (!pendingInterestDelete || !auth.currentUser) return;
+          const updatedInterests = interests.filter((i) => i !== pendingInterestDelete);
+          await updateDoc(doc(db, "users", auth.currentUser.uid), {
+            interests: updatedInterests,
+          });
+          setPendingInterestDelete(null);
+        }}
+      />
+      <ConfirmModal
+        visible={showSignOutConfirm}
+        title="Sign Out"
+        message="Are you sure?"
+        confirmText="Sign Out"
+        onCancel={() => setShowSignOutConfirm(false)}
+        onConfirm={async () => {
+          setShowSignOutConfirm(false);
+          await firebaseSignOut(auth);
+        }}
+      />
     </ScrollView>
   );
 }

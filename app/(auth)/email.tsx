@@ -1,10 +1,9 @@
-import { ACCENT, BG, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
+import { ACCENT, BG, BUTTON_RADIUS, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
 import { router } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Keyboard,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { SvgXml } from "react-native-svg";
+import AlertModal from "../alert-modal";
 import { auth } from "../../src/lib/firebase";
 
 const { height } = Dimensions.get("window");
@@ -23,6 +23,15 @@ export default function EmailSignup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState<string | undefined>();
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const showAlert = (message: string, title?: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   const canContinue = email.trim().length > 3 && password.length >= 6 && !loading;
 
@@ -33,9 +42,9 @@ export default function EmailSignup() {
       await createUserWithEmailAndPassword(auth, cleanedEmail, password);
     } catch (e: any) {
       console.log("email signup error", e?.code, e?.message);
-      Alert.alert(
-        "Couldn’t sign up",
-        e?.message ?? "Please check your email and password and try again."
+      showAlert(
+        e?.message ?? "Please check your email and password and try again.",
+        "Couldn’t sign up"
       );
       setLoading(false);
     }
@@ -97,6 +106,12 @@ export default function EmailSignup() {
             </Text>
           </View>
         </View>
+        <AlertModal
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          onClose={() => setAlertVisible(false)}
+        />
       </View>
     </TouchableWithoutFeedback>
   );
@@ -152,7 +167,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     backgroundColor: ACCENT,
     height: 56,
-    borderRadius: 14,
+    borderRadius: BUTTON_RADIUS,
     alignItems: "center",
     justifyContent: "center",
   },

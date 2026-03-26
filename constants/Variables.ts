@@ -12,6 +12,8 @@ export const synqSvg = `
 `;
 
 export const BG = "#070707";
+export const BUTTON_RADIUS = 14;
+export const MODAL_RADIUS = 22;
 export const TEXT = "rgba(255,255,255,0.92)";
 export const MUTED = "rgba(255,255,255,0.55)";
 export const fonts = {
