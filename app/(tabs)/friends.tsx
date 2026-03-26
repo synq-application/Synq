@@ -11,7 +11,7 @@ import {
   TEXT,
 } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   collection,
   deleteDoc,
@@ -58,6 +58,7 @@ const sortFriendsByName = (list: Friend[]) =>
 
 export default function FriendsScreen() {
   const router = useRouter();
+  const { openAddFriends } = useLocalSearchParams<{ openAddFriends?: string }>();
   const myId = auth.currentUser?.uid ?? "";
   const cachedFriends = myId ? friendsListCacheByUser[myId] ?? [] : [];
   const [friends, setFriends] = useState<Friend[]>(cachedFriends);
@@ -65,6 +66,11 @@ export default function FriendsScreen() {
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
+
+  useEffect(() => {
+    if (openAddFriends !== "1") return;
+    setSearchModalVisible(true);
+  }, [openAddFriends]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -606,13 +612,12 @@ function SearchModal({
                   <TouchableOpacity
                     onPress={() => {
                       onClose();
-
                       setTimeout(() => {
                         router.push({
                           pathname: "/friend-profile",
-                          params: { friendId: item.id },
+                          params: { friendId: item.id, returnToAddFriends: "1" },
                         });
-                      }, 250);
+                      }, 200);
                     }}
                     style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
                     activeOpacity={0.8}

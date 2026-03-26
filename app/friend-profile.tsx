@@ -15,6 +15,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  serverTimestamp,
+  setDoc,
 } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
@@ -42,8 +44,22 @@ const isRemoteImageUri = (value: unknown): value is string =>
   typeof value === "string" && /^https?:\/\//i.test(value);
 
 export default function FriendProfile() {
-  const { friendId } = useLocalSearchParams();
+  const { friendId, returnToAddFriends } = useLocalSearchParams<{
+    friendId?: string;
+    returnToAddFriends?: string;
+  }>();
   const router = useRouter();
+  const handleBack = () => {
+    if (returnToAddFriends === "1") {
+      router.replace({
+        pathname: "/(tabs)/friends",
+        params: { openAddFriends: "1" },
+      });
+      return;
+    }
+    router.back();
+  };
+
   const viewerId = auth.currentUser?.uid ?? "";
   const friendKey = String(friendId || "");
   const cachedFriend =
@@ -59,6 +75,9 @@ export default function FriendProfile() {
   const [mutualFriends, setMutualFriends] = useState<any[]>([]);
   const [lastSynq, setLastSynq] = useState<Date | null>(cachedLastSynq);
   const [loading, setLoading] = useState(!cachedFriend);
+  const [isFriend, setIsFriend] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
 
   useEffect(() => {
@@ -154,6 +173,29 @@ export default function FriendProfile() {
     fetchLastSynq();
   }, [friendKey]);
 
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user || !friendKey) return;
+    const checkRelationship = async () => {
+      const myId = user.uid;
+      try {
+        const friendSnap = await getDoc(doc(db, "users", myId, "friends", friendKey));
+        setIsFriend(friendSnap.exists());
+        if (!friendSnap.exists()) {
+          const pendingSnap = await getDoc(
+            doc(db, "users", friendKey, "friendRequests", myId)
+          );
+          setRequestSent(pendingSnap.exists());
+        } else {
+          setRequestSent(false);
+        }
+      } catch {
+        setIsFriend(false);
+      }
+    };
+    checkRelationship();
+  }, [friendKey]);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -186,11 +228,36 @@ export default function FriendProfile() {
     }
   };
 
+  const addFriend = async () => {
+    const user = auth.currentUser;
+    if (!user || !friendKey) return;
+    setActionLoading(true);
+    try {
+      const meSnap = await getDoc(doc(db, "users", user.uid));
+      const meData = meSnap.exists() ? (meSnap.data() as any) : {};
+      const senderName = meData?.displayName || user.displayName || "Someone";
+      const senderImageUrl = meData?.imageurl || null;
+      await setDoc(doc(db, "users", friendKey, "friendRequests", user.uid), {
+        from: user.uid,
+        to: friendKey,
+        senderName,
+        senderImageUrl,
+        status: "pending",
+        sentAt: serverTimestamp(),
+      });
+      setRequestSent(true);
+    } catch (e) {
+      console.error("Failed to send friend request", e);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
             <Icon name="chevron-back" size={22} color={TEXT} />
           </TouchableOpacity>
         </View>
@@ -316,13 +383,26 @@ export default function FriendProfile() {
         </View>
 
         <View style={{ marginTop: 30, marginBottom: 40, alignItems: "center" }}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={styles.removeFriendBtn}
-            onPress={() => setShowRemoveModal(true)}
-          >
-            <Text style={styles.removeFriendText}>Remove Friend</Text>
-          </TouchableOpacity>
+          {isFriend ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.removeFriendBtn}
+              onPress={() => setShowRemoveModal(true)}
+            >
+              <Text style={styles.removeFriendText}>Remove Friend</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.addFriendBtn, requestSent && styles.addFriendBtnDisabled]}
+              onPress={addFriend}
+              disabled={requestSent || actionLoading}
+            >
+              <Text style={styles.addFriendText}>
+                {requestSent ? "Pending" : actionLoading ? "Sending..." : "Add Friend"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
       <ConfirmModal
@@ -491,6 +571,24 @@ const styles = StyleSheet.create({
 
   removeFriendText: {
     color: "#ff453a",
+    fontFamily: fonts.heavy,
+    fontSize: 15,
+  },
+  addFriendBtn: {
+    borderWidth: 1,
+    borderColor: ACCENT,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(125,255,166,0.08)",
+  },
+  addFriendBtnDisabled: {
+    opacity: 0.55,
+  },
+  addFriendText: {
+    color: ACCENT,
     fontFamily: fonts.heavy,
     fontSize: 15,
   },

@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { Asset } from "expo-asset";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import {
@@ -89,6 +90,7 @@ export default function RootLayout() {
 
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [assetsReady, setAssetsReady] = useState(false);
 
   const pendingChatIdRef = useRef<string | null>(null);
 
@@ -114,6 +116,23 @@ export default function RootLayout() {
     });
 
     return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const preloadAssets = async () => {
+      try {
+        await Asset.loadAsync([require("../assets/SYNQ-2.png")]);
+      } catch (e) {
+        console.error("Asset preload failed:", e);
+      } finally {
+        if (mounted) setAssetsReady(true);
+      }
+    };
+    preloadAssets();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -178,7 +197,7 @@ export default function RootLayout() {
     }, 500);
   }, [authReady, navReady, user]);
 
-  if (!authReady || !navReady) {
+  if (!authReady || !navReady || !assetsReady) {
     return (
       <View
         style={{

@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image as ExpoImage } from "expo-image";
 import { Tabs } from "expo-router";
-import { Image, Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { ACCENT } from "../../constants/Variables";
+
+const SYNQ_ICON = require("../../assets/SYNQ-2.png");
 
 export default function TabsLayout() {
   return (
@@ -32,9 +35,12 @@ export default function TabsLayout() {
           tabBarShowLabel: true,
           tabBarIcon: ({ focused }) => (
             <View style={[styles.synqButton, focused && styles.synqButtonActive]}>
-              <Image
-                source={require("../../assets/SYNQ-2.png")}
+              <ExpoImage
+                source={SYNQ_ICON}
                 style={styles.synqIcon}
+                contentFit="contain"
+                transition={0}
+                cachePolicy="memory-disk"
               />
             </View>
           ),
@@ -87,6 +93,5 @@ const styles = StyleSheet.create({
   synqIcon: {
     width: 100,
     height: 80,
-    resizeMode: "contain",
   },
 });
