@@ -332,7 +332,7 @@ export default function FriendProfile() {
       const joinerName =
         String(meData?.displayName || auth.currentUser?.displayName || "Friend").trim();
       const profileName = String(friend?.displayName || "Friend").trim();
-      const sourceIds = Array.from(
+      const initialSourceIds = Array.from(
         new Set(
           [
             ...((Array.isArray(event?.joinedFromIds) ? event.joinedFromIds : []).filter(Boolean) as string[]),
@@ -356,6 +356,32 @@ export default function FriendProfile() {
             .filter(Boolean)
         )
       );
+      // Backfill attendee IDs from names (older plans may only have names),
+      // so propagation includes everyone consistently.
+      const sourceIdsSet = new Set(initialSourceIds);
+      const sourceNameSet = new Set(sourceNames.map((n) => n.toLowerCase()));
+      try {
+        const myFriendsSnap = await getDocs(collection(db, "users", user.uid, "friends"));
+        myFriendsSnap.docs.forEach((d) => {
+          const data = d.data() as any;
+          const display = String(data?.displayName || "").trim().toLowerCase();
+          if (display && sourceNameSet.has(display)) {
+            sourceIdsSet.add(d.id);
+          }
+        });
+      } catch {}
+      try {
+        const usersSnap = await getDocs(collection(db, "users"));
+        usersSnap.docs.forEach((u) => {
+          const display = String((u.data() as any)?.displayName || "")
+            .trim()
+            .toLowerCase();
+          if (display && sourceNameSet.has(display)) {
+            sourceIdsSet.add(u.id);
+          }
+        });
+      } catch {}
+      const sourceIds = Array.from(sourceIdsSet);
 
       const displayNameById: Record<string, string> = {};
       await Promise.all(

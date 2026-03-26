@@ -55,10 +55,15 @@ export default function OpenPlans({
   deleteEvent,
   events,
 }: Props) {
+  const firstName = (name: string) => String(name || "").trim().split(/\s+/)[0] || "";
+
   const formatAlsoGoing = (event: EventItem) => {
-    const names = (Array.isArray(event.joinedFromNames) && event.joinedFromNames.length > 0
+    const rawNames = (Array.isArray(event.joinedFromNames) && event.joinedFromNames.length > 0
       ? event.joinedFromNames
       : [event.joinedFromName].filter(Boolean)) as string[];
+    const names = Array.from(
+      new Set(rawNames.map((n) => firstName(n)).filter(Boolean))
+    );
     if (names.length === 0) return "A friend is also going";
     if (names.length === 1) return `${names[0]} is also going`;
     if (names.length === 2) return `${names[0]} and ${names[1]} are also going`;
