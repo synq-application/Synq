@@ -25,10 +25,10 @@ import { auth, db, storage } from "../../src/lib/firebase";
 const { height } = Dimensions.get("window");
 
 const fonts = {
-  black: Platform.OS === "ios" ? "Avenir-Heavy" : "sans-serif-condensed",
-  heavy: Platform.OS === "ios" ? "Avenir-Heavy" : "sans-serif-medium",
-  medium: Platform.OS === "ios" ? "Avenir-Medium" : "sans-serif",
-  book: Platform.OS === "ios" ? "Avenir-Book" : "sans-serif",
+  black: "Avenir-Black",
+  heavy: "Avenir-Heavy",
+  medium: "Avenir-Medium",
+  book: "Avenir-Book",
 };
 
 export default function Details() {

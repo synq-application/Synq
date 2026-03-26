@@ -24,9 +24,9 @@ const BACKGROUND = "black";
 const SURFACE = "#161616";
 
 const fonts = {
-  black: Platform.OS === "ios" ? "Avenir-Black" : "sans-serif-condensed",
-  heavy: Platform.OS === "ios" ? "Avenir-Heavy" : "sans-serif-medium",
-  medium: Platform.OS === "ios" ? "Avenir-Medium" : "sans-serif",
+  black: "Avenir-Black",
+  heavy: "Avenir-Heavy",
+  medium: "Avenir-Medium",
 };
 
 export default function SettingsScreen() {

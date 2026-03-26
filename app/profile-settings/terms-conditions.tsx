@@ -17,8 +17,8 @@ const BACKGROUND = "black";
 const SURFACE = "#161616";
 
 const fonts = {
-  heavy: Platform.OS === "ios" ? "Avenir-Heavy" : "sans-serif-medium",
-  medium: Platform.OS === "ios" ? "Avenir-Medium" : "sans-serif",
+  heavy: "Avenir-Heavy",
+  medium: "Avenir-Medium",
 };
 
 export default function TermsScreen() {

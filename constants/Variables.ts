@@ -15,10 +15,10 @@ export const BG = "#070707";
 export const TEXT = "rgba(255,255,255,0.92)";
 export const MUTED = "rgba(255,255,255,0.55)";
 export const fonts = {
-  heavy: Platform.OS === "ios" ? "Avenir-Heavy" : "sans-serif-medium",
-  medium: Platform.OS === "ios" ? "Avenir-Medium" : "sans-serif",
-  book: Platform.OS === "ios" ? "Avenir-Book" : "sans-serif",
-  black: Platform.OS === 'ios' ? 'Avenir-Black' : 'sans-serif-condensed',
+  heavy: "Avenir-Heavy",
+  medium: "Avenir-Medium",
+  book: "Avenir-Book",
+  black: "Avenir-Black",
 };
 export const SURFACE = "rgba(255,255,255,0.06)";
 export const BORDER = "rgba(255,255,255,0.08)";

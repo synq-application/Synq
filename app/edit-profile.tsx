@@ -19,9 +19,9 @@ import { ACCENT } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 
 const fonts = {
-  black: Platform.OS === 'ios' ? 'Avenir-Black' : 'sans-serif-condensed',
-  heavy: Platform.OS === 'ios' ? 'Avenir-Heavy' : 'sans-serif-medium',
-  medium: Platform.OS === 'ios' ? 'Avenir-Medium' : 'sans-serif',
+  black: 'Avenir-Black',
+  heavy: 'Avenir-Heavy',
+  medium: 'Avenir-Medium',
 };
 
 /**

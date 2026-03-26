@@ -24,9 +24,9 @@ const BACKGROUND = "black";
 const SURFACE = "#161616";
 
 const fonts = {
-  heavy: Platform.OS === "ios" ? "Avenir-Heavy" : "sans-serif-medium",
-  medium: Platform.OS === "ios" ? "Avenir-Medium" : "sans-serif",
-  black: Platform.OS === "ios" ? "Avenir-Black" : "sans-serif-condensed",
+  heavy: "Avenir-Heavy",
+  medium: "Avenir-Medium",
+  black: "Avenir-Black",
 };
 
 export default function DeleteAccountScreen() {

@@ -34,9 +34,9 @@ const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png";
 
 const fonts = {
-  black: Platform.OS === "ios" ? "Avenir-Black" : "sans-serif-condensed",
-  heavy: Platform.OS === "ios" ? "Avenir-Heavy" : "sans-serif-medium",
-  medium: Platform.OS === "ios" ? "Avenir-Medium" : "sans-serif",
+  black: "Avenir-Black",
+  heavy: "Avenir-Heavy",
+  medium: "Avenir-Medium",
 };
 
 export default function NotificationsScreen() {
