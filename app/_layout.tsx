@@ -25,7 +25,10 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ACCENT } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
-import { warmSocialCachesInBackground } from "../src/lib/socialCache";
+import {
+  hydrateSocialCachesFromDisk,
+  warmSocialCachesInBackground,
+} from "../src/lib/socialCache";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -115,6 +118,9 @@ export default function RootLayout() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        await hydrateSocialCachesFromDisk(u.uid);
+      }
       setUser(u);
       setAuthReady(true);
 

@@ -29,32 +29,70 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/Ionicons";
+import {
+  friendProfileCacheByUser,
+  friendRelationCacheByUser,
+  warmFriendsAndConnectionsCache,
+} from "../src/lib/socialCache";
 import ConfirmModal from "./confirm-modal";
 import { formatLastSynq } from "./helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
 
+const isRemoteImageUri = (value: unknown): value is string =>
+  typeof value === "string" && /^https?:\/\//i.test(value);
+
 export default function FriendProfile() {
   const { friendId } = useLocalSearchParams();
   const router = useRouter();
+  const viewerId = auth.currentUser?.uid ?? "";
+  const friendKey = String(friendId || "");
+  const cachedFriend =
+    viewerId && friendKey
+      ? friendProfileCacheByUser[viewerId]?.[friendKey] ?? null
+      : null;
+  const cachedLastSynq =
+    viewerId && friendKey
+      ? friendRelationCacheByUser[viewerId]?.[friendKey]?.lastSynqAt?.toDate?.() ?? null
+      : null;
 
-  const [friend, setFriend] = useState<any>(null);
+  const [friend, setFriend] = useState<any>(cachedFriend);
   const [mutualFriends, setMutualFriends] = useState<any[]>([]);
-  const [lastSynq, setLastSynq] = useState<Date | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [lastSynq, setLastSynq] = useState<Date | null>(cachedLastSynq);
+  const [loading, setLoading] = useState(!cachedFriend);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
 
   useEffect(() => {
     const fetchFriend = async () => {
       try {
-        const snap = await getDoc(doc(db, "users", friendId as string));
-        if (snap.exists()) setFriend(snap.data());
+        if (viewerId) {
+          await warmFriendsAndConnectionsCache(viewerId);
+          const warmed = friendProfileCacheByUser[viewerId]?.[friendKey];
+          if (warmed) {
+            setFriend(warmed);
+            setLoading(false);
+          }
+        }
+        const snap = await getDoc(doc(db, "users", friendKey));
+        if (snap.exists()) {
+          const data = snap.data();
+          setFriend(data);
+          if (viewerId) {
+            if (!friendProfileCacheByUser[viewerId]) {
+              friendProfileCacheByUser[viewerId] = {};
+            }
+            friendProfileCacheByUser[viewerId][friendKey] = {
+              id: friendKey,
+              ...(data as any),
+            } as any;
+          }
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchFriend();
-  }, []);
+  }, [viewerId, friendKey]);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -100,7 +138,7 @@ export default function FriendProfile() {
         "users",
         user.uid,
         "friends",
-        friendId as string
+        friendKey
       );
 
       const snap = await getDoc(ref);
@@ -114,7 +152,7 @@ export default function FriendProfile() {
     };
 
     fetchLastSynq();
-  }, [friendId]);
+  }, [friendKey]);
 
   if (loading) {
     return (
@@ -157,14 +195,13 @@ export default function FriendProfile() {
           </TouchableOpacity>
         </View>
         <View style={styles.header}>
-          <Image
-            source={{
-              uri:
-                friend.imageurl ||
-                "https://www.gravatar.com/avatar/?d=mp",
-            }}
-            style={styles.avatar}
-          />
+          {isRemoteImageUri(friend.imageurl) ? (
+            <Image source={{ uri: friend.imageurl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Icon name="person" size={56} color="rgba(255,255,255,0.28)" />
+            </View>
+          )}
 
           <Text style={styles.name}>
             {friend.displayName || "User"}
@@ -225,7 +262,7 @@ export default function FriendProfile() {
                           { transform: [{ scale }] },
                         ]}
                       >
-                        {item.imageurl ? (
+                        {isRemoteImageUri(item.imageurl) ? (
                           <Image
                             source={{ uri: item.imageurl }}
                             style={styles.connImg}
@@ -332,6 +369,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: ACCENT,
     marginBottom: 16,
+  },
+  avatarFallback: {
+    backgroundColor: "#1a1a1a",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   name: {
