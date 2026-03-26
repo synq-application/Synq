@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-export const ACCENT = "#7DFFA6";
+export const ACCENT = "#2BFF88";
 export const DEFAULT_AVATAR = 'https://www.gravatar.com/avatar/?d=mp';
 export const EXPIRATION_HOURS = 12;
 export const synqSvg = `
