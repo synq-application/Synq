@@ -13,7 +13,7 @@ type Props = {
   events: EventItem[];
   ACCENT: string;
   fonts: any;
-  onPressPlan?: (event: EventItem) => void; // for future "interested"
+  onPressPlan?: (event: EventItem) => void;
 };
 
 export default function FriendOpenPlans({
@@ -54,24 +54,20 @@ export default function FriendOpenPlans({
               <Text style={styles.date}>{d.getDate()}</Text>
             </View>
 
-            {/* EVENT INFO */}
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { fontFamily: fonts.medium }]}>
                 {p.title}
               </Text>
-
               <Text style={styles.meta}>
                 {p.time}
                 {p.location ? ` · ${p.location}` : ""}
               </Text>
             </View>
-
-            {/* OPTIONAL ACTION (future) */}
-            <View style={styles.joinPill}>
+            {/* <View style={styles.joinPill}>
               <Text style={{ color: ACCENT, fontSize: 12 }}>
                 Join
               </Text>
-            </View>
+            </View> */}
           </TouchableOpacity>
         );
       })}
@@ -81,32 +77,25 @@ export default function FriendOpenPlans({
 
 const styles = StyleSheet.create({
   container: {
-    width: "92%",
-    alignSelf: "center",
-    marginTop: 20,
+    width: "92%"
   },
-
   header: {
     color: "white",
     fontSize: 18,
     marginBottom: 14,
   },
-
   empty: {
     color: "#666",
     fontSize: 14,
-    marginBottom: 16,
+    marginBottom: 20
   },
-
   card: {
     backgroundColor: "#0d0d0d",
     borderRadius: 20,
     padding: 14,
-    marginBottom: 10,
+    marginBottom: 14,
     flexDirection: "row",
     alignItems: "center",
-    marginTop: -10,
-    marginLeft: -20
   },
 
   dateBlock: {
