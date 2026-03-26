@@ -14,6 +14,15 @@ export const synqSvg = `
 export const BG = "#090A0B";
 export const BUTTON_RADIUS = 14;
 export const MODAL_RADIUS = 22;
+export const RADIUS_SM = 12;
+export const RADIUS_MD = 16;
+export const RADIUS_LG = 20;
+export const SPACE_1 = 4;
+export const SPACE_2 = 8;
+export const SPACE_3 = 12;
+export const SPACE_4 = 16;
+export const SPACE_5 = 24;
+export const SPACE_6 = 32;
 export const TEXT = "rgba(255,255,255,0.92)";
 export const MUTED = "rgba(255,255,255,0.55)";
 export const fonts = {
@@ -26,6 +35,11 @@ export const SURFACE = "rgba(255,255,255,0.06)";
 export const BORDER = "rgba(255,255,255,0.08)";
 export const MUTED2 = "rgba(255,255,255,0.45)";
 export const MUTED3 = "rgba(255,255,255,0.25)";
+export const TYPE_DISPLAY = 34;
+export const TYPE_TITLE = 26;
+export const TYPE_SECTION = 20;
+export const TYPE_BODY = 16;
+export const TYPE_CAPTION = 13;
 
 export interface Friend {
   id: string;

@@ -20,11 +20,12 @@ import React, {
 import {
   ActivityIndicator,
   DeviceEventEmitter,
+  Text,
   Platform,
   View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { ACCENT, BG } from "../constants/Variables";
+import { ACCENT, BG, fonts, TYPE_CAPTION } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import {
   hydrateSocialCachesFromDisk,
@@ -210,7 +211,17 @@ export default function RootLayout() {
           justifyContent: "center",
         }}
       >
-        <ActivityIndicator />
+        <ActivityIndicator color={ACCENT} size="small" />
+        <Text
+          style={{
+            marginTop: 10,
+            color: "rgba(255,255,255,0.55)",
+            fontFamily: fonts.medium,
+            fontSize: TYPE_CAPTION,
+          }}
+        >
+          Loading Synq...
+        </Text>
       </View>
     );
   }

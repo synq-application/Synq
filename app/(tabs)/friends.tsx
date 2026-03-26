@@ -661,6 +661,7 @@ function SearchModal({
                       style={[
                         styles.addBtnText,
                         incomingRequestIds[item.id] && styles.acceptOutlineText,
+                        (pendingRequestIds[item.id] || acceptedIds[item.id]) && styles.addBtnDisabledText,
                       ]}
                     >
                       {acceptedIds[item.id]
@@ -724,6 +725,7 @@ function SearchModal({
                     style={[
                       styles.addBtnText,
                       incomingRequestIds[item.id] && styles.acceptOutlineText,
+                      (currentFriends.includes(item.id) || pendingRequestIds[item.id] || acceptedIds[item.id]) && styles.addBtnDisabledText,
                     ]}
                   >
                     {currentFriends.includes(item.id) || acceptedIds[item.id]
@@ -885,6 +887,7 @@ const styles = StyleSheet.create({
   addBtnDisabled: { opacity: 0.45, backgroundColor: "#3f3f3f" },
   addBtnText: { color: "#061006", fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 0.2 },
   acceptOutlineText: { color: ACCENT },
+  addBtnDisabledText: { color: "rgba(255,255,255,0.85)" },
   searchBarWrap: {
     flexDirection: "row",
     alignItems: "center",

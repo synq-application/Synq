@@ -22,13 +22,27 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { ACCENT, BG } from "../constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BORDER,
+  BUTTON_RADIUS,
+  RADIUS_MD,
+  SPACE_3,
+  SPACE_4,
+  SPACE_5,
+  SPACE_6,
+  TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_SECTION,
+  TYPE_TITLE,
+} from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
 
 const BACKGROUND = BG;
-const SURFACE = "#161616";
+const SURFACE = "rgba(255,255,255,0.06)";
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png";
 const isRemoteImageUri = (value: unknown): value is string =>
@@ -331,15 +345,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingHorizontal: SPACE_4 + 4,
+    paddingTop: SPACE_3,
+    paddingBottom: SPACE_3,
   },
   backButton: {
     marginRight: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: BUTTON_RADIUS,
     backgroundColor: "#1F1F1F",
     alignItems: "center",
     justifyContent: "center",
@@ -353,28 +367,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: TYPE_TITLE,
     fontFamily: fonts.heavy,
     color: "white",
   },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   listContent: {
-    paddingBottom: 40,
-    paddingTop: 10,
+    paddingBottom: SPACE_6 + 8,
+    paddingTop: SPACE_3,
   },
   group: {
     backgroundColor: SURFACE,
-    marginHorizontal: 20,
-    borderRadius: 16,
+    marginHorizontal: SPACE_4 + 4,
+    borderRadius: RADIUS_MD,
     overflow: "hidden",
-    marginBottom: 12,
+    marginBottom: SPACE_3,
+    borderWidth: 1,
+    borderColor: BORDER,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 18,
-    paddingHorizontal: 18,
+    paddingVertical: SPACE_4 + 2,
+    paddingHorizontal: SPACE_4 + 2,
     borderBottomWidth: 0.5,
     borderBottomColor: "#252525",
   },
@@ -382,7 +398,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
-    marginRight: 10,
+    marginRight: SPACE_3,
   },
   avatar: {
     width: 56,
@@ -391,7 +407,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#222",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 14,
+    marginRight: SPACE_4,
     overflow: "hidden",
   },
   avatarImg: {
@@ -401,20 +417,20 @@ const styles = StyleSheet.create({
   },
   rowKicker: {
     color: ACCENT,
-    fontSize: 10,
+    fontSize: TYPE_CAPTION - 2,
     fontFamily: fonts.black,
     textTransform: "uppercase",
     letterSpacing: 1,
     marginBottom: 3,
   },
   rowText: {
-    fontSize: 14,
+    fontSize: TYPE_BODY - 1,
     color: "white",
     fontFamily: fonts.medium,
     lineHeight: 18,
   },
   boldWhite: { fontFamily: fonts.heavy, color: "white" },
-  grayText: { color: "#aaa", fontFamily: fonts.medium, fontSize: 14 },
+  grayText: { color: "#aaa", fontFamily: fonts.medium, fontSize: TYPE_BODY - 1 },
   rowRight: {
     flexDirection: "row",
     alignItems: "center",
@@ -426,7 +442,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    marginRight: SPACE_3,
   },
   denyBtn: {
     backgroundColor: "#222",
@@ -439,10 +455,10 @@ const styles = StyleSheet.create({
     borderColor: "#333",
   },
   emptyWrap: {
-    marginTop: 40,
-    marginHorizontal: 20,
-    padding: 18,
-    borderRadius: 16,
+    marginTop: SPACE_6 + 8,
+    marginHorizontal: SPACE_4 + 4,
+    padding: SPACE_4 + 2,
+    borderRadius: RADIUS_MD,
     backgroundColor: SURFACE,
     alignItems: "center",
   },
@@ -457,13 +473,13 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: "white",
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     fontFamily: fonts.heavy,
     marginBottom: 4,
   },
   emptySubtitle: {
     color: "#777",
-    fontSize: 15,
+    fontSize: TYPE_BODY - 1,
     fontFamily: fonts.medium,
     textAlign: "center",
     marginTop: 8

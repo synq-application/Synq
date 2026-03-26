@@ -37,7 +37,7 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, aiPrompts, BG, BORDER, DEFAULT_AVATAR, EXPIRATION_HOURS, fonts, MUTED, OFFSETS } from '../../constants/Variables';
+import { ACCENT, aiPrompts, BG, BORDER, BUTTON_RADIUS, DEFAULT_AVATAR, EXPIRATION_HOURS, fonts, MODAL_RADIUS, MUTED, OFFSETS } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
@@ -1006,7 +1006,7 @@ export default function SynqScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#070707" },
+  container: { flex: 1, backgroundColor: BG },
   darkFill: { flex: 1, backgroundColor: BG, justifyContent: 'center' },
   activeHeader: {
     flexDirection: 'row',
@@ -1015,10 +1015,10 @@ const styles = StyleSheet.create({
     paddingTop: 70,
     paddingBottom: 20,
     alignItems: 'center',
-    backgroundColor: "#070707",
+    backgroundColor: BG,
     height: 140
   },
-  headerTitle: { color: 'white', fontSize: 24, fontFamily: 'Avenir-Heavy', textAlign: 'center' },
+  headerTitle: { color: 'white', fontSize: 24, fontFamily: fonts.heavy, textAlign: 'center' },
   headerIconContainer: { width: 40, alignItems: 'center', justifyContent: 'center' },
   badge: {
     position: 'absolute',
@@ -1042,22 +1042,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#111',
     padding: 15,
-    borderRadius: 20,
+    borderRadius: BUTTON_RADIUS,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#222'
   },
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
-  whiteBold: { color: 'white', fontSize: 17, fontFamily: 'Avenir-Medium' },
+  whiteBold: { color: 'white', fontSize: 17, fontFamily: fonts.medium },
   grayText: { color: '#666', fontSize: 13, marginTop: 2 },
   locationText: { color: '#666', fontSize: 12, marginTop: 2 },
   footer: { padding: 25, paddingBottom: 80 },
-  btn: { backgroundColor: ACCENT, padding: 18, borderRadius: 20, alignItems: 'center' },
-  btnText: { fontSize: 16, color: 'black', fontFamily: 'Avenir-Medium' },
+  btn: { backgroundColor: ACCENT, padding: 18, borderRadius: BUTTON_RADIUS, alignItems: 'center' },
+  btnText: { fontSize: 16, color: 'black', fontFamily: fonts.medium },
   deactivateLink: { marginTop: 20, alignSelf: 'center', padding: 10 },
-  deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: 'Avenir-Medium', opacity: 0.9 },
+  deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: fonts.medium, opacity: 0.9 },
   activatingContainer: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
-  unifiedTitle: { color: 'white', fontSize: 26, fontFamily: 'Avenir', marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
+  unifiedTitle: { color: 'white', fontSize: 24, fontFamily: fonts.medium, marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
   gifLarge: { width: 280, height: 280 },
   inactiveCenter: {
     flex: 1,
@@ -1148,14 +1148,14 @@ const styles = StyleSheet.create({
   },
   modalBg: { flex: 1, backgroundColor: BG },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
-  modalTitle: { color: 'white', fontSize: 22, fontFamily: 'Avenir-Medium' },
+  modalTitle: { color: 'white', fontSize: 22, fontFamily: fonts.medium },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
   inboxItem: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#111' },
   inboxCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
   stackedPhoto: { width: 40, height: 40, borderRadius: 20, position: 'absolute', borderWidth: 2, borderColor: 'black' },
   msgContainer: { marginBottom: 15 },
   chatAvatar: { width: 46, height: 46, borderRadius: 23, borderColor: BORDER, borderWidth: 2, marginRight: 8 },
-  bubble: { padding: 15, borderRadius: 22 },
+  bubble: { padding: 15, borderRadius: MODAL_RADIUS },
   myBubble: { backgroundColor: ACCENT },
   theirBubble: { backgroundColor: '#1C1C1E' },
   inputRow: { flexDirection: 'row', alignItems: "flex-end", padding: 20, paddingBottom: 40, backgroundColor: BG },
@@ -1165,9 +1165,9 @@ const styles = StyleSheet.create({
     minHeight: 45,
     maxHeight: 120,
   },
-  input: { flex: 1, backgroundColor: '#1C1C1E', borderRadius: 25, paddingHorizontal: 20, paddingVertical: 12, color: 'white', fontSize: 16, marginRight: 10 },
-  sendBtn: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: ACCENT, justifyContent: 'center', alignItems: 'center' },
-  explorePanel: { height: '85%', backgroundColor: '#0A0A0A', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
+  input: { flex: 1, backgroundColor: '#1C1C1E', borderRadius: BUTTON_RADIUS + 10, paddingHorizontal: 20, paddingVertical: 12, color: 'white', fontSize: 16, marginRight: 10 },
+  sendBtn: { width: 45, height: 45, borderRadius: BUTTON_RADIUS + 8, backgroundColor: ACCENT, justifyContent: 'center', alignItems: 'center' },
+  explorePanel: { height: '85%', backgroundColor: '#0A0A0A', borderTopLeftRadius: MODAL_RADIUS + 8, borderTopRightRadius: MODAL_RADIUS + 8, overflow: 'hidden' },
   sectionHeader: { color: 'white', fontSize: 18, fontFamily: 'Avenir-Black', marginBottom: 20, paddingHorizontal: 20 },
   scrollRow: { marginBottom: 30, paddingLeft: 20 },
   ideaCircle: { alignItems: 'center', marginRight: 25 },

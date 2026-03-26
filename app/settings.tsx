@@ -15,14 +15,29 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { BG } from "../constants/Variables";
+import {
+  BG,
+  BORDER,
+  BUTTON_RADIUS,
+  MODAL_RADIUS,
+  MUTED,
+  RADIUS_MD,
+  SPACE_1,
+  SPACE_3,
+  SPACE_4,
+  SPACE_5,
+  SPACE_6,
+  TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_TITLE,
+} from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
 
 const BACKGROUND = BG;
-const SURFACE = "#161616";
+const SURFACE = "rgba(255,255,255,0.06)";
 
 const fonts = {
   black: "Avenir-Black",
@@ -229,27 +244,27 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingHorizontal: SPACE_4 + SPACE_1,
+    paddingTop: SPACE_3,
+    paddingBottom: SPACE_3,
   },
   backButton: {
     marginRight: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: BUTTON_RADIUS,
     backgroundColor: "#1F1F1F",
     alignItems: "center",
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: TYPE_TITLE,
     fontFamily: fonts.heavy,
     color: "white",
   },
   scrollContent: {
-    paddingBottom: 40,
-    paddingTop: 10,
+    paddingBottom: SPACE_6 + SPACE_1,
+    paddingTop: SPACE_3,
   },
   userSection: {
     flexDirection: "row",
@@ -257,9 +272,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#1C1C1E",
     borderWidth: 1,
     borderColor: "#2A2A2A",
-    margin: 20,
-    padding: 15,
-    borderRadius: 16,
+    margin: SPACE_4 + SPACE_1,
+    padding: SPACE_4,
+    borderRadius: RADIUS_MD,
   },
   avatar: {
     width: 50,
@@ -270,46 +285,48 @@ const styles = StyleSheet.create({
   },
   userName: {
     color: "white",
-    fontSize: 18,
+    fontSize: TYPE_BODY + 2,
     fontFamily: fonts.heavy,
   },
 
   groupTitle: {
-    color: "#666",
-    fontSize: 14,
+    color: MUTED,
+    fontSize: TYPE_CAPTION + 1,
     fontFamily: fonts.medium,
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginLeft: 25,
-    marginBottom: 10,
-    marginTop: 10,
+    marginLeft: SPACE_5 + 1,
+    marginBottom: SPACE_3 - 2,
+    marginTop: SPACE_3 - 2,
   },
   group: {
     backgroundColor: SURFACE,
-    marginHorizontal: 20,
-    borderRadius: 16,
+    marginHorizontal: SPACE_4 + SPACE_1,
+    borderRadius: RADIUS_MD,
     overflow: "hidden",
-    marginBottom: 25,
+    marginBottom: SPACE_5 + 1,
+    borderWidth: 1,
+    borderColor: BORDER,
   },
 
   item: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 18,
-    paddingHorizontal: 20,
+    paddingVertical: SPACE_4 + 2,
+    paddingHorizontal: SPACE_4 + 2,
     borderBottomWidth: 0.5,
     borderBottomColor: "#252525",
   },
   itemLeft: { flexDirection: "row", alignItems: "center" },
   itemLabel: {
     color: "white",
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
   },
   itemValue: {
     color: "#A8A8A8",
-    fontSize: 14,
+    fontSize: TYPE_CAPTION + 1,
     fontFamily: fonts.medium,
   },
 

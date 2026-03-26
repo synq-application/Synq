@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { Tabs } from "expo-router";
 import { Platform, StyleSheet, View } from "react-native";
-import { ACCENT, BG } from "../../constants/Variables";
+import { ACCENT, BG, SPACE_2, SPACE_3, SPACE_4, SPACE_5, TYPE_CAPTION, fonts } from "../../constants/Variables";
 
 const SYNQ_ICON = require("../../assets/SYNQ-2.png");
 
@@ -15,7 +15,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: ACCENT,
         tabBarInactiveTintColor: "rgba(255,255,255,0.4)",
         tabBarShowLabel: true,
-        tabBarLabelStyle: { fontSize: 12, marginBottom: -5 },
+        tabBarLabelStyle: { fontSize: TYPE_CAPTION, marginBottom: -SPACE_2, fontFamily: fonts.medium, letterSpacing: 0.2 },
       }}
     >
       <Tabs.Screen
@@ -62,11 +62,12 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: "#081212",
+    backgroundColor: BG,
     borderTopColor: "rgba(255,255,255,0.1)",
     borderTopWidth: StyleSheet.hairlineWidth,
-    height: Platform.OS === "ios" ? 90 : 70,
-    paddingBottom: Platform.OS === "ios" ? 25 : 10,
+    height: Platform.OS === "ios" ? 92 : 74,
+    paddingBottom: Platform.OS === "ios" ? SPACE_5 : SPACE_3,
+    paddingHorizontal: SPACE_4,
   },
   synqButton: {
     width: 64,

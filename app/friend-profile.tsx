@@ -1,8 +1,10 @@
 import {
   ACCENT,
   BG,
+  BUTTON_RADIUS,
   BORDER,
   fonts,
+  MODAL_RADIUS,
   MUTED2,
   SURFACE,
   TEXT,
@@ -561,7 +563,7 @@ const styles = StyleSheet.create({
   removeFriendBtn: {
     borderWidth: 1,
     borderColor: "#ff453a",
-    borderRadius: 16,
+    borderRadius: BUTTON_RADIUS,
     paddingVertical: 14,
     paddingHorizontal: 42,
     alignItems: "center",
@@ -577,7 +579,7 @@ const styles = StyleSheet.create({
   addFriendBtn: {
     borderWidth: 1,
     borderColor: ACCENT,
-    borderRadius: 16,
+    borderRadius: BUTTON_RADIUS,
     paddingVertical: 14,
     paddingHorizontal: 42,
     alignItems: "center",
@@ -596,7 +598,7 @@ const styles = StyleSheet.create({
     backgroundColor: SURFACE,
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 18,
+    borderRadius: MODAL_RADIUS - 4,
     padding: 16,
   },
 
