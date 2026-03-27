@@ -9,6 +9,7 @@ const SYNQ_ICON = require("../../assets/SYNQ-2.png");
 export default function TabsLayout() {
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,

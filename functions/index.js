@@ -36,7 +36,10 @@ exports.onMessageSent = onDocumentCreated({
                     sound: "default",
                     title: senderName,
                     body: messageData.text,
-                    data: { chatId: chatId }, 
+                    data: {
+                        chatId: String(chatId),
+                        type: "message",
+                    },
                 });
             }
         }
@@ -124,7 +127,7 @@ exports.onFriendRequestSent = onDocumentCreated({
                 sound: "default",
                 title: "New Friend Request 🤝",
                 body: `${senderName} wants to Synq with you!`,
-                data: { type: "friend_request" }, 
+                data: { type: "friend_request" },
             });
         }
     } catch (error) {

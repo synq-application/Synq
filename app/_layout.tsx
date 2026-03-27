@@ -14,7 +14,6 @@ import React, {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import {
@@ -93,27 +92,50 @@ export default function RootLayout() {
   const [authReady, setAuthReady] = useState(false);
   const [assetsReady, setAssetsReady] = useState(false);
 
-  const pendingChatIdRef = useRef<string | null>(null);
+  /** Set when user taps a push so navigation runs even if auth/user state does not change. */
+  const [pendingNotificationTap, setPendingNotificationTap] = useState<
+    | { kind: "chat"; chatId: string }
+    | { kind: "notifications" }
+    | null
+  >(null);
 
   const refreshAuth = () => {
     setUser(auth.currentUser ? ({ ...auth.currentUser } as User) : null);
   };
 
   useEffect(() => {
+    const applyNotificationData = (data: Record<string, unknown> | undefined) => {
+      if (!data) return;
+      const chatRaw = data.chatId;
+      const chatId =
+        typeof chatRaw === "string"
+          ? chatRaw
+          : chatRaw != null
+            ? String(chatRaw)
+            : undefined;
+      const type = typeof data.type === "string" ? data.type : undefined;
+      if (chatId) {
+        setPendingNotificationTap({ kind: "chat", chatId });
+        return;
+      }
+      if (type === "friend_request") {
+        setPendingNotificationTap({ kind: "notifications" });
+      }
+    };
+
     const sub = Notifications.addNotificationResponseReceivedListener(
       (response) => {
-        const data: any = response.notification.request.content.data;
-        if (data?.chatId) {
-          pendingChatIdRef.current = String(data.chatId);
-        }
+        applyNotificationData(
+          response.notification.request.content.data as Record<string, unknown> | undefined
+        );
       }
     );
 
     Notifications.getLastNotificationResponseAsync().then((response) => {
-      const data: any = response?.notification.request.content.data;
-      if (data?.chatId) {
-        pendingChatIdRef.current = String(data.chatId);
-      }
+      if (!response) return;
+      applyNotificationData(
+        response.notification.request.content.data as Record<string, unknown> | undefined
+      );
     });
 
     return () => sub.remove();
@@ -189,17 +211,21 @@ export default function RootLayout() {
   useEffect(() => {
     if (!authReady || !navReady) return;
     if (!user) return;
+    if (!pendingNotificationTap) return;
 
-    const chatId = pendingChatIdRef.current;
-    if (!chatId) return;
+    const pending = pendingNotificationTap;
+    setPendingNotificationTap(null);
 
-    pendingChatIdRef.current = null;
+    if (pending.kind === "notifications") {
+      router.push("/notifications");
+      return;
+    }
 
     router.push("/(tabs)");
     setTimeout(() => {
-      DeviceEventEmitter.emit("openChat", { chatId });
+      DeviceEventEmitter.emit("openChat", { chatId: pending.chatId });
     }, 500);
-  }, [authReady, navReady, user]);
+  }, [authReady, navReady, user, pendingNotificationTap, router]);
 
   if (!authReady || !navReady || !assetsReady) {
     return (
