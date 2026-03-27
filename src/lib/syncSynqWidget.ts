@@ -1,0 +1,84 @@
+import { AppState, type AppStateStatus, Platform } from "react-native";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
+import type { DocumentData } from "firebase/firestore";
+import { auth, db } from "./firebase";
+
+/**
+ * Apple Developer: enable App Groups for the main app ID and add
+ * `group.com.stefaniebaarman.synq` (must match app.json expo-widgets groupIdentifier).
+ * Then run a new EAS iOS build; widgets do not run in Expo Go.
+ */
+
+export function mapUserDocToWidgetProps(data: DocumentData | undefined): {
+  statusLabel: string;
+  memo: string;
+  isActive: boolean;
+} {
+  const isAvailable = data?.status === "available";
+  const rawMemo = typeof data?.memo === "string" ? data.memo.trim() : "";
+  const memo =
+    rawMemo.length > 120 ? `${rawMemo.slice(0, 117)}…` : rawMemo;
+  return {
+    statusLabel: isAvailable ? "Synq active" : "Not Synqing",
+    memo,
+    isActive: Boolean(isAvailable),
+  };
+}
+
+type WidgetHandle = {
+  updateSnapshot: (props: ReturnType<typeof mapUserDocToWidgetProps>) => void;
+};
+
+function getWidget(): WidgetHandle | null {
+  if (Platform.OS !== "ios") return null;
+  const mod = require("../../widgets/SynqGlanceWidget") as {
+    default: WidgetHandle | null;
+  };
+  return mod.default;
+}
+
+/**
+ * Subscribes to the signed-in user document and pushes updates to the home screen widget.
+ * Re-applies the last snapshot when the app returns to foreground.
+ */
+export function startSynqGlanceWidgetSync(): () => void {
+  if (Platform.OS !== "ios") return () => {};
+
+  require("../../widgets/SynqGlanceWidget");
+
+  let unsubDoc: (() => void) | undefined;
+  let lastProps: ReturnType<typeof mapUserDocToWidgetProps> | null = null;
+
+  const push = () => {
+    const w = getWidget();
+    if (!w || !lastProps) return;
+    try {
+      w.updateSnapshot(lastProps);
+    } catch {
+      /* native module not linked in dev client without widget rebuild */
+    }
+  };
+
+  const unsubAuth = onAuthStateChanged(auth, (user) => {
+    unsubDoc?.();
+    unsubDoc = undefined;
+    lastProps = null;
+    if (!user) return;
+
+    unsubDoc = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      lastProps = mapUserDocToWidgetProps(snap.data());
+      push();
+    });
+  });
+
+  const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
+    if (next === "active") push();
+  });
+
+  return () => {
+    unsubDoc?.();
+    unsubAuth();
+    sub.remove();
+  };
+}

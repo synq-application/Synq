@@ -9,6 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/ui": "~55.0.6",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.4.4",
@@ -31,6 +32,7 @@
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "~15.0.10",
+    "expo-widgets": "^55.0.8",
     "firebase": "^12.8.0",
     "nativewind": "^4.2.1",
     "react": "19.1.0",

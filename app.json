@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.stefaniebaarman.synq",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -45,7 +45,22 @@
           }
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.stefaniebaarman.synq.widgets",
+          "groupIdentifier": "group.com.stefaniebaarman.synq",
+          "widgets": [
+            {
+              "name": "SynqGlanceWidget",
+              "displayName": "Synq",
+              "description": "Your Synq status and memo at a glance.",
+              "supportedFamilies": ["systemSmall", "systemMedium"]
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

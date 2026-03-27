@@ -30,6 +30,7 @@ import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
 } from "../src/lib/socialCache";
+import { startSynqGlanceWidgetSync } from "../src/lib/syncSynqWidget";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -139,6 +140,10 @@ export default function RootLayout() {
     });
 
     return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    return startSynqGlanceWidgetSync();
   }, []);
 
   useEffect(() => {
