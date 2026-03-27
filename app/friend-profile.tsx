@@ -10,8 +10,8 @@ import {
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
-import { Image as ExpoImage } from "expo-image";
 import { auth, db } from "@/src/lib/firebase";
+import { Image as ExpoImage } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   collection,
@@ -19,6 +19,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -35,6 +36,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/Ionicons";
+import {
+  eventKey,
+  eventKeyLoose,
+  matchesPlanEvent,
+  matchesPlanEventForHostSync,
+} from "../src/lib/planEvents";
 import {
   friendProfileCacheByUser,
   friendRelationCacheByUser,
@@ -85,6 +92,8 @@ export default function FriendProfile() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [joinedPlanKeys, setJoinedPlanKeys] = useState<Record<string, boolean>>({});
+  const [showUnjoinModal, setShowUnjoinModal] = useState(false);
+  const [pendingUnjoinEvent, setPendingUnjoinEvent] = useState<any>(null);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
@@ -95,10 +104,33 @@ export default function FriendProfile() {
     setAlertVisible(true);
   };
 
-  const eventKey = (event: any) =>
-    `${String(event?.title || "").trim().toLowerCase()}|${String(event?.date || "").trim()}|${String(
-      event?.time || ""
-    ).trim().toLowerCase()}|${String(event?.location || "").trim().toLowerCase()}`;
+  /** True if this user is in the same shared plan as this friend (not "same calendar row" solo). */
+  const isInSharedPlanWithFriend = (e: any, myUid: string, friendUid: string) => {
+    if (!e || !friendUid) return false;
+    if (e.joinedFromFriendUid === friendUid) return true;
+    const ids = new Set(
+      [...(Array.isArray(e?.joinedFromIds) ? e.joinedFromIds : []), e?.joinedFromId]
+        .filter(Boolean)
+        .map((id: string) => String(id).trim())
+    );
+    return ids.has(myUid) && ids.has(friendUid);
+  };
+
+  const setJoinedKeysForEvent = (event: any, value: boolean) => {
+    setJoinedPlanKeys((prev) => {
+      const next = { ...prev };
+      const k1 = eventKey(event);
+      const k2 = eventKeyLoose(event);
+      if (value) {
+        next[k1] = true;
+        next[k2] = true;
+      } else {
+        delete next[k1];
+        delete next[k2];
+      }
+      return next;
+    });
+  };
 
   const eventSortValue = (event: any) => {
     const date = String(event?.date || "");
@@ -122,7 +154,7 @@ export default function FriendProfile() {
 
   useEffect(() => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user || !friendKey) return;
     const hydrateJoinedPlans = async () => {
       try {
         const meSnap = await getDoc(doc(db, "users", user.uid));
@@ -130,26 +162,32 @@ export default function FriendProfile() {
         const mine = Array.isArray(meData?.events) ? meData.events : [];
         const next: Record<string, boolean> = {};
         mine.forEach((e: any) => {
+          if (!isInSharedPlanWithFriend(e, user.uid, friendKey)) return;
           next[eventKey(e)] = true;
+          next[eventKeyLoose(e)] = true;
         });
         setJoinedPlanKeys(next);
       } catch {}
     };
     hydrateJoinedPlans();
-  }, []);
+  }, [friendKey]);
 
   useEffect(() => {
-    const fetchFriend = async () => {
-      try {
-        if (viewerId) {
-          await warmFriendsAndConnectionsCache(viewerId);
-          const warmed = friendProfileCacheByUser[viewerId]?.[friendKey];
-          if (warmed) {
-            setFriend(warmed);
-            setLoading(false);
-          }
+    if (!friendKey) return;
+
+    if (viewerId) {
+      warmFriendsAndConnectionsCache(viewerId).then(() => {
+        const warmed = friendProfileCacheByUser[viewerId]?.[friendKey];
+        if (warmed) {
+          setFriend(warmed);
+          setLoading(false);
         }
-        const snap = await getDoc(doc(db, "users", friendKey));
+      });
+    }
+
+    const unsub = onSnapshot(
+      doc(db, "users", friendKey),
+      (snap) => {
         if (snap.exists()) {
           const data = snap.data();
           setFriend(data);
@@ -163,12 +201,12 @@ export default function FriendProfile() {
             } as any;
           }
         }
-      } finally {
         setLoading(false);
-      }
-    };
+      },
+      () => setLoading(false)
+    );
 
-    fetchFriend();
+    return () => unsub();
   }, [viewerId, friendKey]);
 
   useEffect(() => {
@@ -317,6 +355,7 @@ export default function FriendProfile() {
     title: string;
     time?: string;
     location?: string;
+    planHostUid?: string;
     joinedFromId?: string;
     joinedFromIds?: string[];
     joinedFromName?: string;
@@ -395,6 +434,9 @@ export default function FriendProfile() {
         })
       );
 
+      const planHostUid = String(event?.planHostUid || friendKey || "").trim();
+      const eventForMatch = { ...event, planHostUid: event.planHostUid || planHostUid };
+
       const syncAttendeesAcrossUsers = async (allAttendeeIds: string[]) => {
         await Promise.all(
           allAttendeeIds.map(async (attendeeId) => {
@@ -406,7 +448,19 @@ export default function FriendProfile() {
               const attendeeEvents = Array.isArray(attendeeData?.events) ? attendeeData.events : [];
               let changed = false;
               const nextAttendeeEvents = attendeeEvents.map((e: any) => {
-                if (eventKey(e) !== eventKey(event)) return e;
+                const isHostDoc =
+                  !!planHostUid && String(attendeeId) === planHostUid;
+                const hostMatchedById =
+                  isHostDoc &&
+                  event?.id != null &&
+                  e?.id != null &&
+                  String(e.id) === String(event.id);
+                const matched =
+                  hostMatchedById ||
+                  matchesPlanEvent(e, eventForMatch, attendeeEvents) ||
+                  (isHostDoc &&
+                    matchesPlanEventForHostSync(e, eventForMatch, attendeeEvents, planHostUid));
+                if (!matched) return e;
                 const existingIds = Array.isArray(e?.joinedFromIds)
                   ? e.joinedFromIds
                   : [e?.joinedFromId].filter(Boolean);
@@ -426,10 +480,13 @@ export default function FriendProfile() {
                   : [e?.joinedFromName].filter(Boolean);
                 const idsChanged = mergedIds.join("|") !== existingIds.join("|");
                 const namesChanged = otherNames.join("|") !== prevNames.join("|");
-                if (!idsChanged && !namesChanged) return e;
+                const nextHost = e.planHostUid || planHostUid || undefined;
+                const hostChanged = String(nextHost || "") !== String(e?.planHostUid || "");
+                if (!idsChanged && !namesChanged && !hostChanged) return e;
                 changed = true;
                 return {
                   ...e,
+                  planHostUid: nextHost,
                   joinedFromIds: mergedIds,
                   joinedFromId: mergedIds[0] || "",
                   joinedFromNames: otherNames,
@@ -444,19 +501,21 @@ export default function FriendProfile() {
         );
       };
 
-      const exists = existingEvents.some((e: any) => eventKey(e) === eventKey(event));
+      const exists = existingEvents.some((e: any) => matchesPlanEvent(e, eventForMatch, existingEvents));
       if (exists) {
         const updatedExistingEvents = existingEvents.map((e: any) => {
-          if (eventKey(e) !== eventKey(event)) return e;
+          if (!matchesPlanEvent(e, eventForMatch, existingEvents)) return e;
           const existingNames = Array.isArray(e?.joinedFromNames)
             ? e.joinedFromNames
             : [e?.joinedFromName].filter(Boolean);
           const mergedNames = Array.from(
             new Set([...existingNames, ...sourceNames].map((n: string) => String(n).trim()).filter(Boolean))
           );
-          if (mergedNames.length === existingNames.length) return e;
           return {
             ...e,
+            planHostUid: e.planHostUid || event.planHostUid || friendKey,
+            mergedIntoExisting: true,
+            joinedFromFriendUid: friendKey,
             joinedFromIds: sourceIds,
             joinedFromId: sourceIds[0] || "",
             joinedFromNames: mergedNames,
@@ -465,7 +524,7 @@ export default function FriendProfile() {
         });
         await updateDoc(meRef, { events: updatedExistingEvents });
         await syncAttendeesAcrossUsers(sourceIds);
-        setJoinedPlanKeys((prev) => ({ ...prev, [eventKey(event)]: true }));
+        setJoinedKeysForEvent(event, true);
         showAlert("Updated", "Added this friend to the same joined plan.");
         return;
       }
@@ -476,10 +535,13 @@ export default function FriendProfile() {
         date: String(event.date || "").trim(),
         time: String(event.time || "").trim(),
         location: String(event.location || "").trim(),
+        planHostUid: String(event.planHostUid || friendKey || "").trim(),
         joinedFromId: friendKey,
         joinedFromIds: sourceIds,
         joinedFromName: sourceNames.join(", "),
         joinedFromNames: sourceNames,
+        mergedIntoExisting: false,
+        joinedFromFriendUid: friendKey,
       };
 
       const nextEvents = [...existingEvents, newEvent].sort(
@@ -491,10 +553,157 @@ export default function FriendProfile() {
       });
       await syncAttendeesAcrossUsers(sourceIds);
 
-      setJoinedPlanKeys((prev) => ({ ...prev, [eventKey(event)]: true }));
+      setJoinedKeysForEvent(event, true);
       showAlert("Added", "Plan added to your open plans.");
     } catch (e: any) {
       showAlert("Error", e?.message || "Could not join this plan right now.");
+    }
+  };
+
+  const planLooksJoined = (e: any) =>
+    !!(joinedPlanKeys[eventKey(e)] || joinedPlanKeys[eventKeyLoose(e)]);
+
+  /** Friend’s copy of a plan they joined from you — you shouldn’t see Join on your own event. */
+  const isViewerHostOfFriendsPlan = (event: any) => {
+    if (!viewerId || !friendKey) return false;
+    const vid = String(viewerId).trim();
+    const fk = String(friendKey).trim();
+    if (String(event?.planHostUid || "").trim() === vid) return true;
+    if (String(event?.joinedFromFriendUid || "").trim() === vid) return true;
+    const jf = String(event?.joinedFromId || "").trim();
+    if (jf === vid) {
+      const ids = new Set(
+        [...(Array.isArray(event?.joinedFromIds) ? event.joinedFromIds : [])].map((id: string) =>
+          String(id).trim()
+        )
+      );
+      if (ids.has(fk) && ids.has(vid)) return true;
+    }
+    return false;
+  };
+
+  const handlePlanPress = (event: any) => {
+    if (isViewerHostOfFriendsPlan(event)) return;
+    if (planLooksJoined(event)) {
+      setPendingUnjoinEvent(event);
+      setShowUnjoinModal(true);
+    } else {
+      joinPlan(event);
+    }
+  };
+
+  const unjoinPlan = async (event: any) => {
+    const user = auth.currentUser;
+    if (!user || !friendKey) return;
+    try {
+      const meRef = doc(db, "users", user.uid);
+      const meSnap = await getDoc(meRef);
+      const meData = meSnap.exists() ? (meSnap.data() as any) : {};
+      const existingEvents = Array.isArray(meData?.events) ? meData.events : [];
+      const myEvent = existingEvents.find((e: any) => matchesPlanEvent(e, event, existingEvents));
+      if (!myEvent || !isInSharedPlanWithFriend(myEvent, user.uid, friendKey)) {
+        showAlert("Not joined", "You are not in this plan with this friend.");
+        return;
+      }
+
+      const rawSet = new Set<string>();
+      for (const id of [
+        ...(Array.isArray(myEvent.joinedFromIds) ? myEvent.joinedFromIds : []),
+        myEvent.joinedFromId,
+      ].filter(Boolean)) {
+        rawSet.add(String(id).trim());
+      }
+      rawSet.add(user.uid);
+      rawSet.add(friendKey);
+      const allAttendeeIds = Array.from(rawSet);
+
+      const displayNameById: Record<string, string> = {};
+      await Promise.all(
+        allAttendeeIds.map(async (uid) => {
+          try {
+            const s = await getDoc(doc(db, "users", uid));
+            if (s.exists()) {
+              displayNameById[uid] = String((s.data() as any)?.displayName || "").trim();
+            }
+          } catch {}
+        })
+      );
+
+      await Promise.all(
+        allAttendeeIds.map(async (attendeeId) => {
+          if (attendeeId === user.uid) return;
+          try {
+            const attendeeRef = doc(db, "users", attendeeId);
+            const attendeeSnap = await getDoc(attendeeRef);
+            if (!attendeeSnap.exists()) return;
+            const attendeeData = attendeeSnap.data() as any;
+            const attendeeEvents = Array.isArray(attendeeData?.events) ? attendeeData.events : [];
+            let changed = false;
+            const nextAttendeeEvents = attendeeEvents.map((e: any) => {
+              if (!matchesPlanEvent(e, event, attendeeEvents)) return e;
+              const existingIds = Array.isArray(e?.joinedFromIds)
+                ? e.joinedFromIds
+                : [e?.joinedFromId].filter(Boolean);
+              const mergedIds = existingIds
+                .map((id: string) => String(id).trim())
+                .filter(Boolean)
+                .filter((id: string) => id !== user.uid);
+              const otherNames = mergedIds
+                .filter((id: string) => id !== attendeeId)
+                .map((id: string | number) => displayNameById[id])
+                .filter(Boolean);
+              const prevNames = Array.isArray(e?.joinedFromNames)
+                ? e.joinedFromNames
+                : [e?.joinedFromName].filter(Boolean);
+              const idsChanged = mergedIds.join("|") !== existingIds.join("|");
+              const namesChanged = otherNames.join("|") !== prevNames.join("|");
+              if (!idsChanged && !namesChanged) return e;
+              changed = true;
+              return {
+                ...e,
+                joinedFromIds: mergedIds,
+                joinedFromId: mergedIds[0] || "",
+                joinedFromNames: otherNames,
+                joinedFromName: otherNames.join(", "),
+              };
+            });
+            if (changed) {
+              await updateDoc(attendeeRef, { events: nextAttendeeEvents });
+            }
+          } catch {}
+        })
+      );
+
+      const idSet = new Set(
+        [...(Array.isArray(myEvent.joinedFromIds) ? myEvent.joinedFromIds : []), myEvent.joinedFromId]
+          .filter(Boolean)
+          .map((id: string) => String(id).trim())
+      );
+      const shouldDemerge =
+        myEvent.mergedIntoExisting === true ||
+        (myEvent.mergedIntoExisting !== false && idSet.size > 2);
+
+      let nextEvents: any[];
+      if (shouldDemerge) {
+        const soloRest = { ...myEvent };
+        delete soloRest.joinedFromId;
+        delete soloRest.joinedFromIds;
+        delete soloRest.joinedFromName;
+        delete soloRest.joinedFromNames;
+        delete soloRest.mergedIntoExisting;
+        delete soloRest.joinedFromFriendUid;
+        soloRest.planHostUid = user.uid;
+        nextEvents = existingEvents.map((e: any) => (e.id === myEvent.id ? soloRest : e));
+      } else {
+        nextEvents = existingEvents.filter((e: any) => e.id !== myEvent.id);
+      }
+
+      await updateDoc(meRef, { events: nextEvents });
+
+      setJoinedKeysForEvent(event, false);
+      showAlert("Left plan", "You're no longer in this plan with this friend.");
+    } catch (e: any) {
+      showAlert("Error", e?.message || "Could not unjoin this plan.");
     }
   };
 
@@ -631,8 +840,9 @@ export default function FriendProfile() {
             events={friend.events || []}
             ACCENT={ACCENT}
             fonts={fonts}
-            onPressPlan={joinPlan}
-            isPlanJoined={(event) => !!joinedPlanKeys[eventKey(event)]}
+            onPressPlan={handlePlanPress}
+            isPlanJoined={planLooksJoined}
+            isViewerHostOfPlan={isViewerHostOfFriendsPlan}
           />
         </View>
 
@@ -669,6 +879,23 @@ export default function FriendProfile() {
         onConfirm={async () => {
           setShowRemoveModal(false);
           await removeFriend();
+        }}
+      />
+      <ConfirmModal
+        visible={showUnjoinModal}
+        title="Unjoin plan"
+        message="Are you sure you want to unjoin this plan?"
+        confirmText="Unjoin"
+        destructive
+        onCancel={() => {
+          setShowUnjoinModal(false);
+          setPendingUnjoinEvent(null);
+        }}
+        onConfirm={async () => {
+          const ev = pendingUnjoinEvent;
+          setShowUnjoinModal(false);
+          setPendingUnjoinEvent(null);
+          if (ev) await unjoinPlan(ev);
         }}
       />
       <AlertModal

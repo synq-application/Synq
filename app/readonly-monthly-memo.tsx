@@ -7,6 +7,10 @@ type EventItem = {
   title: string;
   time?: string;
   location?: string;
+  joinedFromFriendUid?: string;
+  joinedFromId?: string;
+  joinedFromIds?: string[];
+  planHostUid?: string;
 };
 
 type Props = {
@@ -15,6 +19,8 @@ type Props = {
   fonts: any;
   onPressPlan?: (event: EventItem) => void;
   isPlanJoined?: (event: EventItem) => boolean;
+  /** When true, this row is the viewer’s own plan on the friend’s list (they joined you) — show label, not Join. */
+  isViewerHostOfPlan?: (event: EventItem) => boolean;
 };
 
 export default function FriendOpenPlans({
@@ -23,6 +29,7 @@ export default function FriendOpenPlans({
   fonts,
   onPressPlan,
   isPlanJoined,
+  isViewerHostOfPlan,
 }: Props) {
   const parseDate = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);
@@ -41,6 +48,7 @@ export default function FriendOpenPlans({
         const d = parseDate(p.date);
         const canJoin = typeof onPressPlan === "function";
         const joined = isPlanJoined?.(p) ?? false;
+        const isHost = isViewerHostOfPlan?.(p) ?? false;
 
         return (
           <View key={p.id} style={styles.card}>
@@ -62,27 +70,40 @@ export default function FriendOpenPlans({
                 {p.location ? ` · ${p.location}` : ""}
               </Text>
             </View>
-            {canJoin && (
-              <TouchableOpacity
-                style={[
-                  styles.joinPill,
-                  joined
-                    ? { borderColor: "rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.08)" }
-                    : { borderColor: ACCENT },
-                ]}
-                activeOpacity={0.85}
-                onPress={() => onPressPlan?.(p)}
-                disabled={joined}
-              >
+            {isHost ? (
+              <View style={styles.hostPill}>
                 <Text
                   style={[
                     styles.joinText,
-                    { color: joined ? "rgba(255,255,255,0.75)" : ACCENT, fontFamily: fonts.heavy },
+                    styles.hostPillText,
+                    { fontFamily: fonts.medium },
                   ]}
                 >
-                  {joined ? "Joined" : "Join"}
+                  Your plan
                 </Text>
-              </TouchableOpacity>
+              </View>
+            ) : (
+              canJoin && (
+                <TouchableOpacity
+                  style={[
+                    styles.joinPill,
+                    joined
+                      ? { borderColor: "rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.08)" }
+                      : { borderColor: ACCENT },
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={() => onPressPlan?.(p)}
+                >
+                  <Text
+                    style={[
+                      styles.joinText,
+                      { color: joined ? "rgba(255,255,255,0.75)" : ACCENT, fontFamily: fonts.heavy },
+                    ]}
+                  >
+                    {joined ? "Joined" : "Join"}
+                  </Text>
+                </TouchableOpacity>
+              )
             )}
           </View>
         );
@@ -151,6 +172,19 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     minWidth: 62,
     alignItems: "center",
+  },
+  hostPill: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginLeft: 8,
+    alignItems: "center",
+  },
+  hostPillText: {
+    color: "rgba(255,255,255,0.55)",
   },
   joinText: {
     fontSize: 12.5,

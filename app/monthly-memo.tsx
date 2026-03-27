@@ -25,6 +25,7 @@ type EventItem = {
   joinedFromId?: string;
   joinedFromName?: string;
   joinedFromNames?: string[];
+  planHostUid?: string;
 };
 
 type Props = {
@@ -143,7 +144,10 @@ export default function OpenPlans({
         })
         .map((p) => {
           const d = parseDate(p.date);
-          const isJoinedPlan = !!p.joinedFromId || !!p.joinedFromName;
+          const isJoinedPlan =
+            !!p.joinedFromId ||
+            !!p.joinedFromName ||
+            (Array.isArray(p.joinedFromNames) && p.joinedFromNames.length > 0);
           return (
             <TouchableOpacity
               key={p.id}

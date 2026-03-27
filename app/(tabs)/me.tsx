@@ -13,9 +13,9 @@ import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
-import { collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -32,6 +32,8 @@ import QRCode from "react-native-qrcode-svg";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
+import { matchesPlanEvent } from "../../src/lib/planEvents";
+import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
   connectionProfileCacheByUser,
   connectionsCacheByUser,
@@ -107,6 +109,7 @@ export default function ProfileScreen() {
       title: eventToSave.title,
       time: eventToSave.time || "",
       location: eventToSave.location || "",
+      planHostUid: auth.currentUser.uid,
     };
 
     const updatedEvents = [...events, newItem];
@@ -126,12 +129,33 @@ export default function ProfileScreen() {
   const deleteEvent = async (id: string) => {
     if (!auth.currentUser) return;
 
-    const updated = events.filter((e) => e.id !== id);
+    const toRemove = events.find((e) => e.id === id);
+    if (!toRemove) return;
+
+    const myUid = auth.currentUser.uid;
+    const attendeeIds = new Set<string>();
+    attendeeIds.add(myUid);
+    const host = String((toRemove as any).planHostUid || "").trim();
+    if (host) attendeeIds.add(host);
+    for (const raw of [
+      ...((Array.isArray((toRemove as any).joinedFromIds) ? (toRemove as any).joinedFromIds : []) as string[]),
+      (toRemove as any).joinedFromId,
+    ].filter(Boolean)) {
+      attendeeIds.add(String(raw).trim());
+    }
 
     try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        events: updated,
-      });
+      await Promise.all(
+        [...attendeeIds].map(async (uid) => {
+          const ref = doc(db, "users", uid);
+          const snap = await getDoc(ref);
+          if (!snap.exists()) return;
+          const evs = (snap.data() as any).events || [];
+          const next = evs.filter((e: any) => !matchesPlanEvent(e, toRemove, evs));
+          if (next.length === evs.length) return;
+          await updateDoc(ref, { events: next });
+        })
+      );
     } catch (e) {
       showAlert("Error", "Could not delete event.");
     }
@@ -207,6 +231,16 @@ export default function ProfileScreen() {
       unsubscribeFriends();
     };
   }, []);
+
+  /** Merge attendee names from friends' copies of your plans (works even if rules block joiner from updating your doc). */
+  useEffect(() => {
+    if (!auth.currentUser?.uid) return;
+    const myUid = auth.currentUser.uid;
+    const t = setTimeout(() => {
+      reconcileHostOpenPlansFromFriends(myUid).catch(() => {});
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [events]);
 
   const filteredActivities = useMemo(
     () =>
