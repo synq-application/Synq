@@ -24,6 +24,7 @@ import {
   View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ACCENT, BG, fonts, TYPE_CAPTION } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import {
@@ -259,13 +260,15 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthContext.Provider value={{ refreshAuth }}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="location" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-      </AuthContext.Provider>
+      <ErrorBoundary>
+        <AuthContext.Provider value={{ refreshAuth }}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="location" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </AuthContext.Provider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

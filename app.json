@@ -18,7 +18,8 @@
       "bundleIdentifier": "com.stefaniebaarman.synq",
       "buildNumber": "4",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
@@ -36,6 +37,19 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Synq uses your location for nearby hangout suggestions and place search when you use those features."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Synq needs access to your photo library so you can choose a profile photo.",
+          "cameraPermission": "Synq can use the camera when you take a new profile photo."
+        }
+      ],
       [
         "expo-build-properties",
         {

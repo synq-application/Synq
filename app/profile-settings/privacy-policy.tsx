@@ -102,6 +102,36 @@ export default function PrivacyPolicyScreen() {
           </P>
         </Section>
 
+        <Section title="Photos and camera">
+          <P>
+            If you add or change your profile photo, Synq may access your photo
+            library or camera only when you pick that action. We use the image to
+            show your profile to people you connect with.
+          </P>
+        </Section>
+
+        <Section title="Push notifications">
+          <P>
+            If you allow notifications, Synq may send alerts for things like new
+            messages and friend requests. You can turn notifications off in your
+            device settings or within the app where offered.
+          </P>
+        </Section>
+
+        <Section title="App Store privacy labels">
+          <P>
+            When you submit or update the app in App Store Connect, answer the
+            App Privacy questionnaire to match this policy: account and profile
+            information (name, photo, contact identifiers you provide); user
+            content (messages, memos, availability you share); identifiers
+            (user ID); usage data (app interactions as needed to run the app);
+            diagnostics (crash or performance data if you collect it); location
+            (coarse or precise only if you use location features); and photos
+            (if the user selects images). Link this privacy policy URL in App
+            Store Connect and keep the two in sync when behavior changes.
+          </P>
+        </Section>
+
         <Section title="Messages">
           <P>
             Messages are used solely to facilitate communication between you and

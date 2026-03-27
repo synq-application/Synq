@@ -41,7 +41,9 @@ export default function EmailSignup() {
       const cleanedEmail = email.trim().toLowerCase();
       await createUserWithEmailAndPassword(auth, cleanedEmail, password);
     } catch (e: any) {
-      console.log("email signup error", e?.code, e?.message);
+      if (__DEV__) {
+        console.error("email signup error", e?.code, e?.message);
+      }
       showAlert(
         e?.message ?? "Please check your email and password and try again.",
         "Couldn’t sign up"

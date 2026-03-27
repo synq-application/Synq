@@ -37,7 +37,9 @@ export default function Verify() {
       // ✅ signed in
       router.replace("/(tabs)");
     } catch (err: any) {
-      console.log("verify error", err);
+      if (__DEV__) {
+        console.error("verify error", err);
+      }
       setAlertMessage(err?.message ?? "Please try again.");
       setAlertVisible(true);
     } finally {

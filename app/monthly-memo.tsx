@@ -286,7 +286,6 @@ export default function OpenPlans({
                       textColor="white"
                       onChange={(e, t) => {
                         if (t) {
-                          console.log("PICKED TIME:", t);
                           const updated = new Date(selectedDate);
                           updated.setHours(t.getHours());
                           updated.setMinutes(t.getMinutes());

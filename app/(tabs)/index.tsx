@@ -34,6 +34,7 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  useWindowDimensions,
   Vibration,
   View
 } from 'react-native';
@@ -56,6 +57,12 @@ function prefetchParticipantAvatars(chat: { participantImages?: Record<string, u
 }
 
 export default function SynqScreen() {
+  const { width: windowWidth } = useWindowDimensions();
+  const tabletContentStyle =
+    windowWidth >= 768
+      ? { maxWidth: 840, width: '100%' as const, alignSelf: 'center' as const }
+      : undefined;
+
   const [memo, setMemo] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [status, setStatus] = useState<SynqStatus>('idle');
@@ -660,17 +667,27 @@ export default function SynqScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={styles.container}>
+      <View style={[styles.container, tabletContentStyle]}>
         <StatusBar barStyle="light-content" />
         {status === 'active' && (
           <View style={{ flex: 1 }}>
             <View style={styles.activeHeader}>
-              <TouchableOpacity onPress={() => setIsInboxVisible(true)} style={styles.headerIconContainer}>
+              <TouchableOpacity
+                onPress={() => setIsInboxVisible(true)}
+                style={styles.headerIconContainer}
+                accessibilityRole="button"
+                accessibilityLabel="Open messages"
+              >
                 <Ionicons name="chatbubbles-outline" size={28} color="white" />
                 {hasUnread && <View style={styles.badge} />}
               </TouchableOpacity>
               <Text style={styles.headerTitle}>Synq is active</Text>
-              <TouchableOpacity onPress={() => setIsEditModalVisible(true)} style={styles.headerIconContainer}>
+              <TouchableOpacity
+                onPress={() => setIsEditModalVisible(true)}
+                style={styles.headerIconContainer}
+                accessibilityRole="button"
+                accessibilityLabel="Edit Synq memo and settings"
+              >
                 <Ionicons name="create-outline" size={26} color="white" />
               </TouchableOpacity>
             </View>
@@ -736,11 +753,18 @@ export default function SynqScreen() {
                 style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
                 onPress={handleConnect}
                 disabled={!selectedFriends.length}
+                accessibilityRole="button"
+                accessibilityLabel={`Connect with ${selectedFriends.length} selected friends`}
               >
                 <Text style={styles.btnText}>Connect ({selectedFriends.length})</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={endSynq} style={styles.deactivateLink}>
+              <TouchableOpacity
+                onPress={endSynq}
+                style={styles.deactivateLink}
+                accessibilityRole="button"
+                accessibilityLabel="End Synq"
+              >
                 <Text style={styles.deactivateLinkText}>End Synq</Text>
               </TouchableOpacity>
             </View>
@@ -777,7 +801,11 @@ export default function SynqScreen() {
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Messages</Text>
-              <TouchableOpacity onPress={() => setIsInboxVisible(false)}>
+              <TouchableOpacity
+                onPress={() => setIsInboxVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close messages"
+              >
                 <Ionicons name="close-circle" size={28} color="#444" />
               </TouchableOpacity>
             </View>
@@ -794,7 +822,12 @@ export default function SynqScreen() {
                     }
                   }}
                   renderRightActions={() => (
-                    <TouchableOpacity style={styles.deleteAction} onPress={() => handleDeleteChat(item.id)}>
+                    <TouchableOpacity
+                      style={styles.deleteAction}
+                      onPress={() => handleDeleteChat(item.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete conversation"
+                    >
                       <Ionicons name="trash" size={24} color="white" />
                     </TouchableOpacity>
                   )}
@@ -876,6 +909,8 @@ export default function SynqScreen() {
                     }}
                     style={styles.aiChip}
                     activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open Synq AI place suggestions"
                   >
                     <Ionicons name="sparkles" size={14} color={ACCENT} />
                     <Text style={styles.aiChipText}>{rotatingAIText}</Text>
@@ -889,6 +924,8 @@ export default function SynqScreen() {
                   setShowAICard(false);
                   setShowOptionsList(false);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel="Close chat"
               >
                 <Ionicons name="close-circle" size={28} color="#444" />
               </TouchableOpacity>
@@ -1034,7 +1071,12 @@ export default function SynqScreen() {
                   scrollEnabled
                   returnKeyType="default"
                 />
-                <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}>
+                <TouchableOpacity
+                  onPress={sendMessage}
+                  style={styles.sendBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send message"
+                >
                   <Ionicons name="send" size={18} color="black" />
                 </TouchableOpacity>
               </View>

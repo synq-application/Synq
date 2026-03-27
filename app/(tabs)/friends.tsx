@@ -555,6 +555,7 @@ function SearchModal({
         since: serverTimestamp(),
         displayName: senderName,
         imageurl: senderImageUrl,
+        notifyOnCreate: true,
       });
       batch.set(doc(db, "users", senderId, "friends", myId), {
         synqCount: 0,

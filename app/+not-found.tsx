@@ -1,17 +1,17 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
-
-import { Text, View } from '@/components/Themed';
+import { Link, Stack } from "expo-router";
+import { StyleSheet, Text, View } from "react-native";
+import { ACCENT, BG, fonts, TYPE_BODY, TYPE_TITLE } from "../constants/Variables";
 
 export default function NotFoundScreen() {
   return (
     <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
+      <Stack.Screen options={{ title: "Not found", headerShown: false }} />
       <View style={styles.container}>
-        <Text style={styles.title}>This screen doesn't exist.</Text>
+        <Text style={styles.title}>This screen doesn’t exist.</Text>
+        <Text style={styles.subtitle}>The link may be outdated or mistyped.</Text>
 
-        <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Go to home screen!</Text>
+        <Link href="/" style={styles.link} accessibilityRole="link" accessibilityLabel="Go to home">
+          <Text style={styles.linkText}>Go to home</Text>
         </Link>
       </View>
     </>
@@ -21,20 +21,34 @@ export default function NotFoundScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: BG,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: TYPE_TITLE,
+    fontFamily: fonts.heavy,
+    color: "white",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: TYPE_BODY,
+    fontFamily: fonts.medium,
+    color: "rgba(255,255,255,0.55)",
+    textAlign: "center",
+    marginBottom: 28,
   },
   link: {
-    marginTop: 15,
-    paddingVertical: 15,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    backgroundColor: ACCENT,
   },
   linkText: {
-    fontSize: 14,
-    color: '#2e78b7',
+    fontSize: TYPE_BODY,
+    fontFamily: fonts.heavy,
+    color: "#090A0B",
   },
 });

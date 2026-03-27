@@ -23,6 +23,7 @@ export default function TabsLayout() {
         name="friends"
         options={{
           title: "Friends",
+          tabBarAccessibilityLabel: "Friends",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
           ),
@@ -34,6 +35,7 @@ export default function TabsLayout() {
         options={{
           title: "",
           tabBarShowLabel: true,
+          tabBarAccessibilityLabel: "Synq home",
           tabBarIcon: ({ focused }) => (
             <View style={[styles.synqButton, focused && styles.synqButtonActive]}>
               <ExpoImage
@@ -52,6 +54,7 @@ export default function TabsLayout() {
         name="me"
         options={{
           title: "Me",
+          tabBarAccessibilityLabel: "Me, profile and settings",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-circle-outline" size={size} color={color} />
           ),

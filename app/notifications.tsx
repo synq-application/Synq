@@ -204,6 +204,7 @@ export default function NotificationsScreen() {
           since: serverTimestamp(),
           displayName: senderName,
           imageurl: senderImageUrl || DEFAULT_AVATAR,
+          notifyOnCreate: true,
         });
 
         batch.set(doc(db, "users", senderId, "friends", myId), {

@@ -39,6 +39,7 @@ export default function InactiveSynqView({
           placeholder="Coffee? Walk? Quick bite?"
           placeholderTextColor="#6A6A6A"
           blurOnSubmit
+          accessibilityLabel="Optional memo shown to friends when you start Synq"
         />
       </View>
 
@@ -47,6 +48,8 @@ export default function InactiveSynqView({
         style={styles.pulseBox}
         activeOpacity={0.8}
         disabled={isStartingSynq}
+        accessibilityRole="button"
+        accessibilityLabel="Start Synq and show friends you are available"
       >
         {isStartingSynq ? (
           <ActivityIndicator color={ACCENT} size="large" />
