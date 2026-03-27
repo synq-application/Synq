@@ -672,7 +672,7 @@ export default function SynqScreen() {
                     {item.city && (
                       <View style={styles.locationRow}>
                         <Ionicons
-                          name="location-sharp"
+                          name="location-outline"
                           size={14}
                           color="#999"
                           style={{ marginRight: 4 }}
