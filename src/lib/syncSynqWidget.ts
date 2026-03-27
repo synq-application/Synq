@@ -1,13 +1,17 @@
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { AppState, type AppStateStatus, Platform } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import type { DocumentData } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
+const isExpoGo =
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
 /**
  * Apple Developer: enable App Groups for the main app ID and add
  * `group.com.stefaniebaarman.synq` (must match app.json expo-widgets groupIdentifier).
- * Then run a new EAS iOS build; widgets do not run in Expo Go.
+ * Use an EAS / dev build with widgets; Expo Go does not include the ExpoUI native module.
  */
 
 export function mapUserDocToWidgetProps(data: DocumentData | undefined): {
@@ -31,11 +35,15 @@ type WidgetHandle = {
 };
 
 function getWidget(): WidgetHandle | null {
-  if (Platform.OS !== "ios") return null;
-  const mod = require("../../widgets/SynqGlanceWidget") as {
-    default: WidgetHandle | null;
-  };
-  return mod.default;
+  if (Platform.OS !== "ios" || isExpoGo) return null;
+  try {
+    const mod = require("../../widgets/SynqGlanceWidget") as {
+      default: WidgetHandle | null;
+    };
+    return mod.default;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -44,8 +52,13 @@ function getWidget(): WidgetHandle | null {
  */
 export function startSynqGlanceWidgetSync(): () => void {
   if (Platform.OS !== "ios") return () => {};
+  if (isExpoGo) return () => {};
 
-  require("../../widgets/SynqGlanceWidget");
+  try {
+    require("../../widgets/SynqGlanceWidget");
+  } catch {
+    return () => {};
+  }
 
   let unsubDoc: (() => void) | undefined;
   let lastProps: ReturnType<typeof mapUserDocToWidgetProps> | null = null;
