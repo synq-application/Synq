@@ -47,6 +47,14 @@ import { openInMaps } from '../map-utils';
 import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
 
+function prefetchParticipantAvatars(chat: { participantImages?: Record<string, unknown> } | null | undefined) {
+  const images = chat?.participantImages || {};
+  Object.values(images).forEach((url) => {
+    const uri = resolveAvatar(url as string | undefined);
+    if (uri) ExpoImage.prefetch(uri).catch(() => {});
+  });
+}
+
 export default function SynqScreen() {
   const [memo, setMemo] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -123,6 +131,12 @@ export default function SynqScreen() {
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('openChat', async (data) => {
       if (data.chatId) {
+        try {
+          const snap = await getDoc(doc(db, "chats", data.chatId));
+          if (snap.exists()) {
+            prefetchParticipantAvatars(snap.data() as any);
+          }
+        } catch {}
         setActiveChatId(data.chatId);
         setIsChatVisible(true);
         setIsInboxVisible(false);
@@ -301,6 +315,27 @@ export default function SynqScreen() {
     });
   }, [activeChatId, isChatVisible]);
 
+  /** Prefetch thread avatars so they appear immediately (same caching as rest of the app). */
+  useEffect(() => {
+    if (!activeChatId || !isChatVisible) return;
+    const chat = allChats.find((c: any) => c.id === activeChatId);
+    const prefetchUri = (url: unknown) => {
+      const uri = resolveAvatar(url as string | undefined);
+      if (uri) ExpoImage.prefetch(uri).catch(() => {});
+    };
+    Object.values(chat?.participantImages || {}).forEach((u) => prefetchUri(u));
+    const seen = new Set<string>();
+    messages.forEach((m: any) => {
+      const url =
+        chat?.participantImages?.[m.senderId] || m.imageurl;
+      const uri = resolveAvatar(url);
+      if (uri && !seen.has(uri)) {
+        seen.add(uri);
+        ExpoImage.prefetch(uri).catch(() => {});
+      }
+    });
+  }, [activeChatId, isChatVisible, allChats, messages]);
+
   useEffect(() => {
     let timer: any;
     if (status === 'activating') {
@@ -432,6 +467,7 @@ export default function SynqScreen() {
     try {
       const existing = allChats.find((c) => JSON.stringify(c.participants.sort()) === JSON.stringify(participants));
       if (existing) {
+        prefetchParticipantAvatars(existing);
         setActiveChatId(existing.id);
       } else {
         const nameMap: any = {};
@@ -443,6 +479,7 @@ export default function SynqScreen() {
             imgMap[uid] = uSnap.data().imageurl || DEFAULT_AVATAR;
           }
         }
+        prefetchParticipantAvatars({ participantImages: imgMap });
         const chatRef = await addDoc(collection(db, 'chats'), {
           participants,
           participantNames: nameMap,
@@ -765,6 +802,7 @@ export default function SynqScreen() {
                   <TouchableOpacity
                     style={styles.inboxItem}
                     onPress={async () => {
+                      prefetchParticipantAvatars(item);
                       setActiveChatId(item.id);
                       setIsInboxVisible(false);
                       setIsChatVisible(true);
@@ -920,9 +958,12 @@ export default function SynqScreen() {
                         >
                           {/* Avatar */}
                           {!isMe && (
-                            <Image
+                            <ExpoImage
                               source={{ uri: senderAvatar }}
                               style={styles.chatAvatar}
+                              cachePolicy="memory-disk"
+                              transition={0}
+                              recyclingKey={senderAvatar}
                             />
                           )}
 
