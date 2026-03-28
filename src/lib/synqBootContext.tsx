@@ -1,6 +1,5 @@
 import React, { createContext, useContext } from "react";
 
-/** Set in root layout after AsyncStorage read so Synq tab can paint active immediately on reload. */
 export type SynqBootValue = {
   cachedSynqActive: boolean;
 };

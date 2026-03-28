@@ -32,6 +32,7 @@ import {
   TYPE_TITLE,
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
+import { resolveAvatar } from "./helpers";
 
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
@@ -154,11 +155,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.userSection}>
           <Image
-            source={{
-              uri:
-                userData?.imageurl ||
-                "https://www.gravatar.com/avatar/?d=mp",
-            }}
+            source={{ uri: resolveAvatar(userData?.imageurl) }}
             style={styles.avatar}
           />
           <Text style={styles.userName}>

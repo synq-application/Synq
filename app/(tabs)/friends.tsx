@@ -6,7 +6,6 @@ import {
   Friend,
   MUTED,
   MUTED2,
-  MUTED3,
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
@@ -48,10 +47,9 @@ import {
   warmSuggestedCache,
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
+import { resolveAvatar } from "../helpers";
 
 const { width } = Dimensions.get("window");
-const isRemoteImageUri = (value: unknown): value is string =>
-  typeof value === "string" && /^https?:\/\//i.test(value);
 
 const sortFriendsByName = (list: Friend[]) =>
   [...list].sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
@@ -114,8 +112,7 @@ export default function FriendsScreen() {
         const sortedFriends = sortFriendsByName(fetchedFriends);
         sortedFriends.forEach((friend) => {
           profileCache[friend.id] = friend;
-          const imageUrl = (friend as any)?.imageurl;
-          if (isRemoteImageUri(imageUrl)) ExpoImage.prefetch(imageUrl).catch(() => {});
+          ExpoImage.prefetch(resolveAvatar((friend as any)?.imageurl)).catch(() => {});
         });
 
         friendsListCacheByUser[myId] = sortedFriends;
@@ -161,16 +158,12 @@ export default function FriendsScreen() {
       }
     >
       <View style={styles.avatar}>
-        {isRemoteImageUri((item as any)?.imageurl) ? (
-          <ExpoImage
-            source={{ uri: (item as any).imageurl }}
-            style={styles.img}
-            cachePolicy="memory-disk"
-            transition={0}
-          />
-        ) : (
-          <Icon name="person" size={22} color={MUTED3} />
-        )}
+        <ExpoImage
+          source={{ uri: resolveAvatar((item as any)?.imageurl) }}
+          style={styles.img}
+          cachePolicy="memory-disk"
+          transition={0}
+        />
       </View>
 
       <View style={{ flex: 1, justifyContent: "center" }}>
@@ -325,7 +318,7 @@ function SearchModal({
         );
         suggestedCacheByUser[myId] = nextSuggested;
         nextSuggested.forEach((user) => {
-          if (isRemoteImageUri(user?.imageurl)) ExpoImage.prefetch(user.imageurl).catch(() => {});
+          ExpoImage.prefetch(resolveAvatar(user?.imageurl)).catch(() => {});
         });
         setSuggested(nextSuggested);
         hydratePendingForUsers(nextSuggested.map((u) => u.id));
@@ -640,16 +633,12 @@ function SearchModal({
                     activeOpacity={0.8}
                   >
                     <View style={styles.avatar}>
-                      {isRemoteImageUri(item.imageurl) ? (
-                        <ExpoImage
-                          source={{ uri: item.imageurl }}
-                          style={styles.img}
-                          cachePolicy="memory-disk"
-                          transition={0}
-                        />
-                      ) : (
-                        <Icon name="person" size={22} color={MUTED3} />
-                      )}
+                      <ExpoImage
+                        source={{ uri: resolveAvatar(item.imageurl) }}
+                        style={styles.img}
+                        cachePolicy="memory-disk"
+                        transition={0}
+                      />
                     </View>
 
                     <View style={{ paddingRight: 12 }}>
@@ -712,16 +701,12 @@ function SearchModal({
               <View style={styles.searchResult}>
                 <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                   <View style={styles.avatar}>
-                    {isRemoteImageUri(item.imageurl) ? (
-                      <ExpoImage
-                        source={{ uri: item.imageurl }}
-                        style={styles.img}
-                        cachePolicy="memory-disk"
-                        transition={0}
-                      />
-                    ) : (
-                      <Icon name="person" size={22} color={MUTED3} />
-                    )}
+                    <ExpoImage
+                      source={{ uri: resolveAvatar(item.imageurl) }}
+                      style={styles.img}
+                      cachePolicy="memory-disk"
+                      transition={0}
+                    />
                   </View>
                   <View style={{ paddingRight: 12 }}>
                     <Text style={styles.friendName}>

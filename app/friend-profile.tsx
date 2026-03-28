@@ -49,11 +49,8 @@ import {
 } from "../src/lib/socialCache";
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
-import { formatLastSynq } from "./helpers";
+import { formatLastSynq, resolveAvatar } from "./helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
-
-const isRemoteImageUri = (value: unknown): value is string =>
-  typeof value === "string" && /^https?:\/\//i.test(value);
 
 export default function FriendProfile() {
   const { friendId, returnToAddFriends } = useLocalSearchParams<{
@@ -716,18 +713,12 @@ export default function FriendProfile() {
           </TouchableOpacity>
         </View>
         <View style={styles.header}>
-          {isRemoteImageUri(friend.imageurl) ? (
-            <ExpoImage
-              source={{ uri: friend.imageurl }}
-              style={styles.avatar}
-              cachePolicy="memory-disk"
-              transition={0}
-            />
-          ) : (
-            <View style={[styles.avatar, styles.avatarFallback]}>
-              <Icon name="person" size={56} color="rgba(255,255,255,0.28)" />
-            </View>
-          )}
+          <ExpoImage
+            source={{ uri: resolveAvatar(friend.imageurl) }}
+            style={styles.avatar}
+            cachePolicy="memory-disk"
+            transition={0}
+          />
 
           <Text style={styles.name}>
             {friend.displayName || "User"}
@@ -788,22 +779,12 @@ export default function FriendProfile() {
                           { transform: [{ scale }] },
                         ]}
                       >
-                        {isRemoteImageUri(item.imageurl) ? (
-                          <ExpoImage
-                            source={{ uri: item.imageurl }}
-                            style={styles.connImg}
-                            cachePolicy="memory-disk"
-                            transition={0}
-                          />
-                        ) : (
-                          <View style={styles.connDefaultAvatar}>
-                            <Icon
-                              name="person"
-                              size={22}
-                              color="rgba(255,255,255,0.2)"
-                            />
-                          </View>
-                        )}
+                        <ExpoImage
+                          source={{ uri: resolveAvatar(item.imageurl) }}
+                          style={styles.connImg}
+                          cachePolicy="memory-disk"
+                          transition={0}
+                        />
                       </Animated.View>
                     </TouchableOpacity>
 
@@ -1002,15 +983,6 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 34,
-  },
-
-  connDefaultAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#1a1a1a",
-    justifyContent: "center",
-    alignItems: "center",
   },
 
   connName: {

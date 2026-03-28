@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-/** Persisted so cold start / reload can restore UI before Firestore returns. */
 export function synqStatusStorageKey(uid: string) {
   return `synq-status:${uid}`;
 }

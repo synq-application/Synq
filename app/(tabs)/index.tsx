@@ -41,7 +41,7 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, aiPrompts, BG, BORDER, BUTTON_RADIUS, DEFAULT_AVATAR, EXPIRATION_HOURS, fonts, MODAL_RADIUS, MUTED } from '../../constants/Variables';
+import { ACCENT, aiPrompts, BG, BORDER, BUTTON_RADIUS, EXPIRATION_HOURS, fonts, MODAL_RADIUS, MUTED } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
@@ -58,7 +58,6 @@ function prefetchParticipantAvatars(chat: { participantImages?: Record<string, u
   });
 }
 
-/** Single source of truth so we never paint hydrated+idle before server says active (fixes inactive flash). */
 type SynqUi = { status: SynqStatus; hydrated: boolean };
 
 function setSynqStatus(setSynq: Dispatch<SetStateAction<SynqUi>>, status: SynqStatus) {
@@ -114,9 +113,7 @@ export default function SynqScreen() {
       await updateDoc(doc(db, 'chats', chatId), {
         [`lastReadBy.${myId}`]: serverTimestamp(),
       });
-    } catch (e) {
-      console.error('Failed to mark chat read', e);
-    }
+    } catch {}
   };
 
   const DOUBLE_TAP_MS = 320;
@@ -196,8 +193,7 @@ export default function SynqScreen() {
             AsyncStorage.setItem(synqStatusStorageKey(uid), "idle").catch(() => {});
           }
         }
-      } catch (e) {
-        console.error(e);
+      } catch {
         nextStatus = "idle";
       }
       setSynq({ status: nextStatus, hydrated: true });
@@ -322,7 +318,6 @@ export default function SynqScreen() {
     });
   }, [activeChatId, isChatVisible]);
 
-  /** Prefetch thread avatars so they appear immediately (same caching as rest of the app). */
   useEffect(() => {
     if (!activeChatId || !isChatVisible) return;
     const chat = allChats.find((c: any) => c.id === activeChatId);
@@ -402,9 +397,7 @@ export default function SynqScreen() {
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
-      console.error('AI Error:', error);
-    } finally {
+    } catch {} finally {
       setIsAILoading(false);
       setIsThinking(false)
     }
@@ -421,7 +414,7 @@ export default function SynqScreen() {
       await addDoc(collection(db, 'chats', activeChatId, 'messages'), {
         text: textToSend,
         senderId: auth.currentUser.uid,
-        imageurl: userProfile?.imageurl || DEFAULT_AVATAR,
+        imageurl: resolveAvatar(userProfile?.imageurl),
         venueImage: selectedOption?.imageUrl || selectedOption?.imageurl || null,
         createdAt: serverTimestamp()
       });
@@ -436,9 +429,7 @@ export default function SynqScreen() {
       setShowOptionsList(false);
       setSelectedOption(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
-      console.error('Failed to share AI suggestion', e);
-    }
+    } catch {}
   };
 
   const startSynq = async () => {
@@ -453,9 +444,7 @@ export default function SynqScreen() {
       });
       AsyncStorage.setItem(synqStatusStorageKey(auth.currentUser.uid), "active").catch(() => {});
       setSynqStatus(setSynq, 'activating');
-    } catch (e) {
-      console.error("Failed to start Synq", e);
-    } finally {
+    } catch {} finally {
       setIsStartingSynq(false);
     }
   };
@@ -483,7 +472,7 @@ export default function SynqScreen() {
           const uSnap = await getDoc(doc(db, 'users', uid));
           if (uSnap.exists()) {
             nameMap[uid] = uSnap.data().displayName;
-            imgMap[uid] = uSnap.data().imageurl || DEFAULT_AVATAR;
+            imgMap[uid] = resolveAvatar(uSnap.data().imageurl);
           }
         }
         prefetchParticipantAvatars({ participantImages: imgMap });
@@ -499,9 +488,7 @@ export default function SynqScreen() {
       }
       setIsChatVisible(true);
       setSelectedFriends([]);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch {}
   };
 
   const sendMessage = async () => {
@@ -517,7 +504,7 @@ export default function SynqScreen() {
       await addDoc(collection(db, 'chats', activeChatId, 'messages'), {
         text,
         senderId: myId,
-        imageurl: userProfile?.imageurl || DEFAULT_AVATAR,
+        imageurl: resolveAvatar(userProfile?.imageurl),
         createdAt: serverTimestamp()
       });
 
@@ -542,9 +529,7 @@ export default function SynqScreen() {
           lastSynqAt: serverTimestamp(),
         }).catch(() => { });
       });
-    } catch (e) {
-      console.error('Failed to send message', e);
-    }
+    } catch {}
   };
 
   const handleDeleteChat = async (chatId: string) => {
@@ -564,9 +549,7 @@ export default function SynqScreen() {
       await updateDoc(messageRef, {
         [`reactions.${userId}`]: hasReacted ? deleteField() : "heart",
       });
-    } catch (e) {
-      console.error("Failed to toggle reaction", e);
-    }
+    } catch {}
   };
 
   const firstName = (fullName: string) =>
@@ -662,7 +645,6 @@ export default function SynqScreen() {
   };
 
   const bootActive = synqBoot?.cachedSynqActive === true;
-  /** No idle UI until hydrated; without optimistic active, show solid bg (not inactive). */
   if (!hydrated && !bootActive) return <View style={styles.darkFill} />;
 
   return (
@@ -715,7 +697,7 @@ export default function SynqScreen() {
                   style={[styles.friendCard, selectedFriends.includes(item.id) && { borderColor: ACCENT }]}
                 >
                   <ExpoImage
-                    source={{ uri: item.imageurl || DEFAULT_AVATAR }}
+                    source={{ uri: resolveAvatar(item.imageurl) }}
                     style={styles.friendImg}
                     cachePolicy="memory-disk"
                     transition={0}
@@ -884,9 +866,7 @@ export default function SynqScreen() {
                 try {
                   await deleteDoc(doc(db, "chats", chatId));
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                } catch (e) {
-                  console.error("Failed to delete chat", e);
-                }
+                } catch {}
               }}
             />
           </View>
@@ -948,7 +928,9 @@ export default function SynqScreen() {
                     const isSystemIdea = item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
                     const currentChat = allChats.find((c) => c.id === activeChatId);
                     const senderAvatar =
-                      currentChat?.participantImages?.[item.senderId] || item.imageurl || DEFAULT_AVATAR;
+                      resolveAvatar(
+                        currentChat?.participantImages?.[item.senderId] || item.imageurl
+                      );
                     if (isSystemIdea) {
                       const { name, address } = parseIdeaText(item.text);
 
@@ -993,7 +975,6 @@ export default function SynqScreen() {
                             alignItems: "flex-end",
                           }}
                         >
-                          {/* Avatar */}
                           {!isMe && (
                             <ExpoImage
                               source={{ uri: senderAvatar }}
@@ -1004,7 +985,6 @@ export default function SynqScreen() {
                             />
                           )}
 
-                          {/* Bubble — double-tap to heart */}
                           <View style={{ maxWidth: "75%" }}>
                             <Pressable
                               onPress={() =>
@@ -1498,7 +1478,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
   },
-  /** Inbox: one other participant — single circle (iMessage-style size). */
   inboxSingleWrap: {
     width: 56,
     height: 56,
@@ -1513,7 +1492,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "#1C1C1E",
   },
-  /** Inbox: 2+ others — max 2 faces, stacked with strong overlap (iMessage-style). */
   inboxStackWrap: {
     width: 56,
     height: 54,

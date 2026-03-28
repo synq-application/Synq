@@ -1,5 +1,6 @@
 export const ACCENT = "#00FF85";
-export const DEFAULT_AVATAR = 'https://www.gravatar.com/avatar/?d=mp';
+export const DEFAULT_AVATAR =
+  "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&s=256";
 export const EXPIRATION_HOURS = 12;
 export const synqSvg = `
   <svg width="390" height="565" viewBox="0 0 390 565" fill="none" xmlns="http://www.w3.org/2000/svg">

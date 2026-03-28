@@ -101,7 +101,6 @@ export default function RootLayout() {
   } | null>(null);
   const synqBootUidRef = useRef<string | null>(null);
 
-  /** Set when user taps a push so navigation runs even if auth/user state does not change. */
   const [pendingNotificationTap, setPendingNotificationTap] = useState<
     | { kind: "chat"; chatId: string }
     | { kind: "notifications" }
@@ -161,7 +160,6 @@ export default function RootLayout() {
       return;
     }
     let cancelled = false;
-    /** Avoid clearing on React Strict Mode re-run (same uid) — prevents extra loading gate + wrong boot. */
     if (synqBootUidRef.current !== user.uid) {
       synqBootUidRef.current = user.uid;
       setSynqBoot(null);
@@ -185,9 +183,7 @@ export default function RootLayout() {
           require("../assets/SYNQ-2.png"),
           require("../assets/pulse.gif"),
         ]);
-      } catch (e) {
-        console.error("Asset preload failed:", e);
-      } finally {
+      } catch {} finally {
         if (mounted) setAssetsReady(true);
       }
     };
@@ -211,9 +207,7 @@ export default function RootLayout() {
         if (token) {
           try {
             await updateDoc(doc(db, "users", u.uid), { pushToken: token });
-          } catch (e) {
-            console.error("Error saving push token:", e);
-          }
+          } catch {}
         }
       }
     });

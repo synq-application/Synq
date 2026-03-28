@@ -27,7 +27,6 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
-  DEFAULT_AVATAR,
   RADIUS_MD,
   SPACE_3,
   SPACE_4,
@@ -41,11 +40,10 @@ import {
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
+import { resolveAvatar } from "./helpers";
 
 const BACKGROUND = BG;
 const SURFACE = "rgba(255,255,255,0.06)";
-const isRemoteImageUri = (value: unknown): value is string =>
-  typeof value === "string" && /^https?:\/\//i.test(value);
 
 const fonts = {
   black: "Avenir-Black",
@@ -168,7 +166,7 @@ export default function NotificationsScreen() {
           auth.currentUser.displayName ||
           "User";
 
-        const myImageUrl = meData?.imageurl || DEFAULT_AVATAR;
+        const myImageUrl = resolveAvatar(meData?.imageurl);
 
         let senderName =
           request.senderName ||
@@ -192,8 +190,7 @@ export default function NotificationsScreen() {
               "User";
             senderImageUrl =
               senderImageUrl ||
-              senderData?.imageurl ||
-              DEFAULT_AVATAR;
+              resolveAvatar(senderData?.imageurl);
           }
         }
 
@@ -203,7 +200,7 @@ export default function NotificationsScreen() {
           synqCount: 0,
           since: serverTimestamp(),
           displayName: senderName,
-          imageurl: senderImageUrl || DEFAULT_AVATAR,
+          imageurl: resolveAvatar(senderImageUrl),
           notifyOnCreate: true,
         });
 
@@ -211,7 +208,7 @@ export default function NotificationsScreen() {
           synqCount: 0,
           since: serverTimestamp(),
           displayName: myName,
-          imageurl: myImageUrl || DEFAULT_AVATAR,
+          imageurl: myImageUrl,
         });
 
         batch.delete(
@@ -243,11 +240,10 @@ export default function NotificationsScreen() {
       <View style={styles.row}>
         <View style={styles.rowLeft}>
           <View style={styles.avatar}>
-            {isRemoteImageUri(fromImageUrl) ? (
-              <Image source={{ uri: fromImageUrl }} style={styles.avatarImg} />
-            ) : (
-              <Image source={{ uri: DEFAULT_AVATAR }} style={styles.avatarImg} />
-            )}
+            <Image
+              source={{ uri: resolveAvatar(fromImageUrl) }}
+              style={styles.avatarImg}
+            />
           </View>
 
           <View style={{ flex: 1 }}>

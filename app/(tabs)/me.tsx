@@ -41,6 +41,7 @@ import {
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
+import { resolveAvatar } from "../helpers";
 import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
@@ -51,9 +52,6 @@ type Connection = {
   imageUrl: string | null;
   synqCount: number;
 };
-const isRemoteImageUri = (value: unknown): value is string =>
-  typeof value === "string" && /^https?:\/\//i.test(value);
-
 export default function ProfileScreen() {
   const myId = auth.currentUser?.uid ?? "";
   const cachedConnections = myId ? connectionsCacheByUser[myId] ?? [] : [];
@@ -355,17 +353,13 @@ export default function ProfileScreen() {
           <TouchableOpacity onPress={pickImage} style={styles.imageWrapper}>
             {isUploading ? (
               <ActivityIndicator color={ACCENT} />
-            ) : isRemoteImageUri(profileImage) ? (
+            ) : (
               <ExpoImage
-                source={{ uri: profileImage }}
+                source={{ uri: resolveAvatar(profileImage) }}
                 style={styles.profileImg}
                 cachePolicy="memory-disk"
                 transition={0}
               />
-            ) : (
-              <View style={styles.defaultAvatarContainer}>
-                <Icon name="person" size={80} color="rgba(255,255,255,0.2)" />
-              </View>
             )}
           </TouchableOpacity>
 
@@ -447,22 +441,12 @@ export default function ProfileScreen() {
                       { borderColor: ACCENT, borderWidth: 1 },
                     ]}
                   >
-                    {isRemoteImageUri(item.imageUrl) ? (
-                      <ExpoImage
-                        source={{ uri: item.imageUrl }}
-                        style={styles.connImg}
-                        cachePolicy="memory-disk"
-                        transition={0}
-                      />
-                    ) : (
-                      <View style={[styles.connImg, styles.connDefaultAvatar]}>
-                        <Icon
-                          name="person"
-                          size={24}
-                          color="rgba(255,255,255,0.2)"
-                        />
-                      </View>
-                    )}
+                    <ExpoImage
+                      source={{ uri: resolveAvatar(item.imageUrl) }}
+                      style={styles.connImg}
+                      cachePolicy="memory-disk"
+                      transition={0}
+                    />
                     {i === 0 && (
                       <View style={styles.crown}>
                         <Icon name="star" size={10} color="black" />
@@ -667,7 +651,6 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   profileImg: { width: "100%", height: "100%" },
-  defaultAvatarContainer: { width: "100%", height: "100%", justifyContent: "center", alignItems: "center" },
   qrToggle: { position: "absolute", bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
   nameText: { color: ACCENT, fontSize: 26, fontFamily: fonts.heavy, letterSpacing: 0.2, marginTop: 10 },
   locationRow: {
@@ -692,7 +675,6 @@ const styles = StyleSheet.create({
   connItem: { alignItems: "center", width: 80 },
   imageCircle: { width: 72, height: 72, borderRadius: 36, justifyContent: "center", alignItems: "center", position: "relative" },
   connImg: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#222" },
-  connDefaultAvatar: { justifyContent: "center", alignItems: "center", backgroundColor: "#1a1a1a" },
   crown: {
     position: "absolute",
     bottom: 0,
