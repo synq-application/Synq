@@ -9,9 +9,9 @@ const isExpoGo =
   Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 /**
- * Apple Developer: enable App Groups for the main app ID and add
- * `group.com.stefaniebaarman.synq` (must match app.json expo-widgets groupIdentifier).
- * Use an EAS / dev build with widgets; Expo Go does not include the ExpoUI native module.
+ * Home screen widget (expo-widgets + @expo/ui) was removed for Expo SDK 54 / Expo Go.
+ * Re-add the widget target and `widgets/SynqGlanceWidget.ios.tsx` when you upgrade to SDK 55+.
+ * Expo Go: no native widget module (noop).
  */
 
 export function mapUserDocToWidgetProps(data: DocumentData | undefined): {
