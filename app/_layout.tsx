@@ -14,6 +14,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -26,7 +27,9 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ACCENT, BG, fonts, TYPE_CAPTION } from "../constants/Variables";
+import { SynqBootProvider } from "../src/lib/synqBootContext";
 import { auth, db } from "../src/lib/firebase";
+import { readCachedSynqActive } from "../src/lib/synqSession";
 import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
@@ -93,6 +96,10 @@ export default function RootLayout() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [assetsReady, setAssetsReady] = useState(false);
+  const [synqBoot, setSynqBoot] = useState<{
+    cachedSynqActive: boolean;
+  } | null>(null);
+  const synqBootUidRef = useRef<string | null>(null);
 
   /** Set when user taps a push so navigation runs even if auth/user state does not change. */
   const [pendingNotificationTap, setPendingNotificationTap] = useState<
@@ -146,6 +153,29 @@ export default function RootLayout() {
   useEffect(() => {
     return startSynqGlanceWidgetSync();
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      synqBootUidRef.current = null;
+      setSynqBoot(null);
+      return;
+    }
+    let cancelled = false;
+    /** Avoid clearing on React Strict Mode re-run (same uid) — prevents extra loading gate + wrong boot. */
+    if (synqBootUidRef.current !== user.uid) {
+      synqBootUidRef.current = user.uid;
+      setSynqBoot(null);
+    }
+    (async () => {
+      const cachedSynqActive = await readCachedSynqActive(user.uid);
+      if (!cancelled) {
+        setSynqBoot({ cachedSynqActive });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
 
   useEffect(() => {
     let mounted = true;
@@ -233,7 +263,9 @@ export default function RootLayout() {
     }, 500);
   }, [authReady, navReady, user, pendingNotificationTap, router]);
 
-  if (!authReady || !navReady || !assetsReady) {
+  const synqBootReady = user == null || synqBoot !== null;
+
+  if (!authReady || !navReady || !assetsReady || !synqBootReady) {
     return (
       <View
         style={{
@@ -262,11 +294,15 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>
         <AuthContext.Provider value={{ refreshAuth }}>
+          <SynqBootProvider
+            value={synqBoot ?? { cachedSynqActive: false }}
+          >
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="location" />
             <Stack.Screen name="(tabs)" />
           </Stack>
+          </SynqBootProvider>
         </AuthContext.Provider>
       </ErrorBoundary>
     </GestureHandlerRootView>

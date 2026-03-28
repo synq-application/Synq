@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useSynqBoot } from "../../src/lib/synqBootContext";
+import { synqStatusStorageKey } from "../../src/lib/synqSession";
 import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from "expo-image";
 import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   increment,
@@ -17,10 +20,8 @@ import {
   where
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
   DeviceEventEmitter,
   FlatList,
   Image,
@@ -28,6 +29,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   StatusBar,
   StyleSheet,
   Text,
@@ -39,7 +41,7 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, aiPrompts, BG, BORDER, BUTTON_RADIUS, DEFAULT_AVATAR, EXPIRATION_HOURS, fonts, MODAL_RADIUS, MUTED, OFFSETS } from '../../constants/Variables';
+import { ACCENT, aiPrompts, BG, BORDER, BUTTON_RADIUS, DEFAULT_AVATAR, EXPIRATION_HOURS, fonts, MODAL_RADIUS, MUTED } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
@@ -56,7 +58,15 @@ function prefetchParticipantAvatars(chat: { participantImages?: Record<string, u
   });
 }
 
+/** Single source of truth so we never paint hydrated+idle before server says active (fixes inactive flash). */
+type SynqUi = { status: SynqStatus; hydrated: boolean };
+
+function setSynqStatus(setSynq: Dispatch<SetStateAction<SynqUi>>, status: SynqStatus) {
+  setSynq((s) => ({ ...s, status }));
+}
+
 export default function SynqScreen() {
+  const synqBoot = useSynqBoot();
   const { width: windowWidth } = useWindowDimensions();
   const tabletContentStyle =
     windowWidth >= 768
@@ -65,9 +75,12 @@ export default function SynqScreen() {
 
   const [memo, setMemo] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [status, setStatus] = useState<SynqStatus>('idle');
+  const [synq, setSynq] = useState<SynqUi>(() => ({
+    status: synqBoot?.cachedSynqActive ? "active" : "idle",
+    hydrated: false,
+  }));
+  const { status, hydrated } = synq;
   const [availableFriends, setAvailableFriends] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -87,14 +100,12 @@ export default function SynqScreen() {
   const [currentCategory, setCurrentCategory] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const lastTapRef = useRef<{ [key: string]: number }>({});
-  const heartScales = useRef<{ [key: string]: Animated.Value }>({});
   const [hasUnread, setHasUnread] = useState(false);
   const [showEndSynqModal, setShowEndSynqModal] = useState(false);
   const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
   const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
   const [isStartingSynq, setIsStartingSynq] = useState(false);
-  const synqStatusCacheKey = (uid: string) => `synq-status:${uid}`;
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
@@ -108,20 +119,17 @@ export default function SynqScreen() {
     }
   };
 
-  const animateHeart = (messageId: string) => {
-    if (!heartScales.current[messageId]) {
-      heartScales.current[messageId] = new Animated.Value(0);
+  const DOUBLE_TAP_MS = 320;
+  const onMessageBubblePress = (item: { id: string; reactions?: Record<string, string> }) => {
+    const now = Date.now();
+    const last = lastTapRef.current[item.id] ?? 0;
+    if (now - last < DOUBLE_TAP_MS) {
+      lastTapRef.current[item.id] = 0;
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      void toggleHeartReaction(item.id, item.reactions);
+    } else {
+      lastTapRef.current[item.id] = now;
     }
-
-    const scale = heartScales.current[messageId];
-
-    scale.setValue(0);
-
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 5,
-    }).start();
   };
 
   useEffect(() => {
@@ -161,18 +169,10 @@ export default function SynqScreen() {
   useEffect(() => {
     if (!auth.currentUser) return;
     const init = async () => {
+      let nextStatus: SynqStatus = "idle";
       try {
         const uid = auth.currentUser!.uid;
         const userRef = doc(db, 'users', uid);
-        try {
-          const cachedStatus = await AsyncStorage.getItem(synqStatusCacheKey(uid));
-          if (cachedStatus === "active") {
-            setStatus("active");
-          } else if (cachedStatus === "idle") {
-            setStatus("idle");
-          }
-        } catch {}
-        setLoading(false);
 
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
@@ -184,23 +184,23 @@ export default function SynqScreen() {
             const hoursElapsed = (new Date().getTime() - startTime) / (1000 * 60 * 60);
             if (hoursElapsed > EXPIRATION_HOURS) {
               await updateDoc(userRef, { status: 'inactive', memo: '' });
-              setStatus('idle');
-              AsyncStorage.setItem(synqStatusCacheKey(uid), "idle").catch(() => {});
+              nextStatus = "idle";
+              AsyncStorage.setItem(synqStatusStorageKey(uid), "idle").catch(() => {});
               setMemo('');
             } else {
-              setStatus('active');
-              AsyncStorage.setItem(synqStatusCacheKey(uid), "active").catch(() => {});
+              nextStatus = "active";
+              AsyncStorage.setItem(synqStatusStorageKey(uid), "active").catch(() => {});
             }
           } else {
-            setStatus('idle');
-            AsyncStorage.setItem(synqStatusCacheKey(uid), "idle").catch(() => {});
+            nextStatus = "idle";
+            AsyncStorage.setItem(synqStatusStorageKey(uid), "idle").catch(() => {});
           }
         }
       } catch (e) {
         console.error(e);
-      } finally {
-        setLoading(false);
+        nextStatus = "idle";
       }
+      setSynq({ status: nextStatus, hydrated: true });
     };
 
     init();
@@ -348,17 +348,17 @@ export default function SynqScreen() {
     if (status === 'activating') {
       timer = setTimeout(() => {
         Vibration.vibrate(100);
-        setStatus('finding');
+        setSynqStatus(setSynq, 'finding');
       }, 2000);
     } else if (status === 'finding') {
       timer = setTimeout(() => {
         Vibration.vibrate(100);
-        setStatus('optimizing');
+        setSynqStatus(setSynq, 'optimizing');
       }, 2000);
     } else if (status === 'optimizing') {
       timer = setTimeout(() => {
         Vibration.vibrate(500);
-        setStatus('active');
+        setSynqStatus(setSynq, 'active');
       }, 2000);
     }
     return () => {
@@ -451,8 +451,8 @@ export default function SynqScreen() {
         status: 'available',
         synqStartedAt: serverTimestamp()
       });
-      AsyncStorage.setItem(synqStatusCacheKey(auth.currentUser.uid), "active").catch(() => {});
-      setStatus('activating');
+      AsyncStorage.setItem(synqStatusStorageKey(auth.currentUser.uid), "active").catch(() => {});
+      setSynqStatus(setSynq, 'activating');
     } catch (e) {
       console.error("Failed to start Synq", e);
     } finally {
@@ -562,7 +562,7 @@ export default function SynqScreen() {
       const hasReacted = currentReactions?.[userId] === "heart";
 
       await updateDoc(messageRef, {
-        [`reactions.${userId}`]: hasReacted ? null : "heart",
+        [`reactions.${userId}`]: hasReacted ? deleteField() : "heart",
       });
     } catch (e) {
       console.error("Failed to toggle reaction", e);
@@ -617,24 +617,10 @@ export default function SynqScreen() {
 
     const others = Object.entries(images)
       .filter(([uid]) => uid !== auth.currentUser?.uid)
-      .map(([_, url]) => resolveAvatar(url));
+      .map(([_, url]) => resolveAvatar(url))
+      .filter((uri): uri is string => Boolean(uri));
 
-    if (others.length === 1) {
-      return (
-        <View style={styles.singleAvatarWrap}>
-          <ExpoImage
-            source={{ uri: others[0] }}
-            style={styles.singleAvatar}
-            cachePolicy="memory-disk"
-            transition={0}
-          />
-        </View>
-      );
-    }
-
-    const displayImages = others.slice(0, 4);
-
-    if (displayImages.length === 0) {
+    if (others.length === 0) {
       return (
         <View style={styles.inboxCircle}>
           <Ionicons name="people" size={20} color={ACCENT} />
@@ -642,28 +628,42 @@ export default function SynqScreen() {
       );
     }
 
+    if (others.length === 1) {
+      return (
+        <View style={styles.inboxSingleWrap}>
+          <ExpoImage
+            source={{ uri: others[0] }}
+            style={styles.inboxSinglePhoto}
+            cachePolicy="memory-disk"
+            transition={0}
+          />
+        </View>
+      );
+    }
+
+    const stack = others.slice(0, 2);
+
     return (
-      <View style={styles.avatarCluster}>
-        {displayImages.map((uri, index) => {
-          const o = OFFSETS[index] ?? { x: index * 14, y: 0, z: 1 };
-          return (
-            <ExpoImage
-              key={`${uri}-${index}`}
-              source={{ uri }}
-              style={[
-                styles.clusterPhoto,
-                { left: o.x, top: o.y, zIndex: o.z },
-              ]}
-              cachePolicy="memory-disk"
-              transition={0}
-            />
-          );
-        })}
+      <View style={styles.inboxStackWrap}>
+        <ExpoImage
+          source={{ uri: stack[0] }}
+          style={[styles.inboxStackPhoto, styles.inboxStackPhotoBack]}
+          cachePolicy="memory-disk"
+          transition={0}
+        />
+        <ExpoImage
+          source={{ uri: stack[1] }}
+          style={[styles.inboxStackPhoto, styles.inboxStackPhotoFront]}
+          cachePolicy="memory-disk"
+          transition={0}
+        />
       </View>
     );
   };
 
-  if (loading) return <View style={styles.darkFill}><ActivityIndicator color={ACCENT} /></View>;
+  const bootActive = synqBoot?.cachedSynqActive === true;
+  /** No idle UI until hydrated; without optimistic active, show solid bg (not inactive). */
+  if (!hydrated && !bootActive) return <View style={styles.darkFill} />;
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -788,7 +788,7 @@ export default function SynqScreen() {
             />
           </View>
         )}
-        {status === "idle" && (
+        {status === "idle" && hydrated && (
           <InactiveSynqView
             memo={memo}
             setMemo={setMemo}
@@ -1004,23 +1004,60 @@ export default function SynqScreen() {
                             />
                           )}
 
-                          {/* Bubble */}
+                          {/* Bubble — double-tap to heart */}
                           <View style={{ maxWidth: "75%" }}>
-                            <View
-                              style={[
-                                styles.bubble,
-                                isMe ? styles.myBubble : styles.theirBubble,
-                              ]}
+                            <Pressable
+                              onPress={() =>
+                                onMessageBubblePress({
+                                  id: item.id,
+                                  reactions: item.reactions,
+                                })
+                              }
                             >
-                              <Text
-                                style={{
-                                  color: isMe ? "black" : "white",
-                                  fontSize: 16,
-                                }}
+                              <View
+                                style={[
+                                  styles.bubble,
+                                  isMe ? styles.myBubble : styles.theirBubble,
+                                  { position: "relative", overflow: "visible" },
+                                ]}
                               >
-                                {item.text}
-                              </Text>
-                            </View>
+                                <Text
+                                  style={{
+                                    color: isMe ? "black" : "white",
+                                    fontSize: 16,
+                                    textAlign: isMe ? "right" : "left",
+                                  }}
+                                >
+                                  {item.text}
+                                </Text>
+                                {(() => {
+                                  const heartCount =
+                                    item.reactions &&
+                                    Object.values(item.reactions).filter((v) => v === "heart").length;
+                                  if (!heartCount) return null;
+                                  return (
+                                    <View
+                                      style={[
+                                        styles.heartReaction,
+                                        isMe
+                                          ? { left: -4, right: undefined }
+                                          : { right: -6, left: undefined },
+                                      ]}
+                                    >
+                                      {Array.from({ length: heartCount }, (_, i) => (
+                                        <Ionicons
+                                          key={i}
+                                          name="heart"
+                                          size={14}
+                                          color="#FF2D55"
+                                          style={{ marginLeft: i > 0 ? 3 : 0 }}
+                                        />
+                                      ))}
+                                    </View>
+                                  );
+                                })()}
+                              </View>
+                            </Pressable>
                           </View>
                         </View>
                         <Text
@@ -1028,7 +1065,7 @@ export default function SynqScreen() {
                             color: "#444",
                             fontSize: 11,
                             marginTop: 4,
-                            marginLeft: isMe ? 0 : 54,
+                            marginLeft: isMe ? 0 : 44,
                             alignSelf: isMe ? "flex-end" : "flex-start",
                           }}
                         >
@@ -1138,10 +1175,10 @@ export default function SynqScreen() {
               status: "inactive",
               memo: "",
             });
-            AsyncStorage.setItem(synqStatusCacheKey(auth.currentUser.uid), "idle").catch(() => {});
+            AsyncStorage.setItem(synqStatusStorageKey(auth.currentUser.uid), "idle").catch(() => {});
 
             setMemo("");
-            setStatus("idle");
+            setSynqStatus(setSynq, "idle");
             setIsEditModalVisible(false);
           }}
         />
@@ -1299,7 +1336,14 @@ const styles = StyleSheet.create({
   inboxCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
   stackedPhoto: { width: 40, height: 40, borderRadius: 20, position: 'absolute', borderWidth: 2, borderColor: 'black' },
   msgContainer: { marginBottom: 15 },
-  chatAvatar: { width: 46, height: 46, borderRadius: 23, borderColor: BORDER, borderWidth: 2, marginRight: 8 },
+  chatAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderColor: BORDER,
+    borderWidth: 1.5,
+    marginRight: 7,
+  },
   bubble: { padding: 15, borderRadius: MODAL_RADIUS },
   myBubble: { backgroundColor: ACCENT },
   theirBubble: { backgroundColor: '#1C1C1E' },
@@ -1422,9 +1466,12 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: -6,
     right: -6,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: BG,
     borderRadius: 8,
-    padding: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
     borderWidth: 1,
     borderColor: "#222",
   },
@@ -1451,43 +1498,50 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 4,
   },
-  singleAvatarWrap: {
+  /** Inbox: one other participant — single circle (iMessage-style size). */
+  inboxSingleWrap: {
     width: 56,
     height: 56,
     alignItems: "center",
     justifyContent: "center",
   },
-  singleAvatar: {
-    width: 52,
-    height: 52,
+  inboxSinglePhoto: {
+    width: 48,
+    height: 48,
     borderRadius: 24,
     borderWidth: 2,
-    borderColor: "black",
+    borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "#1C1C1E",
+  },
+  /** Inbox: 2+ others — max 2 faces, stacked with strong overlap (iMessage-style). */
+  inboxStackWrap: {
+    width: 56,
+    height: 54,
+    position: "relative",
+  },
+  inboxStackPhoto: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    position: "absolute",
+    borderWidth: 2,
+    borderColor: BG,
+    backgroundColor: "#1C1C1E",
+  },
+  inboxStackPhotoBack: {
+    left: 0,
+    top: 2,
+    zIndex: 1,
+  },
+  inboxStackPhotoFront: {
+    left: 11,
+    top: 10,
+    zIndex: 2,
   },
   avatarColumn: {
     width: 60,
     alignItems: "center",
     justifyContent: "center",
-  },
-  avatarCluster: {
-    width: 64,
-    height: 56,
-    position: "relative",
-  },
-  clusterPhoto: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    position: "absolute",
-    borderWidth: 2,
-    borderColor: "black",
-    backgroundColor: "#1C1C1E",
-  },
-  avatarStack: {
-    width: 50,
-    height: 50,
-    position: 'relative',
   },
   inboxTextCol: {
     flex: 1,
