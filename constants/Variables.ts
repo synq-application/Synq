@@ -12,6 +12,10 @@ export const synqSvg = `
 `;
 
 export const BG = "#090A0B";
+/** Primary bottom CTA width (Continue / Connect / Sign in) — not full-bleed. */
+export const PRIMARY_CTA_WIDTH = "68%";
+/** Shared height for solid primary CTAs and onboarding Continue rows. */
+export const PRIMARY_CTA_HEIGHT = 56;
 export const BUTTON_RADIUS = 14;
 export const MODAL_RADIUS = 22;
 export const RADIUS_SM = 12;

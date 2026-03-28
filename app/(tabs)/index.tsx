@@ -41,7 +41,19 @@ import {
   View
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ACCENT, aiPrompts, BG, BORDER, BUTTON_RADIUS, EXPIRATION_HOURS, fonts, MODAL_RADIUS, MUTED } from '../../constants/Variables';
+import {
+  ACCENT,
+  aiPrompts,
+  BG,
+  BORDER,
+  BUTTON_RADIUS,
+  EXPIRATION_HOURS,
+  fonts,
+  MODAL_RADIUS,
+  MUTED,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
+} from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
@@ -1214,7 +1226,15 @@ const styles = StyleSheet.create({
   grayText: { color: '#666', fontSize: 13, marginTop: 2 },
   locationText: { color: '#666', fontSize: 12, marginTop: 2 },
   footer: { padding: 25, paddingBottom: 80 },
-  btn: { backgroundColor: ACCENT, padding: 18, borderRadius: BUTTON_RADIUS, alignItems: 'center' },
+  btn: {
+    alignSelf: 'center',
+    width: PRIMARY_CTA_WIDTH,
+    height: PRIMARY_CTA_HEIGHT,
+    backgroundColor: ACCENT,
+    borderRadius: BUTTON_RADIUS,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   btnText: { fontSize: 16, color: 'black', fontFamily: fonts.medium },
   deactivateLink: { marginTop: 20, alignSelf: 'center', padding: 10 },
   deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: fonts.medium, opacity: 0.9 },
@@ -1448,12 +1468,6 @@ const styles = StyleSheet.create({
     right: -6,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: BG,
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: "#222",
   },
   ideaImage: {
     width: '100%',

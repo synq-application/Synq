@@ -1,4 +1,14 @@
-import { ACCENT, BG, BUTTON_RADIUS, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BUTTON_RADIUS,
+  fonts,
+  MUTED,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
+  synqSvg,
+  TEXT,
+} from "@/constants/Variables";
 import { router } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from "react";
@@ -167,8 +177,10 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     marginTop: 20,
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
     backgroundColor: ACCENT,
-    height: 56,
+    height: PRIMARY_CTA_HEIGHT,
     borderRadius: BUTTON_RADIUS,
     alignItems: "center",
     justifyContent: "center",

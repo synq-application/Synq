@@ -12,7 +12,13 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { ACCENT, BG, BUTTON_RADIUS } from "../constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BUTTON_RADIUS,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
+} from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import AlertModal from "./alert-modal";
 import { useAuthRefresh } from "./_layout";
@@ -330,8 +336,10 @@ const styles = StyleSheet.create({
 
   button: {
     marginTop: 24,
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
     backgroundColor: ACCENT,
-    height: 52,
+    height: PRIMARY_CTA_HEIGHT,
     borderRadius: BUTTON_RADIUS,
     alignItems: "center",
     justifyContent: "center",

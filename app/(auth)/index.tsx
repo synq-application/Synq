@@ -1,4 +1,13 @@
-import { ACCENT, BG, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  fonts,
+  MUTED,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
+  synqSvg,
+  TEXT,
+} from "@/constants/Variables";
 import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
@@ -184,8 +193,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   nextBtn: {
-    width: "88%",
-    height: 54,
+    width: PRIMARY_CTA_WIDTH,
+    height: PRIMARY_CTA_HEIGHT,
     borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,

@@ -1,4 +1,13 @@
-import { ACCENT, BG, BUTTON_RADIUS, fonts, synqSvg, TEXT } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BUTTON_RADIUS,
+  fonts,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
+  synqSvg,
+  TEXT,
+} from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
 import { router } from "expo-router";
@@ -359,8 +368,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   primaryButton: {
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
     backgroundColor: ACCENT,
-    height: 56,
+    height: PRIMARY_CTA_HEIGHT,
     borderRadius: BUTTON_RADIUS,
     justifyContent: "center",
     alignItems: "center",

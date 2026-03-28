@@ -1,4 +1,13 @@
-import { ACCENT, BG, fonts, synqSvg, TEXT } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BUTTON_RADIUS,
+  fonts,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
+  synqSvg,
+  TEXT,
+} from "@/constants/Variables";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -104,8 +113,10 @@ const styles = StyleSheet.create({
   },
 
   primaryBtn: {
-    height: 58,
-    borderRadius: 22,
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
+    height: PRIMARY_CTA_HEIGHT,
+    borderRadius: BUTTON_RADIUS,
     backgroundColor: ACCENT,
     justifyContent: "center",
     alignItems: "center",

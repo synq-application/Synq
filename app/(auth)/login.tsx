@@ -1,4 +1,14 @@
-import { ACCENT, BG, BUTTON_RADIUS, fonts, MUTED, synqSvg, TEXT } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BUTTON_RADIUS,
+  fonts,
+  MUTED,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
+  synqSvg,
+  TEXT,
+} from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
@@ -259,8 +269,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.book,
   },
   primaryButton: {
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
     backgroundColor: ACCENT,
-    height: 56,
+    height: PRIMARY_CTA_HEIGHT,
     borderRadius: BUTTON_RADIUS,
     justifyContent: "center",
     alignItems: "center",

@@ -1,4 +1,12 @@
-import { ACCENT, BG, TEXT, fonts, synqSvg } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
+  TEXT,
+  fonts,
+  synqSvg,
+} from "@/constants/Variables";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
@@ -284,8 +292,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   nextBtn: {
-    width: "88%",
-    height: 54,
+    width: PRIMARY_CTA_WIDTH,
+    height: PRIMARY_CTA_HEIGHT,
     borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
