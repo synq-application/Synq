@@ -4,6 +4,7 @@ import { useSynqBoot } from "../../src/lib/synqBootContext";
 import { synqStatusStorageKey } from "../../src/lib/synqSession";
 import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   addDoc,
   collection,
@@ -40,6 +41,7 @@ import {
   Vibration,
   View
 } from 'react-native';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Swipeable } from 'react-native-gesture-handler';
 import {
   ACCENT,
@@ -79,6 +81,7 @@ function setSynqStatus(setSynq: Dispatch<SetStateAction<SynqUi>>, status: SynqSt
 export default function SynqScreen() {
   const synqBoot = useSynqBoot();
   const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const tabletContentStyle =
     windowWidth >= 768
       ? { maxWidth: 840, width: '100%' as const, alignSelf: 'center' as const }
@@ -664,7 +667,7 @@ export default function SynqScreen() {
       <View style={[styles.container, tabletContentStyle]}>
         <StatusBar barStyle="light-content" />
         {status === 'active' && (
-          <View style={{ flex: 1 }}>
+          <View style={styles.activeSynqRoot}>
             <View style={styles.activeHeader}>
               <TouchableOpacity
                 onPress={() => setIsInboxVisible(true)}
@@ -686,7 +689,9 @@ export default function SynqScreen() {
               </TouchableOpacity>
             </View>
 
+            <View style={styles.activeListWrap}>
             <FlatList
+              style={styles.activeFriendsList}
               data={availableFriends}
               keyExtractor={(item) => item.id}
               ListEmptyComponent={
@@ -739,10 +744,24 @@ export default function SynqScreen() {
                   {selectedFriends.includes(item.id) && <Ionicons name="checkmark-circle" size={24} color={ACCENT} />}
                 </TouchableOpacity>
               )}
-              contentContainerStyle={{ padding: 20 }}
+              contentContainerStyle={styles.activeListContent}
             />
+            <LinearGradient
+              pointerEvents="none"
+              colors={["rgba(9,10,11,0)", "rgba(9,10,11,0.72)", BG]}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={styles.activeListFade}
+            />
+            </View>
 
-            <View style={styles.footer}>
+            <View
+              style={[
+                styles.activeFooterBlock,
+                { paddingBottom: Math.max(40, 20 + insets.bottom) },
+              ]}
+            >
               <TouchableOpacity
                 style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
                 onPress={handleConnect}
@@ -1182,6 +1201,20 @@ export default function SynqScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   darkFill: { flex: 1, backgroundColor: BG, justifyContent: 'center' },
+  activeSynqRoot: { flex: 1, backgroundColor: BG },
+  activeListWrap: { flex: 1, position: "relative" },
+  activeFriendsList: { flex: 1 },
+  /** Extra bottom padding so last rows scroll above the fade overlay. */
+  activeListContent: { padding: 20, paddingBottom: 140 },
+  activeListFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 120,
+    zIndex: 1,
+    elevation: 2,
+  },
   activeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1225,7 +1258,11 @@ const styles = StyleSheet.create({
   whiteBold: { color: 'white', fontSize: 17, fontFamily: fonts.medium },
   grayText: { color: '#666', fontSize: 13, marginTop: 2 },
   locationText: { color: '#666', fontSize: 12, marginTop: 2 },
-  footer: { padding: 25, paddingBottom: 80 },
+  activeFooterBlock: {
+    backgroundColor: BG,
+    paddingHorizontal: 25,
+    paddingTop: 12,
+  },
   btn: {
     alignSelf: 'center',
     width: PRIMARY_CTA_WIDTH,
