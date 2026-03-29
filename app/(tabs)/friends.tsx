@@ -16,9 +16,10 @@ import {
   TYPE_BODY,
   TYPE_CAPTION,
 } from "@/constants/Variables";
-import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
+import * as Haptics from "expo-haptics";
+import { Image as ExpoImage } from "expo-image";
 import {
   useLocalSearchParams,
   usePathname,
@@ -50,6 +51,18 @@ import {
   TouchableWithoutFeedback,
   View
 } from "react-native";
+import Animated, {
+  cancelAnimation,
+  Easing,
+  FadeIn,
+  FadeInDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
 import {
@@ -60,12 +73,111 @@ import {
   warmSuggestedCache,
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
-import { prefetchResolvedAvatar, resolveAvatar } from "../helpers";
+import { resolveAvatar } from "../helpers";
 
 const { width } = Dimensions.get("window");
 
 const sortFriendsByName = (list: Friend[]) =>
   [...list].sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
+
+const STAGGER_DELAYS = [0, 120] as const;
+
+function emptyEntering(reduced: boolean, delayMs: number) {
+  if (reduced) {
+    return FadeIn.duration(1);
+  }
+  return FadeInDown.duration(380).delay(delayMs);
+}
+
+function FriendsHeaderAddButton({
+  pulse,
+  onPress,
+}: {
+  pulse: boolean;
+  onPress: () => void;
+}) {
+  const reduced = useReducedMotion();
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    if (reduced || !pulse) {
+      cancelAnimation(scale);
+      scale.value = 1;
+      return;
+    }
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.07, { duration: 1400, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+    return () => {
+      cancelAnimation(scale);
+    };
+  }, [pulse, reduced, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <TouchableOpacity onPress={onPress} accessibilityLabel="Add friends">
+      <Animated.View style={animatedStyle}>
+        <Icon name="add-circle-outline" size={30} color="white" />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+function FriendsEmptyMainContent({
+  onAddFriends,
+}: {
+  onAddFriends: () => void;
+}) {
+  const reduced = useReducedMotion();
+
+  const onPressAdd = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    onAddFriends();
+  };
+
+  return (
+    <View style={styles.emptyStateMain}>
+      <Animated.View
+        entering={emptyEntering(reduced, STAGGER_DELAYS[0])}
+        style={styles.emptyHeroBlock}
+      >
+        <Text style={styles.emptyHeroTitle}>
+          Your friends. Your plans.
+        </Text>
+        <Text style={styles.emptyHeroSubtitle}>
+          {`Build your circle — then see who's free.`}
+        </Text>
+        <Text style={styles.emptyHeroHint}>
+          Your friends will show up here once you connect.
+        </Text>
+      </Animated.View>
+
+      <Animated.View
+        entering={emptyEntering(reduced, STAGGER_DELAYS[1])}
+        style={styles.emptyPrimaryCtaWrap}
+      >
+        <TouchableOpacity
+          style={styles.emptyPrimaryCta}
+          onPress={onPressAdd}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Add friends"
+        >
+          <Ionicons name="person-add-outline" size={22} color="#061006" />
+          <Text style={styles.emptyPrimaryCtaText}>Add friends</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  );
+}
 
 function FriendsListEmpty({
   hasFriends,
@@ -78,9 +190,13 @@ function FriendsListEmpty({
   onAddFriends: () => void;
   onClearSearch: () => void;
 }) {
+  const reduced = useReducedMotion();
   if (hasFriends && searchText.trim().length > 0) {
     return (
-      <View style={styles.emptyStateCenter}>
+      <Animated.View
+        entering={reduced ? FadeIn.duration(1) : FadeInDown.duration(400)}
+        style={styles.emptyStateCenter}
+      >
         <Ionicons name="search-outline" size={40} color={MUTED2} />
         <Text style={styles.emptyTitle}>No matches</Text>
         <Text style={styles.emptyText}>
@@ -89,46 +205,11 @@ function FriendsListEmpty({
         <TouchableOpacity onPress={onClearSearch} style={styles.emptySecondaryBtn} activeOpacity={0.8}>
           <Text style={styles.emptySecondaryBtnText}>Clear search</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     );
   }
 
-  return (
-    <View style={styles.emptyStateMain}>
-      <Text style={styles.emptyHeroTitle}>Your circle starts here</Text>
-      <Text style={styles.emptyHeroSubtitle}>
-        {`Friends power Synq: see who's free, share a quick memo, and make spontaneous plans together.`}
-      </Text>
-
-      <View style={styles.emptyTipsCard}>
-        <View style={styles.emptyTipRow}>
-          <Ionicons name="flash-outline" size={18} color={ACCENT} style={styles.emptyTipIcon} />
-          <Text style={styles.emptyTipText}>
-            {`Know who's open right now—not everyone, just your circle.`}
-          </Text>
-        </View>
-        <View style={styles.emptyTipRow}>
-          <Ionicons name="mail-outline" size={18} color={ACCENT} style={styles.emptyTipIcon} />
-          <Text style={styles.emptyTipText}>Send invites by name or email from Add friends.</Text>
-        </View>
-        <View style={[styles.emptyTipRow, { marginBottom: 0 }]}>
-          <Ionicons name="sparkles-outline" size={18} color={ACCENT} style={styles.emptyTipIcon} />
-          <Text style={styles.emptyTipText}>Suggested people appear there too as Synq learns your network.</Text>
-        </View>
-      </View>
-
-      <TouchableOpacity
-        style={styles.emptyPrimaryCta}
-        onPress={onAddFriends}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel="Add friends"
-      >
-        <Ionicons name="person-add-outline" size={22} color="#061006" />
-        <Text style={styles.emptyPrimaryCtaText}>Add friends</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  return <FriendsEmptyMainContent onAddFriends={onAddFriends} />;
 }
 
 export default function FriendsScreen() {
@@ -302,13 +383,11 @@ export default function FriendsScreen() {
       <View style={styles.header}>
         <View style={styles.headerTitleBlock}>
           <Text style={styles.headerTitle}>Friends</Text>
-          {!isFriendsInitialLoading && friends.length === 0 && (
-            <Text style={styles.headerSub}>Add a few people to get started</Text>
-          )}
         </View>
-        <TouchableOpacity onPress={() => setSearchModalVisible(true)}>
-          <Icon name="add-circle-outline" size={30} color="white" />
-        </TouchableOpacity>
+        <FriendsHeaderAddButton
+          pulse={!isFriendsInitialLoading && friends.length === 0}
+          onPress={() => setSearchModalVisible(true)}
+        />
       </View>
       <View style={styles.headerDivider} />
       {showFriendSearch && (
@@ -880,7 +959,6 @@ const styles = StyleSheet.create({
   },
   headerTitleBlock: { flex: 1, paddingRight: 12 },
   headerTitle: { color: TEXT, fontSize: 32, fontFamily: fonts.heavy, letterSpacing: 0.2 },
-  headerSub: { color: MUTED, fontSize: 14, fontFamily: fonts.book, marginTop: 6, lineHeight: 20 },
   headerAction: { paddingLeft: 12, paddingVertical: 6 },
   headerDivider: { marginTop: 16, height: 1, backgroundColor: BORDER },
   friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
@@ -922,56 +1000,62 @@ const styles = StyleSheet.create({
   /** Friends list empty (no icon) — vertically centered in the list area. */
   emptyStateMain: {
     flex: 1,
-    paddingHorizontal: SPACE_4,
+    paddingHorizontal: SPACE_5,
     paddingVertical: SPACE_6,
     alignItems: "center",
     justifyContent: "center",
+    maxWidth: 420,
+    width: "100%",
+    alignSelf: "center",
   },
+  emptyHeroBlock: {
+    alignItems: "center",
+    width: "100%",
+  },
+  /** Matches `headerTitle` on this screen (32 / Heavy) for visual consistency. */
   emptyHeroTitle: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 24,
+    fontSize: 32,
+    lineHeight: 38,
     letterSpacing: 0.2,
     textAlign: "center",
+    width: "100%",
   },
   emptyHeroSubtitle: {
     color: MUTED,
-    fontFamily: fonts.book,
+    fontFamily: fonts.medium,
     fontSize: TYPE_BODY,
     lineHeight: 24,
     textAlign: "center",
     marginTop: SPACE_5,
-    maxWidth: 320,
+    maxWidth: 340,
   },
-  emptyTipsCard: {
-    alignSelf: "stretch",
-    backgroundColor: SURFACE,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingVertical: SPACE_6,
-    paddingHorizontal: SPACE_6,
-    marginTop: SPACE_6,
-  },
-  emptyTipRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: SPACE_6 },
-  emptyTipIcon: { marginRight: SPACE_4, marginTop: 2 },
-  emptyTipText: {
-    flex: 1,
-    color: MUTED,
+  emptyHeroHint: {
+    color: MUTED2,
     fontFamily: fonts.book,
     fontSize: TYPE_CAPTION + 1,
-    lineHeight: 22,
+    lineHeight: 20,
+    textAlign: "center",
+    marginTop: SPACE_4,
+    maxWidth: 320,
+  },
+  emptyPrimaryCtaWrap: {
+    alignSelf: "stretch",
+    width: "100%",
+    marginTop: SPACE_6 + SPACE_3,
   },
   emptyPrimaryCta: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: SPACE_3,
-    alignSelf: "stretch",
+    width: "100%",
     backgroundColor: ACCENT,
     borderRadius: BUTTON_RADIUS,
     paddingVertical: 18,
-    marginTop: SPACE_6,
+    paddingHorizontal: SPACE_5,
+    minHeight: 56,
   },
   emptyPrimaryCtaText: {
     color: "#061006",
