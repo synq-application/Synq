@@ -675,7 +675,7 @@ export default function SynqScreen() {
         <StatusBar barStyle="light-content" />
         {status === 'active' && (
           <View style={styles.activeSynqRoot}>
-            <View style={styles.activeHeader}>
+            <View style={styles.header}>
               <TouchableOpacity
                 onPress={() => setIsInboxVisible(true)}
                 style={styles.headerIconContainer}
@@ -685,7 +685,9 @@ export default function SynqScreen() {
                 <Ionicons name="chatbubbles-outline" size={28} color="white" />
                 {hasUnread && <View style={styles.badge} />}
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>Synq is active</Text>
+              <View style={styles.synqHeaderTitleWrap}>
+                <Text style={styles.headerTitle}>Synq is active</Text>
+              </View>
               <TouchableOpacity
                 onPress={() => setIsEditModalVisible(true)}
                 style={styles.headerIconContainer}
@@ -695,6 +697,7 @@ export default function SynqScreen() {
                 <Ionicons name="create-outline" size={26} color="white" />
               </TouchableOpacity>
             </View>
+            <View style={styles.headerDivider} />
 
             <View style={styles.activeListWrap}>
             <FlatList
@@ -764,7 +767,7 @@ export default function SynqScreen() {
             <View
               style={[
                 styles.activeFooterBlock,
-                { paddingBottom: Math.max(40, 20 + insets.bottom) },
+                { paddingBottom: Math.max(56, 36 + insets.bottom) },
               ]}
             >
               <TouchableOpacity
@@ -1209,11 +1212,11 @@ export default function SynqScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   darkFill: { flex: 1, backgroundColor: BG, justifyContent: 'center' },
-  activeSynqRoot: { flex: 1, backgroundColor: BG },
+  activeSynqRoot: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
   activeListWrap: { flex: 1, position: "relative" },
   activeFriendsList: { flex: 1 },
   /** Extra bottom padding so last rows scroll above the fade overlay. */
-  activeListContent: { padding: 20, paddingBottom: 140 },
+  activeListContent: { paddingTop: 20, paddingBottom: 140, paddingHorizontal: 0 },
   activeListFade: {
     position: "absolute",
     left: 0,
@@ -1234,7 +1237,7 @@ const styles = StyleSheet.create({
   activeEmptyTitle: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 24,
+    fontSize: 22,
     lineHeight: 34,
     letterSpacing: 0.2,
     textAlign: "center",
@@ -1242,22 +1245,34 @@ const styles = StyleSheet.create({
   activeEmptySub: {
     color: MUTED2,
     fontFamily: fonts.medium,
-    fontSize: TYPE_BODY + 2,
+    fontSize: TYPE_BODY + 1,
     lineHeight: 26,
     textAlign: "center",
     marginTop: SPACE_4,
   },
-  activeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 25,
-    paddingTop: 70,
-    paddingBottom: 20,
-    alignItems: 'center',
-    backgroundColor: BG,
-    height: 140
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 88,
+    alignItems: "flex-start",
   },
-  headerTitle: { color: 'white', fontSize: 24, fontFamily: fonts.heavy, textAlign: 'center' },
+  synqHeaderTitleWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+  headerDivider: {
+    marginTop: 16,
+    height: 1,
+    backgroundColor: BORDER,
+  },
+  headerTitle: {
+    color: TEXT,
+    fontSize: 28,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
+    textAlign: "center",
+  },
   headerIconContainer: { width: 40, alignItems: 'center', justifyContent: 'center' },
   badge: {
     position: 'absolute',
@@ -1292,8 +1307,8 @@ const styles = StyleSheet.create({
   locationText: { color: '#666', fontSize: 12, marginTop: 2 },
   activeFooterBlock: {
     backgroundColor: BG,
-    paddingHorizontal: 25,
-    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   btn: {
     alignSelf: 'center',
@@ -1308,7 +1323,7 @@ const styles = StyleSheet.create({
   deactivateLink: { marginTop: 20, alignSelf: 'center', padding: 10 },
   deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: fonts.medium, opacity: 0.9 },
   activatingContainer: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
-  unifiedTitle: { color: 'white', fontSize: 27, fontFamily: fonts.medium, marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
+  unifiedTitle: { color: 'white', fontSize: 28, fontFamily: fonts.medium, marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
   gifLarge: { width: 280, height: 280 },
   inactiveCenter: {
     flex: 1,

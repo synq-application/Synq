@@ -958,7 +958,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   headerTitleBlock: { flex: 1, paddingRight: 12 },
-  headerTitle: { color: TEXT, fontSize: 32, fontFamily: fonts.heavy, letterSpacing: 0.2 },
+  headerTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   headerAction: { paddingLeft: 12, paddingVertical: 6 },
   headerDivider: { marginTop: 16, height: 1, backgroundColor: BORDER },
   friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
@@ -1012,12 +1012,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
   },
-  /** Matches `headerTitle` on this screen (32 / Heavy) for visual consistency. */
+  /** Matches `headerTitle` on this screen (28 / Heavy) for visual consistency. */
   emptyHeroTitle: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 28,
+    lineHeight: 34,
     letterSpacing: 0.2,
     textAlign: "center",
     width: "100%",

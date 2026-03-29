@@ -347,7 +347,12 @@ export default function ProfileScreen() {
       <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
+        <TouchableOpacity
+          style={styles.headerIconContainer}
+          onPress={() => router.push("/notifications")}
+          accessibilityRole="button"
+          accessibilityLabel="Notifications"
+        >
           <Icon name="notifications-outline" size={26} color="white" />
           {requestCount > 0 && (
             <View style={styles.badge}>
@@ -356,7 +361,12 @@ export default function ProfileScreen() {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push("/settings")}>
+        <TouchableOpacity
+          style={styles.headerIconContainer}
+          onPress={() => router.push("/settings")}
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+        >
           <Icon name="settings-outline" size={26} color="white" />
         </TouchableOpacity>
       </View>
@@ -647,13 +657,17 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  scrollContent: { paddingBottom: 60 },
+  scrollContent: { paddingBottom: 60, paddingHorizontal: 20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 25,
-    marginTop: 70,
+    marginTop: 88,
+    alignItems: "flex-start",
+  },
+  headerIconContainer: {
+    width: 40,
     alignItems: "center",
+    justifyContent: "center",
   },
   badge: {
     position: "absolute",
@@ -702,7 +716,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     fontFamily: fonts.medium,
   },
-  section: { marginTop: 30, paddingHorizontal: 25 },
+  section: { marginTop: 30 },
   sectionTitle: { color: TEXT, fontSize: 20, fontFamily: fonts.heavy, marginBottom: 12, letterSpacing: 0.2 },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 20 },
