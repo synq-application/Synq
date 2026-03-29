@@ -21,6 +21,7 @@ import {
   ActivityIndicator,
   Keyboard,
   Modal,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -530,13 +531,19 @@ export default function ProfileScreen() {
       </TouchableOpacity>
 
       <Modal visible={isQRExpanded} transparent animationType="fade">
-        <TouchableOpacity style={styles.modalOverlay} onPress={() => setQRExpanded(false)}>
-          <View style={styles.qrModalBox}>
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setQRExpanded(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close QR code"
+          />
+          <View style={styles.qrModalBox} pointerEvents="box-none">
             {profileQrUrl ? (
               <QRCode value={profileQrUrl} size={260} color="black" backgroundColor="white" />
             ) : null}
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       <Modal visible={showInputModal} transparent animationType="slide">
