@@ -1,10 +1,10 @@
 import { ACCENT } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { Image as ExpoImage } from "expo-image";
+import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
-    Image,
     Keyboard,
     ScrollView,
     StyleSheet,
@@ -75,9 +75,12 @@ export default function ExploreModal({
         <View style={[StyleSheet.absoluteFill, styles.overlay]}>
             {isThinking && ( 
                 <View style={styles.thinkingOverlay}>
-                    <Image
+                    <ExpoImage
                         source={require("../assets/pulse.gif")}
                         style={styles.thinkingOrb}
+                        contentFit="contain"
+                        cachePolicy="memory-disk"
+                        transition={0}
                     />
                     <Text style={styles.thinkingText}>Finding the move...</Text>
                 </View>
@@ -177,7 +180,14 @@ export default function ExploreModal({
                                                 ]}
                                                 onPress={() => setSelectedOption(item)}
                                             >
-                                                <Image source={{ uri: item.imageUrl }} style={styles.venueImage} />
+                                                <ExpoImage
+                                                    source={{ uri: item.imageUrl }}
+                                                    style={styles.venueImage}
+                                                    contentFit="cover"
+                                                    cachePolicy="memory-disk"
+                                                    transition={0}
+                                                    recyclingKey={item.imageUrl}
+                                                />
 
                                                 <View style={{ flex: 1, marginLeft: 12 }}>
                                                     <Text style={styles.venueName}>{item.name}</Text>

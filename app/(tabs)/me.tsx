@@ -41,7 +41,7 @@ import {
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
-import { resolveAvatar } from "../helpers";
+import { prefetchResolvedAvatar, resolveAvatar } from "../helpers";
 import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
@@ -178,12 +178,29 @@ export default function ProfileScreen() {
         setInterests(userData.interests || []);
         setSelectedInterests(userData.interests || []);
         setProfileImage(userData?.imageurl || null);
+        prefetchResolvedAvatar(userData?.imageurl);
       }
     });
 
     const reqRef = collection(db, "users", myId, "friendRequests");
     const unsubscribeRequests = onSnapshot(reqRef, (snap) => {
       setRequestCount(snap.docs.length);
+      snap.docs.forEach((d) => {
+        const data = d.data() as any;
+        const senderId = data.from || data.fromId || d.id;
+        const inline =
+          data.senderImageUrl || data.fromImageUrl || data.fromImageurl || data.imageurl;
+        prefetchResolvedAvatar(inline);
+        const hasHttp =
+          typeof inline === "string" && inline.trim().startsWith("http");
+        if (!hasHttp && senderId) {
+          getDoc(doc(db, "users", senderId))
+            .then((u) => {
+              if (u.exists()) prefetchResolvedAvatar((u.data() as any)?.imageurl);
+            })
+            .catch(() => {});
+        }
+      });
     });
 
     const friendsCol = collection(db, "users", myId, "friends");

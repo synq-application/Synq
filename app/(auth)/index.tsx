@@ -8,11 +8,11 @@ import {
   synqSvg,
   TEXT,
 } from "@/constants/Variables";
+import { Image as ExpoImage } from "expo-image";
 import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
-  Image,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -108,7 +108,13 @@ export default function MakePlansScreen({
           </Animated.View>
 
           <Animated.View style={[styles.orbWrap, { opacity: orbFade }]}>
-            <Image style={styles.orb} resizeMode="contain" />
+            <ExpoImage
+              source={require("../../assets/pulse.gif")}
+              style={styles.orb}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              transition={0}
+            />
           </Animated.View>
 
           <Animated.View style={[styles.bottom, { opacity: bottomFade }]}>

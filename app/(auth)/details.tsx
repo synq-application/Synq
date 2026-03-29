@@ -1,22 +1,22 @@
+import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   Keyboard,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View,
+  View
 } from "react-native";
+import Icon from "react-native-vector-icons/Ionicons";
 import {
   ACCENT,
   BG,
@@ -24,9 +24,8 @@ import {
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
 } from "../../constants/Variables";
-import AlertModal from "../alert-modal";
-import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db, storage } from "../../src/lib/firebase";
+import AlertModal from "../alert-modal";
 
 const { height } = Dimensions.get("window");
 
@@ -148,7 +147,13 @@ export default function Details() {
           <View style={styles.avatarContainer}>
             <TouchableOpacity onPress={pickImage} style={styles.avatarCircle} disabled={isUploading}>
               {image ? (
-                <Image source={{ uri: image }} style={styles.avatarImage} />
+                <ExpoImage
+                  source={{ uri: image }}
+                  style={styles.avatarImage}
+                  cachePolicy="memory-disk"
+                  transition={0}
+                  recyclingKey={image}
+                />
               ) : (
                 <View style={styles.placeholderIcon}>
                   <Icon name="camera-outline" size={32} color="rgba(255,255,255,0.5)" />

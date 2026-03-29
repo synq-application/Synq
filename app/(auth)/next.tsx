@@ -8,11 +8,11 @@ import {
   synqSvg,
 } from "@/constants/Variables";
 import * as Haptics from "expo-haptics";
+import { Image as ExpoImage } from "expo-image";
 import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
-  Image,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -185,10 +185,12 @@ export default function SeeWhenFriendsAvailable({
               },
             ]}
           >
-            <Image
+            <ExpoImage
               source={require("../../assets/pulse.gif")}
               style={styles.pulse}
-              resizeMode="contain"
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              transition={0}
             />
           </Animated.View>
 

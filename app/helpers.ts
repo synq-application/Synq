@@ -1,4 +1,5 @@
 import { DEFAULT_AVATAR } from "@/constants/Variables";
+import * as ExpoImage from "expo-image";
 
 export type SynqStatus = "idle" | "activating" | "finding" | "optimizing" | "active";
 
@@ -57,6 +58,14 @@ export const resolveAvatar = (url?: any) => {
     return url;
   }
   return DEFAULT_AVATAR;
+};
+
+/** Warm disk/memory cache for a remote avatar or default URL (no-op for invalid). */
+export const prefetchResolvedAvatar = (url?: any) => {
+  const resolved = resolveAvatar(url);
+  if (typeof resolved === "string" && resolved.startsWith("http")) {
+    ExpoImage.Image.prefetch(resolved, "memory-disk").catch(() => {});
+  }
 };
 
 export const wrapChatTitle = (text: string, maxChars = 30) => {

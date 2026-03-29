@@ -25,7 +25,6 @@ import React, { useEffect, useRef, useState, type Dispatch, type SetStateAction 
 import {
   DeviceEventEmitter,
   FlatList,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -349,6 +348,9 @@ export default function SynqScreen() {
       if (uri && !seen.has(uri)) {
         seen.add(uri);
         ExpoImage.prefetch(uri).catch(() => {});
+      }
+      if (typeof m.venueImage === "string" && m.venueImage.startsWith("http")) {
+        ExpoImage.prefetch(m.venueImage).catch(() => {});
       }
     });
   }, [activeChatId, isChatVisible, allChats, messages]);
@@ -976,10 +978,13 @@ export default function SynqScreen() {
                             >
                               <View style={[styles.ideaBubble, { width: "100%" }]}>
                                 {item.venueImage ? (
-                                  <Image
+                                  <ExpoImage
                                     source={{ uri: item.venueImage }}
                                     style={styles.ideaImage}
-                                    resizeMode="cover"
+                                    contentFit="cover"
+                                    cachePolicy="memory-disk"
+                                    transition={0}
+                                    recyclingKey={item.venueImage}
                                   />
                                 ) : null}
                                 <Text style={styles.ideaText}>{item.text}</Text>

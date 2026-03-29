@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image as ExpoImage } from "expo-image";
 import { router } from "expo-router";
 import {
   collection,
@@ -14,7 +15,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -26,24 +26,31 @@ import {
   ACCENT,
   BG,
   BORDER,
-  BUTTON_RADIUS,
+  DEFAULT_AVATAR,
   RADIUS_MD,
   SPACE_3,
   SPACE_4,
-  SPACE_5,
   SPACE_6,
   TYPE_BODY,
   TYPE_CAPTION,
   TYPE_SECTION,
-  TYPE_TITLE,
+  TYPE_TITLE
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
-import { resolveAvatar } from "./helpers";
+import { prefetchResolvedAvatar, resolveAvatar } from "./helpers";
 
-const BACKGROUND = BG;
+function prefetchRequestRows(items: any[]) {
+  items.forEach((item) => {
+    prefetchResolvedAvatar(
+      item.senderImageUrl || item.fromImageUrl || item.fromImageurl || item.imageurl
+    );
+  });
+}
+
 const SURFACE = "rgba(255,255,255,0.06)";
+const BACKGROUND = BG;
 
 const fonts = {
   black: "Avenir-Black",
@@ -136,6 +143,7 @@ export default function NotificationsScreen() {
           ...d.data(),
         }));
         const resolved = await Promise.all(reqList.map(resolveRequestDisplay));
+        prefetchRequestRows(resolved);
         setRequests(resolved);
         setLoading(false);
       },
@@ -146,6 +154,10 @@ export default function NotificationsScreen() {
     );
 
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    prefetchResolvedAvatar(DEFAULT_AVATAR);
   }, []);
 
   const handleRequest = async (request: any, accept: boolean) => {
@@ -236,13 +248,20 @@ export default function NotificationsScreen() {
       item.imageurl ||
       null;
 
+    const avatarUri = resolveAvatar(fromImageUrl);
+
     return (
       <View style={styles.row}>
         <View style={styles.rowLeft}>
           <View style={styles.avatar}>
-            <Image
-              source={{ uri: resolveAvatar(fromImageUrl) }}
+            <ExpoImage
+              source={{ uri: avatarUri }}
               style={styles.avatarImg}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={0}
+              recyclingKey={avatarUri}
+              priority="high"
             />
           </View>
 

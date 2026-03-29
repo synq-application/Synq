@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image as ExpoImage } from "expo-image";
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { doc, onSnapshot } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
-  Image,
   Linking,
   Platform,
   SafeAreaView,
@@ -27,18 +27,18 @@ import {
   SPACE_4,
   SPACE_5,
   SPACE_6,
+  SURFACE,
   TYPE_BODY,
   TYPE_CAPTION,
   TYPE_TITLE,
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
-import { resolveAvatar } from "./helpers";
+import { prefetchResolvedAvatar, resolveAvatar } from "./helpers";
 
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
 
 const BACKGROUND = BG;
-const SURFACE = "rgba(255,255,255,0.06)";
 
 const fonts = {
   black: "Avenir-Black",
@@ -71,6 +71,10 @@ export default function SettingsScreen() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    prefetchResolvedAvatar(userData?.imageurl);
+  }, [userData?.imageurl]);
 
   const appVersion =
     Constants.expoConfig?.version ||
@@ -154,9 +158,13 @@ export default function SettingsScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.userSection}>
-          <Image
+          <ExpoImage
             source={{ uri: resolveAvatar(userData?.imageurl) }}
             style={styles.avatar}
+            cachePolicy="memory-disk"
+            transition={0}
+            recyclingKey={resolveAvatar(userData?.imageurl)}
+            priority="high"
           />
           <Text style={styles.userName}>
             {userData?.displayName ||

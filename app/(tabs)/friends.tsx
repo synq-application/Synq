@@ -47,7 +47,7 @@ import {
   warmSuggestedCache,
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
-import { resolveAvatar } from "../helpers";
+import { prefetchResolvedAvatar, resolveAvatar } from "../helpers";
 
 const { width } = Dimensions.get("window");
 
@@ -481,8 +481,11 @@ function SearchModal({
 
     try {
       Keyboard.dismiss();
-      const senderName = auth.currentUser.displayName || "Someone";
-      const senderImageUrl = null;
+      const meSnap = await getDoc(doc(db, "users", myId));
+      const meData = meSnap.exists() ? (meSnap.data() as any) : {};
+      const senderName =
+        meData?.displayName || auth.currentUser.displayName || "Someone";
+      const senderImageUrl = meData?.imageurl || null;
 
       const payload = {
         from: myId,
