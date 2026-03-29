@@ -11,6 +11,7 @@ import {
 } from "@/constants/Variables";
 import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
@@ -322,11 +323,14 @@ export default function ProfileScreen() {
     }
   };
 
-  const accountData = {
-    id: auth.currentUser?.uid,
-    email: auth.currentUser?.email,
-    displayName: auth.currentUser?.displayName,
-  };
+  /** Deep link so any phone camera / QR app can open Synq to this profile (requires Synq installed). */
+  const profileQrUrl = useMemo(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return "";
+    return Linking.createURL("/friend-profile", {
+      queryParams: { friendId: uid },
+    });
+  }, [auth.currentUser?.uid]);
 
   const locationLower =
     city && state ? `${city}, ${state}` : null;
@@ -359,12 +363,16 @@ export default function ProfileScreen() {
       <View style={styles.profileSection}>
         <View style={styles.qrContainer}>
           <View style={styles.qrBg}>
-            <QRCode
-              value={JSON.stringify(accountData)}
-              size={160}
-              color="black"
-              backgroundColor="white"
-            />
+            {profileQrUrl ? (
+              <QRCode
+                value={profileQrUrl}
+                size={160}
+                color="black"
+                backgroundColor="white"
+              />
+            ) : (
+              <View style={{ width: 160, height: 160, backgroundColor: "#eee" }} />
+            )}
           </View>
 
           <TouchableOpacity onPress={pickImage} style={styles.imageWrapper}>
@@ -524,7 +532,9 @@ export default function ProfileScreen() {
       <Modal visible={isQRExpanded} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} onPress={() => setQRExpanded(false)}>
           <View style={styles.qrModalBox}>
-            <QRCode value={JSON.stringify(accountData)} size={260} />
+            {profileQrUrl ? (
+              <QRCode value={profileQrUrl} size={260} color="black" backgroundColor="white" />
+            ) : null}
           </View>
         </TouchableOpacity>
       </Modal>

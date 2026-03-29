@@ -298,6 +298,8 @@ export default function FriendProfile() {
   const locationText =
     friend.location || [city, state].filter(Boolean).join(", ");
 
+  const avatarUri = resolveAvatar(friend.imageurl);
+
   const removeFriend = async () => {
     const user = auth.currentUser;
     if (!user || !friendId) return;
@@ -706,10 +708,11 @@ export default function FriendProfile() {
         </View>
         <View style={styles.header}>
           <ExpoImage
-            source={{ uri: resolveAvatar(friend.imageurl) }}
+            source={{ uri: avatarUri }}
             style={styles.avatar}
             cachePolicy="memory-disk"
             transition={0}
+            recyclingKey={avatarUri}
           />
 
           <Text style={styles.name}>
@@ -910,6 +913,7 @@ const styles = StyleSheet.create({
     borderColor: ACCENT,
     marginBottom: 16,
   },
+
   avatarFallback: {
     backgroundColor: "#1a1a1a",
     justifyContent: "center",
