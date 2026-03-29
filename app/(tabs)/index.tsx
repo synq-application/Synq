@@ -1,7 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useSynqBoot } from "../../src/lib/synqBootContext";
-import { synqStatusStorageKey } from "../../src/lib/synqSession";
 import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -40,8 +38,8 @@ import {
   Vibration,
   View
 } from 'react-native';
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Swipeable } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ACCENT,
   aiPrompts,
@@ -52,10 +50,17 @@ import {
   fonts,
   MODAL_RADIUS,
   MUTED,
+  MUTED2,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
+  SPACE_4,
+  SPACE_5,
+  TEXT,
+  TYPE_BODY,
 } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
+import { useSynqBoot } from "../../src/lib/synqBootContext";
+import { synqStatusStorageKey } from "../../src/lib/synqSession";
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
 import { formatTime, parseIdeaText, resolveAvatar, SynqStatus, wrapChatTitle } from '../helpers';
@@ -697,14 +702,12 @@ export default function SynqScreen() {
               data={availableFriends}
               keyExtractor={(item) => item.id}
               ListEmptyComponent={
-                <>
-                  <Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 22 }}>
-                    No free friends right now.
+                <View style={styles.activeEmptyWrap}>
+                  <Text style={styles.activeEmptyTitle}>No free friends right now.</Text>
+                  <Text style={styles.activeEmptySub}>
+                    {`In the meantime, add more connections to increase the chances of having overlapping free time!`}
                   </Text>
-                  <Text style={{ color: 'white', textAlign: 'center', marginTop: 50, fontSize: 18 }}>
-                    In the meantime, add more connections to increase the chances of having overlapping free time!
-                  </Text>
-                </>
+                </View>
               }
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -1219,6 +1222,30 @@ const styles = StyleSheet.create({
     height: 120,
     zIndex: 1,
     elevation: 2,
+  },
+  /** Friends-tab–style tokens, bumped for legibility on Synq active empty list. */
+  activeEmptyWrap: {
+    alignItems: "center",
+    paddingHorizontal: SPACE_5,
+    marginTop: SPACE_5,
+    maxWidth: 380,
+    alignSelf: "center",
+  },
+  activeEmptyTitle: {
+    color: TEXT,
+    fontFamily: fonts.heavy,
+    fontSize: 24,
+    lineHeight: 34,
+    letterSpacing: 0.2,
+    textAlign: "center",
+  },
+  activeEmptySub: {
+    color: MUTED2,
+    fontFamily: fonts.medium,
+    fontSize: TYPE_BODY + 2,
+    lineHeight: 26,
+    textAlign: "center",
+    marginTop: SPACE_4,
   },
   activeHeader: {
     flexDirection: 'row',
