@@ -2,12 +2,19 @@ import {
   ACCENT,
   BG,
   BORDER,
+  BUTTON_RADIUS,
   fonts,
   Friend,
   MUTED,
   MUTED2,
+  SPACE_3,
+  SPACE_4,
+  SPACE_5,
+  SPACE_6,
   SURFACE,
   TEXT,
+  TYPE_BODY,
+  TYPE_CAPTION,
 } from "@/constants/Variables";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -59,6 +66,70 @@ const { width } = Dimensions.get("window");
 
 const sortFriendsByName = (list: Friend[]) =>
   [...list].sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
+
+function FriendsListEmpty({
+  hasFriends,
+  searchText,
+  onAddFriends,
+  onClearSearch,
+}: {
+  hasFriends: boolean;
+  searchText: string;
+  onAddFriends: () => void;
+  onClearSearch: () => void;
+}) {
+  if (hasFriends && searchText.trim().length > 0) {
+    return (
+      <View style={styles.emptyStateCenter}>
+        <Ionicons name="search-outline" size={40} color={MUTED2} />
+        <Text style={styles.emptyTitle}>No matches</Text>
+        <Text style={styles.emptyText}>
+          {`No friend named "${searchText.trim()}". Try another spelling or clear search.`}
+        </Text>
+        <TouchableOpacity onPress={onClearSearch} style={styles.emptySecondaryBtn} activeOpacity={0.8}>
+          <Text style={styles.emptySecondaryBtnText}>Clear search</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.emptyStateMain}>
+      <Text style={styles.emptyHeroTitle}>Your circle starts here</Text>
+      <Text style={styles.emptyHeroSubtitle}>
+        {`Friends power Synq: see who's free, share a quick memo, and make spontaneous plans together.`}
+      </Text>
+
+      <View style={styles.emptyTipsCard}>
+        <View style={styles.emptyTipRow}>
+          <Ionicons name="flash-outline" size={18} color={ACCENT} style={styles.emptyTipIcon} />
+          <Text style={styles.emptyTipText}>
+            {`Know who's open right now—not everyone, just your circle.`}
+          </Text>
+        </View>
+        <View style={styles.emptyTipRow}>
+          <Ionicons name="mail-outline" size={18} color={ACCENT} style={styles.emptyTipIcon} />
+          <Text style={styles.emptyTipText}>Send invites by name or email from Add friends.</Text>
+        </View>
+        <View style={[styles.emptyTipRow, { marginBottom: 0 }]}>
+          <Ionicons name="sparkles-outline" size={18} color={ACCENT} style={styles.emptyTipIcon} />
+          <Text style={styles.emptyTipText}>Suggested people appear there too as Synq learns your network.</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={styles.emptyPrimaryCta}
+        onPress={onAddFriends}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Add friends"
+      >
+        <Ionicons name="person-add-outline" size={22} color="#061006" />
+        <Text style={styles.emptyPrimaryCtaText}>Add friends</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 export default function FriendsScreen() {
   const router = useRouter();
@@ -152,6 +223,9 @@ export default function FriendsScreen() {
       .includes(searchText.toLowerCase())
   );
 
+  const showFriendSearch = friends.length > 0 && !isFriendsInitialLoading;
+  const listIsEmpty = filteredFriends.length === 0;
+
   const renderSkeletonRow = (key: string) => (
     <View key={key} style={styles.friendRow}>
       <View style={[styles.avatar, { backgroundColor: "#151515" }]} />
@@ -226,27 +300,34 @@ export default function FriendsScreen() {
         <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Friends</Text>
+        <View style={styles.headerTitleBlock}>
+          <Text style={styles.headerTitle}>Friends</Text>
+          {!isFriendsInitialLoading && friends.length === 0 && (
+            <Text style={styles.headerSub}>Add a few people to get started</Text>
+          )}
+        </View>
         <TouchableOpacity onPress={() => setSearchModalVisible(true)}>
           <Icon name="add-circle-outline" size={30} color="white" />
         </TouchableOpacity>
       </View>
       <View style={styles.headerDivider} />
-      <View style={styles.searchBarWrap}>
-        <Ionicons name="search-outline" size={18} color={MUTED2} />
-        <TextInput
-          placeholder="Search friends..."
-          placeholderTextColor="rgba(255,255,255,0.3)"
-          style={styles.searchBarInput}
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-        {searchText.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchText("")}>
-            <Ionicons name="close-circle" size={18} color={MUTED2} />
-          </TouchableOpacity>
-        )}
-      </View>
+      {showFriendSearch && (
+        <View style={styles.searchBarWrap}>
+          <Ionicons name="search-outline" size={18} color={MUTED2} />
+          <TextInput
+            placeholder="Search friends..."
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            style={styles.searchBarInput}
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchText("")}>
+              <Ionicons name="close-circle" size={18} color={MUTED2} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {isFriendsInitialLoading ? (
         <View style={{ paddingBottom: 20 }}>
@@ -255,6 +336,7 @@ export default function FriendsScreen() {
       ) : (
         <>
           <FlatList
+            style={styles.friendsList}
             data={filteredFriends}
             keyExtractor={(item) => item.id}
             renderItem={renderFriendRow}
@@ -263,6 +345,15 @@ export default function FriendsScreen() {
             onScrollBeginDrag={Keyboard.dismiss}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             ListFooterComponent={<View style={{ height: 40 }} />}
+            contentContainerStyle={listIsEmpty ? styles.friendsListContentEmpty : styles.friendsListContent}
+            ListEmptyComponent={
+              <FriendsListEmpty
+                hasFriends={friends.length > 0}
+                searchText={searchText}
+                onAddFriends={() => setSearchModalVisible(true)}
+                onClearSearch={() => setSearchText("")}
+              />
+            }
           />
         </>
       )}
@@ -785,10 +876,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 88,
-    alignItems: "center",
+    alignItems: "flex-start",
   },
+  headerTitleBlock: { flex: 1, paddingRight: 12 },
   headerTitle: { color: TEXT, fontSize: 32, fontFamily: fonts.heavy, letterSpacing: 0.2 },
-  headerSub: { color: MUTED, fontSize: 14, fontFamily: fonts.book, marginTop: 6 },
+  headerSub: { color: MUTED, fontSize: 14, fontFamily: fonts.book, marginTop: 6, lineHeight: 20 },
   headerAction: { paddingLeft: 12, paddingVertical: 6 },
   headerDivider: { marginTop: 16, height: 1, backgroundColor: BORDER },
   friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
@@ -815,6 +907,80 @@ const styles = StyleSheet.create({
   },
   friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
   mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
+  friendsList: { flex: 1 },
+  friendsListContent: { paddingBottom: 40 },
+  friendsListContentEmpty: { flexGrow: 1, paddingBottom: 40 },
+  emptyStateCenter: {
+    flex: 1,
+    paddingTop: SPACE_5,
+    paddingHorizontal: SPACE_3,
+    paddingBottom: SPACE_5,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 360,
+  },
+  /** Friends list empty (no icon) — vertically centered in the list area. */
+  emptyStateMain: {
+    flex: 1,
+    paddingHorizontal: SPACE_4,
+    paddingVertical: SPACE_6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyHeroTitle: {
+    color: TEXT,
+    fontFamily: fonts.heavy,
+    fontSize: 24,
+    letterSpacing: 0.2,
+    textAlign: "center",
+  },
+  emptyHeroSubtitle: {
+    color: MUTED,
+    fontFamily: fonts.book,
+    fontSize: TYPE_BODY,
+    lineHeight: 24,
+    textAlign: "center",
+    marginTop: SPACE_5,
+    maxWidth: 320,
+  },
+  emptyTipsCard: {
+    alignSelf: "stretch",
+    backgroundColor: SURFACE,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingVertical: SPACE_6,
+    paddingHorizontal: SPACE_6,
+    marginTop: SPACE_6,
+  },
+  emptyTipRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: SPACE_6 },
+  emptyTipIcon: { marginRight: SPACE_4, marginTop: 2 },
+  emptyTipText: {
+    flex: 1,
+    color: MUTED,
+    fontFamily: fonts.book,
+    fontSize: TYPE_CAPTION + 1,
+    lineHeight: 22,
+  },
+  emptyPrimaryCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACE_3,
+    alignSelf: "stretch",
+    backgroundColor: ACCENT,
+    borderRadius: BUTTON_RADIUS,
+    paddingVertical: 18,
+    marginTop: SPACE_6,
+  },
+  emptyPrimaryCtaText: {
+    color: "#061006",
+    fontFamily: fonts.heavy,
+    fontSize: 17,
+    letterSpacing: 0.2,
+  },
+  emptySecondaryBtn: { marginTop: SPACE_4, paddingVertical: 8, paddingHorizontal: 12 },
+  emptySecondaryBtnText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 15 },
   emptyContainer: { flex: 1, justifyContent: "center", marginTop: 30, paddingHorizontal: 10 },
   emptyCard: {
     backgroundColor: SURFACE,
@@ -824,7 +990,7 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   emptyTitle: { color: TEXT, textAlign: "center", fontFamily: fonts.heavy, fontSize: 18 },
-  emptyText: { color: MUTED, textAlign: "center", fontFamily: fonts.book, fontSize: 14, marginTop: 8, lineHeight: 20 },
+  emptyText: { color: MUTED, textAlign: "center", fontFamily: fonts.book, fontSize: 14, marginTop: 12, lineHeight: 20, paddingHorizontal: 8 },
   popupOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.78)",
