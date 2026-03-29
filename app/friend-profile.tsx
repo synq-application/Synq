@@ -53,19 +53,11 @@ import { formatLastSynq, resolveAvatar } from "./helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
 
 export default function FriendProfile() {
-  const { friendId, returnToAddFriends } = useLocalSearchParams<{
+  const { friendId } = useLocalSearchParams<{
     friendId?: string;
-    returnToAddFriends?: string;
   }>();
   const router = useRouter();
   const handleBack = () => {
-    if (returnToAddFriends === "1") {
-      router.replace({
-        pathname: "/(tabs)/friends",
-        params: { openAddFriends: "1" },
-      });
-      return;
-    }
     router.back();
   };
 

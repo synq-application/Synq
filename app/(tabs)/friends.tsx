@@ -11,7 +11,13 @@ import {
 } from "@/constants/Variables";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
+import {
+  useLocalSearchParams,
+  usePathname,
+  useRouter,
+  useSegments,
+} from "expo-router";
 import {
   collection,
   deleteDoc,
@@ -56,6 +62,9 @@ const sortFriendsByName = (list: Friend[]) =>
 
 export default function FriendsScreen() {
   const router = useRouter();
+  const pathname = usePathname();
+  const segments = useSegments();
+  const isFriendsTabFocused = useIsFocused();
   const { openAddFriends } = useLocalSearchParams<{ openAddFriends?: string }>();
   const myId = auth.currentUser?.uid ?? "";
   const cachedFriends = myId ? friendsListCacheByUser[myId] ?? [] : [];
@@ -64,6 +73,13 @@ export default function FriendsScreen() {
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
+
+  /** Keep modal "open" in state while viewing friend profile so back() restores it without a second sheet animation. */
+  const routeShowsFriendProfile =
+    (pathname ?? "").includes("friend-profile") ||
+    segments.some((s) => typeof s === "string" && s.includes("friend-profile"));
+  const showAddFriendsModal =
+    searchModalVisible && isFriendsTabFocused && !routeShowsFriendProfile;
 
   useEffect(() => {
     if (openAddFriends !== "1") return;
@@ -255,7 +271,7 @@ export default function FriendsScreen() {
       )}
 
         <SearchModal
-          visible={searchModalVisible}
+          visible={showAddFriendsModal}
           onClose={() => setSearchModalVisible(false)}
           currentFriends={friends.map((f) => f.id)}
         />
@@ -624,13 +640,10 @@ function SearchModal({
                 <View style={styles.searchResult}>
                   <TouchableOpacity
                     onPress={() => {
-                      onClose();
-                      setTimeout(() => {
-                        router.push({
-                          pathname: "/friend-profile",
-                          params: { friendId: item.id, returnToAddFriends: "1" },
-                        });
-                      }, 200);
+                      router.push({
+                        pathname: "/friend-profile",
+                        params: { friendId: item.id },
+                      });
                     }}
                     style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
                     activeOpacity={0.8}
