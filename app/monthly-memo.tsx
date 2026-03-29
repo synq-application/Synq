@@ -93,6 +93,21 @@ export default function OpenPlans({
     setSelectedDate(d);
   };
 
+  const isSameCalendarDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const todayRef = new Date();
+  const tomorrowRef = new Date(Date.now() + 86400000);
+  const pickDateMode = picker === "date";
+  const pillarToday =
+    !pickDateMode && isSameCalendarDay(selectedDate, todayRef);
+  const pillarTomorrow =
+    !pickDateMode && isSameCalendarDay(selectedDate, tomorrowRef);
+  const pillarPickDate =
+    pickDateMode || (!pillarToday && !pillarTomorrow);
+
   const handleSave = () => {
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
@@ -238,15 +253,28 @@ export default function OpenPlans({
                   />
 
                   <View style={styles.row}>
-                    <DateBtn label="Today" onPress={() => setDate(new Date())} />
+                    <DateBtn
+                      label="Today"
+                      selected={pillarToday}
+                      accentColor={ACCENT}
+                      onPress={() => {
+                        setPicker(null);
+                        setDate(new Date());
+                      }}
+                    />
                     <DateBtn
                       label="Tomorrow"
-                      onPress={() =>
-                        setDate(new Date(Date.now() + 86400000))
-                      }
+                      selected={pillarTomorrow}
+                      accentColor={ACCENT}
+                      onPress={() => {
+                        setPicker(null);
+                        setDate(new Date(Date.now() + 86400000));
+                      }}
                     />
                     <DateBtn
                       label="Pick a date"
+                      selected={pillarPickDate}
+                      accentColor={ACCENT}
                       onPress={() => setPicker("date")}
                     />
                   </View>
@@ -328,9 +356,34 @@ export default function OpenPlans({
   );
 }
 
-const DateBtn = ({ label, onPress }: any) => (
-  <TouchableOpacity style={styles.dateBtn} onPress={onPress}>
-    <Text style={{ color: "white", fontSize: 14, fontFamily: fonts.medium }}>
+const DateBtn = ({
+  label,
+  onPress,
+  selected,
+  accentColor,
+}: {
+  label: string;
+  onPress: () => void;
+  selected: boolean;
+  accentColor: string;
+}) => (
+  <TouchableOpacity
+    style={[
+      styles.dateBtn,
+      selected && {
+        borderColor: accentColor,
+        backgroundColor: `${accentColor}22`,
+      },
+    ]}
+    onPress={onPress}
+  >
+    <Text
+      style={{
+        color: selected ? accentColor : "white",
+        fontSize: 14,
+        fontFamily: fonts.medium,
+      }}
+    >
       {label}
     </Text>
   </TouchableOpacity>
