@@ -4,10 +4,12 @@ import {
   BUTTON_RADIUS,
   fonts,
   PRIMARY_CTA_HEIGHT,
-  PRIMARY_CTA_WIDTH,
   synqSvg,
   TEXT,
 } from "@/constants/Variables";
+
+/** Slightly wider than default CTAs so both buttons feel balanced on this screen. */
+const GET_STARTED_CTA_WIDTH = "84%";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -114,7 +116,7 @@ const styles = StyleSheet.create({
 
   primaryBtn: {
     alignSelf: "center",
-    width: PRIMARY_CTA_WIDTH,
+    width: GET_STARTED_CTA_WIDTH,
     height: PRIMARY_CTA_HEIGHT,
     borderRadius: BUTTON_RADIUS,
     backgroundColor: ACCENT,
@@ -133,8 +135,10 @@ const styles = StyleSheet.create({
 
   secondaryBtn: {
     marginTop: 12,
-    height: 52,
-    borderRadius: 18,
+    alignSelf: "center",
+    width: GET_STARTED_CTA_WIDTH,
+    height: PRIMARY_CTA_HEIGHT,
+    borderRadius: BUTTON_RADIUS,
     backgroundColor: "rgba(0,0,0,0.18)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
