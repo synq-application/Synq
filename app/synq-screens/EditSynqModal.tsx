@@ -30,11 +30,9 @@ export default function EditSynqModal({
 }: Props) {
   const suggestions = [
     "Down for drinks",
-    "Grabbing dinner",
     "Anyone for happy hour?",
     "Coffee?",
     "Down for something chill",
-    "Anyone around?",
     "Quick bite?",
     "Down for a walk",
     "Gym?",
