@@ -1,5 +1,9 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const {
+  onDocumentCreated,
+  onDocumentUpdated,
+  onDocumentWritten,
+} = require("firebase-functions/v2/firestore");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 const logger = require("firebase-functions/logger");
@@ -8,6 +12,55 @@ const admin = require("firebase-admin");
 if (admin.apps.length === 0) {
     admin.initializeApp();
 }
+
+/**
+ * Expo push tokens identify a device+install, not a user. If two accounts log in on
+ * the same phone, both user docs can end up with the same token — then "notify the
+ * recipient" delivers to the sender's device. When a user saves a token, remove it
+ * from every other profile so only one uid owns it.
+ */
+exports.onUserPushTokenWrite = onDocumentWritten(
+  {
+    document: "users/{userId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const userId = event.params.userId;
+    const after = event.data.after?.exists ? event.data.after.data() : null;
+    const token = after?.pushToken;
+    if (!token || typeof token !== "string") return;
+
+    try {
+      const dupes = await admin
+        .firestore()
+        .collection("users")
+        .where("pushToken", "==", token)
+        .get();
+
+      if (dupes.size <= 1) return;
+
+      const batch = admin.firestore().batch();
+      let cleared = 0;
+      dupes.docs.forEach((d) => {
+        if (d.id !== userId) {
+          batch.update(d.ref, {
+            pushToken: admin.firestore.FieldValue.delete(),
+          });
+          cleared += 1;
+        }
+      });
+      if (cleared > 0) {
+        await batch.commit();
+        logger.info("onUserPushTokenWrite: cleared duplicate pushToken from other users", {
+          userId,
+          cleared,
+        });
+      }
+    } catch (e) {
+      logger.error("onUserPushTokenWrite", e);
+    }
+  }
+);
 
 exports.onMessageSent = onDocumentCreated({
     document: "chats/{chatId}/messages/{messageId}",
@@ -21,27 +74,50 @@ exports.onMessageSent = onDocumentCreated({
     try {
         const chatDoc = await admin.firestore().collection("chats").doc(chatId).get();
         if (!chatDoc.exists) return;
-        
+
         const chatData = chatDoc.data();
-        const recipientIds = (chatData.participants || []).filter(id => id !== messageData.senderId);
+        const senderId = String(messageData.senderId ?? "").trim();
+        if (!senderId) {
+            logger.warn("onMessageSent: missing senderId", { chatId });
+            return;
+        }
+
+        const recipientIds = (chatData.participants || [])
+            .map((id) => String(id ?? "").trim())
+            .filter((id) => id && id !== senderId);
+
+        const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
+        const senderPushToken = senderDoc.data()?.pushToken || null;
 
         for (const recipientId of recipientIds) {
             const userDoc = await admin.firestore().collection("users").doc(recipientId).get();
             const userData = userDoc.data();
+            const token = userData?.pushToken;
 
-            if (userData?.pushToken) {
-                const senderName = chatData.participantNames?.[messageData.senderId] || "New Message";
-                await axios.post("https://exp.host/--/api/v2/push/send", {
-                    to: userData.pushToken,
-                    sound: "default",
-                    title: senderName,
-                    body: messageData.text,
-                    data: {
-                        chatId: String(chatId),
-                        type: "message",
-                    },
+            if (!token) continue;
+
+            if (senderPushToken && token === senderPushToken) {
+                logger.warn("onMessageSent: skip push — recipient shares device token with sender", {
+                    chatId,
+                    recipientId,
                 });
+                continue;
             }
+
+            const senderName =
+                chatData.participantNames?.[senderId] ||
+                chatData.participantNames?.[messageData.senderId] ||
+                "New Message";
+            await axios.post("https://exp.host/--/api/v2/push/send", {
+                to: token,
+                sound: "default",
+                title: senderName,
+                body: messageData.text,
+                data: {
+                    chatId: String(chatId),
+                    type: "message",
+                },
+            });
         }
     } catch (error) {
         logger.error("Error in onMessageSent:", error);
