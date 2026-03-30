@@ -93,6 +93,8 @@ export default function EditSynqModal({
                 placeholder="e.g. let’s grab drinks 🍸"
                 placeholderTextColor="rgba(255,255,255,0.25)"
                 multiline
+                submitBehavior="blurAndSubmit"
+                returnKeyType="done"
               />
 
               <View style={localStyles.suggestionHeaderRow}>
