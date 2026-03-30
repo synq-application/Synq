@@ -1,4 +1,4 @@
-import { fonts } from "@/constants/Variables";
+import { fonts, TEXT } from "@/constants/Variables";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useState } from "react";
 import {
@@ -390,9 +390,15 @@ const DateBtn = ({
 );
 
 const styles = StyleSheet.create({
-  container: { marginTop: 30, width: "92%", alignSelf: "center" },
-  header: { color: "white", fontSize: 18, fontFamily: fonts.heavy, marginBottom: 14, marginLeft: 10 },
-  empty: { color: "#666", marginBottom: 16, marginLeft: 10 },
+  container: { width: "100%", alignSelf: "stretch" },
+  header: {
+    color: TEXT,
+    fontSize: 20,
+    fontFamily: fonts.heavy,
+    marginBottom: 12,
+    letterSpacing: 0.2,
+  },
+  empty: { color: "#666", marginBottom: 16 },
   card: { backgroundColor: "#0d0d0d", borderRadius: 20, padding: 14, marginBottom: 10, flexDirection: "row" },
   joinedCard: {
     borderWidth: 1,

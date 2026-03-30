@@ -523,7 +523,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </View>
-      <View>
+      <View style={styles.section}>
         <MonthlyMemo
           ACCENT={ACCENT}
           setShowEventModal={setShowEventModal}
@@ -741,7 +741,7 @@ const styles = StyleSheet.create({
   interestText: { color: TEXT, fontFamily: fonts.heavy, fontSize: 13 },
   addRect: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: ACCENT, borderStyle: "dashed", borderRadius: BUTTON_RADIUS, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 4 },
-  signOutBtn: { alignSelf: "center", marginTop: 50, paddingVertical: 14, paddingHorizontal: 60, borderRadius: BUTTON_RADIUS + 8, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
+  signOutBtn: { alignSelf: "center", marginTop: 22, paddingVertical: 14, paddingHorizontal: 60, borderRadius: BUTTON_RADIUS + 8, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
   signOutText: { color: "#666", fontFamily: fonts.heavy, fontSize: 13, letterSpacing: 2, textTransform: "uppercase" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" },
   qrModalBox: { backgroundColor: "white", padding: 25, borderRadius: MODAL_RADIUS + 18 },
