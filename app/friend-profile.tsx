@@ -57,8 +57,17 @@ export default function FriendProfile() {
     friendId?: string;
   }>();
   const router = useRouter();
+
+  const goBackOrHome = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
+
   const handleBack = () => {
-    router.back();
+    goBackOrHome();
   };
 
   const viewerId = auth.currentUser?.uid ?? "";
@@ -309,7 +318,7 @@ export default function FriendProfile() {
         doc(db, "users", user.uid, "friends", friendId as string)
       );
 
-      router.back();
+      goBackOrHome();
     } catch (e) {
       console.error("Failed to remove friend", e);
     }
