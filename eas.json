@@ -17,6 +17,12 @@
     "production": {
       "autoIncrement": true,
       "distribution": "store"
+    },
+    "production-fresh": {
+      "extends": "production",
+      "cache": {
+        "disabled": true
+      }
     }
   },
   "submit": {
