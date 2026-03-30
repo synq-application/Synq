@@ -125,6 +125,7 @@ export default function SynqScreen() {
   const [showOptionsList, setShowOptionsList] = useState(false);
   const [currentCategory, setCurrentCategory] = useState('');
   const flatListRef = useRef<FlatList>(null);
+  const [pendingScrollToMessageId, setPendingScrollToMessageId] = useState<string | null>(null);
   const lastTapRef = useRef<{ [key: string]: number }>({});
   const ideaMapOpenTimerRef = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
   const [hasUnread, setHasUnread] = useState(false);
@@ -203,7 +204,7 @@ export default function SynqScreen() {
   }, []);
 
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('openChat', async (data) => {
+    const subscription = DeviceEventEmitter.addListener('openChat', async (data: { chatId?: string; messageId?: string }) => {
       if (data.chatId) {
         try {
           const snap = await getDoc(doc(db, "chats", data.chatId));
@@ -215,11 +216,41 @@ export default function SynqScreen() {
         setActiveChatId(data.chatId);
         setIsChatVisible(true);
         setIsInboxVisible(false);
+        const mid = typeof data.messageId === "string" && data.messageId.trim() ? data.messageId.trim() : null;
+        setPendingScrollToMessageId(mid);
         await markChatRead(data.chatId);
       }
     });
     return () => subscription.remove();
   }, []);
+
+  useEffect(() => {
+    if (!pendingScrollToMessageId) return;
+    if (!messages.length) return;
+    const idx = messages.findIndex((m) => m.id === pendingScrollToMessageId);
+    if (idx < 0) return;
+    const t = setTimeout(() => {
+      try {
+        flatListRef.current?.scrollToIndex({
+          index: idx,
+          animated: true,
+          viewPosition: 0.4,
+        });
+      } catch {
+        try {
+          flatListRef.current?.scrollToIndex({ index: idx, animated: true });
+        } catch {}
+      }
+      setPendingScrollToMessageId(null);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [pendingScrollToMessageId, messages]);
+
+  useEffect(() => {
+    if (!pendingScrollToMessageId) return;
+    const failSafe = setTimeout(() => setPendingScrollToMessageId(null), 10000);
+    return () => clearTimeout(failSafe);
+  }, [pendingScrollToMessageId]);
   useEffect(() => {
     if (isExploreVisible) {
       Keyboard.dismiss();
@@ -1085,8 +1116,25 @@ export default function SynqScreen() {
                   keyboardShouldPersistTaps="handled"
                   onScrollBeginDrag={() => Keyboard.dismiss()}
                   onMomentumScrollBegin={() => Keyboard.dismiss()}
-                  onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                  onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                  onContentSizeChange={() => {
+                    if (pendingScrollToMessageId) return;
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                  }}
+                  onLayout={() => {
+                    if (pendingScrollToMessageId) return;
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                  }}
+                  onScrollToIndexFailed={(info) => {
+                    setTimeout(() => {
+                      try {
+                        flatListRef.current?.scrollToIndex({
+                          index: info.index,
+                          animated: true,
+                          viewPosition: 0.4,
+                        });
+                      } catch {}
+                    }, 350);
+                  }}
                   renderItem={({ item }) => {
                     const isMe = item.senderId === auth.currentUser?.uid;
                     const isSystemIdea = item.text.includes("✨ Synq AI Suggestion") || item.venueImage;

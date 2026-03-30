@@ -41,6 +41,8 @@ type Props = {
   viewerUid?: string;
   /** uid → display name (friends + self) for resolving "{Host}'s plan". */
   hostDisplayNameByUid?: Record<string, string>;
+  /** Emphasize one plan row (e.g. opened from a push notification). */
+  highlightEventId?: string | null;
 };
 
 const getInitialDate = () => {
@@ -61,6 +63,7 @@ export default function OpenPlans({
   events,
   viewerUid = "",
   hostDisplayNameByUid = {},
+  highlightEventId = null,
 }: Props) {
   const firstName = (name: string) => String(name || "").trim().split(/\s+/)[0] || "";
 
@@ -212,10 +215,16 @@ export default function OpenPlans({
             !!p.joinedFromName ||
             (Array.isArray(p.joinedFromNames) && p.joinedFromNames.length > 0);
           const { primary: hostLine, secondary: othersLine } = planAttributionLines(p);
+          const isHighlighted =
+            !!highlightEventId && String(p.id) === String(highlightEventId);
           return (
             <TouchableOpacity
               key={p.id}
-              style={[styles.card, isJoinedPlan && styles.joinedCard]}
+              style={[
+                styles.card,
+                isJoinedPlan && styles.joinedCard,
+                isHighlighted && { borderColor: ACCENT, borderWidth: 2 },
+              ]}
               onLongPress={() => handleDelete(p.id)}
             >
             <View style={styles.dateBlock}>

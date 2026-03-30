@@ -123,6 +123,89 @@ exports.onMessageSent = onDocumentCreated({
         logger.error("Error in onMessageSent:", error);
     }
 });
+
+/** Notify the message author when someone else hearts their message. */
+exports.onMessageReaction = onDocumentUpdated(
+  {
+    document: "chats/{chatId}/messages/{messageId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+    if (!after) return;
+
+    const { chatId, messageId } = event.params;
+    const beforeR = (before && before.reactions) || {};
+    const afterR = after.reactions || {};
+
+    const senderId = String(after.senderId ?? "").trim();
+    if (!senderId) return;
+
+    const newHeartUserIds = Object.keys(afterR).filter(
+      (uid) => afterR[uid] === "heart" && beforeR[uid] !== "heart"
+    );
+    if (newHeartUserIds.length === 0) return;
+
+    let chatData = {};
+    try {
+      const chatDoc = await admin.firestore().collection("chats").doc(chatId).get();
+      if (!chatDoc.exists) return;
+      chatData = chatDoc.data() || {};
+    } catch (e) {
+      logger.error("onMessageReaction: chat read", e);
+      return;
+    }
+
+    const messageText = String(after.text || "").slice(0, 120);
+
+    for (const reactorId of newHeartUserIds) {
+      const rid = String(reactorId || "").trim();
+      if (!rid || rid === senderId) continue;
+
+      try {
+        const authorDoc = await admin.firestore().collection("users").doc(senderId).get();
+        const reactorDoc = await admin.firestore().collection("users").doc(rid).get();
+        const authorToken = authorDoc.data()?.pushToken;
+        if (!authorToken) continue;
+
+        const reactorToken = reactorDoc.data()?.pushToken || null;
+        if (reactorToken && authorToken === reactorToken) {
+          logger.warn("onMessageReaction: skip — author and reactor share device token", {
+            chatId,
+            messageId,
+          });
+          continue;
+        }
+
+        let reactorName =
+          chatData.participantNames?.[rid] ||
+          reactorDoc.data()?.displayName ||
+          "Someone";
+        reactorName = String(reactorName).trim() || "Someone";
+
+        const body = messageText
+          ? `${reactorName} liked: ${messageText}${messageText.length >= 120 ? "…" : ""}`
+          : `${reactorName} liked your message`;
+
+        await axios.post("https://exp.host/--/api/v2/push/send", {
+          to: authorToken,
+          sound: "default",
+          title: `${reactorName} liked your message`,
+          body,
+          data: {
+            type: "message_reaction",
+            chatId: String(chatId),
+            messageId: String(messageId),
+          },
+        });
+      } catch (err) {
+        logger.error("onMessageReaction: push", err);
+      }
+    }
+  }
+);
+
 exports.deleteMyAccount = onCall(
   { region: "us-central1" },
   async (request) => {
@@ -212,23 +295,37 @@ exports.onFriendRequestSent = onDocumentCreated({
     region: "us-central1"
 }, async (event) => {
     const requestData = event.data.data();
-    const { userId } = event.params;
+    const { userId, requestId } = event.params;
 
     try {
         const recipientDoc = await admin.firestore().collection("users").doc(userId).get();
         const recipientData = recipientDoc.data();
+        const senderDoc = await admin.firestore().collection("users").doc(requestId).get();
+        const senderPushToken = senderDoc.data()?.pushToken || null;
 
-        if (recipientData?.pushToken) {
-            const senderName = requestData.senderName || "A user";
-            
-            await axios.post("https://exp.host/--/api/v2/push/send", {
-                to: recipientData.pushToken,
-                sound: "default",
-                title: "New Friend Request 🤝",
-                body: `${senderName} wants to Synq with you!`,
-                data: { type: "friend_request" },
+        const token = recipientData?.pushToken;
+        if (!token) return;
+
+        if (senderPushToken && token === senderPushToken) {
+            logger.warn("onFriendRequestSent: skip push — same device token as sender", {
+                userId,
+                requestId,
             });
+            return;
         }
+
+        const senderName = requestData.senderName || "A user";
+
+        await axios.post("https://exp.host/--/api/v2/push/send", {
+            to: token,
+            sound: "default",
+            title: "New Friend Request 🤝",
+            body: `${senderName} wants to Synq with you!`,
+            data: {
+                type: "friend_request",
+                fromUserId: String(requestId),
+            },
+        });
     } catch (error) {
         logger.error("Error in onFriendRequestSent:", error);
     }
@@ -310,10 +407,13 @@ exports.onOpenPlanInterest = onDocumentUpdated(
         if (alreadySent.exists) continue;
 
         let joinerName = "Someone";
+        let joinerPushToken = null;
         try {
           const joinerDoc = await admin.firestore().collection("users").doc(joinerId).get();
           if (joinerDoc.exists) {
-            joinerName = joinerDoc.data()?.displayName || joinerName;
+            const jd = joinerDoc.data();
+            joinerName = jd?.displayName || joinerName;
+            joinerPushToken = jd?.pushToken || null;
           }
         } catch (e) {
           logger.warn("onOpenPlanInterest: joiner profile", e);
@@ -324,13 +424,30 @@ exports.onOpenPlanInterest = onDocumentUpdated(
           ? `${firstNameFromDisplay(joinerName)} is interested in your plan ${planTitle}`
           : `${firstNameFromDisplay(joinerName)} is interested in your plan`;
 
+        const eventIdForClient =
+          String(ev?.id || "").trim() ||
+          String(eventMatchKey(ev)).replace(/[/\s]/g, "_");
+
+        if (joinerPushToken && hostPushToken === joinerPushToken) {
+          logger.warn("onOpenPlanInterest: skip push — same device token as joiner", {
+            hostUid,
+            joinerId,
+          });
+          continue;
+        }
+
         try {
           await axios.post("https://exp.host/--/api/v2/push/send", {
             to: hostPushToken,
             sound: "default",
             title: "Open plan",
             body,
-            data: { type: "open_plan_interest", planHostUid: hostUid, fromUserId: joinerId },
+            data: {
+              type: "open_plan_interest",
+              planHostUid: hostUid,
+              fromUserId: joinerId,
+              eventId: eventIdForClient,
+            },
           });
           await lockRef.set({
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -387,6 +504,15 @@ exports.onFriendAccepted = onDocumentCreated({
     const accepterData = accepterDoc.data();
 
     if (!friendUserData?.pushToken) return;
+
+    const accepterToken = accepterData?.pushToken || null;
+    if (accepterToken && friendUserData.pushToken === accepterToken) {
+      logger.warn("onFriendAccepted: skip push — same device token as accepter", {
+        userId,
+        friendId,
+      });
+      return;
+    }
 
     await axios.post("https://exp.host/--/api/v2/push/send", {
       to: friendUserData.pushToken,

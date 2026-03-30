@@ -105,8 +105,10 @@ export default function RootLayout() {
   const synqBootUidRef = useRef<string | null>(null);
 
   const [pendingNotificationTap, setPendingNotificationTap] = useState<
-    | { kind: "chat"; chatId: string }
+    | { kind: "chat"; chatId: string; messageId?: string }
     | { kind: "notifications" }
+    | { kind: "friend_profile"; friendId: string }
+    | { kind: "me"; focusEventId?: string }
     | null
   >(null);
 
@@ -115,6 +117,11 @@ export default function RootLayout() {
   };
 
   useEffect(() => {
+    const str = (v: unknown): string | undefined => {
+      if (typeof v === "string" && v.trim()) return v.trim();
+      return undefined;
+    };
+
     const applyNotificationData = (data: Record<string, unknown> | undefined) => {
       if (!data) return;
       const chatRaw = data.chatId;
@@ -124,13 +131,39 @@ export default function RootLayout() {
           : chatRaw != null
             ? String(chatRaw)
             : undefined;
+      const messageId = str(data.messageId);
       const type = typeof data.type === "string" ? data.type : undefined;
+
       if (chatId) {
-        setPendingNotificationTap({ kind: "chat", chatId });
+        setPendingNotificationTap({
+          kind: "chat",
+          chatId,
+          messageId: messageId || undefined,
+        });
         return;
       }
+
       if (type === "friend_request") {
         setPendingNotificationTap({ kind: "notifications" });
+        return;
+      }
+
+      if (type === "friend_accepted") {
+        const friendId = str(data.fromUserId);
+        if (friendId) {
+          setPendingNotificationTap({ kind: "friend_profile", friendId });
+        } else {
+          setPendingNotificationTap({ kind: "notifications" });
+        }
+        return;
+      }
+
+      if (type === "open_plan_interest") {
+        setPendingNotificationTap({
+          kind: "me",
+          focusEventId: str(data.eventId),
+        });
+        return;
       }
     };
 
@@ -269,9 +302,31 @@ export default function RootLayout() {
       return;
     }
 
+    if (pending.kind === "friend_profile") {
+      router.push({
+        pathname: "/friend-profile",
+        params: { friendId: pending.friendId },
+      });
+      return;
+    }
+
+    if (pending.kind === "me") {
+      if (pending.focusEventId) {
+        router.push(
+          `/(tabs)/me?focusEventId=${encodeURIComponent(pending.focusEventId)}`
+        );
+      } else {
+        router.push("/(tabs)/me");
+      }
+      return;
+    }
+
     router.push("/(tabs)");
     setTimeout(() => {
-      DeviceEventEmitter.emit("openChat", { chatId: pending.chatId });
+      DeviceEventEmitter.emit("openChat", {
+        chatId: pending.chatId,
+        messageId: pending.messageId,
+      });
     }, 500);
   }, [authReady, navReady, user, pendingNotificationTap, router]);
 
