@@ -712,7 +712,9 @@ export default function SynqScreen() {
                   </Text>
                 </View>
               }
-              renderItem={({ item }) => (
+              renderItem={({ item }) => {
+                const friendMemo = item.memo?.trim();
+                return (
                 <TouchableOpacity
                   onPress={() =>
                     setSelectedFriends((prev) =>
@@ -744,14 +746,20 @@ export default function SynqScreen() {
                       </View>
                     )}
 
-                    <Text style={styles.grayText} numberOfLines={1}>
-                      {item.memo}
-                    </Text>
+                    {friendMemo ? (
+                      <Text
+                        style={[styles.grayText, styles.friendMemoLine]}
+                        numberOfLines={2}
+                      >
+                        {friendMemo}
+                      </Text>
+                    ) : null}
                   </View>
 
                   {selectedFriends.includes(item.id) && <Ionicons name="checkmark-circle" size={24} color={ACCENT} />}
                 </TouchableOpacity>
-              )}
+                );
+              }}
               contentContainerStyle={styles.activeListContent}
             />
             <LinearGradient
@@ -1570,6 +1578,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 2,
+  },
+  friendMemoLine: {
+    marginTop: 4,
+    fontStyle: "italic",
   },
   timestampCentered: {
     color: '#666',
