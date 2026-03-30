@@ -1,5 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 const logger = require("firebase-functions/logger");
@@ -134,6 +134,118 @@ exports.onFriendRequestSent = onDocumentCreated({
         logger.error("Error in onFriendRequestSent:", error);
     }
 });
+
+function collectJoinedIds(e) {
+  const ids = new Set();
+  if (Array.isArray(e?.joinedFromIds)) {
+    e.joinedFromIds.forEach((id) => {
+      const s = String(id || "").trim();
+      if (s) ids.add(s);
+    });
+  }
+  const j = String(e?.joinedFromId || "").trim();
+  if (j) ids.add(j);
+  return ids;
+}
+
+function eventMatchKey(e) {
+  return `${String(e?.title || "").trim().toLowerCase()}|${String(e?.date || "").trim()}`;
+}
+
+function findBeforeEvent(beforeEvents, afterEvent) {
+  const aid = String(afterEvent?.id || "").trim();
+  if (aid) {
+    const b = beforeEvents.find((x) => String(x?.id || "").trim() === aid);
+    if (b) return b;
+  }
+  const k = eventMatchKey(afterEvent);
+  return beforeEvents.find((x) => eventMatchKey(x) === k);
+}
+
+function firstNameFromDisplay(name) {
+  return String(name || "").trim().split(/\s+/)[0] || "Someone";
+}
+
+/** When a friend’s id is added to a hosted open plan, notify the host. */
+exports.onOpenPlanInterest = onDocumentUpdated(
+  {
+    document: "users/{userId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const hostUid = event.params.userId;
+    const before = event.data.before.data() || {};
+    const after = event.data.after.data() || {};
+    const beforeEvents = Array.isArray(before.events) ? before.events : [];
+    const afterEvents = Array.isArray(after.events) ? after.events : [];
+
+    const hostDocRef = admin.firestore().collection("users").doc(hostUid);
+    let hostPushToken = after.pushToken;
+    if (!hostPushToken) {
+      try {
+        const snap = await hostDocRef.get();
+        hostPushToken = snap.data()?.pushToken;
+      } catch (e) {
+        logger.error("onOpenPlanInterest: could not read host push token", e);
+        return;
+      }
+    }
+    if (!hostPushToken) return;
+
+    for (const ev of afterEvents) {
+      if (String(ev?.planHostUid || "").trim() !== hostUid) continue;
+
+      const beforeEv = findBeforeEvent(beforeEvents, ev);
+      const beforeIds = beforeEv ? collectJoinedIds(beforeEv) : new Set();
+      const afterIds = collectJoinedIds(ev);
+
+      for (const joinerId of afterIds) {
+        if (joinerId === hostUid) continue;
+        if (beforeIds.has(joinerId)) continue;
+
+        const eventId = String(ev?.id || eventMatchKey(ev)).replace(/[/\s]/g, "_");
+        const lockId = `plan_interest_${hostUid}_${joinerId}_${eventId}`.slice(0, 1400);
+        const lockRef = hostDocRef.collection("notificationLocks").doc(lockId);
+
+        const alreadySent = await lockRef.get();
+        if (alreadySent.exists) continue;
+
+        let joinerName = "Someone";
+        try {
+          const joinerDoc = await admin.firestore().collection("users").doc(joinerId).get();
+          if (joinerDoc.exists) {
+            joinerName = joinerDoc.data()?.displayName || joinerName;
+          }
+        } catch (e) {
+          logger.warn("onOpenPlanInterest: joiner profile", e);
+        }
+
+        const planTitle = String(ev?.title || "").trim();
+        const body = planTitle
+          ? `${firstNameFromDisplay(joinerName)} is interested in your plan ${planTitle}`
+          : `${firstNameFromDisplay(joinerName)} is interested in your plan`;
+
+        try {
+          await axios.post("https://exp.host/--/api/v2/push/send", {
+            to: hostPushToken,
+            sound: "default",
+            title: "Open plan",
+            body,
+            data: { type: "open_plan_interest", planHostUid: hostUid, fromUserId: joinerId },
+          });
+          await lockRef.set({
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            type: "open_plan_interest",
+            joinerId,
+            planTitle: planTitle || null,
+          });
+        } catch (error) {
+          logger.error("Error in onOpenPlanInterest push:", error);
+        }
+      }
+    }
+  }
+);
 
 exports.onFriendAccepted = onDocumentCreated({
   document: "users/{userId}/friends/{friendId}",

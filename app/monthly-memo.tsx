@@ -58,19 +58,19 @@ export default function OpenPlans({
 }: Props) {
   const firstName = (name: string) => String(name || "").trim().split(/\s+/)[0] || "";
 
-  const formatAlsoGoing = (event: EventItem) => {
+  const formatAlsoInterested = (event: EventItem) => {
     const rawNames = (Array.isArray(event.joinedFromNames) && event.joinedFromNames.length > 0
       ? event.joinedFromNames
       : [event.joinedFromName].filter(Boolean)) as string[];
     const names = Array.from(
       new Set(rawNames.map((n) => firstName(n)).filter(Boolean))
     );
-    if (names.length === 0) return "A friend is also going";
-    if (names.length === 1) return `${names[0]} is also going`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are also going`;
+    if (names.length === 0) return "A friend is also interested";
+    if (names.length === 1) return `${names[0]} is also interested`;
+    if (names.length === 2) return `${names[0]} and ${names[1]} are also interested`;
     const head = names.slice(0, -1).join(", ");
     const tail = names[names.length - 1];
-    return `${head}, and ${tail} are also going`;
+    return `${head}, and ${tail} are also interested`;
   };
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
@@ -190,7 +190,7 @@ export default function OpenPlans({
                 </Text>
                 {isJoinedPlan && (
                   <Text style={[styles.joinedMeta, { color: ACCENT }]}>
-                    {formatAlsoGoing(p)}
+                    {formatAlsoInterested(p)}
                   </Text>
                 )}
               </View>
