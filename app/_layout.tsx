@@ -20,6 +20,7 @@ import React, {
 import {
   ActivityIndicator,
   DeviceEventEmitter,
+  InteractionManager,
   Text,
   Platform,
   View,
@@ -290,8 +291,9 @@ export default function RootLayout() {
   }, [authReady, navReady, user, segments]);
 
   useEffect(() => {
-    if (!authReady || !navReady) return;
+    if (!authReady || !navReady || !assetsReady) return;
     if (!user) return;
+    if (synqBoot === null) return;
     if (!pendingNotificationTap) return;
 
     const pending = pendingNotificationTap;
@@ -321,14 +323,31 @@ export default function RootLayout() {
       return;
     }
 
-    router.push("/(tabs)");
-    setTimeout(() => {
-      DeviceEventEmitter.emit("openChat", {
-        chatId: pending.chatId,
-        messageId: pending.messageId,
+    if (pending.kind === "chat") {
+      router.push("/(tabs)");
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const handle = InteractionManager.runAfterInteractions(() => {
+        timeoutId = setTimeout(() => {
+          DeviceEventEmitter.emit("openChat", {
+            chatId: pending.chatId,
+            messageId: pending.messageId,
+          });
+        }, 500);
       });
-    }, 500);
-  }, [authReady, navReady, user, pendingNotificationTap, router]);
+      return () => {
+        handle.cancel?.();
+        if (timeoutId) clearTimeout(timeoutId);
+      };
+    }
+  }, [
+    authReady,
+    navReady,
+    assetsReady,
+    user,
+    synqBoot,
+    pendingNotificationTap,
+    router,
+  ]);
 
   const synqBootReady = user == null || synqBoot !== null;
 
