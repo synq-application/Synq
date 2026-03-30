@@ -1,4 +1,4 @@
-import { fonts, TEXT } from "@/constants/Variables";
+import { fonts, MUTED2, TEXT } from "@/constants/Variables";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useState } from "react";
 import {
@@ -37,6 +37,10 @@ type Props = {
   saveEvent: (event?: any) => void;
   deleteEvent: (id: string) => void;
   events: EventItem[];
+  /** Current user id — used for host vs guest attribution on shared plans. */
+  viewerUid?: string;
+  /** uid → display name (friends + self) for resolving "{Host}'s plan". */
+  hostDisplayNameByUid?: Record<string, string>;
 };
 
 const getInitialDate = () => {
@@ -55,22 +59,63 @@ export default function OpenPlans({
   saveEvent,
   deleteEvent,
   events,
+  viewerUid = "",
+  hostDisplayNameByUid = {},
 }: Props) {
   const firstName = (name: string) => String(name || "").trim().split(/\s+/)[0] || "";
 
-  const formatAlsoInterested = (event: EventItem) => {
+  const formatOthersInterestedLine = (names: string[]) => {
+    if (names.length === 0) return null;
+    if (names.length === 1) return `${names[0]} is interested`;
+    if (names.length === 2) return `${names[0]} and ${names[1]} are interested`;
+    const head = names.slice(0, -1).join(", ");
+    const tail = names[names.length - 1];
+    return `${head}, and ${tail} are interested`;
+  };
+
+  /** Host line + optional "others interested" for shared plans. */
+  const planAttributionLines = (event: EventItem): { primary: string | null; secondary: string | null } => {
+    const isJoinedPlan =
+      !!event.joinedFromId ||
+      !!event.joinedFromName ||
+      (Array.isArray(event.joinedFromNames) && event.joinedFromNames.length > 0);
+    if (!isJoinedPlan) return { primary: null, secondary: null };
+
     const rawNames = (Array.isArray(event.joinedFromNames) && event.joinedFromNames.length > 0
       ? event.joinedFromNames
       : [event.joinedFromName].filter(Boolean)) as string[];
-    const names = Array.from(
+    const nameFirsts = Array.from(
       new Set(rawNames.map((n) => firstName(n)).filter(Boolean))
     );
-    if (names.length === 0) return "A friend is also interested";
-    if (names.length === 1) return `${names[0]} is also interested`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are also interested`;
-    const head = names.slice(0, -1).join(", ");
-    const tail = names[names.length - 1];
-    return `${head}, and ${tail} are also interested`;
+    const hostUid = String(event.planHostUid || "").trim();
+    const viewerFn = viewerUid ? firstName(hostDisplayNameByUid[viewerUid] || "") : "";
+    const hostIsViewer = !!(hostUid && viewerUid && hostUid === viewerUid);
+
+    let hostFn: string | null = null;
+    if (hostUid && !hostIsViewer) {
+      const hostFull = String(hostDisplayNameByUid[hostUid] || "").trim();
+      hostFn = hostFull ? firstName(hostFull) : null;
+      if (!hostFn && nameFirsts.length > 0) {
+        hostFn = nameFirsts[0];
+      }
+      if (!hostFn) hostFn = "Friend";
+    }
+
+    const othersFirsts = hostFn && !hostIsViewer
+      ? nameFirsts.filter((n) => n !== hostFn)
+      : nameFirsts.filter((n) => n !== viewerFn);
+
+    const primary =
+      hostIsViewer || !hostUid
+        ? null
+        : hostFn
+          ? `${hostFn}'s plan`
+          : null;
+
+    const secondary =
+      othersFirsts.length > 0 ? formatOthersInterestedLine(othersFirsts) : null;
+
+    return { primary, secondary };
   };
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
@@ -128,6 +173,9 @@ export default function OpenPlans({
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Open plans</Text>
+      <Text style={styles.subtitle}>
+        {"Share what you're doing, friends can tap in without pressure."}
+      </Text>
 
       {!events.length && (
         <Text style={styles.empty}>Nothing planned… yet 👀</Text>
@@ -163,6 +211,7 @@ export default function OpenPlans({
             !!p.joinedFromId ||
             !!p.joinedFromName ||
             (Array.isArray(p.joinedFromNames) && p.joinedFromNames.length > 0);
+          const { primary: hostLine, secondary: othersLine } = planAttributionLines(p);
           return (
             <TouchableOpacity
               key={p.id}
@@ -188,11 +237,23 @@ export default function OpenPlans({
                   {p.time}
                   {p.location ? ` · ${p.location}` : ""}
                 </Text>
-                {isJoinedPlan && (
-                  <Text style={[styles.joinedMeta, { color: ACCENT }]}>
-                    {formatAlsoInterested(p)}
-                  </Text>
-                )}
+                {isJoinedPlan && (hostLine || othersLine) ? (
+                  <>
+                    {hostLine ? (
+                      <Text style={styles.hostPlanLine}>{hostLine}</Text>
+                    ) : null}
+                    {othersLine ? (
+                      <Text
+                        style={[
+                          styles.joinedMeta,
+                          { color: ACCENT, marginTop: hostLine ? 4 : 6 },
+                        ]}
+                      >
+                        {othersLine}
+                      </Text>
+                    ) : null}
+                  </>
+                ) : null}
               </View>
             </TouchableOpacity>
           );
@@ -395,8 +456,16 @@ const styles = StyleSheet.create({
     color: TEXT,
     fontSize: 20,
     fontFamily: fonts.heavy,
-    marginBottom: 12,
+    marginBottom: 6,
     letterSpacing: 0.2,
+  },
+  subtitle: {
+    color: MUTED2,
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    lineHeight: 18,
+    marginBottom: 14,
+    paddingRight: 8,
   },
   empty: { color: "#666", marginBottom: 16 },
   card: { backgroundColor: "#0d0d0d", borderRadius: 20, padding: 14, marginBottom: 10, flexDirection: "row" },
@@ -411,6 +480,13 @@ const styles = StyleSheet.create({
   title: { color: "white", fontSize: 15 },
   meta: { color: "#777", marginTop: 3, fontSize: 13 },
   joinedMeta: { marginTop: 6, fontSize: 12.5, fontFamily: fonts.medium },
+  /** Matches friend profile `planOwnerLine` — muted, not accent. */
+  hostPlanLine: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 12,
+    marginTop: 5,
+    fontFamily: fonts.medium,
+  },
   addBtn: { padding: 12, alignItems: "center", marginTop: 8 },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" },
   modal: { width: "92%", backgroundColor: "#0a0a0a", padding: 18, borderRadius: 22 },

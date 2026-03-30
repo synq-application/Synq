@@ -19,8 +19,12 @@ type Props = {
   fonts: any;
   onPressPlan?: (event: EventItem) => void;
   isPlanJoined?: (event: EventItem) => boolean;
-  /** When true, this row is the viewer’s own plan on the friend’s list (they joined you) — show label, not Join. */
+  /** When true, this row is the viewer’s own plan on the friend’s list — show label, not interest CTA. */
   isViewerHostOfPlan?: (event: EventItem) => boolean;
+  /** uid → display name for resolving “{host}’s plan” from each event’s planHostUid. */
+  hostDisplayNameByUid: Record<string, string>;
+  /** When planHostUid is missing (legacy), use this profile’s first name as host. */
+  profileFallbackFirstName?: string;
 };
 
 export default function FriendOpenPlans({
@@ -30,10 +34,31 @@ export default function FriendOpenPlans({
   onPressPlan,
   isPlanJoined,
   isViewerHostOfPlan,
+  hostDisplayNameByUid,
+  profileFallbackFirstName,
 }: Props) {
   const parseDate = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);
     return new Date(y, m - 1, d);
+  };
+
+  const firstName = (name: string) =>
+    String(name || "")
+      .trim()
+      .split(/\s+/)[0] || "";
+
+  const planHostLabelForRow = (p: EventItem) => {
+    const hostUid =
+      String(p.planHostUid || "").trim() ||
+      String(p.joinedFromFriendUid || "").trim();
+    const hostFull = hostUid ? hostDisplayNameByUid[hostUid] : "";
+    if (hostUid) {
+      if (!hostFull) return null;
+      return `${firstName(hostFull)}'s plan`;
+    }
+    const fb = profileFallbackFirstName && String(profileFallbackFirstName).trim();
+    if (fb) return `${firstName(fb)}'s plan`;
+    return null;
   };
 
   return (
@@ -49,6 +74,7 @@ export default function FriendOpenPlans({
         const canJoin = typeof onPressPlan === "function";
         const joined = isPlanJoined?.(p) ?? false;
         const isHost = isViewerHostOfPlan?.(p) ?? false;
+        const rowHostLabel = planHostLabelForRow(p);
 
         return (
           <View key={p.id} style={styles.card}>
@@ -69,12 +95,17 @@ export default function FriendOpenPlans({
                 {p.time}
                 {p.location ? ` · ${p.location}` : ""}
               </Text>
+              {rowHostLabel ? (
+                <Text style={[styles.planOwnerLine, { fontFamily: fonts.medium }]}>
+                  {rowHostLabel}
+                </Text>
+              ) : null}
             </View>
             {isHost ? (
               <View style={styles.hostPill}>
                 <Text
                   style={[
-                    styles.joinText,
+                    styles.interestText,
                     styles.hostPillText,
                     { fontFamily: fonts.medium },
                   ]}
@@ -86,21 +117,35 @@ export default function FriendOpenPlans({
               canJoin && (
                 <TouchableOpacity
                   style={[
-                    styles.joinPill,
+                    styles.interestPill,
                     joined
-                      ? { borderColor: "rgba(255,255,255,0.2)", backgroundColor: "rgba(255,255,255,0.08)" }
+                      ? {
+                          borderColor: "rgba(255,255,255,0.14)",
+                          backgroundColor: "rgba(255,255,255,0.06)",
+                        }
                       : { borderColor: ACCENT },
                   ]}
                   activeOpacity={0.85}
                   onPress={() => onPressPlan?.(p)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Interested"
+                  accessibilityHint={
+                    joined
+                      ? "You are interested. Tap to remove from your open plans."
+                      : "Show interest in this plan."
+                  }
+                  accessibilityState={{ selected: joined }}
                 >
                   <Text
                     style={[
-                      styles.joinText,
-                      { color: joined ? "rgba(255,255,255,0.75)" : ACCENT, fontFamily: fonts.heavy },
+                      styles.interestText,
+                      {
+                        color: joined ? "rgba(255,255,255,0.48)" : ACCENT,
+                        fontFamily: joined ? fonts.medium : fonts.heavy,
+                      },
                     ]}
                   >
-                    {joined ? "Joined" : "Join"}
+                    Interested
                   </Text>
                 </TouchableOpacity>
               )
@@ -163,15 +208,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  joinPill: {
+  planOwnerLine: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 12,
+    marginTop: 5,
+  },
+
+  interestPill: {
     borderWidth: 1,
     borderColor: "#333",
     borderRadius: 14,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     marginLeft: 8,
-    minWidth: 62,
+    minWidth: 76,
     alignItems: "center",
+    justifyContent: "center",
   },
   hostPill: {
     borderWidth: 1,
@@ -182,11 +234,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginLeft: 8,
     alignItems: "center",
+    minWidth: 76,
+    justifyContent: "center",
   },
   hostPillText: {
     color: "rgba(255,255,255,0.55)",
   },
-  joinText: {
+  interestText: {
     fontSize: 12.5,
   },
 });

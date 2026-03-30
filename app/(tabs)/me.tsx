@@ -70,7 +70,7 @@ export default function ProfileScreen() {
   const [hasLoadedConnections, setHasLoadedConnections] = useState(cachedConnections.length > 0);
   const [requestCount, setRequestCount] = useState(0);
   const [events, setEvents] = useState<
-    { id: string; date: string; title: string; time?: string }[]
+    { id: string; date: string; title: string; time?: string; location?: string }[]
   >([]);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
@@ -86,6 +86,18 @@ export default function ProfileScreen() {
     time: "",
     location: "",
   });
+
+  const hostDisplayNameByUid = useMemo(() => {
+    const m: Record<string, string> = {};
+    if (myId) {
+      const selfName = auth.currentUser?.displayName?.trim();
+      if (selfName) m[myId] = selfName;
+    }
+    connections.forEach((c) => {
+      if (c.id && c.name) m[c.id] = c.name;
+    });
+    return m;
+  }, [myId, connections]);
 
   const showAlert = (title: string, message: string) => {
     setAlertTitle(title);
@@ -533,6 +545,8 @@ export default function ProfileScreen() {
           saveEvent={saveEvent}
           events={events}
           deleteEvent={deleteEvent}
+          viewerUid={myId}
+          hostDisplayNameByUid={hostDisplayNameByUid}
         />
       </View>
 

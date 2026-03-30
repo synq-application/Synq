@@ -95,6 +95,8 @@ export default function FriendProfile() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
+  /** Resolves planHostUid → display name so “{name}’s plan” shows the real host, not the profile owner. */
+  const [hostDisplayNameByUid, setHostDisplayNameByUid] = useState<Record<string, string>>({});
 
   const showAlert = (title: string, message: string) => {
     setAlertTitle(title);
@@ -206,6 +208,42 @@ export default function FriendProfile() {
 
     return () => unsub();
   }, [viewerId, friendKey]);
+
+  useEffect(() => {
+    if (!friendKey || !friend) return;
+    const events = Array.isArray(friend.events) ? friend.events : [];
+    const uids = new Set<string>();
+    events.forEach((e: any) => {
+      const h = String(e?.planHostUid || "").trim();
+      if (h) uids.add(h);
+      const jf = String(e?.joinedFromFriendUid || "").trim();
+      if (jf) uids.add(jf);
+    });
+    uids.add(friendKey);
+    let cancelled = false;
+    (async () => {
+      const next: Record<string, string> = {};
+      if (friend.displayName) {
+        next[friendKey] = String(friend.displayName);
+      }
+      await Promise.all(
+        [...uids].map(async (uid) => {
+          if (next[uid]) return;
+          try {
+            const snap = await getDoc(doc(db, "users", uid));
+            if (snap.exists()) {
+              const dn = String((snap.data() as any)?.displayName || "").trim();
+              if (dn) next[uid] = dn;
+            }
+          } catch {}
+        })
+      );
+      if (!cancelled) setHostDisplayNameByUid(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [friendKey, friend?.events, friend?.displayName]);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -525,7 +563,7 @@ export default function FriendProfile() {
         await updateDoc(meRef, { events: updatedExistingEvents });
         await syncAttendeesAcrossUsers(sourceIds);
         setJoinedKeysForEvent(event, true);
-        showAlert("Updated", "Added this friend to the same joined plan.");
+        showAlert("Updated", "They're on this plan with you.");
         return;
       }
 
@@ -602,7 +640,7 @@ export default function FriendProfile() {
       const existingEvents = Array.isArray(meData?.events) ? meData.events : [];
       const myEvent = existingEvents.find((e: any) => matchesPlanEvent(e, event, existingEvents));
       if (!myEvent || !isInSharedPlanWithFriend(myEvent, user.uid, friendKey)) {
-        showAlert("Not joined", "You are not in this plan with this friend.");
+        showAlert("Not in this plan", "You aren't showing interest in this plan together.");
         return;
       }
 
@@ -701,9 +739,9 @@ export default function FriendProfile() {
       await updateDoc(meRef, { events: nextEvents });
 
       setJoinedKeysForEvent(event, false);
-      showAlert("Left plan", "You're no longer in this plan with this friend.");
+      showAlert("Removed", "You're no longer interested in this plan together.");
     } catch (e: any) {
-      showAlert("Error", e?.message || "Could not unjoin this plan.");
+      showAlert("Error", e?.message || "Could not remove this plan.");
     }
   };
 
@@ -828,6 +866,8 @@ export default function FriendProfile() {
             onPressPlan={handlePlanPress}
             isPlanJoined={planLooksJoined}
             isViewerHostOfPlan={isViewerHostOfFriendsPlan}
+            hostDisplayNameByUid={hostDisplayNameByUid}
+            profileFallbackFirstName={friend.displayName?.split(" ")[0] || "Friend"}
           />
         </View>
 
@@ -868,9 +908,9 @@ export default function FriendProfile() {
       />
       <ConfirmModal
         visible={showUnjoinModal}
-        title="Unjoin plan"
-        message="Are you sure you want to unjoin this plan?"
-        confirmText="Unjoin"
+        title="Remove this plan?"
+        message="This removes it from your open plans and updates interest for this friend."
+        confirmText="Remove"
         destructive
         onCancel={() => {
           setShowUnjoinModal(false);
