@@ -9,7 +9,7 @@ import {
   useSegments,
 } from "expo-router";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, {
   createContext,
   useContext,
@@ -29,7 +29,10 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ACCENT, BG, fonts, TYPE_CAPTION } from "../constants/Variables";
 import { SynqBootProvider } from "../src/lib/synqBootContext";
 import { auth, db } from "../src/lib/firebase";
-import { readCachedSynqActive } from "../src/lib/synqSession";
+import {
+  computeSynqActiveFromUserData,
+  readCachedSynqActive,
+} from "../src/lib/synqSession";
 import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
@@ -165,7 +168,22 @@ export default function RootLayout() {
       setSynqBoot(null);
     }
     (async () => {
-      const cachedSynqActive = await readCachedSynqActive(user.uid);
+      let cachedSynqActive = false;
+      try {
+        const [cached, userSnap] = await Promise.all([
+          readCachedSynqActive(user.uid),
+          getDoc(doc(db, "users", user.uid)),
+        ]);
+        cachedSynqActive = userSnap.exists()
+          ? computeSynqActiveFromUserData(userSnap.data())
+          : cached;
+      } catch {
+        try {
+          cachedSynqActive = await readCachedSynqActive(user.uid);
+        } catch {
+          cachedSynqActive = false;
+        }
+      }
       if (!cancelled) {
         setSynqBoot({ cachedSynqActive });
       }

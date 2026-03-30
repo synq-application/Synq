@@ -60,7 +60,10 @@ import {
 } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import { useSynqBoot } from "../../src/lib/synqBootContext";
-import { synqStatusStorageKey } from "../../src/lib/synqSession";
+import {
+  computeSynqActiveFromUserData,
+  synqStatusStorageKey,
+} from "../../src/lib/synqSession";
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
 import { formatTime, parseIdeaText, resolveAvatar, SynqStatus, wrapChatTitle } from '../helpers';
@@ -184,6 +187,7 @@ export default function SynqScreen() {
 
   useEffect(() => {
     if (!auth.currentUser) return;
+    let cancelled = false;
     const init = async () => {
       let nextStatus: SynqStatus = "idle";
       try {
@@ -193,21 +197,22 @@ export default function SynqScreen() {
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
           const data = userSnap.data();
-          setUserProfile(data);
-          setMemo(data.memo || '');
-          if (data.status === 'available' && data.synqStartedAt) {
-            const startTime = data.synqStartedAt.toDate().getTime();
-            const hoursElapsed = (new Date().getTime() - startTime) / (1000 * 60 * 60);
-            if (hoursElapsed > EXPIRATION_HOURS) {
-              await updateDoc(userRef, { status: 'inactive', memo: '' });
-              nextStatus = "idle";
-              AsyncStorage.setItem(synqStatusStorageKey(uid), "idle").catch(() => {});
-              setMemo('');
-            } else {
-              nextStatus = "active";
-              AsyncStorage.setItem(synqStatusStorageKey(uid), "active").catch(() => {});
-            }
+          if (!cancelled) {
+            setUserProfile(data);
+            setMemo(data.memo || '');
+          }
+          if (computeSynqActiveFromUserData(data)) {
+            nextStatus = "active";
+            AsyncStorage.setItem(synqStatusStorageKey(uid), "active").catch(() => {});
           } else {
+            if (data.status === 'available' && data.synqStartedAt) {
+              const startTime = data.synqStartedAt.toDate().getTime();
+              const hoursElapsed = (new Date().getTime() - startTime) / (1000 * 60 * 60);
+              if (hoursElapsed > EXPIRATION_HOURS) {
+                await updateDoc(userRef, { status: 'inactive', memo: '' });
+                if (!cancelled) setMemo('');
+              }
+            }
             nextStatus = "idle";
             AsyncStorage.setItem(synqStatusStorageKey(uid), "idle").catch(() => {});
           }
@@ -215,7 +220,9 @@ export default function SynqScreen() {
       } catch {
         nextStatus = "idle";
       }
-      setSynq({ status: nextStatus, hydrated: true });
+      if (!cancelled) {
+        setSynq({ status: nextStatus, hydrated: true });
+      }
     };
 
     init();
@@ -226,7 +233,7 @@ export default function SynqScreen() {
       orderBy("createdAt", "desc")
     );
 
-    return onSnapshot(q, (snap) => {
+    const unsubChats = onSnapshot(q, (snap) => {
       const chats = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
 
       chats.sort((a, b) => {
@@ -255,6 +262,11 @@ export default function SynqScreen() {
 
       setHasUnread(anyUnread);
     });
+
+    return () => {
+      cancelled = true;
+      unsubChats();
+    };
   }, []);
 
   useEffect(() => {
