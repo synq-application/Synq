@@ -39,6 +39,7 @@ import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOp
 import {
   connectionProfileCacheByUser,
   connectionsCacheByUser,
+  pruneSocialCachesToFriendIds,
   warmFriendsAndConnectionsCache,
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
@@ -219,6 +220,9 @@ export default function ProfileScreen() {
 
     const friendsCol = collection(db, "users", myId, "friends");
     const unsubscribeFriends = onSnapshot(friendsCol, async (snapshot) => {
+      const friendIds = new Set(snapshot.docs.map((d) => d.id));
+      pruneSocialCachesToFriendIds(myId, friendIds);
+
       const profileCache = connectionProfileCacheByUser[myId];
       const friendDocs = snapshot.docs.map((friendDoc) => ({
         id: friendDoc.id,

@@ -45,6 +45,37 @@ type PersistedSocialCache = {
   suggested: any[];
 };
 
+/**
+ * Drops cache entries for users no longer in `friendIds` (e.g. after unfriend).
+ * Keeps Top Synqs / friends UI from showing removed people from stale AsyncStorage or memory.
+ */
+export function pruneSocialCachesToFriendIds(userId: string, friendIds: Set<string>) {
+  if (!userId) return;
+
+  const pruneRecord = (obj: Record<string, unknown> | undefined) => {
+    if (!obj) return;
+    Object.keys(obj).forEach((id) => {
+      if (!friendIds.has(id)) delete obj[id];
+    });
+  };
+
+  pruneRecord(friendProfileCacheByUser[userId] as Record<string, unknown>);
+  pruneRecord(connectionProfileCacheByUser[userId] as Record<string, unknown>);
+  pruneRecord(friendRelationCacheByUser[userId] as Record<string, unknown>);
+
+  const list = friendsListCacheByUser[userId];
+  if (list?.length) {
+    friendsListCacheByUser[userId] = list.filter((f) => friendIds.has(f.id));
+  }
+
+  const conns = connectionsCacheByUser[userId];
+  if (conns?.length) {
+    connectionsCacheByUser[userId] = conns.filter((c) => friendIds.has(c.id));
+  }
+
+  void persistSocialCache(userId);
+}
+
 async function persistSocialCache(userId: string) {
   const payload: PersistedSocialCache = {
     friendsList: friendsListCacheByUser[userId] ?? [],
@@ -108,6 +139,8 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
       id: d.id,
       synqCount: d.data().synqCount || 0,
     }));
+
+    pruneSocialCachesToFriendIds(userId, new Set(friendDocs.map((d) => d.id)));
 
     if (!friendProfileCacheByUser[userId]) {
       friendProfileCacheByUser[userId] = {};

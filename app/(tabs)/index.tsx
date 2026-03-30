@@ -109,6 +109,11 @@ export default function SynqScreen() {
   const [isInboxVisible, setIsInboxVisible] = useState(false);
   const [isExploreVisible, setIsExploreVisible] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [pendingNewChat, setPendingNewChat] = useState<{
+    participants: string[];
+    participantNames: Record<string, string>;
+    participantImages: Record<string, string>;
+  } | null>(null);
   const [allChats, setAllChats] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
@@ -121,6 +126,7 @@ export default function SynqScreen() {
   const [currentCategory, setCurrentCategory] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const lastTapRef = useRef<{ [key: string]: number }>({});
+  const ideaMapOpenTimerRef = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
   const [hasUnread, setHasUnread] = useState(false);
   const [showEndSynqModal, setShowEndSynqModal] = useState(false);
   const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
@@ -151,6 +157,40 @@ export default function SynqScreen() {
     }
   };
 
+  /** Single tap opens maps (after double-tap window); double tap hearts — mirrors Instagram-style idea cards. */
+  const onIdeaBubblePress = (
+    item: { id: string; reactions?: Record<string, string> },
+    mapsPayload: { name: string; address: string }
+  ) => {
+    const now = Date.now();
+    const last = lastTapRef.current[item.id] ?? 0;
+    if (now - last < DOUBLE_TAP_MS) {
+      const pending = ideaMapOpenTimerRef.current[item.id];
+      if (pending) clearTimeout(pending);
+      delete ideaMapOpenTimerRef.current[item.id];
+      lastTapRef.current[item.id] = 0;
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      void toggleHeartReaction(item.id, item.reactions);
+      return;
+    }
+    lastTapRef.current[item.id] = now;
+    const prev = ideaMapOpenTimerRef.current[item.id];
+    if (prev) clearTimeout(prev);
+    ideaMapOpenTimerRef.current[item.id] = setTimeout(() => {
+      delete ideaMapOpenTimerRef.current[item.id];
+      lastTapRef.current[item.id] = 0;
+      openInMaps(mapsPayload);
+    }, DOUBLE_TAP_MS);
+  };
+
+  useEffect(() => {
+    if (isChatVisible) return;
+    Object.values(ideaMapOpenTimerRef.current).forEach((t) => {
+      if (t) clearTimeout(t);
+    });
+    ideaMapOpenTimerRef.current = {};
+  }, [isChatVisible]);
+
   useEffect(() => {
     let index = 0;
 
@@ -171,6 +211,7 @@ export default function SynqScreen() {
             prefetchParticipantAvatars(snap.data() as any);
           }
         } catch {}
+        setPendingNewChat(null);
         setActiveChatId(data.chatId);
         setIsChatVisible(true);
         setIsInboxVisible(false);
@@ -350,12 +391,17 @@ export default function SynqScreen() {
   }, [activeChatId, isChatVisible]);
 
   useEffect(() => {
-    if (!activeChatId || !isChatVisible) return;
-    const chat = allChats.find((c: any) => c.id === activeChatId);
+    if (!isChatVisible) return;
     const prefetchUri = (url: unknown) => {
       const uri = resolveAvatar(url as string | undefined);
       if (uri) ExpoImage.prefetch(uri).catch(() => {});
     };
+    if (pendingNewChat) {
+      Object.values(pendingNewChat.participantImages).forEach((u) => prefetchUri(u));
+      return;
+    }
+    if (!activeChatId) return;
+    const chat = allChats.find((c: any) => c.id === activeChatId);
     Object.values(chat?.participantImages || {}).forEach((u) => prefetchUri(u));
     const seen = new Set<string>();
     messages.forEach((m: any) => {
@@ -370,7 +416,7 @@ export default function SynqScreen() {
         ExpoImage.prefetch(m.venueImage).catch(() => {});
       }
     });
-  }, [activeChatId, isChatVisible, allChats, messages]);
+  }, [activeChatId, isChatVisible, pendingNewChat, allChats, messages]);
 
   useEffect(() => {
     let timer: any;
@@ -396,7 +442,7 @@ export default function SynqScreen() {
   }, [status]);
 
   const triggerAISuggestion = async (category: string) => {
-    if (!activeChatId || isAILoading) return;
+    if ((!activeChatId && !pendingNewChat) || isAILoading) return;
     setIsAILoading(true);
     setCurrentCategory(category);
 
@@ -405,7 +451,10 @@ export default function SynqScreen() {
     try {
       const functions = getFunctions();
       const getSuggestions = httpsCallable(functions, 'getSynqSuggestions');
-      const currentChat = allChats.find((c) => c.id === activeChatId);
+      const currentChat = pendingNewChat
+        ? { participants: pendingNewChat.participants }
+        : allChats.find((c) => c.id === activeChatId);
+      if (!currentChat) return;
       const city = userProfile?.city + ' ' + userProfile?.state;
       const friendId = currentChat.participants.find((id: string) => id !== auth.currentUser?.uid);
       const friendSnap = await getDoc(doc(db, 'users', friendId));
@@ -438,14 +487,31 @@ export default function SynqScreen() {
   };
 
   const sendAISuggestionToChat = async () => {
-    if (!activeChatId || !auth.currentUser) return;
+    if (!auth.currentUser) return;
+    if (!pendingNewChat && !activeChatId) return;
 
     const textToSend = selectedOption
       ? `${selectedOption.name}\n${selectedOption.location}`
       : `✨ Synq AI Suggestion:\n\n${aiResponse}`;
 
     try {
-      await addDoc(collection(db, 'chats', activeChatId, 'messages'), {
+      let chatId = activeChatId;
+      if (pendingNewChat) {
+        const chatRef = await addDoc(collection(db, 'chats'), {
+          participants: pendingNewChat.participants,
+          participantNames: pendingNewChat.participantNames,
+          participantImages: pendingNewChat.participantImages,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastMessage: '',
+        });
+        chatId = chatRef.id;
+        setActiveChatId(chatId);
+        setPendingNewChat(null);
+      }
+      if (!chatId) return;
+
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
         text: textToSend,
         senderId: auth.currentUser.uid,
         imageurl: resolveAvatar(userProfile?.imageurl),
@@ -453,7 +519,7 @@ export default function SynqScreen() {
         createdAt: serverTimestamp()
       });
 
-      await updateDoc(doc(db, 'chats', activeChatId), {
+      await updateDoc(doc(db, 'chats', chatId), {
         lastMessage: selectedOption ? `Shared: ${selectedOption.name}` : 'AI Suggestion shared',
         lastMessageSenderId: auth.currentUser.uid,
         updatedAt: serverTimestamp()
@@ -498,10 +564,11 @@ export default function SynqScreen() {
       const existing = allChats.find((c) => JSON.stringify(c.participants.sort()) === JSON.stringify(participants));
       if (existing) {
         prefetchParticipantAvatars(existing);
+        setPendingNewChat(null);
         setActiveChatId(existing.id);
       } else {
-        const nameMap: any = {};
-        const imgMap: any = {};
+        const nameMap: Record<string, string> = {};
+        const imgMap: Record<string, string> = {};
         for (const uid of participants) {
           const uSnap = await getDoc(doc(db, 'users', uid));
           if (uSnap.exists()) {
@@ -510,15 +577,13 @@ export default function SynqScreen() {
           }
         }
         prefetchParticipantAvatars({ participantImages: imgMap });
-        const chatRef = await addDoc(collection(db, 'chats'), {
+        setPendingNewChat({
           participants,
           participantNames: nameMap,
           participantImages: imgMap,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          lastMessage: 'Synq established!'
         });
-        setActiveChatId(chatRef.id);
+        setActiveChatId(null);
+        setMessages([]);
       }
       setIsChatVisible(true);
       setSelectedFriends([]);
@@ -526,29 +591,47 @@ export default function SynqScreen() {
   };
 
   const sendMessage = async () => {
-    if (!inputText.trim() || !activeChatId || !auth.currentUser) return;
-    const currentChat = allChats.find((c) => c.id === activeChatId);
-    if (!currentChat) return;
+    if (!inputText.trim() || !auth.currentUser) return;
+    if (!pendingNewChat && (!activeChatId || !allChats.find((c) => c.id === activeChatId))) return;
 
-    const text = inputText;
+    const text = inputText.trim();
     const myId = auth.currentUser.uid;
     setInputText('');
 
     try {
-      await addDoc(collection(db, 'chats', activeChatId, 'messages'), {
+      let chatId = activeChatId;
+      let otherParticipants: string[];
+
+      if (pendingNewChat) {
+        const chatRef = await addDoc(collection(db, 'chats'), {
+          participants: pendingNewChat.participants,
+          participantNames: pendingNewChat.participantNames,
+          participantImages: pendingNewChat.participantImages,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastMessage: '',
+        });
+        chatId = chatRef.id;
+        otherParticipants = pendingNewChat.participants.filter((pId: string) => pId !== myId);
+        setActiveChatId(chatId);
+        setPendingNewChat(null);
+      } else {
+        const currentChat = allChats.find((c) => c.id === activeChatId)!;
+        otherParticipants = currentChat.participants.filter((pId: string) => pId !== myId);
+      }
+
+      await addDoc(collection(db, 'chats', chatId!, 'messages'), {
         text,
         senderId: myId,
         imageurl: resolveAvatar(userProfile?.imageurl),
         createdAt: serverTimestamp()
       });
 
-      await updateDoc(doc(db, 'chats', activeChatId), {
+      await updateDoc(doc(db, 'chats', chatId!), {
         lastMessage: text,
         lastMessageSenderId: myId,
         updatedAt: serverTimestamp()
       });
-
-      const otherParticipants = currentChat.participants.filter((pId: string) => pId !== myId);
       otherParticipants.forEach(async (pId: string) => {
         const mySideFriendDoc = doc(db, 'users', myId, 'friends', pId);
         const theirSideFriendDoc = doc(db, 'users', pId, 'friends', myId);
@@ -621,7 +704,14 @@ export default function SynqScreen() {
     return title;
   };
 
-  const activeChat = allChats.find((c) => c.id === activeChatId);
+  const activeChat = pendingNewChat
+    ? {
+        id: "__pending__",
+        participants: pendingNewChat.participants,
+        participantNames: pendingNewChat.participantNames,
+        participantImages: pendingNewChat.participantImages,
+      }
+    : allChats.find((c) => c.id === activeChatId);
 
   const renderAvatarStack = (images: any) => {
     if (!images) {
@@ -841,7 +931,7 @@ export default function SynqScreen() {
         <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Messages</Text>
+              <Text style={styles.messagesInboxTitle}>Messages</Text>
               <TouchableOpacity
                 onPress={() => setIsInboxVisible(false)}
                 accessibilityRole="button"
@@ -877,6 +967,7 @@ export default function SynqScreen() {
                     style={styles.inboxItem}
                     onPress={async () => {
                       prefetchParticipantAvatars(item);
+                      setPendingNewChat(null);
                       setActiveChatId(item.id);
                       setIsInboxVisible(false);
                       setIsChatVisible(true);
@@ -894,9 +985,16 @@ export default function SynqScreen() {
                       >
                         {getChatTitle(item)}
                       </Text>
-                      <Text style={styles.grayText} numberOfLines={1}>
-                        {item.lastMessage}
-                      </Text>
+                      {(() => {
+                        const lm =
+                          typeof item.lastMessage === "string" ? item.lastMessage.trim() : "";
+                        if (!lm || lm === "Synq established!") return null;
+                        return (
+                          <Text style={styles.grayText} numberOfLines={1}>
+                            {lm}
+                          </Text>
+                        );
+                      })()}
                     </View>
                   </TouchableOpacity>
                 </Swipeable>
@@ -920,6 +1018,7 @@ export default function SynqScreen() {
                 if (activeChatId === chatId) {
                   setIsChatVisible(false);
                   setActiveChatId(null);
+                  setPendingNewChat(null);
                 }
                 setAllChats((prev) => prev.filter((c) => c.id !== chatId));
                 try {
@@ -933,7 +1032,12 @@ export default function SynqScreen() {
 
         <Modal visible={isChatVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={styles.modalBg}>
-            <View style={styles.modalHeader}>
+            <View
+              style={[
+                styles.modalHeader,
+                { paddingTop: Math.max(4, insets.top - 26) },
+              ]}
+            >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View>
                   <Text style={styles.modalTitle}>
@@ -962,6 +1066,7 @@ export default function SynqScreen() {
                   setIsChatVisible(false);
                   setShowAICard(false);
                   setShowOptionsList(false);
+                  setPendingNewChat(null);
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Close chat"
@@ -985,24 +1090,33 @@ export default function SynqScreen() {
                   renderItem={({ item }) => {
                     const isMe = item.senderId === auth.currentUser?.uid;
                     const isSystemIdea = item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
-                    const currentChat = allChats.find((c) => c.id === activeChatId);
                     const senderAvatar =
                       resolveAvatar(
-                        currentChat?.participantImages?.[item.senderId] || item.imageurl
+                        activeChat?.participantImages?.[item.senderId] || item.imageurl
                       );
                     if (isSystemIdea) {
                       const { name, address } = parseIdeaText(item.text);
+                      const ideaHeartCount =
+                        item.reactions &&
+                        Object.values(item.reactions).filter((v) => v === "heart").length;
 
                       return (
                         <View style={styles.centeredIdeaContainer}>
                           <View style={{ width: "85%", alignSelf: "center" }}>
-                            <TouchableOpacity
-                              activeOpacity={0.9}
-                              onPress={() => {
-                                openInMaps({ name, address });
-                              }}
+                            <Pressable
+                              onPress={() =>
+                                onIdeaBubblePress(
+                                  { id: item.id, reactions: item.reactions },
+                                  { name, address }
+                                )
+                              }
                             >
-                              <View style={[styles.ideaBubble, { width: "100%" }]}>
+                              <View
+                                style={[
+                                  styles.ideaBubble,
+                                  { width: "100%", position: "relative", overflow: "visible" },
+                                ]}
+                              >
                                 {item.venueImage ? (
                                   <ExpoImage
                                     source={{ uri: item.venueImage }}
@@ -1014,8 +1128,21 @@ export default function SynqScreen() {
                                   />
                                 ) : null}
                                 <Text style={styles.ideaText}>{item.text}</Text>
+                                {ideaHeartCount ? (
+                                  <View style={styles.heartReaction}>
+                                    {Array.from({ length: ideaHeartCount }, (_, i) => (
+                                      <Ionicons
+                                        key={i}
+                                        name="heart"
+                                        size={14}
+                                        color="#FF2D55"
+                                        style={{ marginLeft: i > 0 ? 3 : 0 }}
+                                      />
+                                    ))}
+                                  </View>
+                                ) : null}
                               </View>
-                            </TouchableOpacity>
+                            </Pressable>
                           </View>
 
                           <Text style={styles.timestampCentered}>{formatTime(item.createdAt)}</Text>
@@ -1435,6 +1562,7 @@ const styles = StyleSheet.create({
   modalBg: { flex: 1, backgroundColor: BG },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
   modalTitle: { color: 'white', fontSize: 22, fontFamily: fonts.medium },
+  messagesInboxTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
   inboxItem: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#111' },
   inboxCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },

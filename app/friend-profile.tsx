@@ -11,11 +11,11 @@ import {
   TEXT,
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { Image as ExpoImage } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -352,10 +352,9 @@ export default function FriendProfile() {
     if (!user || !friendId) return;
 
     try {
-      await deleteDoc(
-        doc(db, "users", user.uid, "friends", friendId as string)
-      );
-
+      const functions = getFunctions(undefined, "us-central1");
+      const removeFriendMutual = httpsCallable(functions, "removeFriendMutual");
+      await removeFriendMutual({ otherUid: friendId as string });
       goBackOrHome();
     } catch (e) {
       console.error("Failed to remove friend", e);

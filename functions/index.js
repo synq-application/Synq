@@ -108,6 +108,29 @@ exports.deleteMyAccount = onCall(
   }
 );
 
+/** Removes friendship on both sides and clears pending friend requests in both directions. */
+exports.removeFriendMutual = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Must be logged in.");
+    }
+    const uid = request.auth.uid;
+    const otherUid = request.data?.otherUid;
+    if (!otherUid || typeof otherUid !== "string" || otherUid === uid) {
+      throw new HttpsError("invalid-argument", "Invalid friend id.");
+    }
+    const db = admin.firestore();
+    const batch = db.batch();
+    batch.delete(db.collection("users").doc(uid).collection("friends").doc(otherUid));
+    batch.delete(db.collection("users").doc(otherUid).collection("friends").doc(uid));
+    batch.delete(db.collection("users").doc(uid).collection("friendRequests").doc(otherUid));
+    batch.delete(db.collection("users").doc(otherUid).collection("friendRequests").doc(uid));
+    await batch.commit();
+    return { ok: true };
+  }
+);
+
 exports.onFriendRequestSent = onDocumentCreated({
     document: "users/{userId}/friendRequests/{requestId}",
     region: "us-central1"
