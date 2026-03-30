@@ -1675,6 +1675,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
+  suggestionSectionTitle: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 15,
+    fontFamily: fonts.medium,
+  },
+
   suggestionWrap: {
     flexDirection: "row",
     flexWrap: "wrap",

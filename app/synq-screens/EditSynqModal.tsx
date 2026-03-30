@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import {
   Keyboard,
   Modal,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -94,21 +95,20 @@ export default function EditSynqModal({
                 multiline
               />
 
-              <View style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 6
-              }}>
-                <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
-                  Suggested ideas
-                </Text>
+              <View style={localStyles.suggestionHeaderRow}>
+                <Text style={styles.suggestionSectionTitle}>Suggested ideas</Text>
 
-                <TouchableOpacity onPress={pickSuggestions}>
+                <TouchableOpacity
+                  onPress={pickSuggestions}
+                  style={localStyles.shuffleBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Shuffle suggested ideas"
+                >
                   <Ionicons
                     name="shuffle-outline"
-                    size={18}
-                    color="rgba(255,255,255,0.4)"
+                    size={26}
+                    color="rgba(255,255,255,0.55)"
                   />
                 </TouchableOpacity>
               </View>
@@ -150,3 +150,20 @@ export default function EditSynqModal({
     </Modal>
   );
 }
+
+const localStyles = StyleSheet.create({
+  suggestionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+    minHeight: 44,
+  },
+  shuffleBtn: {
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: -4,
+  },
+});
