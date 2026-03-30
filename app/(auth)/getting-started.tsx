@@ -1,3 +1,4 @@
+import { onboardingContentTopPadding, ONBOARDING_H_PADDING } from "@/constants/onboardingLayout";
 import {
   ACCENT,
   BG,
@@ -30,7 +31,12 @@ export default function GetStartedScreen() {
         <View pointerEvents="none" style={styles.bgSvgWrap}>
           <SvgXml xml={synqSvg} width="120%" height="120%" />
         </View>
-        <View style={styles.topCopy}>
+        <View
+          style={{
+            paddingTop: onboardingContentTopPadding(),
+            paddingHorizontal: ONBOARDING_H_PADDING,
+          }}
+        >
           <Text style={styles.title}>Let’s Synq.</Text>
           <Text style={styles.sub}>
             Less scrolling, more time with the people{"\n"}
@@ -75,10 +81,6 @@ const styles = StyleSheet.create({
     opacity: 0.28,
     transform: [{ rotate: "-10deg" }],
   },
-  topCopy: {
-    paddingTop: 120,
-    paddingHorizontal: 22,
-  },
   title: {
     color: TEXT,
     fontFamily: fonts.heavy,
@@ -99,7 +101,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 28,
-    paddingHorizontal: 18,
+    paddingHorizontal: ONBOARDING_H_PADDING,
   },
   ctaCard: {
     borderRadius: 26,

@@ -1,4 +1,17 @@
 import {
+  onboardingAuthInnerMarginTop,
+  ONBOARDING_BACK_LEFT,
+  ONBOARDING_BACK_TOP,
+  ONBOARDING_DIVIDER_MARGIN_TOP,
+  ONBOARDING_DIVIDER_WIDTH,
+  ONBOARDING_H_PADDING,
+  ONBOARDING_SCROLL_BOTTOM,
+  ONBOARDING_SUBTITLE_MARGIN_TOP,
+  ONBOARDING_SUBTITLE_SIZE,
+  ONBOARDING_TITLE_LINE_HEIGHT,
+  ONBOARDING_TITLE_SIZE,
+} from "@/constants/onboardingLayout";
+import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
@@ -15,9 +28,10 @@ import { sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/aut
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   Keyboard,
   Modal,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -26,12 +40,12 @@ import {
   View
 } from "react-native";
 import { SvgXml } from "react-native-svg";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AlertModal from "../alert-modal";
 import { auth } from "../../src/lib/firebase";
 
-const { height } = Dimensions.get("window");
-
 export default function Login() {
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -88,7 +102,7 @@ export default function Login() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.root}>
         <View pointerEvents="none" style={styles.bgSvgWrap}>
           <SvgXml xml={synqSvg} width="120%" height="120%" />
@@ -98,6 +112,24 @@ export default function Login() {
         </TouchableOpacity>
 
         <View style={styles.container}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingTop: Math.max(
+                  onboardingAuthInnerMarginTop(),
+                  insets.top + 24
+                ),
+                paddingBottom: ONBOARDING_SCROLL_BOTTOM + insets.bottom,
+              },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            onScrollBeginDrag={Keyboard.dismiss}
+            showsVerticalScrollIndicator={false}
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          >
           <View style={styles.inner}>
             <Text style={styles.title}>Welcome back!</Text>
             <View style={styles.divider} />
@@ -153,11 +185,19 @@ export default function Login() {
               )}
             </TouchableOpacity>
           </View>
+          </ScrollView>
         </View>
 
         <Modal visible={resetModalVisible} transparent animationType="fade">
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
             <View style={styles.modalOverlay}>
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.modalScrollContent}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                onScrollBeginDrag={Keyboard.dismiss}
+              >
               <View style={styles.modalContent}>
                 <Text style={styles.modalTitle}>Reset password</Text>
                 <Text style={styles.modalSubtitle}>
@@ -190,6 +230,7 @@ export default function Login() {
                   <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
+              </ScrollView>
             </View>
           </TouchableWithoutFeedback>
         </Modal>
@@ -217,8 +258,8 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     position: "absolute",
-    top: 56,
-    left: 18,
+    top: ONBOARDING_BACK_TOP,
+    left: ONBOARDING_BACK_LEFT,
     zIndex: 10,
     width: 40,
     height: 40,
@@ -229,26 +270,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
-  container: { flex: 1, paddingHorizontal: 22 },
-  inner: { width: "100%", marginTop: height * 0.20 },
+  container: { flex: 1, paddingHorizontal: ONBOARDING_H_PADDING },
+  scrollContent: { flexGrow: 1 },
+  inner: { width: "100%" },
   title: {
     color: TEXT,
-    fontSize: 36,
+    fontSize: ONBOARDING_TITLE_SIZE,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
+    lineHeight: ONBOARDING_TITLE_LINE_HEIGHT,
   },
   divider: {
-    marginTop: 14,
+    marginTop: ONBOARDING_DIVIDER_MARGIN_TOP,
     height: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
-    width: "78%",
+    width: ONBOARDING_DIVIDER_WIDTH,
   },
   subtitle: {
     color: MUTED,
-    fontSize: 15,
-    marginTop: 14,
+    fontSize: ONBOARDING_SUBTITLE_SIZE,
+    marginTop: ONBOARDING_SUBTITLE_MARGIN_TOP,
     marginBottom: 26,
     fontFamily: fonts.book,
+    lineHeight: 22,
   },
   inputGroup: { gap: 12 },
   input: {
@@ -289,7 +333,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.78)",
     justifyContent: "center",
-    padding: 22,
+    padding: ONBOARDING_H_PADDING,
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingVertical: 8,
   },
   modalContent: {
     backgroundColor: "rgba(18,18,18,0.96)",

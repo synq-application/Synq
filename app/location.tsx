@@ -1,10 +1,12 @@
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,73 +15,44 @@ import {
   View,
 } from "react-native";
 import {
+  onboardingContentTopPadding,
+  ONBOARDING_DIVIDER_MARGIN_TOP,
+  ONBOARDING_DIVIDER_WIDTH,
+  ONBOARDING_H_PADDING,
+  ONBOARDING_SCROLL_BOTTOM,
+  ONBOARDING_SUBTITLE_MARGIN_TOP,
+  ONBOARDING_SUBTITLE_SIZE,
+  ONBOARDING_TITLE_LINE_HEIGHT,
+  ONBOARDING_TITLE_SIZE,
+} from "../constants/onboardingLayout";
+import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
+  MUTED,
+  TEXT,
+  fonts,
 } from "../constants/Variables";
+import { stateAbbreviations } from "../assets/Mocks";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, db } from "../src/lib/firebase";
 import AlertModal from "./alert-modal";
 import { useAuthRefresh } from "./_layout";
 
-const US_STATE_ABBREV: Record<string, string> = {
-  Alabama: "AL",
-  Alaska: "AK",
-  Arizona: "AZ",
-  Arkansas: "AR",
-  California: "CA",
-  Colorado: "CO",
-  Connecticut: "CT",
-  Delaware: "DE",
-  Florida: "FL",
-  Georgia: "GA",
-  Hawaii: "HI",
-  Idaho: "ID",
-  Illinois: "IL",
-  Indiana: "IN",
-  Iowa: "IA",
-  Kansas: "KS",
-  Kentucky: "KY",
-  Louisiana: "LA",
-  Maine: "ME",
-  Maryland: "MD",
-  Massachusetts: "MA",
-  Michigan: "MI",
-  Minnesota: "MN",
-  Mississippi: "MS",
-  Missouri: "MO",
-  Montana: "MT",
-  Nebraska: "NE",
-  Nevada: "NV",
-  "New Hampshire": "NH",
-  "New Jersey": "NJ",
-  "New Mexico": "NM",
-  "New York": "NY",
-  "North Carolina": "NC",
-  "North Dakota": "ND",
-  Ohio: "OH",
-  Oklahoma: "OK",
-  Oregon: "OR",
-  Pennsylvania: "PA",
-  "Rhode Island": "RI",
-  "South Carolina": "SC",
-  "South Dakota": "SD",
-  Tennessee: "TN",
-  Texas: "TX",
-  Utah: "UT",
-  Vermont: "VT",
-  Virginia: "VA",
-  Washington: "WA",
-  "West Virginia": "WV",
-  Wisconsin: "WI",
-  Wyoming: "WY",
-  "District of Columbia": "DC",
-};
+const US_STATE_ABBREV: Record<string, string> = stateAbbreviations;
+
+const VALID_US_STATE_ABBREVS = new Set(Object.values(stateAbbreviations));
+
+function isValidStateAbbrev(abbrev: string): boolean {
+  return VALID_US_STATE_ABBREVS.has(abbrev.trim().toUpperCase());
+}
 
 export default function LocationDetails() {
   const router = useRouter();
   const { refreshAuth } = useAuthRefresh();
+  const insets = useSafeAreaInsets();
 
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -100,7 +73,14 @@ export default function LocationDetails() {
   };
 
   const canContinue = useMemo(() => {
-    return !!city.trim() && !!state.trim() && !loading && !locating;
+    const s = state.trim().toUpperCase();
+    return (
+      !!city.trim() &&
+      s.length === 2 &&
+      isValidStateAbbrev(s) &&
+      !loading &&
+      !locating
+    );
   }, [city, state, loading, locating]);
 
   const fillFromCurrentLocation = async () => {
@@ -169,11 +149,19 @@ export default function LocationDetails() {
   const saveLocation = async () => {
     if (!auth.currentUser) return;
 
+    const c = city.trim();
+    const s = state.trim().toUpperCase();
+
+    if (s.length !== 2 || !isValidStateAbbrev(s)) {
+      showAlert(
+        "Enter a valid 2-letter US state or DC abbreviation (for example WA, CA, or DC).",
+        "Invalid state abbreviation"
+      );
+      return;
+    }
+
     try {
       setLoading(true);
-
-      const c = city.trim();
-      const s = state.trim().toUpperCase();
 
       await setDoc(
         doc(db, "users", auth.currentUser.uid),
@@ -205,7 +193,26 @@ export default function LocationDetails() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.container}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingTop: Math.max(
+                onboardingContentTopPadding(),
+                insets.top + 24
+              ),
+              paddingBottom: ONBOARDING_SCROLL_BOTTOM + 12 + insets.bottom,
+            },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onScrollBeginDrag={Keyboard.dismiss}
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+        >
         <Text style={styles.title}>Where do you live?</Text>
+        <View style={styles.divider} />
         <Text style={styles.subtitle}>
           This helps friends see who is nearby for a quick Synq.
         </Text>
@@ -274,6 +281,7 @@ export default function LocationDetails() {
           message={alertMessage}
           onClose={() => setAlertVisible(false)}
         />
+        </ScrollView>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -283,11 +291,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BG,
-    padding: 24,
-    justifyContent: "center",
+    paddingHorizontal: ONBOARDING_H_PADDING,
   },
-  title: { color: "white", fontSize: 28, fontWeight: "800" },
-  subtitle: { color: "rgba(255,255,255,0.7)", fontSize: 16, marginTop: 8 },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  title: {
+    color: TEXT,
+    fontSize: ONBOARDING_TITLE_SIZE,
+    lineHeight: ONBOARDING_TITLE_LINE_HEIGHT,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
+  },
+  divider: {
+    marginTop: ONBOARDING_DIVIDER_MARGIN_TOP,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    width: ONBOARDING_DIVIDER_WIDTH,
+  },
+  subtitle: {
+    color: MUTED,
+    fontSize: ONBOARDING_SUBTITLE_SIZE,
+    marginTop: ONBOARDING_SUBTITLE_MARGIN_TOP,
+    fontFamily: fonts.book,
+    lineHeight: 22,
+  },
 
   input: {
     color: "white",

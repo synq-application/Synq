@@ -1,8 +1,22 @@
 import {
+  onboardingAuthInnerMarginTop,
+  ONBOARDING_BACK_LEFT,
+  ONBOARDING_BACK_TOP,
+  ONBOARDING_DIVIDER_MARGIN_TOP,
+  ONBOARDING_DIVIDER_WIDTH,
+  ONBOARDING_H_PADDING,
+  ONBOARDING_SCROLL_BOTTOM,
+  ONBOARDING_SUBTITLE_MARGIN_TOP,
+  ONBOARDING_SUBTITLE_SIZE,
+  ONBOARDING_TITLE_LINE_HEIGHT,
+  ONBOARDING_TITLE_SIZE,
+} from "@/constants/onboardingLayout";
+import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
   fonts,
+  MUTED,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   synqSvg,
@@ -19,6 +33,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,7 +45,7 @@ import { SvgXml } from "react-native-svg";
 import AlertModal from "../alert-modal";
 import { app, auth, firebaseConfig } from "../../src/lib/firebase";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 export default function Phone() {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -138,7 +153,7 @@ export default function Phone() {
   const recaptchaConfig = (app as any)?.options ?? firebaseConfig;
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.root}>
         <View pointerEvents="none" style={styles.bgSvgWrap}>
           <SvgXml xml={synqSvg} width="120%" height="120%" />
@@ -157,8 +172,16 @@ export default function Phone() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.container}
         >
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            onScrollBeginDrag={Keyboard.dismiss}
+            showsVerticalScrollIndicator={false}
+          >
           {!isCodeSent ? (
-            <View style={styles.innerContent}>
+            <View style={[styles.innerContent, { marginTop: onboardingAuthInnerMarginTop() }]}>
               <Text style={styles.title}>What’s your{"\n"}number?</Text>
               <View style={styles.divider} />
 
@@ -212,16 +235,18 @@ export default function Phone() {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.innerContent}>
-              <Text style={styles.titleCenter}>Enter code</Text>
-              <View style={[styles.divider, { alignSelf: "center", width: "62%" }]} />
-              <Text style={styles.subtitleCenter}>Sent to {maskedPhone}</Text>
+            <View style={[styles.innerContent, { marginTop: onboardingAuthInnerMarginTop() }]}>
+              <Text style={styles.title}>Enter code</Text>
+              <View style={styles.divider} />
+              <Text style={styles.subtitle}>Sent to {maskedPhone}</Text>
 
               <View style={styles.otpRow}>
                 {code.map((digit, index) => (
                   <TextInput
                     key={index}
-                    ref={(el) => (inputs.current[index] = el)}
+                    ref={(el) => {
+                      inputs.current[index] = el;
+                    }}
                     value={digit}
                     onChangeText={(text) => handleChange(text, index)}
                     onKeyPress={(e) => handleKeyPress(e, index)}
@@ -263,6 +288,7 @@ export default function Phone() {
               </TouchableOpacity>
             </View>
           )}
+          </ScrollView>
         </KeyboardAvoidingView>
         <AlertModal
           visible={alertVisible}
@@ -288,8 +314,8 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     position: "absolute",
-    top: 56,
-    left: 18,
+    top: ONBOARDING_BACK_TOP,
+    left: ONBOARDING_BACK_LEFT,
     zIndex: 10,
     width: 40,
     height: 40,
@@ -300,34 +326,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
-  container: { flex: 1, paddingHorizontal: 22 },
-  innerContent: { width: "100%", marginTop: height * 0.20 },
+  container: { flex: 1, paddingHorizontal: ONBOARDING_H_PADDING },
+  scrollContent: { flexGrow: 1, paddingBottom: ONBOARDING_SCROLL_BOTTOM },
+  innerContent: { width: "100%" },
   title: {
     color: TEXT,
-    fontSize: 38,
+    fontSize: ONBOARDING_TITLE_SIZE,
     fontFamily: fonts.heavy,
-    lineHeight: 46,
+    lineHeight: ONBOARDING_TITLE_LINE_HEIGHT,
     letterSpacing: 0.2,
+  },
+  subtitle: {
+    color: MUTED,
+    fontSize: ONBOARDING_SUBTITLE_SIZE,
+    marginTop: ONBOARDING_SUBTITLE_MARGIN_TOP,
+    fontFamily: fonts.book,
+    lineHeight: 22,
   },
   divider: {
-    marginTop: 14,
+    marginTop: ONBOARDING_DIVIDER_MARGIN_TOP,
     height: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
-    width: "78%",
-  },
-  titleCenter: {
-    color: TEXT,
-    fontSize: 30,
-    fontFamily: fonts.heavy,
-    textAlign: "center",
-    letterSpacing: 0.2,
-  },
-  subtitleCenter: {
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 15,
-    textAlign: "center",
-    marginTop: 10,
-    fontFamily: fonts.book,
+    width: ONBOARDING_DIVIDER_WIDTH,
   },
   inputRow: { flexDirection: "row", marginTop: 28, height: 58 },
   countryWrapper: {

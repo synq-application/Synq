@@ -10,11 +10,24 @@ import {
     View,
 } from "react-native";
 import {
+  onboardingContentTopPadding,
+  ONBOARDING_DIVIDER_MARGIN_TOP,
+  ONBOARDING_DIVIDER_WIDTH,
+  ONBOARDING_H_PADDING,
+  ONBOARDING_SUBTITLE_MARGIN_TOP,
+  ONBOARDING_SUBTITLE_SIZE,
+  ONBOARDING_TITLE_LINE_HEIGHT,
+  ONBOARDING_TITLE_SIZE,
+} from "../constants/onboardingLayout";
+import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
+  MUTED,
+  TEXT,
+  fonts,
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import AlertModal from "./alert-modal";
@@ -94,8 +107,9 @@ export default function InterestsOnboarding() {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingTop: onboardingContentTopPadding() }]}>
             <Text style={styles.title}>Add your interests</Text>
+            <View style={styles.divider} />
             <Text style={styles.subtitle}>
                 This helps Synq suggest plans and helps friends find common ground.
             </Text>
@@ -155,14 +169,28 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: BG,
-        padding: 24,
-        justifyContent: "center",
+        paddingHorizontal: ONBOARDING_H_PADDING,
+        paddingBottom: 24,
     },
-    title: { color: "white", fontSize: 28, fontWeight: "800" },
+    title: {
+        color: TEXT,
+        fontSize: ONBOARDING_TITLE_SIZE,
+        lineHeight: ONBOARDING_TITLE_LINE_HEIGHT,
+        fontFamily: fonts.heavy,
+        letterSpacing: 0.2,
+    },
+    divider: {
+        marginTop: ONBOARDING_DIVIDER_MARGIN_TOP,
+        height: 1,
+        backgroundColor: "rgba(255,255,255,0.08)",
+        width: ONBOARDING_DIVIDER_WIDTH,
+    },
     subtitle: {
-        color: "rgba(255,255,255,0.7)",
-        fontSize: 16,
-        marginTop: 8,
+        color: MUTED,
+        fontSize: ONBOARDING_SUBTITLE_SIZE,
+        marginTop: ONBOARDING_SUBTITLE_MARGIN_TOP,
+        fontFamily: fonts.book,
+        lineHeight: 22,
     },
     pillsSection: {
         marginTop: 28,
@@ -207,7 +235,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
-    buttonText: { color: "black", fontSize: 16, fontWeight: "800" },
+    buttonText: { color: "black", fontSize: 18, fontFamily: fonts.heavy, letterSpacing: 0.2 },
     skipButton: { marginTop: 20, alignSelf: "center" },
     skipText: {
         color: "rgba(255,255,255,0.5)",

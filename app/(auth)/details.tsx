@@ -7,8 +7,9 @@ import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   Keyboard,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,23 +19,28 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import {
+  onboardingContentTopPadding,
+  ONBOARDING_DIVIDER_MARGIN_TOP,
+  ONBOARDING_DIVIDER_WIDTH,
+  ONBOARDING_H_PADDING,
+  ONBOARDING_SCROLL_BOTTOM,
+  ONBOARDING_SUBTITLE_MARGIN_TOP,
+  ONBOARDING_SUBTITLE_SIZE,
+  ONBOARDING_TITLE_LINE_HEIGHT,
+  ONBOARDING_TITLE_SIZE,
+} from "@/constants/onboardingLayout";
+import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
+  MUTED,
+  TEXT,
+  fonts,
 } from "../../constants/Variables";
 import { auth, db, storage } from "../../src/lib/firebase";
 import AlertModal from "../alert-modal";
-
-const { height } = Dimensions.get("window");
-
-const fonts = {
-  black: "Avenir-Black",
-  heavy: "Avenir-Heavy",
-  medium: "Avenir-Medium",
-  book: "Avenir-Book",
-};
 
 export default function Details() {
   const router = useRouter();
@@ -136,11 +142,24 @@ export default function Details() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.container}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: onboardingContentTopPadding() },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onScrollBeginDrag={Keyboard.dismiss}
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+        >
         <View style={styles.innerContent}>
           <View style={styles.headerSection}>
             <Text style={styles.title}>What’s your name?</Text>
+            <View style={styles.divider} />
             <Text style={styles.subtitle}>Help friends recognize you on Synq.</Text>
           </View>
 
@@ -156,7 +175,7 @@ export default function Details() {
                 />
               ) : (
                 <View style={styles.placeholderIcon}>
-                  <Icon name="camera-outline" size={32} color="rgba(255,255,255,0.5)" />
+                  <Icon name="camera-outline" size={28} color="rgba(255,255,255,0.5)" />
                   <Text style={styles.addPhotoText}>
                     {isUploading ? "Uploading..." : "Add Photo"}
                   </Text>
@@ -167,7 +186,7 @@ export default function Details() {
                 {isUploading ? (
                   <ActivityIndicator color="black" />
                 ) : (
-                  <Icon name="add" size={16} color="black" />
+                  <Icon name="add" size={15} color="black" />
                 )}
               </View>
             </TouchableOpacity>
@@ -215,6 +234,7 @@ export default function Details() {
             onClose={() => setAlertVisible(false)}
           />
         </View>
+        </ScrollView>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -224,43 +244,54 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BG,
-    paddingHorizontal: 24,
+    paddingHorizontal: ONBOARDING_H_PADDING,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: ONBOARDING_SCROLL_BOTTOM + 48,
   },
   innerContent: {
     width: "100%",
-    marginTop: height * 0.15,
   },
   headerSection: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   title: {
-    color: "white",
-    fontSize: 28,
-    fontFamily: fonts.black,
-    textAlign: "center",
+    color: TEXT,
+    fontSize: ONBOARDING_TITLE_SIZE,
+    lineHeight: ONBOARDING_TITLE_LINE_HEIGHT,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
+  },
+  divider: {
+    marginTop: ONBOARDING_DIVIDER_MARGIN_TOP,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    width: ONBOARDING_DIVIDER_WIDTH,
   },
   subtitle: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 16,
-    marginTop: 8,
-    fontFamily: fonts.medium,
-    textAlign: "center",
+    color: MUTED,
+    fontSize: ONBOARDING_SUBTITLE_SIZE,
+    marginTop: ONBOARDING_SUBTITLE_MARGIN_TOP,
+    fontFamily: fonts.book,
+    lineHeight: 22,
   },
   avatarContainer: {
     alignItems: "center",
-    marginVertical: 20,
+    marginTop: 4,
+    marginBottom: 12,
   },
   avatarCircle: {
-    width: 170,
-    height: 170,
-    borderRadius: 100,
+    width: 132,
+    height: 132,
+    borderRadius: 66,
     backgroundColor: "rgba(255,255,255,0.1)",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
   },
-  avatarImage: { width: 110, height: 110, borderRadius: 55 },
+  avatarImage: { width: 86, height: 86, borderRadius: 43 },
   placeholderIcon: { alignItems: "center" },
   addPhotoText: {
     color: "rgba(255,255,255,0.4)",
@@ -273,8 +304,8 @@ const styles = StyleSheet.create({
     bottom: 2,
     right: 2,
     backgroundColor: ACCENT,
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     borderRadius: BUTTON_RADIUS,
     justifyContent: "center",
     alignItems: "center",
@@ -284,11 +315,11 @@ const styles = StyleSheet.create({
   optionalText: {
     color: "rgba(255,255,255,0.3)",
     fontSize: 12,
-    marginTop: 8,
+    marginTop: 6,
     fontFamily: fonts.book,
   },
   inputContainer: {
-    marginTop: 10,
+    marginTop: 6,
   },
   input: {
     color: "white",
@@ -314,6 +345,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "black",
     fontSize: 18,
-    fontFamily: fonts.black,
+    fontFamily: fonts.heavy,
   },
 });

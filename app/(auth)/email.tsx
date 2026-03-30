@@ -1,4 +1,15 @@
 import {
+  onboardingAuthInnerMarginTop,
+  ONBOARDING_BACK_LEFT,
+  ONBOARDING_BACK_TOP,
+  ONBOARDING_DIVIDER_MARGIN_TOP,
+  ONBOARDING_DIVIDER_WIDTH,
+  ONBOARDING_H_PADDING,
+  ONBOARDING_SCROLL_BOTTOM,
+  ONBOARDING_TITLE_LINE_HEIGHT,
+  ONBOARDING_TITLE_SIZE,
+} from "@/constants/onboardingLayout";
+import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
@@ -16,6 +27,9 @@ import {
   ActivityIndicator,
   Dimensions,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -26,8 +40,6 @@ import {
 import { SvgXml } from "react-native-svg";
 import AlertModal from "../alert-modal";
 import { auth } from "../../src/lib/firebase";
-
-const { height } = Dimensions.get("window");
 
 export default function EmailSignup() {
   const [email, setEmail] = useState("");
@@ -63,7 +75,7 @@ export default function EmailSignup() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.root}>
         <View pointerEvents="none" style={styles.bgSvgWrap}>
           <SvgXml xml={synqSvg} width="120%" height="120%" />
@@ -72,8 +84,19 @@ export default function EmailSignup() {
           <Text style={styles.closeText}>Back</Text>
         </TouchableOpacity>
 
-        <View style={styles.container}>
-          <View style={styles.inner}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.container}
+        >
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            onScrollBeginDrag={Keyboard.dismiss}
+            showsVerticalScrollIndicator={false}
+          >
+          <View style={[styles.inner, { marginTop: onboardingAuthInnerMarginTop() }]}>
             <Text style={styles.title}>Sign up with email</Text>
             <View style={styles.divider} />
             <View style={{ marginTop: 18 }}>
@@ -117,7 +140,8 @@ export default function EmailSignup() {
               By continuing, you agree to receive account-related emails from Synq.
             </Text>
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
         <AlertModal
           visible={alertVisible}
           title={alertTitle}
@@ -141,21 +165,23 @@ const styles = StyleSheet.create({
     opacity: 0.35,
     transform: [{ rotate: "-8deg" }],
   },
-  closeBtn: { position: "absolute", top: 60, left: 22, zIndex: 10 },
+  closeBtn: { position: "absolute", top: ONBOARDING_BACK_TOP, left: ONBOARDING_BACK_LEFT, zIndex: 10 },
   closeText: { fontSize: 16, color: ACCENT, fontFamily: fonts.book },
-  container: { flex: 1, paddingHorizontal: 22 },
-  inner: { width: "100%", marginTop: height * 0.20 },
+  container: { flex: 1, paddingHorizontal: ONBOARDING_H_PADDING },
+  scrollContent: { flexGrow: 1, paddingBottom: ONBOARDING_SCROLL_BOTTOM },
+  inner: { width: "100%" },
   title: {
     color: TEXT,
-    fontSize: 34,
+    fontSize: ONBOARDING_TITLE_SIZE,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
+    lineHeight: ONBOARDING_TITLE_LINE_HEIGHT,
   },
   divider: {
-    marginTop: 14,
+    marginTop: ONBOARDING_DIVIDER_MARGIN_TOP,
     height: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
-    width: "78%",
+    width: ONBOARDING_DIVIDER_WIDTH,
   },
   subtitle: {
     color: MUTED,
