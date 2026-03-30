@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Keyboard,
   Modal,
@@ -27,22 +27,22 @@ export default function EditSynqModal({
   onSaveMemo,
   styles,
 }: Props) {
-  const suggestions = useMemo(
-    () => [
-      "Let’s grab drinks 🍸",
-      "Anyone want to get dinner?",
-      "Coffee run?",
-      "Let’s go out tonight",
-      "Who wants to hang?",
-      "Movie night anyone?",
-      "Down for something fun",
-      "Anyone up for a walk?",
-      "Let’s do happy hour",
-      "Want to grab food?",
-      "Anyone want to workout?"
-    ],
-    []
-  );
+  const suggestions = [
+    "Down for drinks",
+    "Grabbing dinner",
+    "Anyone for happy hour?",
+    "Coffee?",
+    "Down for something chill",
+    "Anyone around?",
+    "Quick bite?",
+    "Down for a walk",
+    "Gym?",
+    "Going for a run",
+    "Movie night?",
+    "Game night?",
+    "Down for something fun",
+    "What’s the move?"
+  ];
 
   const [visibleSuggestions, setVisibleSuggestions] = useState<string[]>([]);
 
@@ -51,7 +51,7 @@ export default function EditSynqModal({
       .sort(() => 0.5 - Math.random())
       .filter((s) => s.toLowerCase() !== memo.toLowerCase());
 
-    setVisibleSuggestions(shuffled.slice(0, 3));
+    setVisibleSuggestions(shuffled.slice(0, 4));
   };
 
   useEffect(() => {
@@ -94,9 +94,9 @@ export default function EditSynqModal({
                 multiline
               />
 
-              <View style={{ 
-                flexDirection: "row", 
-                justifyContent: "space-between", 
+              <View style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
                 alignItems: "center",
                 marginBottom: 6
               }}>
