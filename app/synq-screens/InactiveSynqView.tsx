@@ -1,8 +1,6 @@
 import { Image as ExpoImage } from "expo-image";
 import React from "react";
-import { ACCENT } from "@/constants/Variables";
 import {
-  ActivityIndicator,
   Text,
   TextInput,
   TouchableOpacity,
@@ -45,23 +43,19 @@ export default function InactiveSynqView({
 
       <TouchableOpacity
         onPress={onStartSynq}
-        style={styles.pulseBox}
+        style={[styles.pulseBox, isStartingSynq && { opacity: 0.9 }]}
         activeOpacity={0.8}
         disabled={isStartingSynq}
         accessibilityRole="button"
         accessibilityLabel="Start Synq and show friends you are available"
       >
-        {isStartingSynq ? (
-          <ActivityIndicator color={ACCENT} size="large" />
-        ) : (
-          <ExpoImage
-            source={require("../../assets/pulse.gif")}
-            style={styles.gifLarge}
-            contentFit="contain"
-            transition={0}
-            cachePolicy="memory-disk"
-          />
-        )}
+        <ExpoImage
+          source={require("../../assets/pulse.gif")}
+          style={styles.gifLarge}
+          contentFit="contain"
+          transition={0}
+          cachePolicy="memory-disk"
+        />
       </TouchableOpacity>
     </View>
   );
