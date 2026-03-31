@@ -474,6 +474,14 @@ function SearchModal({
     message: string;
   } | null>(null);
 
+  const getResultSubtitle = (user: any) => {
+    const mutualCount =
+      typeof user?.mutualCount === "number" && Number.isFinite(user.mutualCount)
+        ? user.mutualCount
+        : 0;
+    return `${mutualCount} mutual ${mutualCount === 1 ? "friend" : "friends"}`;
+  };
+
   useEffect(() => {
     if (!visible) return;
     setQueryText("");
@@ -898,7 +906,7 @@ function SearchModal({
                     <Text style={styles.friendName}>
                       {item.displayName || "User"}
                     </Text>
-                    <Text style={styles.emailDetail}>{item.email}</Text>
+                    <Text style={styles.secondaryDetail}>{getResultSubtitle(item)}</Text>
                   </View>
                 </View>
 
@@ -1159,7 +1167,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   searchResult: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14 },
-  emailDetail: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 2 },
+  secondaryDetail: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 2 },
   addBtn: { backgroundColor: ACCENT, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 14 },
   acceptOutlineBtn: { backgroundColor: "transparent", borderWidth: 1, borderColor: ACCENT },
   addBtnDisabled: { opacity: 0.45, backgroundColor: "#3f3f3f" },
