@@ -17,7 +17,7 @@ import {
   TYPE_CAPTION,
 } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
-import { useIsFocused } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import {
@@ -40,8 +40,9 @@ import {
   where,
   writeBatch
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  DeviceEventEmitter,
   Dimensions,
   FlatList,
   Keyboard,
@@ -68,6 +69,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
+import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
 import {
   friendProfileCacheByUser,
   friendsListCacheByUser,
@@ -240,6 +242,15 @@ export default function FriendsScreen() {
     if (openAddFriends !== "1") return;
     setSearchModalVisible(true);
   }, [openAddFriends]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const t = setTimeout(() => {
+        DeviceEventEmitter.emit(LOCATION_PROMPT_CHECK_REQUEST);
+      }, 1000);
+      return () => clearTimeout(t);
+    }, [])
+  );
 
   useEffect(() => {
     if (!auth.currentUser) return;

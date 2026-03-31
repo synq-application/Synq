@@ -1,5 +1,5 @@
-import Constants from "expo-constants";
 import { Asset } from "expo-asset";
+import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import {
@@ -9,7 +9,7 @@ import {
   useSegments,
 } from "expo-router";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 import React, {
   createContext,
   useContext,
@@ -21,24 +21,26 @@ import {
   ActivityIndicator,
   DeviceEventEmitter,
   InteractionManager,
-  Text,
   Platform,
+  Text,
   View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ACCENT, BG, fonts, TYPE_CAPTION } from "../constants/Variables";
-import { SynqBootProvider } from "../src/lib/synqBootContext";
 import { auth, db } from "../src/lib/firebase";
-import {
-  computeSynqActiveFromUserData,
-  readCachedSynqActive,
-} from "../src/lib/synqSession";
 import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
 } from "../src/lib/socialCache";
 import { startSynqGlanceWidgetSync } from "../src/lib/syncSynqWidget";
+import { SynqBootProvider } from "../src/lib/synqBootContext";
+import { LOCATION_PROMPT_CHECK_REQUEST } from "../src/lib/locationPromptEvents";
+import {
+  computeSynqActiveFromUserData,
+  readCachedSynqActive,
+} from "../src/lib/synqSession";
+import LocationUpdateModal from "../components/LocationUpdateModal";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -90,6 +92,18 @@ async function registerForPushNotificationsAsync() {
 const AuthContext = createContext({ refreshAuth: () => {} });
 export const useAuthRefresh = () => useContext(AuthContext);
 
+function snoozedUntilMsFromField(raw: unknown): number {
+  if (typeof raw === "string") return Date.parse(raw);
+  if (
+    raw &&
+    typeof raw === "object" &&
+    typeof (raw as { toMillis?: unknown }).toMillis === "function"
+  ) {
+    return (raw as { toMillis: () => number }).toMillis();
+  }
+  return Number.NaN;
+}
+
 export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
@@ -104,6 +118,8 @@ export default function RootLayout() {
     cachedSynqActive: boolean;
   } | null>(null);
   const synqBootUidRef = useRef<string | null>(null);
+  const didLogUserLocationsRef = useRef(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
 
   const [pendingNotificationTap, setPendingNotificationTap] = useState<
     | { kind: "chat"; chatId: string; messageId?: string }
@@ -278,6 +294,108 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    if (!user || didLogUserLocationsRef.current) return;
+    didLogUserLocationsRef.current = true;
+
+    const logAllUsersLocationSnapshot = async () => {
+      try {
+        const snap = await getDocs(collection(db, "users"));
+        const rows = snap.docs.map((d) => {
+          const data = d.data() as any;
+          const lat = typeof data?.lat === "number" ? data.lat : null;
+          const lng = typeof data?.lng === "number" ? data.lng : null;
+          return {
+            uid: d.id,
+            name: data?.displayName || `${data?.firstName || ""} ${data?.lastName || ""}`.trim() || "Unknown",
+            location: data?.city && data?.state ? `${data.city}, ${data.state}` : "No location",
+            lat,
+            lng,
+            hasCoords: lat !== null && lng !== null,
+          };
+        });
+
+        const withCoords = rows.filter((r) => r.hasCoords).length;
+        const withoutCoords = rows.length - withCoords;
+
+        console.log("[Location Audit] Users (name | location | coordinates):");
+        rows.forEach(({ name, location, lat, lng, hasCoords }) => {
+          if (hasCoords) {
+            console.log(
+              `${name} | ${location} | Coordinates: yes — lat ${lat}, lng ${lng}`
+            );
+          } else {
+            console.log(`${name} | ${location} | Coordinates: no`);
+          }
+        });
+        console.log(
+          `[Location Audit] total=${rows.length}, withCoords=${withCoords}, withoutCoords=${withoutCoords}`
+        );
+      } catch (e) {
+        console.log("[Location Audit] Failed to fetch users for audit", e);
+      }
+    };
+
+    logAllUsersLocationSnapshot();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !authReady || !navReady) return;
+
+    const maybePromptForLocationUpdate = async () => {
+      try {
+        const userSnap = await getDoc(doc(db, "users", user.uid));
+        if (!userSnap.exists()) return;
+        const data = userSnap.data() as any;
+        const hasCoords =
+          typeof data?.lat === "number" && typeof data?.lng === "number";
+        const hasCityState =
+          typeof data?.city === "string" &&
+          data.city.trim().length > 0 &&
+          typeof data?.state === "string" &&
+          data.state.trim().length > 0;
+        const hasLocationDisplay =
+          typeof data?.locationDisplay === "string" &&
+          data.locationDisplay.trim().length > 0;
+        if (hasCoords || hasCityState || hasLocationDisplay) return;
+
+        const now = Date.now();
+        const snoozedUntilMs = snoozedUntilMsFromField(
+          data?.locationPromptSnoozedUntil
+        );
+        if (!Number.isNaN(snoozedUntilMs) && snoozedUntilMs > now) return;
+
+        setShowLocationModal(true);
+      } catch {}
+    };
+
+    const sub = DeviceEventEmitter.addListener(
+      LOCATION_PROMPT_CHECK_REQUEST,
+      () => {
+        void maybePromptForLocationUpdate();
+      }
+    );
+    return () => sub.remove();
+  }, [user?.uid, authReady, navReady]);
+
+  const markLocationPromptSnoozed = async () => {
+    if (!user) return;
+    const snoozeDays = 7;
+    const snoozedUntil = new Date(Date.now() + snoozeDays * 24 * 60 * 60 * 1000).toISOString();
+    try {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const currentCount =
+        snap.exists() && typeof (snap.data() as any)?.locationPromptCount === "number"
+          ? (snap.data() as any).locationPromptCount
+          : 0;
+      await updateDoc(doc(db, "users", user.uid), {
+        locationPromptCount: currentCount + 1,
+        lastLocationPromptAt: new Date().toISOString(),
+        locationPromptSnoozedUntil: snoozedUntil,
+      });
+    } catch {}
+  };
+
+  useEffect(() => {
     if (!authReady || !navReady) return;
 
     const inAuthGroup = segments[0] === "(auth)";
@@ -369,31 +487,23 @@ export default function RootLayout() {
   ]);
 
   const synqBootReady = user == null || synqBoot !== null;
+  const appReady =
+    authReady && navReady && assetsReady && synqBootReady;
 
-  if (!authReady || !navReady || !assetsReady || !synqBootReady) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: BG,
-          alignItems: "center",
-          justifyContent: "center",
+  const locationModals =
+    user && authReady ? (
+      <LocationUpdateModal
+        visible={showLocationModal}
+        onClose={async () => {
+          setShowLocationModal(false);
+          await markLocationPromptSnoozed();
         }}
-      >
-        <ActivityIndicator color={ACCENT} size="small" />
-        <Text
-          style={{
-            marginTop: 10,
-            color: "rgba(255,255,255,0.55)",
-            fontFamily: fonts.medium,
-            fontSize: TYPE_CAPTION,
-          }}
-        >
-          Loading Synq...
-        </Text>
-      </View>
-    );
-  }
+        onSaved={async () => {
+          setShowLocationModal(false);
+          await markLocationPromptSnoozed();
+        }}
+      />
+    ) : null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -402,11 +512,35 @@ export default function RootLayout() {
           <SynqBootProvider
             value={synqBoot ?? { cachedSynqActive: false }}
           >
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="location" />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
+            {!appReady ? (
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: BG,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <ActivityIndicator color={ACCENT} size="small" />
+                <Text
+                  style={{
+                    marginTop: 10,
+                    color: "rgba(255,255,255,0.55)",
+                    fontFamily: fonts.medium,
+                    fontSize: TYPE_CAPTION,
+                  }}
+                >
+                  Loading Synq...
+                </Text>
+              </View>
+            ) : (
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="location" />
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+            )}
+            {locationModals}
           </SynqBootProvider>
         </AuthContext.Provider>
       </ErrorBoundary>
