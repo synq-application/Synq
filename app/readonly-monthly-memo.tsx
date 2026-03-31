@@ -1,5 +1,18 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from "react-native";
+
+/** Shared by Add / Added and Your plan so row pills match exactly. */
+const PLAN_PILL_LAYOUT: ViewStyle = {
+  marginLeft: "auto",
+  minWidth: 88,
+  height: 32,
+  borderRadius: 12,
+  borderWidth: 1,
+  paddingHorizontal: 10,
+  alignItems: "center",
+  justifyContent: "center",
+  overflow: "hidden",
+};
 
 type EventItem = {
   id: string;
@@ -104,6 +117,7 @@ export default function FriendOpenPlans({
             {isHost ? (
               <View style={styles.hostPill}>
                 <Text
+                  numberOfLines={1}
                   style={[
                     styles.interestText,
                     styles.hostPillText,
@@ -215,27 +229,13 @@ const styles = StyleSheet.create({
   },
 
   interestPill: {
-    borderWidth: 1,
+    ...PLAN_PILL_LAYOUT,
     borderColor: "#333",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    marginLeft: "auto",
-    width: 72,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
   },
   hostPill: {
-    borderWidth: 1,
+    ...PLAN_PILL_LAYOUT,
     borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginLeft: 8,
-    alignItems: "center",
-    minWidth: 76,
-    justifyContent: "center",
   },
   hostPillText: {
     color: "rgba(255,255,255,0.55)",
