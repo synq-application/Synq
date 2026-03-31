@@ -159,6 +159,16 @@ export default function RootLayout() {
         return;
       }
 
+      if (type === "friend_synq_active") {
+        const friendId = str(data.fromUserId);
+        if (friendId) {
+          setPendingNotificationTap({ kind: "friend_profile", friendId });
+        } else {
+          setPendingNotificationTap({ kind: "notifications" });
+        }
+        return;
+      }
+
       if (type === "open_plan_interest") {
         setPendingNotificationTap({
           kind: "me",

@@ -362,6 +362,11 @@ function firstNameFromDisplay(name) {
   return String(name || "").trim().split(/\s+/)[0] || "Someone";
 }
 
+function isSynqActive(userData) {
+  if (!userData || typeof userData !== "object") return false;
+  return String(userData.status || "").trim().toLowerCase() === "available" && !!userData.synqStartedAt;
+}
+
 /** When a friend’s id is added to a hosted open plan, notify the host. */
 exports.onOpenPlanInterest = onDocumentUpdated(
   {
@@ -532,6 +537,78 @@ exports.onFriendAccepted = onDocumentCreated({
     logger.error("Error in onFriendAccepted:", error);
   }
 });
+
+/** Notify active friends when a friend activates Synq (only to recipients also active). */
+exports.onFriendSynqActivated = onDocumentUpdated(
+  {
+    document: "users/{userId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const activatedUserId = event.params.userId;
+    const before = event.data.before.data() || {};
+    const after = event.data.after.data() || {};
+
+    const wasActive = isSynqActive(before);
+    const isActive = isSynqActive(after);
+    if (wasActive || !isActive) return;
+
+    const activatedPushToken = after?.pushToken || null;
+    const activatedName = String(after?.displayName || "Your friend").trim() || "Your friend";
+
+    try {
+      const friendsSnap = await admin
+        .firestore()
+        .collection("users")
+        .doc(activatedUserId)
+        .collection("friends")
+        .get();
+
+      if (friendsSnap.empty) return;
+
+      const friendIds = friendsSnap.docs.map((d) => String(d.id || "").trim()).filter(Boolean);
+      if (!friendIds.length) return;
+
+      const friendDocs = await Promise.all(
+        friendIds.map((fid) => admin.firestore().collection("users").doc(fid).get())
+      );
+
+      for (const friendDoc of friendDocs) {
+        if (!friendDoc.exists) continue;
+        const friendData = friendDoc.data() || {};
+        const recipientId = friendDoc.id;
+        const recipientToken = friendData?.pushToken;
+        if (!recipientToken) continue;
+        if (!isSynqActive(friendData)) continue;
+
+        if (activatedPushToken && recipientToken === activatedPushToken) {
+          logger.warn("onFriendSynqActivated: skip push — same device token", {
+            activatedUserId,
+            recipientId,
+          });
+          continue;
+        }
+
+        try {
+          await axios.post("https://exp.host/--/api/v2/push/send", {
+            to: recipientToken,
+            sound: "default",
+            title: "Friend active on Synq",
+            body: `${firstNameFromDisplay(activatedName)} just activated Synq.`,
+            data: {
+              type: "friend_synq_active",
+              fromUserId: activatedUserId,
+            },
+          });
+        } catch (pushErr) {
+          logger.error("onFriendSynqActivated: push send failed", pushErr);
+        }
+      }
+    } catch (err) {
+      logger.error("onFriendSynqActivated", err);
+    }
+  }
+);
 
 exports.getSynqSuggestions = onCall(
     {
