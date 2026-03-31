@@ -428,14 +428,16 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          <TouchableOpacity onPress={pickImage} style={styles.imageWrapper} disabled={isUploading}>
-            <ExpoImage
-              source={{ uri: resolveAvatar(profileImage) }}
-              style={styles.profileImg}
-              cachePolicy="memory-disk"
-              transition={0}
-            />
-          </TouchableOpacity>
+          <View style={styles.avatarGlowWrap}>
+            <TouchableOpacity onPress={pickImage} style={styles.imageWrapper} disabled={isUploading}>
+              <ExpoImage
+                source={{ uri: resolveAvatar(profileImage) }}
+                style={styles.profileImg}
+                cachePolicy="memory-disk"
+                transition={0}
+              />
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity onPress={() => setQRExpanded(true)} style={styles.qrToggle}>
             <Icon name="qr-code-outline" size={13} color="black" />
@@ -458,15 +460,18 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionTitle}>Top Synqs</Text>
+        <View style={styles.sectionTitleRow}>
+          <Text style={[styles.sectionTitle, styles.sectionTitleInline]}>Top Synqs</Text>
           <TouchableOpacity
-              onPress={() => {
-                showAlert(
-                  "Top Synqs",
-                  "Your top Synqs are the people you connect with the most!"
-                );
-              }}
+            style={styles.sectionInfoBtn}
+            onPress={() => {
+              showAlert(
+                "Top Synqs",
+                "Your top Synqs are the people you connect with the most!"
+              );
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="About top synqs"
           >
             <Icon name="information-circle-outline" size={18} color="#444" />
           </TouchableOpacity>
@@ -556,8 +561,7 @@ export default function ProfileScreen() {
           ))}
 
           <TouchableOpacity onPress={() => setShowInputModal(true)} style={styles.addRect}>
-            <Icon name="add" size={16} color={ACCENT} />
-            <Text style={styles.addRectText}>Add</Text>
+            <Text style={styles.addRectText}>+ Add</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -698,7 +702,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  scrollContent: { paddingBottom: 60, paddingHorizontal: 20 },
+  scrollContent: { paddingBottom: 24, paddingHorizontal: 20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -724,9 +728,17 @@ const styles = StyleSheet.create({
     borderColor: "black",
   },
   badgeText: { color: "white", fontSize: 10, fontFamily: fonts.black },
-  profileSection: { alignItems: "center", marginTop: 10 },
+  profileSection: { alignItems: "center", marginTop: 4 },
   qrContainer: { width: 200, height: 200, justifyContent: "center", alignItems: "center" },
   qrBg: { position: "absolute", opacity: 0.4, backgroundColor: "white", borderRadius: 25, padding: 10 },
+  avatarGlowWrap: {
+    borderRadius: 84,
+    shadowColor: ACCENT,
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 7,
+  },
   imageWrapper: {
     width: 160,
     height: 160,
@@ -757,9 +769,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     fontFamily: fonts.medium,
   },
-  section: { marginTop: 30 },
-  sectionTitle: { color: TEXT, fontSize: 20, fontFamily: fonts.heavy, marginBottom: 12, letterSpacing: 0.2 },
+  section: { marginTop: 20 },
+  sectionTitle: { color: TEXT, fontSize: 21, fontFamily: fonts.heavy, marginBottom: 12, letterSpacing: 0.2 },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  sectionTitleRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  sectionTitleInline: { marginBottom: 0 },
+  sectionInfoBtn: { marginLeft: 6, paddingVertical: 0 },
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 20 },
   connItem: { alignItems: "center", width: 80 },
   imageCircle: { width: 72, height: 72, borderRadius: 36, justifyContent: "center", alignItems: "center", position: "relative" },
@@ -775,13 +790,32 @@ const styles = StyleSheet.create({
     borderColor: "black",
     zIndex: 10,
   },
-  connName: { color: TEXT, fontSize: 12, marginTop: 10, textAlign: "center", fontFamily: fonts.heavy },
-  emptyText: { color: MUTED2, fontFamily: fonts.medium, fontSize: 14 },
+  connName: { color: TEXT, fontSize: 14, marginTop: 10, textAlign: "center", fontFamily: fonts.heavy },
+  emptyText: { color: MUTED2, fontFamily: fonts.medium, fontSize: 15 },
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
-  interestRect: { backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER, borderRadius: BUTTON_RADIUS, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, marginBottom: 8 },
-  interestText: { color: TEXT, fontFamily: fonts.heavy, fontSize: 13 },
-  addRect: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: ACCENT, borderStyle: "dashed", borderRadius: BUTTON_RADIUS, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
-  addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 4 },
+  interestRect: {
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  interestText: { color: TEXT, fontFamily: fonts.book, fontSize: 13 },
+  addRect: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: ACCENT,
+    borderStyle: "solid",
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13 },
   signOutBtn: { alignSelf: "center", marginTop: 22, paddingVertical: 14, paddingHorizontal: 60, borderRadius: BUTTON_RADIUS + 8, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
   signOutText: { color: "#666", fontFamily: fonts.heavy, fontSize: 13, letterSpacing: 2, textTransform: "uppercase" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" },

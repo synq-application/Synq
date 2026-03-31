@@ -1,4 +1,4 @@
-import { fonts, MUTED2, TEXT } from "@/constants/Variables";
+import { ACCENT, fonts, MUTED2, TEXT } from "@/constants/Variables";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useState } from "react";
 import {
@@ -269,12 +269,10 @@ export default function OpenPlans({
         })}
 
       <TouchableOpacity
-        style={[styles.addBtn, { borderColor: ACCENT }]}
+        style={styles.addBtn}
         onPress={() => setShowEventModal(true)}
       >
-        <Text style={{ color: ACCENT, fontSize: 18, fontFamily: fonts.heavy }}>
-          + Add plan
-        </Text>
+        <Text style={styles.addBtnText}>+ Add plan</Text>
       </TouchableOpacity>
 
       <Modal visible={showEventModal} transparent animationType="fade">
@@ -514,7 +512,20 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontFamily: fonts.medium,
   },
-  addBtn: { padding: 12, alignItems: "center", marginTop: 8 },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: ACCENT,
+    borderStyle: "solid",
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 0,
+    marginBottom: 8,
+    alignSelf: "center",
+  },
+  addBtnText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 0 },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" },
   modal: { width: "92%", backgroundColor: "#0a0a0a", padding: 18, borderRadius: 22 },
   modalTitle: { color: "white", fontSize: 18, fontFamily: fonts.medium },

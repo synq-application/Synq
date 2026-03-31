@@ -6,12 +6,10 @@ import {
   fonts,
   MODAL_RADIUS,
   MUTED2,
-  SPACE_5,
   SURFACE,
-  TEXT,
+  TEXT
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import { Image as ExpoImage } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -24,6 +22,7 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -749,7 +748,11 @@ export default function FriendProfile() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
             <Icon name="chevron-back" size={22} color={TEXT} />
@@ -763,13 +766,15 @@ export default function FriendProfile() {
             accessibilityRole="imagebutton"
             accessibilityLabel="Open profile photo preview"
           >
-            <ExpoImage
-              source={{ uri: avatarUri }}
-              style={styles.avatar}
-              cachePolicy="memory-disk"
-              transition={0}
-              recyclingKey={avatarUri}
-            />
+            <View style={styles.avatarGlowWrap}>
+              <ExpoImage
+                source={{ uri: avatarUri }}
+                style={styles.avatar}
+                cachePolicy="memory-disk"
+                transition={0}
+                recyclingKey={avatarUri}
+              />
+            </View>
           </TouchableOpacity>
 
           <Text style={styles.name}>
@@ -886,7 +891,7 @@ export default function FriendProfile() {
           />
         </View>
 
-        <View style={{ marginTop: SPACE_5, marginBottom: 40, alignItems: "center" }}>
+        <View style={styles.footerActions}>
           {isFriend ? (
             <TouchableOpacity
               activeOpacity={0.8}
@@ -976,9 +981,10 @@ export default function FriendProfile() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BG },
   container: { flex: 1, paddingHorizontal: 20 },
+  scrollContent: { paddingBottom: 20 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  topBar: { marginTop: 6, marginBottom: 10 },
+  topBar: { marginTop: 4, marginBottom: 6 },
 
   backBtn: {
     width: 38,
@@ -991,7 +997,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  header: { alignItems: "center", marginTop: 10 },
+  header: { alignItems: "center", marginTop: 4 },
+  avatarGlowWrap: {
+    borderRadius: 84,
+    shadowColor: ACCENT,
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 7,
+  },
 
   avatar: {
     width: 160,
@@ -1052,13 +1066,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  section: { marginTop: SPACE_5 },
+  section: { marginTop: 18 },
 
   sectionTitle: {
     color: TEXT,
     fontSize: 20,
     fontFamily: fonts.heavy,
-    marginBottom: 15,
+    marginBottom: 10,
   },
 
   openPlansTitle: {
@@ -1073,6 +1087,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingRight: 8,
   },
+  footerActions: { marginTop: 20, marginBottom: 24, alignItems: "center" },
 
   synqsContainer: {
     flexDirection: "row",
