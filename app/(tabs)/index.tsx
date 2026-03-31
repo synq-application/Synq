@@ -20,13 +20,14 @@ import {
   where
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import React, { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   DeviceEventEmitter,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
+  PixelRatio,
   Platform,
   Pressable,
   StatusBar,
@@ -37,7 +38,9 @@ import {
   TouchableWithoutFeedback,
   useWindowDimensions,
   Vibration,
-  View
+  View,
+  type NativeSyntheticEvent,
+  type TextLayoutEventData,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -91,6 +94,130 @@ type SynqUi = { status: SynqStatus; hydrated: boolean };
 
 function setSynqStatus(setSynq: Dispatch<SetStateAction<SynqUi>>, status: SynqStatus) {
   setSynq((s) => ({ ...s, status }));
+}
+
+/**
+ * Native Messages (iPhone)–style bubble metrics: ~252pt max width @ 375pt screen width,
+ * 17pt body, ~11×8pt insets, ~18pt corner radius (no tail).
+ */
+const IMESSAGE_REF_SCREEN_WIDTH = 375;
+const IMESSAGE_BUBBLE_MAX_WIDTH_PT = 252;
+const IMESSAGE_BUBBLE_FONT_SIZE = 17;
+const IMESSAGE_BUBBLE_LINE_HEIGHT = 22;
+const IMESSAGE_BUBBLE_PADDING_H = 9;
+const IMESSAGE_BUBBLE_PADDING_V = 8;
+const IMESSAGE_BUBBLE_CORNER_RADIUS = 18;
+const MESSAGE_BUBBLE_MIN_HEIGHT = 36;
+/** Horizontal padding of the transcript (Messages ~10–12pt from sheet edge). */
+const IMESSAGE_CHAT_HORIZONTAL_INSET = 8;
+/** Outer edge from transcript content to bubble on the screen side (tighter than 12pt). */
+const IMESSAGE_BUBBLE_OUTER_MARGIN = 6;
+/** Must match `styles.chatAvatar` width + `marginRight`. */
+const IMESSAGE_INCOMING_AVATAR_BLOCK = 34 + 7;
+
+function iMessageBubbleColumnMaxWidth(windowWidth: number, isOutgoing: boolean) {
+  const contentWidth = windowWidth - 2 * IMESSAGE_CHAT_HORIZONTAL_INSET;
+  const scaled252 = (windowWidth / IMESSAGE_REF_SCREEN_WIDTH) * IMESSAGE_BUBBLE_MAX_WIDTH_PT;
+  const capFromLayout = isOutgoing
+    ? contentWidth - IMESSAGE_BUBBLE_OUTER_MARGIN
+    : contentWidth - IMESSAGE_BUBBLE_OUTER_MARGIN - IMESSAGE_INCOMING_AVATAR_BLOCK;
+  return Math.max(32, Math.min(scaled252, capFromLayout));
+}
+
+/**
+ * iMessage-style width: after wrapping, the bubble is only as wide as the longest line (+ padding),
+ * not the full max column width (avoids empty space on the right of short last lines).
+ */
+function ChatMessageBubble({
+  text,
+  bubbleCap,
+  isMe,
+  onPress,
+  heartCount,
+}: {
+  text: string;
+  bubbleCap: number;
+  isMe: boolean;
+  onPress: () => void;
+  heartCount: number;
+}) {
+  const [bubbleWidth, setBubbleWidth] = useState<number | undefined>(undefined);
+  const [lineCount, setLineCount] = useState<number | null>(null);
+  const fontScale = PixelRatio.getFontScale();
+  const padH = Math.round(IMESSAGE_BUBBLE_PADDING_H * fontScale);
+  const padV = Math.round(IMESSAGE_BUBBLE_PADDING_V * fontScale);
+  const horizontalPad = 2 * padH;
+  const maxText = Math.max(24, bubbleCap - horizontalPad);
+
+  useEffect(() => {
+    setBubbleWidth(undefined);
+    setLineCount(null);
+  }, [bubbleCap, text]);
+
+  const onTextLayout = useCallback(
+    (e: NativeSyntheticEvent<TextLayoutEventData>) => {
+      const lines = e.nativeEvent.lines;
+      if (!lines.length) return;
+      setLineCount(lines.length);
+      const longest = Math.max(...lines.map((l) => l.width), 0);
+      const raw = longest > 0 ? longest + horizontalPad : Math.min(text.length * (IMESSAGE_BUBBLE_FONT_SIZE * 0.55), bubbleCap);
+      const next = Math.min(Math.max(raw, horizontalPad + 8), bubbleCap);
+      setBubbleWidth((prev) => (prev === next ? prev : next));
+    },
+    [bubbleCap, horizontalPad, text]
+  );
+
+  const textAlign =
+    lineCount === null ? "left" : lineCount <= 1 ? "center" : "left";
+
+  return (
+    <Pressable onPress={onPress}>
+      <View
+        style={[
+          styles.bubble,
+          isMe ? styles.myBubble : styles.theirBubble,
+          { paddingHorizontal: padH, paddingVertical: padV },
+          bubbleWidth !== undefined
+            ? { width: bubbleWidth }
+            : { maxWidth: bubbleCap },
+          { position: "relative", overflow: "visible" },
+        ]}
+      >
+        <Text
+          onTextLayout={onTextLayout}
+          style={[
+            styles.bubbleText,
+            {
+              color: isMe ? "black" : "white",
+              maxWidth:
+                bubbleWidth !== undefined ? bubbleWidth - horizontalPad : maxText,
+              textAlign,
+            },
+          ]}
+        >
+          {text}
+        </Text>
+        {heartCount > 0 ? (
+          <View
+            style={[
+              styles.heartReaction,
+              isMe ? { left: -4, right: undefined } : { right: -6, left: undefined },
+            ]}
+          >
+            {Array.from({ length: heartCount }, (_, i) => (
+              <Ionicons
+                key={i}
+                name="heart"
+                size={14}
+                color="#FF2D55"
+                style={{ marginLeft: i > 0 ? 3 : 0 }}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
 }
 
 export default function SynqScreen() {
@@ -1030,7 +1157,13 @@ export default function SynqScreen() {
             <FlatList
               data={allChats}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => {
+              ItemSeparatorComponent={() => (
+                <View style={styles.inboxSeparatorBetween}>
+                  <View style={styles.inboxSeparatorLine} />
+                </View>
+              )}
+              contentContainerStyle={styles.inboxListContent}
+              renderItem={({ item, index }) => {
                 const myId = auth.currentUser?.uid;
                 const updatedAtMs = item.updatedAt?.toMillis?.() ?? 0;
                 const lastReadMs = myId ? item.lastReadBy?.[myId]?.toMillis?.() ?? 0 : 0;
@@ -1057,7 +1190,11 @@ export default function SynqScreen() {
                   )}
                 >
                   <TouchableOpacity
-                    style={[styles.inboxItem, isUnreadThread && styles.inboxItemUnread]}
+                    style={[
+                      styles.inboxItem,
+                      index === 0 && styles.inboxItemFirst,
+                      isUnreadThread && styles.inboxItemUnread,
+                    ]}
                     onPress={async () => {
                       prefetchParticipantAvatars(item);
                       setPendingNewChat(null);
@@ -1067,27 +1204,29 @@ export default function SynqScreen() {
                       await markChatRead(item.id);
                     }}
                   >
-                    <View style={styles.avatarColumn}>
-                      {renderAvatarStack(item.participantImages)}
-                    </View>
-                    <View style={styles.inboxTextCol}>
-                      <Text
-                        style={[styles.whiteBold, isUnreadThread && styles.unreadChatTitle]}
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                      >
-                        {getChatTitle(item)}
-                      </Text>
-                      {(() => {
-                        const lm =
-                          typeof item.lastMessage === "string" ? item.lastMessage.trim() : "";
-                        if (!lm || lm === "Synq established!") return null;
-                        return (
-                          <Text style={styles.grayText} numberOfLines={1}>
-                            {lm}
-                          </Text>
-                        );
-                      })()}
+                    <View style={styles.inboxItemRow}>
+                      <View style={styles.avatarColumn}>
+                        {renderAvatarStack(item.participantImages)}
+                      </View>
+                      <View style={styles.inboxTextCol}>
+                        <Text
+                          style={[styles.whiteBold, isUnreadThread && styles.unreadChatTitle]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {getChatTitle(item)}
+                        </Text>
+                        {(() => {
+                          const lm =
+                            typeof item.lastMessage === "string" ? item.lastMessage.trim() : "";
+                          if (!lm || lm === "Synq established!") return null;
+                          return (
+                            <Text style={styles.grayText} numberOfLines={1}>
+                              {lm}
+                            </Text>
+                          );
+                        })()}
+                      </View>
                     </View>
                   </TouchableOpacity>
                 </Swipeable>
@@ -1177,8 +1316,6 @@ export default function SynqScreen() {
                   keyExtractor={(item) => item.id}
                   keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
                   keyboardShouldPersistTaps="handled"
-                  onScrollBeginDrag={() => Keyboard.dismiss()}
-                  onMomentumScrollBegin={() => Keyboard.dismiss()}
                   onContentSizeChange={() => {
                     if (pendingScrollToMessageId) return;
                     flatListRef.current?.scrollToEnd({ animated: true });
@@ -1260,6 +1397,10 @@ export default function SynqScreen() {
                         </View>
                       );
                     }
+                    const bubbleCap = iMessageBubbleColumnMaxWidth(windowWidth, isMe);
+                    const heartCount =
+                      item.reactions &&
+                      Object.values(item.reactions).filter((v) => v === "heart").length;
                     return (
                       <View
                         style={[
@@ -1285,59 +1426,28 @@ export default function SynqScreen() {
                             />
                           )}
 
-                          <View style={{ maxWidth: "75%" }}>
-                            <Pressable
+                          <View
+                            style={[
+                              styles.messageBubbleColumn,
+                              {
+                                maxWidth: bubbleCap,
+                                alignSelf: isMe ? "flex-end" : "flex-start",
+                                alignItems: isMe ? "flex-end" : "flex-start",
+                              },
+                            ]}
+                          >
+                            <ChatMessageBubble
+                              text={item.text}
+                              bubbleCap={bubbleCap}
+                              isMe={isMe}
+                              heartCount={heartCount || 0}
                               onPress={() =>
                                 onMessageBubblePress({
                                   id: item.id,
                                   reactions: item.reactions,
                                 })
                               }
-                            >
-                              <View
-                                style={[
-                                  styles.bubble,
-                                  isMe ? styles.myBubble : styles.theirBubble,
-                                  { position: "relative", overflow: "visible" },
-                                ]}
-                              >
-                                <Text
-                                  style={{
-                                    color: isMe ? "black" : "white",
-                                    fontSize: 16,
-                                    textAlign: isMe ? "right" : "left",
-                                  }}
-                                >
-                                  {item.text}
-                                </Text>
-                                {(() => {
-                                  const heartCount =
-                                    item.reactions &&
-                                    Object.values(item.reactions).filter((v) => v === "heart").length;
-                                  if (!heartCount) return null;
-                                  return (
-                                    <View
-                                      style={[
-                                        styles.heartReaction,
-                                        isMe
-                                          ? { left: -4, right: undefined }
-                                          : { right: -6, left: undefined },
-                                      ]}
-                                    >
-                                      {Array.from({ length: heartCount }, (_, i) => (
-                                        <Ionicons
-                                          key={i}
-                                          name="heart"
-                                          size={14}
-                                          color="#FF2D55"
-                                          style={{ marginLeft: i > 0 ? 3 : 0 }}
-                                        />
-                                      ))}
-                                    </View>
-                                  );
-                                })()}
-                              </View>
-                            </Pressable>
+                            />
                           </View>
                         </View>
                         <Text
@@ -1354,7 +1464,10 @@ export default function SynqScreen() {
                       </View>
                     );
                   }}
-                  contentContainerStyle={{ padding: 20 }}
+                  contentContainerStyle={{
+                    flexGrow: 1,
+                    padding: 20,
+                  }}
                 />
 
                 {showAICard && (
@@ -1675,12 +1788,33 @@ const styles = StyleSheet.create({
   modalTitle: { color: 'white', fontSize: 22, fontFamily: fonts.medium },
   messagesInboxTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
+  /** Symmetric vertical padding so the between-row hairline sits centered in the gap (iMessage-style). */
   inboxItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.12)',
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 20,
+  },
+  inboxItemFirst: {
+    paddingTop: 16,
+  },
+  inboxListContent: {
+    paddingBottom: 20,
+  },
+  inboxItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 56,
+  },
+  /** Hairline between rows; vertically centered between adjacent avatar rows via item padding + this block. */
+  inboxSeparatorBetween: {
+    paddingLeft: 20 + 60 + 14,
+    paddingRight: 40,
+    justifyContent: "center",
+  },
+  inboxSeparatorLine: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    width: "100%",
   },
   inboxItemUnread: {
     backgroundColor: 'rgba(43,255,136,0.10)',
@@ -1701,7 +1835,25 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     marginRight: 7,
   },
-  bubble: { padding: 15, borderRadius: MODAL_RADIUS },
+  /**
+   * alignItems prevents default stretch so the bubble shrink-wraps to text (no trailing void).
+   * maxWidth in JSX caps the column; Text maxWidth = cap − horizontal padding for wrapping.
+   */
+  messageBubbleColumn: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  /** Padding overridden in ChatMessageBubble (font-scaled). No minWidth — width comes from measurement. */
+  bubble: {
+    minHeight: MESSAGE_BUBBLE_MIN_HEIGHT,
+    paddingVertical: IMESSAGE_BUBBLE_PADDING_V,
+    paddingHorizontal: IMESSAGE_BUBBLE_PADDING_H,
+    borderRadius: IMESSAGE_BUBBLE_CORNER_RADIUS,
+  },
+  bubbleText: {
+    fontSize: IMESSAGE_BUBBLE_FONT_SIZE,
+    lineHeight: IMESSAGE_BUBBLE_LINE_HEIGHT,
+  },
   myBubble: { backgroundColor: ACCENT },
   theirBubble: { backgroundColor: '#1C1C1E' },
   inputRow: { flexDirection: 'row', alignItems: "flex-end", padding: 20, paddingBottom: 40, backgroundColor: BG },
