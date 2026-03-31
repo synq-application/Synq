@@ -18,7 +18,6 @@ import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firesto
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Keyboard,
   Modal,
   Pressable,
@@ -429,17 +428,13 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          <TouchableOpacity onPress={pickImage} style={styles.imageWrapper}>
-            {isUploading ? (
-              <ActivityIndicator color={ACCENT} />
-            ) : (
-              <ExpoImage
-                source={{ uri: resolveAvatar(profileImage) }}
-                style={styles.profileImg}
-                cachePolicy="memory-disk"
-                transition={0}
-              />
-            )}
+          <TouchableOpacity onPress={pickImage} style={styles.imageWrapper} disabled={isUploading}>
+            <ExpoImage
+              source={{ uri: resolveAvatar(profileImage) }}
+              style={styles.profileImg}
+              cachePolicy="memory-disk"
+              transition={0}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => setQRExpanded(true)} style={styles.qrToggle}>
