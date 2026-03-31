@@ -115,6 +115,7 @@ exports.onMessageSent = onDocumentCreated({
                 body: messageData.text,
                 data: {
                     chatId: String(chatId),
+                    messageId: String(event.params.messageId ?? ""),
                     type: "message",
                 },
             });

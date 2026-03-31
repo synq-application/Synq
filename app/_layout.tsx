@@ -336,17 +336,26 @@ export default function RootLayout() {
     if (pending.kind === "chat") {
       router.push("/(tabs)");
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      let timeoutId2: ReturnType<typeof setTimeout> | undefined;
       const handle = InteractionManager.runAfterInteractions(() => {
         timeoutId = setTimeout(() => {
           DeviceEventEmitter.emit("openChat", {
             chatId: pending.chatId,
             messageId: pending.messageId,
           });
-        }, 500);
+        }, 700);
+        // Safety re-emit in case the Synq tab listener mounts slightly later.
+        timeoutId2 = setTimeout(() => {
+          DeviceEventEmitter.emit("openChat", {
+            chatId: pending.chatId,
+            messageId: pending.messageId,
+          });
+        }, 1400);
       });
       return () => {
         handle.cancel?.();
         if (timeoutId) clearTimeout(timeoutId);
+        if (timeoutId2) clearTimeout(timeoutId2);
       };
     }
   }, [

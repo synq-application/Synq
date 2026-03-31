@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Notifications from "expo-notifications";
 import {
   addDoc,
   collection,
@@ -222,6 +223,54 @@ export default function SynqScreen() {
       }
     });
     return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    const openFromNotificationData = async (data: Record<string, unknown> | undefined) => {
+      if (!data) return;
+      const rawChatId = data.chatId;
+      const chatId =
+        typeof rawChatId === "string"
+          ? rawChatId.trim()
+          : rawChatId != null
+            ? String(rawChatId).trim()
+            : "";
+      if (!chatId) return;
+      try {
+        const snap = await getDoc(doc(db, "chats", chatId));
+        if (snap.exists()) {
+          prefetchParticipantAvatars(snap.data() as any);
+        }
+      } catch {}
+      setPendingNewChat(null);
+      setActiveChatId(chatId);
+      setIsChatVisible(true);
+      setIsInboxVisible(false);
+      const rawMid = data.messageId;
+      const mid =
+        typeof rawMid === "string" && rawMid.trim()
+          ? rawMid.trim()
+          : rawMid != null
+            ? String(rawMid).trim() || null
+            : null;
+      setPendingScrollToMessageId(mid);
+      await markChatRead(chatId);
+    };
+
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      openFromNotificationData(
+        response.notification.request.content.data as Record<string, unknown> | undefined
+      );
+    });
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return;
+      openFromNotificationData(
+        response.notification.request.content.data as Record<string, unknown> | undefined
+      );
+    });
+
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {
