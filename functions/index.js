@@ -82,12 +82,19 @@ exports.onMessageSent = onDocumentCreated({
             return;
         }
 
-        const recipientIds = (chatData.participants || [])
-            .map((id) => String(id ?? "").trim())
-            .filter((id) => id && id !== senderId);
+        const recipientIds = [
+            ...new Set(
+                (chatData.participants || [])
+                    .map((id) => String(id ?? "").trim())
+                    .filter((id) => id && id !== senderId)
+            ),
+        ];
 
         const senderDoc = await admin.firestore().collection("users").doc(senderId).get();
         const senderPushToken = senderDoc.data()?.pushToken || null;
+
+        /** One Expo push per device token per invocation (duplicate UIDs or stale same-token rows). */
+        const sentTokens = new Set();
 
         for (const recipientId of recipientIds) {
             const userDoc = await admin.firestore().collection("users").doc(recipientId).get();
@@ -103,6 +110,15 @@ exports.onMessageSent = onDocumentCreated({
                 });
                 continue;
             }
+
+            if (sentTokens.has(token)) {
+                logger.info("onMessageSent: skip duplicate Expo token for another recipient", {
+                    chatId,
+                    recipientId,
+                });
+                continue;
+            }
+            sentTokens.add(token);
 
             const senderName =
                 chatData.participantNames?.[senderId] ||
