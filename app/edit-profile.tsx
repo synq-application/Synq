@@ -115,6 +115,11 @@ export default function EditProfileScreen() {
         setDisplayName(data.displayName || '');
         setCity(data.city || '');
         setState(data.state || '');
+        const lat = typeof data.lat === "number" ? data.lat : null;
+        const lng = typeof data.lng === "number" ? data.lng : null;
+        if (lat !== null && lng !== null) {
+          setCoords({ lat, lng });
+        }
       }
       setLoading(false);
     };
@@ -214,18 +219,15 @@ export default function EditProfileScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="close-circle" size={28} color="#444" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.headerAction}>
+            <Ionicons name="chevron-back" size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Profile</Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            {saving ? (
-              <ActivityIndicator size="small" color={ACCENT} />
-            ) : (
-              <Text style={styles.saveText}>Save</Text>
-            )}
-          </TouchableOpacity>
+          <View style={styles.headerTitleBlock}>
+            <Text style={styles.headerTitle}>Edit profile</Text>
+          </View>
+          <View style={styles.headerAction} />
         </View>
+        <View style={styles.headerDivider} />
 
         <ScrollView
           contentContainerStyle={styles.form}
@@ -288,6 +290,18 @@ export default function EditProfileScreen() {
             </View>
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={saving}
+          style={[styles.saveButton, saving && { opacity: 0.7 }]}
+          activeOpacity={0.85}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="black" />
+          ) : (
+            <Text style={styles.saveButtonText}>Save</Text>
+          )}
+        </TouchableOpacity>
         </ScrollView>
         <AlertModal
           visible={alertVisible}
@@ -311,16 +325,19 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#222'
+    marginTop: 20,
   },
-  headerTitle: { color: 'white', fontSize: 18, fontFamily: fonts.black },
-  saveText: { color: ACCENT, fontSize: 16, fontFamily: fonts.heavy },
+  headerTitleBlock: {
+    flex: 1,
+    paddingHorizontal: 10,
+  },
+  headerTitle: { color: 'white', fontSize: 22, fontFamily: fonts.heavy, letterSpacing: 0.2 },
+  headerAction: { width: 40, alignItems: 'center', justifyContent: 'center', paddingTop: 4 },
+  headerDivider: { marginTop: 16, height: 1, backgroundColor: '#222' },
 
-  form: { padding: 25 },
+  form: { padding: 25, paddingTop: 18, paddingBottom: 12 },
 
   inputGroup: { marginBottom: 25 },
   label: {
@@ -363,5 +380,20 @@ const styles = StyleSheet.create({
   },
   locationIcon: { fontSize: 16 },
   locationPrimary: { color: "white", fontSize: 14, fontWeight: "800" },
-  locationSecondary: { marginTop: 2, color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: "600" }
+  locationSecondary: { marginTop: 2, color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: "600" },
+  saveButton: {
+    marginTop: 24,
+    alignSelf: "center",
+    height: 52,
+    width: "62%",
+    borderRadius: BUTTON_RADIUS,
+    backgroundColor: ACCENT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveButtonText: {
+    color: "black",
+    fontSize: 16,
+    fontFamily: fonts.heavy,
+  },
 });
