@@ -13,10 +13,11 @@ import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Keyboard,
   Modal,
@@ -55,6 +56,8 @@ type Connection = {
   synqCount: number;
 };
 export default function ProfileScreen() {
+  const isFocused = useIsFocused();
+  const scrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{ focusEventId?: string | string[] }>();
   const focusEventIdRaw = params.focusEventId;
   const focusEventId =
@@ -378,8 +381,14 @@ export default function ProfileScreen() {
   const locationLower =
     city && state ? `${city}, ${state}` : null;
 
+  useEffect(() => {
+    if (isFocused) return;
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [isFocused]);
+
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
