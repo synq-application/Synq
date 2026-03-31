@@ -856,7 +856,12 @@ export default function FriendProfile() {
           </View>
         </View>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Open plans</Text>
+          <Text style={[styles.sectionTitle, styles.openPlansTitle]}>Open plans</Text>
+          <Text style={styles.openPlansSubtitle}>
+            {`Tap a plan to add it to your open plans and let ${
+              friend.displayName?.trim().split(/\s+/)[0] || "your friend"
+            } know you're interested.`}
+          </Text>
 
           <MonthlyMemoReadOnly
             events={friend.events || []}
@@ -1001,6 +1006,19 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: fonts.heavy,
     marginBottom: 15,
+  },
+
+  openPlansTitle: {
+    marginBottom: 6,
+  },
+
+  openPlansSubtitle: {
+    color: MUTED2,
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    lineHeight: 18,
+    marginBottom: 14,
+    paddingRight: 8,
   },
 
   synqsContainer: {

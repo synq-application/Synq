@@ -128,11 +128,11 @@ export default function FriendOpenPlans({
                   activeOpacity={0.85}
                   onPress={() => onPressPlan?.(p)}
                   accessibilityRole="button"
-                  accessibilityLabel="Interested"
+                  accessibilityLabel={joined ? "Added" : "Add"}
                   accessibilityHint={
                     joined
-                      ? "You are interested. Tap to remove from your open plans."
-                      : "Show interest in this plan."
+                      ? "Tap to remove this plan from your open plans."
+                      : "Adds this plan to your open plans and notifies your friend."
                   }
                   accessibilityState={{ selected: joined }}
                 >
@@ -145,7 +145,7 @@ export default function FriendOpenPlans({
                       },
                     ]}
                   >
-                    Interested
+                    {joined ? "Added" : "Add"}
                   </Text>
                 </TouchableOpacity>
               )
@@ -217,11 +217,11 @@ const styles = StyleSheet.create({
   interestPill: {
     borderWidth: 1,
     borderColor: "#333",
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginLeft: 8,
-    minWidth: 76,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    marginLeft: "auto",
+    width: 72,
+    height: 32,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -241,6 +241,10 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
   },
   interestText: {
-    fontSize: 12.5,
+    fontSize: 12,
+    lineHeight: 32,
+    textAlign: "center",
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
 });
