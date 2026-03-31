@@ -1024,7 +1024,14 @@ export default function SynqScreen() {
             <FlatList
               data={allChats}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
+              renderItem={({ item }) => {
+                const myId = auth.currentUser?.uid;
+                const updatedAtMs = item.updatedAt?.toMillis?.() ?? 0;
+                const lastReadMs = myId ? item.lastReadBy?.[myId]?.toMillis?.() ?? 0 : 0;
+                const lastSender = item.lastMessageSenderId;
+                const isUnreadThread =
+                  !!myId && !!lastSender && lastSender !== myId && updatedAtMs > lastReadMs;
+                return (
                 <Swipeable
                   rightThreshold={24}
                   onSwipeableOpen={(direction) => {
@@ -1044,7 +1051,7 @@ export default function SynqScreen() {
                   )}
                 >
                   <TouchableOpacity
-                    style={styles.inboxItem}
+                    style={[styles.inboxItem, isUnreadThread && styles.inboxItemUnread]}
                     onPress={async () => {
                       prefetchParticipantAvatars(item);
                       setPendingNewChat(null);
@@ -1059,7 +1066,7 @@ export default function SynqScreen() {
                     </View>
                     <View style={styles.inboxTextCol}>
                       <Text
-                        style={styles.whiteBold}
+                        style={[styles.whiteBold, isUnreadThread && styles.unreadChatTitle]}
                         numberOfLines={1}
                         ellipsizeMode="tail"
                       >
@@ -1078,7 +1085,8 @@ export default function SynqScreen() {
                     </View>
                   </TouchableOpacity>
                 </Swipeable>
-              )}
+                );
+              }}
             />
             <ConfirmModal
               visible={showDeleteChatModal}
@@ -1661,7 +1669,21 @@ const styles = StyleSheet.create({
   modalTitle: { color: 'white', fontSize: 22, fontFamily: fonts.medium },
   messagesInboxTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
-  inboxItem: { flexDirection: 'row', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#111' },
+  inboxItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.12)',
+  },
+  inboxItemUnread: {
+    backgroundColor: 'rgba(43,255,136,0.10)',
+    borderLeftWidth: 2,
+    borderLeftColor: ACCENT,
+  },
+  unreadChatTitle: {
+    color: ACCENT,
+  },
   inboxCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
   stackedPhoto: { width: 40, height: 40, borderRadius: 20, position: 'absolute', borderWidth: 2, borderColor: 'black' },
   msgContainer: { marginBottom: 15 },
