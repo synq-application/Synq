@@ -60,7 +60,7 @@ import {
   SPACE_4,
   SPACE_5,
   TEXT,
-  TYPE_BODY,
+  TYPE_BODY
 } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
 import { useSynqBoot } from "../../src/lib/synqBootContext";
@@ -991,30 +991,32 @@ export default function SynqScreen() {
         <StatusBar barStyle="light-content" />
         {status === 'active' && (
           <View style={styles.activeSynqRoot}>
-            <View style={styles.header}>
-              <TouchableOpacity
-                onPress={() => setIsInboxVisible(true)}
-                style={styles.headerIconContainer}
-                accessibilityRole="button"
-                accessibilityLabel="Open messages"
-              >
-                <Ionicons name="chatbubbles-outline" size={28} color="white" />
-                {hasUnread && <View style={styles.badge} />}
-              </TouchableOpacity>
-              <View style={styles.synqHeaderTitleWrap}>
-                <Text style={styles.headerTitle}>Synq is active</Text>
-                <Text style={styles.headerSubtitleActive}>
-                  Tap one or more friends to start a chat and plan together.
-                </Text>
+            <View style={styles.activeHeaderBlock}>
+              <View style={styles.headerTitleRow}>
+                <TouchableOpacity
+                  onPress={() => setIsInboxVisible(true)}
+                  style={styles.headerIconContainer}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open messages"
+                >
+                  <Ionicons name="chatbubbles-outline" size={28} color="white" />
+                  {hasUnread && <View style={styles.badge} />}
+                </TouchableOpacity>
+                <View style={styles.synqHeaderTitleCenter}>
+                  <Text style={styles.headerTitle}>Synq is active</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setIsEditModalVisible(true)}
+                  style={styles.headerIconContainer}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit Synq memo and settings"
+                >
+                  <Ionicons name="create-outline" size={26} color="white" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                onPress={() => setIsEditModalVisible(true)}
-                style={styles.headerIconContainer}
-                accessibilityRole="button"
-                accessibilityLabel="Edit Synq memo and settings"
-              >
-                <Ionicons name="create-outline" size={26} color="white" />
-              </TouchableOpacity>
+              <Text style={styles.headerSubtitleActive}>
+                Tap one or more friends to start a chat and plan together.
+              </Text>
             </View>
             <View style={styles.headerDivider} />
 
@@ -1065,10 +1067,7 @@ export default function SynqScreen() {
                     ) : null}
 
                     {friendMemo ? (
-                      <Text
-                        style={[styles.grayText, styles.friendMemoLine]}
-                        numberOfLines={2}
-                      >
+                      <Text style={styles.friendMemoInline} numberOfLines={2}>
                         {friendMemo}
                       </Text>
                     ) : null}
@@ -1630,16 +1629,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: SPACE_4,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  activeHeaderBlock: {
     marginTop: 88,
-    alignItems: "flex-start",
   },
-  synqHeaderTitleWrap: {
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  synqHeaderTitleCenter: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
     paddingHorizontal: 4,
   },
   headerSubtitleActive: {
@@ -1650,6 +1651,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 8,
     maxWidth: 320,
+    alignSelf: "center",
   },
   headerDivider: {
     marginTop: 16,
@@ -2015,9 +2017,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 2,
   },
-  friendMemoLine: {
-    marginTop: 4,
-    fontStyle: "italic",
+  friendMemoInline: {
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 21,
+    color: MUTED2,
+    fontFamily: fonts.medium,
   },
   timestampCentered: {
     color: '#666',
