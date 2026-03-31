@@ -1003,6 +1003,9 @@ export default function SynqScreen() {
               </TouchableOpacity>
               <View style={styles.synqHeaderTitleWrap}>
                 <Text style={styles.headerTitle}>Synq is active</Text>
+                <Text style={styles.headerSubtitleActive}>
+                  Tap one or more friends to start a chat and plan together.
+                </Text>
               </View>
               <TouchableOpacity
                 onPress={() => setIsEditModalVisible(true)}
@@ -1079,8 +1082,8 @@ export default function SynqScreen() {
             />
             <LinearGradient
               pointerEvents="none"
-              colors={["rgba(9,10,11,0)", "rgba(9,10,11,0.72)", BG]}
-              locations={[0, 0.55, 1]}
+              colors={["rgba(9,10,11,0)", "rgba(9,10,11,0.38)", BG]}
+              locations={[0, 0.45, 1]}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
               style={styles.activeListFade}
@@ -1090,7 +1093,7 @@ export default function SynqScreen() {
             <View
               style={[
                 styles.activeFooterBlock,
-                { paddingBottom: Math.max(56, 36 + insets.bottom) },
+                { paddingBottom: Math.max(44, 24 + insets.bottom) },
               ]}
             >
               <TouchableOpacity
@@ -1098,9 +1101,15 @@ export default function SynqScreen() {
                 onPress={handleConnect}
                 disabled={!selectedFriends.length}
                 accessibilityRole="button"
-                accessibilityLabel={`Connect with ${selectedFriends.length} selected friends`}
+                accessibilityLabel={
+                  selectedFriends.length === 0
+                    ? 'Select friends who are free to start planning'
+                    : `Start plan with ${selectedFriends.length} friend${selectedFriends.length === 1 ? '' : 's'}`
+                }
               >
-                <Text style={styles.btnText}>Connect ({selectedFriends.length})</Text>
+                <Text style={styles.btnText}>
+                  {selectedFriends.length === 0 ? 'Select friends' : 'Start plan'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1587,13 +1596,13 @@ const styles = StyleSheet.create({
   activeListWrap: { flex: 1, position: "relative" },
   activeFriendsList: { flex: 1 },
   /** Extra bottom padding so last rows scroll above the fade overlay. */
-  activeListContent: { paddingTop: 20, paddingBottom: 140, paddingHorizontal: 0 },
+  activeListContent: { paddingTop: 20, paddingBottom: 108, paddingHorizontal: 0 },
   activeListFade: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: 120,
+    height: 72,
     zIndex: 1,
     elevation: 2,
   },
@@ -1631,6 +1640,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "flex-start",
+    paddingHorizontal: 4,
+  },
+  headerSubtitleActive: {
+    color: MUTED2,
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    lineHeight: 20,
+    textAlign: "center",
+    marginTop: 8,
+    maxWidth: 320,
   },
   headerDivider: {
     marginTop: 16,
@@ -1679,7 +1698,7 @@ const styles = StyleSheet.create({
   activeFooterBlock: {
     backgroundColor: BG,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 6,
   },
   btn: {
     alignSelf: 'center',
@@ -1691,7 +1710,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnText: { fontSize: 16, color: 'black', fontFamily: fonts.medium },
-  deactivateLink: { marginTop: 20, alignSelf: 'center', padding: 10 },
+  deactivateLink: { marginTop: 10, alignSelf: 'center', padding: 8 },
   deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: fonts.medium, opacity: 0.9 },
   activatingContainer: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
   unifiedTitle: { color: 'white', fontSize: 28, fontFamily: fonts.medium, marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
