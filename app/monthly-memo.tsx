@@ -122,7 +122,7 @@ export default function OpenPlans({
   };
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [pendingDeleteEvent, setPendingDeleteEvent] = useState<EventItem | null>(null);
 
   const closePickers = () => setPicker(null);
 
@@ -171,7 +171,7 @@ export default function OpenPlans({
     setShowEventModal(false);
   };
 
-  const handleDelete = (id: string) => setDeleteId(id);
+  const handleDelete = (event: EventItem) => setPendingDeleteEvent(event);
 
   return (
     <View style={styles.container}>
@@ -225,7 +225,7 @@ export default function OpenPlans({
                 isJoinedPlan && styles.joinedCard,
                 isHighlighted && { borderColor: ACCENT, borderWidth: 2 },
               ]}
-              onLongPress={() => handleDelete(p.id)}
+              onLongPress={() => handleDelete(p)}
             >
             <View style={styles.dateBlock}>
               <Text style={styles.month}>
@@ -411,15 +411,33 @@ export default function OpenPlans({
         </TouchableWithoutFeedback>
       </Modal>
       <ConfirmModal
-        visible={!!deleteId}
-        title="Delete plan"
-        message="Are you sure?"
-        confirmText="Delete"
+        visible={!!pendingDeleteEvent}
+        title={
+          pendingDeleteEvent?.planHostUid &&
+          viewerUid &&
+          pendingDeleteEvent.planHostUid !== viewerUid
+            ? "Remove this plan?"
+            : "Delete plan"
+        }
+        message={
+          pendingDeleteEvent?.planHostUid &&
+          viewerUid &&
+          pendingDeleteEvent.planHostUid !== viewerUid
+            ? "This removes it from your open plans and updates interest for this friend."
+            : "Are you sure?"
+        }
+        confirmText={
+          pendingDeleteEvent?.planHostUid &&
+          viewerUid &&
+          pendingDeleteEvent.planHostUid !== viewerUid
+            ? "Remove"
+            : "Delete"
+        }
         destructive
-        onCancel={() => setDeleteId(null)}
+        onCancel={() => setPendingDeleteEvent(null)}
         onConfirm={() => {
-          if (deleteId) deleteEvent(deleteId);
-          setDeleteId(null);
+          if (pendingDeleteEvent?.id) deleteEvent(pendingDeleteEvent.id);
+          setPendingDeleteEvent(null);
         }}
       />
     </View>

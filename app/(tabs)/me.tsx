@@ -176,21 +176,29 @@ export default function ProfileScreen() {
       attendeeIds.add(String(raw).trim());
     }
 
+    const removeFromUserCalendar = async (uid: string) => {
+      const ref = doc(db, "users", uid);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return false;
+      const evs = (snap.data() as any).events || [];
+      const next = evs.filter((e: any) => !matchesPlanEvent(e, toRemove, evs));
+      if (next.length === evs.length) return true;
+      await updateDoc(ref, { events: next });
+      return true;
+    };
+
     try {
-      await Promise.all(
-        [...attendeeIds].map(async (uid) => {
-          const ref = doc(db, "users", uid);
-          const snap = await getDoc(ref);
-          if (!snap.exists()) return;
-          const evs = (snap.data() as any).events || [];
-          const next = evs.filter((e: any) => !matchesPlanEvent(e, toRemove, evs));
-          if (next.length === evs.length) return;
-          await updateDoc(ref, { events: next });
-        })
-      );
+      // Always prioritize removing from my own calendar so UX reflects the action I took.
+      await removeFromUserCalendar(myUid);
     } catch (e) {
       showAlert("Error", "Could not delete event.");
+      return;
     }
+
+    const otherAttendeeIds = [...attendeeIds].filter((uid) => uid !== myUid);
+    await Promise.allSettled(
+      otherAttendeeIds.map((uid) => removeFromUserCalendar(uid))
+    );
   };
 
   useEffect(() => {
