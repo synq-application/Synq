@@ -32,9 +32,12 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch
 } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
@@ -584,7 +587,17 @@ function SearchModal({
         incomingCheckInFlightRef.current[targetId] = getDoc(
           doc(db, "users", myId, "friendRequests", targetId)
         )
-          .then((snap) => snap.exists())
+          .then(async (snap) => {
+            if (snap.exists()) return true;
+            // Legacy compatibility: some friend request docs may not use sender uid as doc id.
+            const legacyQ = query(
+              collection(db, "users", myId, "friendRequests"),
+              where("from", "==", targetId),
+              limit(1)
+            );
+            const legacySnap = await getDocs(legacyQ);
+            return !legacySnap.empty;
+          })
           .catch(() => false);
       }
       const exists = await incomingCheckInFlightRef.current[targetId];
@@ -857,7 +870,7 @@ function SearchModal({
                     style={[
                       styles.addBtn,
                       incomingRequestIds[item.id] && styles.acceptOutlineBtn,
-                      pendingRequestIds[item.id] && styles.addBtnDisabled,
+                      (pendingRequestIds[item.id] || acceptedIds[item.id]) && styles.addBtnDisabled,
                     ]}
                     activeOpacity={0.8}
                     disabled={!!pendingRequestIds[item.id] || !!acceptedIds[item.id]}
