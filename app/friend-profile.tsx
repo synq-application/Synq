@@ -28,6 +28,8 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -92,6 +94,7 @@ export default function FriendProfile() {
   const [joinedPlanKeys, setJoinedPlanKeys] = useState<Record<string, boolean>>({});
   const [showUnjoinModal, setShowUnjoinModal] = useState(false);
   const [pendingUnjoinEvent, setPendingUnjoinEvent] = useState<any>(null);
+  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
@@ -753,13 +756,21 @@ export default function FriendProfile() {
           </TouchableOpacity>
         </View>
         <View style={styles.header}>
-          <ExpoImage
-            source={{ uri: avatarUri }}
-            style={styles.avatar}
-            cachePolicy="memory-disk"
-            transition={0}
-            recyclingKey={avatarUri}
-          />
+          <TouchableOpacity
+            onPress={() => setAvatarPreviewOpen(true)}
+            onLongPress={() => setAvatarPreviewOpen(true)}
+            activeOpacity={0.9}
+            accessibilityRole="imagebutton"
+            accessibilityLabel="Open profile photo preview"
+          >
+            <ExpoImage
+              source={{ uri: avatarUri }}
+              style={styles.avatar}
+              cachePolicy="memory-disk"
+              transition={0}
+              recyclingKey={avatarUri}
+            />
+          </TouchableOpacity>
 
           <Text style={styles.name}>
             {friend.displayName || "User"}
@@ -933,6 +944,30 @@ export default function FriendProfile() {
         message={alertMessage}
         onClose={() => setAlertVisible(false)}
       />
+      <Modal
+        visible={avatarPreviewOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarPreviewOpen(false)}
+      >
+        <Pressable
+          style={styles.avatarPreviewOverlay}
+          onPress={() => setAvatarPreviewOpen(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close profile photo preview"
+        >
+          {/* No expo-blur: avoids native ExpoBlurView when the binary lacks the module (e.g. Expo Go mismatch). */}
+          <View style={styles.avatarPreviewDim} pointerEvents="none" />
+          <ExpoImage
+            source={{ uri: avatarUri }}
+            style={styles.avatarPreviewImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={0}
+            recyclingKey={avatarUri}
+          />
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 
@@ -965,6 +1000,24 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: ACCENT,
     marginBottom: 16,
+  },
+  avatarPreviewOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+    paddingHorizontal: 24,
+  },
+  avatarPreviewDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.88)",
+  },
+  avatarPreviewImage: {
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.22)",
   },
 
   avatarFallback: {
