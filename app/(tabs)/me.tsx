@@ -702,7 +702,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  scrollContent: { paddingBottom: 24, paddingHorizontal: 20 },
+  scrollContent: { paddingBottom: 70, paddingHorizontal: 20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
