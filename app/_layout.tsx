@@ -353,10 +353,7 @@ export default function RootLayout() {
           data.city.trim().length > 0 &&
           typeof data?.state === "string" &&
           data.state.trim().length > 0;
-        const hasLocationDisplay =
-          typeof data?.locationDisplay === "string" &&
-          data.locationDisplay.trim().length > 0;
-        if (hasCoords || hasCityState || hasLocationDisplay) return;
+        if (hasCoords && hasCityState) return;
 
         const now = Date.now();
         const snoozedUntilMs = snoozedUntilMsFromField(
