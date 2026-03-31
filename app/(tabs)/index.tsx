@@ -67,7 +67,14 @@ import {
 } from "../../src/lib/synqSession";
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
-import { formatTime, parseIdeaText, resolveAvatar, SynqStatus, wrapChatTitle } from '../helpers';
+import {
+  formatTime,
+  friendLocationLineWithProximity,
+  parseIdeaText,
+  resolveAvatar,
+  SynqStatus,
+  wrapChatTitle,
+} from '../helpers';
 import { openInMaps } from '../map-utils';
 import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
@@ -896,6 +903,7 @@ export default function SynqScreen() {
               }
               renderItem={({ item }) => {
                 const friendMemo = item.memo?.trim();
+                const locationLine = friendLocationLineWithProximity(userProfile, item);
                 return (
                 <TouchableOpacity
                   onPress={() =>
@@ -914,7 +922,7 @@ export default function SynqScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.whiteBold}>{item.displayName}</Text>
 
-                    {item.city && (
+                    {locationLine ? (
                       <View style={styles.locationRow}>
                         <Ionicons
                           name="location-outline"
@@ -922,11 +930,9 @@ export default function SynqScreen() {
                           color="#999"
                           style={{ marginRight: 4 }}
                         />
-                        <Text style={styles.locationText}>
-                          {item.state ? `${item.city}, ${item.state}` : item.city}
-                        </Text>
+                        <Text style={styles.locationText}>{locationLine}</Text>
                       </View>
-                    )}
+                    ) : null}
 
                     {friendMemo ? (
                       <Text
