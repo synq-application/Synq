@@ -78,7 +78,7 @@ import {
   warmSuggestedCache,
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
-import { resolveAvatar } from "../helpers";
+import { friendLocationLineWithProximity, resolveAvatar } from "../helpers";
 
 const { width } = Dimensions.get("window");
 
@@ -230,6 +230,7 @@ export default function FriendsScreen() {
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [meProfile, setMeProfile] = useState<Record<string, unknown> | null>(null);
 
   /** Keep modal "open" in state while viewing friend profile so back() restores it without a second sheet animation. */
   const routeShowsFriendProfile =
@@ -251,6 +252,15 @@ export default function FriendsScreen() {
       return () => clearTimeout(t);
     }, [])
   );
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    const unsubMe = onSnapshot(doc(db, "users", uid), (snap) => {
+      setMeProfile(snap.exists() ? (snap.data() as Record<string, unknown>) : null);
+    });
+    return () => unsubMe();
+  }, []);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -332,7 +342,15 @@ export default function FriendsScreen() {
     </View>
   );
 
-  const renderFriendRow = ({ item }: { item: Friend }) => (
+  const renderFriendRow = ({ item }: { item: Friend }) => {
+    const locationLine = friendLocationLineWithProximity(meProfile, item);
+    const fallbackLoc =
+      typeof (item as any)?.location === "string" && (item as any).location.trim()
+        ? (item as any).location
+        : "";
+    const locationText = locationLine || fallbackLoc || "No location";
+
+    return (
     <TouchableOpacity
       style={styles.friendRow}
       onPress={() =>
@@ -378,16 +396,19 @@ export default function FriendsScreen() {
             style={{
               color: "rgba(255,255,255,0.6)",
               fontSize: 13,
+              flex: 1,
             }}
+            numberOfLines={2}
           >
-            {(item as any)?.location || "No location"}
+            {locationText}
           </Text>
         </View>
       </View>
 
       <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.25)" />
     </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
