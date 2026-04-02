@@ -40,12 +40,13 @@ import {
   where,
   writeBatch
 } from "firebase/firestore";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DeviceEventEmitter,
   Dimensions,
   FlatList,
   Keyboard,
+  SectionList,
   Modal,
   StatusBar,
   StyleSheet,
@@ -498,6 +499,7 @@ function SearchModal({
   const [queryText, setQueryText] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [suggested, setSuggested] = useState<any[]>([]);
+  const [incomingRequestsRows, setIncomingRequestsRows] = useState<any[]>([]);
   const [pendingRequestIds, setPendingRequestIds] = useState<Record<string, boolean>>({});
   const [incomingRequestIds, setIncomingRequestIds] = useState<Record<string, boolean>>({});
   const [acceptedIds, setAcceptedIds] = useState<Record<string, boolean>>({});
@@ -560,6 +562,61 @@ function SearchModal({
     };
 
     fetchSuggested();
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !auth.currentUser) {
+      setIncomingRequestsRows([]);
+      return;
+    }
+    const myId = auth.currentUser.uid;
+    const reqRef = collection(db, "users", myId, "friendRequests");
+    const unsubscribe = onSnapshot(
+      reqRef,
+      async (snapshot) => {
+        const rows = await Promise.all(
+          snapshot.docs.map(async (d) => {
+            const data = d.data() as Record<string, unknown>;
+            const friendRequestDocId = d.id;
+            const senderId =
+              (typeof data.from === "string" && data.from) ||
+              (typeof data.fromId === "string" && data.fromId) ||
+              friendRequestDocId;
+            let displayName =
+              (typeof data.senderName === "string" && data.senderName) ||
+              (typeof data.fromName === "string" && data.fromName) ||
+              "Someone";
+            let imageurl =
+              (typeof data.senderImageUrl === "string" && data.senderImageUrl) ||
+              (typeof data.fromImageUrl === "string" && data.fromImageUrl) ||
+              (typeof data.fromImageurl === "string" && data.fromImageurl) ||
+              null;
+            try {
+              const senderSnap = await getDoc(doc(db, "users", senderId));
+              if (senderSnap.exists()) {
+                const u = senderSnap.data() as Record<string, unknown>;
+                displayName = (u.displayName as string) || displayName;
+                imageurl = (u.imageurl as string | null | undefined) ?? imageurl;
+              }
+            } catch {
+              /* keep embedded request fields */
+            }
+            return {
+              id: senderId,
+              friendRequestDocId,
+              displayName,
+              imageurl,
+            };
+          })
+        );
+        rows.forEach((user) => {
+          ExpoImage.prefetch(resolveAvatar(user?.imageurl)).catch(() => {});
+        });
+        setIncomingRequestsRows(rows);
+      },
+      (e) => console.error("[SearchModal] friendRequests snapshot:", e)
+    );
+    return () => unsubscribe();
   }, [visible]);
 
   const debounceRef = React.useRef<any>(null);
@@ -647,6 +704,46 @@ function SearchModal({
       return next;
     });
   };
+
+  const incomingRequestsVisible = useMemo(
+    () => incomingRequestsRows.filter((r) => !currentFriends.includes(r.id)),
+    [incomingRequestsRows, currentFriends]
+  );
+
+  const incomingIds = useMemo(
+    () => new Set(incomingRequestsVisible.map((r) => r.id)),
+    [incomingRequestsVisible]
+  );
+
+  const pymkSuggested = useMemo(
+    () => suggested.filter((u) => !incomingIds.has(u.id)),
+    [suggested, incomingIds]
+  );
+
+  const addFriendsSections = useMemo(() => {
+    const sections: {
+      title: string;
+      data: any[];
+      showRefresh?: boolean;
+      isFirstSection?: boolean;
+    }[] = [];
+    if (incomingRequestsVisible.length > 0) {
+      sections.push({
+        title: "Friend requests",
+        data: incomingRequestsVisible,
+        isFirstSection: sections.length === 0,
+      });
+    }
+    if (pymkSuggested.length > 0) {
+      sections.push({
+        title: "People you may know",
+        data: pymkSuggested,
+        showRefresh: true,
+        isFirstSection: sections.length === 0,
+      });
+    }
+    return sections;
+  }, [incomingRequestsVisible, pymkSuggested]);
 
   const searchUsers = (val: string) => {
     setQueryText(val);
@@ -798,7 +895,8 @@ function SearchModal({
         displayName: myName,
         imageurl: myImageUrl,
       });
-      batch.delete(doc(db, "users", myId, "friendRequests", senderId));
+      const requestDocId = targetUser.friendRequestDocId ?? senderId;
+      batch.delete(doc(db, "users", myId, "friendRequests", requestDocId));
       await batch.commit();
 
       incomingCheckCacheRef.current[senderId] = false;
@@ -815,6 +913,28 @@ function SearchModal({
       setAlertConfig({
         title: "Error",
         message: e?.message || "Could not accept request.",
+      });
+      setAlertVisible(true);
+    }
+  };
+
+  const declineIncomingRequest = async (targetUser: any) => {
+    if (!auth.currentUser) return;
+    const myId = auth.currentUser.uid;
+    const senderId = targetUser.id;
+    const requestDocId = targetUser.friendRequestDocId ?? senderId;
+
+    try {
+      Keyboard.dismiss();
+      await deleteDoc(doc(db, "users", myId, "friendRequests", requestDocId));
+      await deleteDoc(doc(db, "users", senderId, "friendRequests", myId)).catch(() => {});
+
+      incomingCheckCacheRef.current[senderId] = false;
+      setIncomingRequestIds((prev) => ({ ...prev, [senderId]: false }));
+    } catch (e: any) {
+      setAlertConfig({
+        title: "Error",
+        message: e?.message || "Could not decline request.",
       });
       setAlertVisible(true);
     }
@@ -843,88 +963,149 @@ function SearchModal({
           />
         </View>
 
-        {!queryText && suggested.length > 0 && (
+        {!queryText && addFriendsSections.length > 0 && (
           <View style={{ marginTop: 10, paddingBottom: 160 }}>
-            <View style={styles.suggestedHeaderRow}>
-              <Text style={styles.sectionLabel}>Suggested</Text>
-              {isSuggestedRefreshing && <View style={styles.suggestedRefreshingDot} />}
-            </View>
-            <FlatList
-              data={suggested}
+            <SectionList
+              sections={addFriendsSections}
               keyExtractor={(item) => item.id}
               scrollEnabled={true}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               onScrollBeginDrag={Keyboard.dismiss}
+              stickySectionHeadersEnabled={false}
               ListFooterComponent={<View style={{ height: 40 }} />}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-              renderItem={({ item }) => (
-                <View style={styles.searchResult}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      router.push({
-                        pathname: "/friend-profile",
-                        params: { friendId: item.id },
-                      });
-                    }}
-                    style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.avatar}>
-                      <ExpoImage
-                        source={{ uri: resolveAvatar(item.imageurl) }}
-                        style={styles.img}
-                        cachePolicy="memory-disk"
-                        transition={0}
-                      />
-                    </View>
-
-                    <View style={{ paddingRight: 12 }}>
-                      <Text style={styles.friendName}>
-                        {item.displayName || "User"}
-                      </Text>
-                      <Text style={styles.mutualText}>
-                        {item.mutualCount} mutual{" "}
-                        {item.mutualCount === 1 ? "friend" : "friends"}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (incomingRequestIds[item.id]) {
-                        acceptIncomingRequest(item);
-                      } else {
-                        sendInvite(item);
-                      }
-                    }}
-                    style={[
-                      styles.addBtn,
-                      incomingRequestIds[item.id] && styles.acceptOutlineBtn,
-                      (pendingRequestIds[item.id] || acceptedIds[item.id]) && styles.addBtnDisabled,
-                    ]}
-                    activeOpacity={0.8}
-                    disabled={!!pendingRequestIds[item.id] || !!acceptedIds[item.id]}
-                  >
-                    <Text
-                      style={[
-                        styles.addBtnText,
-                        incomingRequestIds[item.id] && styles.acceptOutlineText,
-                        (pendingRequestIds[item.id] || acceptedIds[item.id]) && styles.addBtnDisabledText,
-                      ]}
-                    >
-                      {acceptedIds[item.id]
-                        ? "Friends"
-                        : incomingRequestIds[item.id]
-                          ? "Accept"
-                          : pendingRequestIds[item.id]
-                            ? "Pending"
-                            : "Add"}
-                    </Text>
-                  </TouchableOpacity>
+              SectionSeparatorComponent={() => null}
+              renderSectionHeader={({ section }) => (
+                <View
+                  style={[
+                    styles.suggestedHeaderRow,
+                    { marginTop: section.isFirstSection ? 0 : 18 },
+                  ]}
+                >
+                  <Text style={styles.sectionLabel}>{section.title}</Text>
+                  {section.showRefresh && isSuggestedRefreshing ? (
+                    <View style={styles.suggestedRefreshingDot} />
+                  ) : null}
                 </View>
               )}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              renderItem={({ item, section }) => {
+                const isFriendRequests = !section.showRefresh;
+                if (isFriendRequests) {
+                  return (
+                    <View style={styles.searchResult}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          router.push({
+                            pathname: "/friend-profile",
+                            params: { friendId: item.id },
+                          });
+                        }}
+                        style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.avatar}>
+                          <ExpoImage
+                            source={{ uri: resolveAvatar(item.imageurl) }}
+                            style={styles.img}
+                            cachePolicy="memory-disk"
+                            transition={0}
+                          />
+                        </View>
+                        <View style={{ paddingRight: 12 }}>
+                          <Text style={styles.friendName}>
+                            {item.displayName || "User"}
+                          </Text>
+                          <Text style={styles.mutualText}>Sent you a request</Text>
+                        </View>
+                      </TouchableOpacity>
+                      <View style={styles.requestActionBtns}>
+                        <TouchableOpacity
+                          onPress={() => declineIncomingRequest(item)}
+                          style={styles.declineBtn}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.declineBtnText}>Decline</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => acceptIncomingRequest(item)}
+                          style={[styles.addBtn, styles.acceptOutlineBtn]}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.addBtnText, styles.acceptOutlineText]}>Accept</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                }
+                return (
+                  <View style={styles.searchResult}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        router.push({
+                          pathname: "/friend-profile",
+                          params: { friendId: item.id },
+                        });
+                      }}
+                      style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.avatar}>
+                        <ExpoImage
+                          source={{ uri: resolveAvatar(item.imageurl) }}
+                          style={styles.img}
+                          cachePolicy="memory-disk"
+                          transition={0}
+                        />
+                      </View>
+
+                      <View style={{ paddingRight: 12 }}>
+                        <Text style={styles.friendName}>
+                          {item.displayName || "User"}
+                        </Text>
+                        <Text style={styles.mutualText}>
+                          {item.mutualCount} mutual{" "}
+                          {item.mutualCount === 1 ? "friend" : "friends"}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (incomingRequestIds[item.id]) {
+                          acceptIncomingRequest(item);
+                        } else {
+                          sendInvite(item);
+                        }
+                      }}
+                      style={[
+                        styles.addBtn,
+                        incomingRequestIds[item.id] && styles.acceptOutlineBtn,
+                        (pendingRequestIds[item.id] || acceptedIds[item.id]) && styles.addBtnDisabled,
+                      ]}
+                      activeOpacity={0.8}
+                      disabled={!!pendingRequestIds[item.id] || !!acceptedIds[item.id]}
+                    >
+                      <Text
+                        style={[
+                          styles.addBtnText,
+                          incomingRequestIds[item.id] && styles.acceptOutlineText,
+                          (pendingRequestIds[item.id] || acceptedIds[item.id]) && styles.addBtnDisabledText,
+                        ]}
+                      >
+                        {acceptedIds[item.id]
+                          ? "Friends"
+                          : incomingRequestIds[item.id]
+                            ? "Accept"
+                            : pendingRequestIds[item.id]
+                              ? "Pending"
+                              : "Add"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }}
             />
           </View>
         )}
@@ -1160,11 +1341,11 @@ const styles = StyleSheet.create({
   popupLocationText: { color: "rgba(255,255,255,0.35)", fontSize: 13, fontFamily: fonts.book },
   interestsContainer: { width: "100%", marginTop: 10, marginBottom: 10 },
   sectionLabel: {
-    color: MUTED2,
+    color: MUTED,
     fontSize: 16,
     fontFamily: fonts.heavy,
     marginBottom: 10,
-    letterSpacing: 0.9,
+    letterSpacing: 0.2,
   },
   interestsScroll: { maxHeight: 150, width: "100%" },
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", paddingBottom: 4 },
@@ -1213,6 +1394,16 @@ const styles = StyleSheet.create({
   },
   searchResult: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14 },
   secondaryDetail: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 2 },
+  requestActionBtns: { flexDirection: "row", alignItems: "center", gap: 8 },
+  declineBtn: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  declineBtnText: { color: MUTED2, fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 0.2 },
   addBtn: { backgroundColor: ACCENT, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 14 },
   acceptOutlineBtn: { backgroundColor: "transparent", borderWidth: 1, borderColor: ACCENT },
   addBtnDisabled: { opacity: 0.45, backgroundColor: "#3f3f3f" },
