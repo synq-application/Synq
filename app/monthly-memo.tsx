@@ -177,7 +177,7 @@ export default function OpenPlans({
     <View style={styles.container}>
       <Text style={styles.header}>Open plans</Text>
       <Text style={styles.subtitle}>
-        {"Share what you're doing, friends can tap in without pressure."}
+        {`Share what you're up to, friends can tap in.`}
       </Text>
 
       {!events.length && (
