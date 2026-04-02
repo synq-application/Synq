@@ -5,6 +5,7 @@ import {
   BUTTON_RADIUS,
   fonts,
   MODAL_RADIUS,
+  MUTED,
   MUTED2,
   SURFACE,
   TEXT,
@@ -81,6 +82,7 @@ export default function ProfileScreen() {
   const [interests, setInterests] = useState<string[]>([]);
   const [city, setCity] = useState<string | null>(null);
   const [state, setState] = useState<string | null>(null);
+  const [memo, setMemo] = useState("");
   const [hasLoadedConnections, setHasLoadedConnections] = useState(cachedConnections.length > 0);
   const [requestCount, setRequestCount] = useState(0);
   const [events, setEvents] = useState<
@@ -222,6 +224,7 @@ export default function ProfileScreen() {
         setInterests(userData.interests || []);
         setSelectedInterests(userData.interests || []);
         setProfileImage(userData?.imageurl || null);
+        setMemo(typeof userData.memo === "string" ? userData.memo : "");
         prefetchResolvedAvatar(userData?.imageurl);
       }
     });
@@ -465,6 +468,10 @@ export default function ProfileScreen() {
             />
             <Text style={styles.locationText}>{locationLower}</Text>
           </View>
+        )}
+
+        {memo.trim() !== "" && (
+          <Text style={styles.profileMemoText}>{memo.trim()}</Text>
         )}
       </View>
 
@@ -777,6 +784,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 1,
     fontFamily: fonts.medium,
+  },
+  profileMemoText: {
+    color: MUTED,
+    fontSize: 16,
+    lineHeight: 23,
+    marginTop: 10,
+    paddingHorizontal: 16,
+    textAlign: "center",
+    fontFamily: fonts.medium,
+    alignSelf: "stretch",
   },
   section: { marginTop: 20 },
   sectionTitle: { color: TEXT, fontSize: 21, fontFamily: fonts.heavy, marginBottom: 12, letterSpacing: 0.2 },
