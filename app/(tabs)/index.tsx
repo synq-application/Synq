@@ -22,6 +22,7 @@ import {
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
+  Animated,
   DeviceEventEmitter,
   FlatList,
   Keyboard,
@@ -269,6 +270,7 @@ export default function SynqScreen() {
   const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
   const [isStartingSynq, setIsStartingSynq] = useState(false);
+  const activePulseOpacity = useRef(new Animated.Value(1)).current;
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
@@ -337,6 +339,29 @@ export default function SynqScreen() {
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (status !== 'active') return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(activePulseOpacity, {
+          toValue: 0.78,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(activePulseOpacity, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+      activePulseOpacity.setValue(1);
+    };
+  }, [status, activePulseOpacity]);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('openChat', async (data: { chatId?: string; messageId?: string }) => {
@@ -1003,7 +1028,13 @@ export default function SynqScreen() {
                   {hasUnread && <View style={styles.badge} />}
                 </TouchableOpacity>
                 <View style={styles.synqHeaderTitleCenter}>
-                  <Text style={styles.headerTitle}>Synq is active</Text>
+                  <View style={styles.headerTitleWithIndicator}>
+                    <Animated.View
+                      style={[styles.activeStatusDot, { opacity: activePulseOpacity }]}
+                      accessibilityLabel="Synq session live"
+                    />
+                    <Text style={styles.headerTitle}>Synq is active</Text>
+                  </View>
                 </View>
                 <TouchableOpacity
                   onPress={() => setIsEditModalVisible(true)}
@@ -1014,11 +1045,11 @@ export default function SynqScreen() {
                   <Ionicons name="create-outline" size={26} color="white" />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.headerSubtitleActive}>
-                Tap one or more friends to start a chat and plan together.
-              </Text>
             </View>
             <View style={styles.headerDivider} />
+            <Text style={styles.headerSubtitleActive}>
+              Tap one or more friends to start a chat and plan together.
+            </Text>
 
             <View style={styles.activeListWrap}>
             <FlatList
@@ -1643,13 +1674,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 4,
   },
+  headerTitleWithIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    maxWidth: "100%",
+  },
+  activeStatusDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 5.5,
+    marginRight: 11,
+    backgroundColor: "#34D399",
+    shadowColor: "#34D399",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 6,
+    elevation: 3,
+  },
   headerSubtitleActive: {
     color: MUTED2,
     fontSize: 14,
     fontFamily: fonts.medium,
     lineHeight: 20,
     textAlign: "center",
-    marginTop: 8,
+    marginTop: 12,
     maxWidth: 320,
     alignSelf: "center",
   },
