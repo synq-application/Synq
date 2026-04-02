@@ -72,6 +72,8 @@ import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
 import {
+  type Connection,
+  connectionsCacheByUser,
   friendProfileCacheByUser,
   friendsListCacheByUser,
   suggestedCacheByUser,
@@ -226,7 +228,10 @@ export default function FriendsScreen() {
   const { openAddFriends } = useLocalSearchParams<{ openAddFriends?: string }>();
   const myId = auth.currentUser?.uid ?? "";
   const cachedFriends = myId ? friendsListCacheByUser[myId] ?? [] : [];
+  const cachedTopSynqs = myId ? connectionsCacheByUser[myId] ?? [] : [];
   const [friends, setFriends] = useState<Friend[]>(cachedFriends);
+  const [topSynqs, setTopSynqs] = useState<Connection[]>(cachedTopSynqs);
+  const [hasLoadedTopSynqs, setHasLoadedTopSynqs] = useState(cachedTopSynqs.length > 0);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
@@ -315,6 +320,8 @@ export default function FriendsScreen() {
       } finally {
         setIsFriendsInitialLoading(false);
         setIsFriendsRefreshing(false);
+        setTopSynqs(connectionsCacheByUser[myId] ?? []);
+        setHasLoadedTopSynqs(true);
       }
     });
 
@@ -332,6 +339,8 @@ export default function FriendsScreen() {
   const showFriendSearch = friends.length > 0 && !isFriendsInitialLoading;
   const listIsEmpty = filteredFriends.length === 0;
 
+  const hasTopSynqActivity = topSynqs.some((t) => (t.synqCount ?? 0) > 0);
+
   const renderSkeletonRow = (key: string) => (
     <View key={key} style={styles.friendRow}>
       <View style={[styles.avatar, { backgroundColor: "#151515" }]} />
@@ -342,6 +351,109 @@ export default function FriendsScreen() {
       <View style={{ height: 12, width: 12 }} />
     </View>
   );
+
+  const renderTopSynqsSection = () => {
+    if (hasLoadedTopSynqs && !hasTopSynqActivity) {
+      return null;
+    }
+    if (!hasLoadedTopSynqs && friends.length === 0) {
+      return null;
+    }
+
+    if (!hasLoadedTopSynqs) {
+      return (
+        <View style={styles.topSynqsSection}>
+          <View style={styles.topSynqsHeading}>
+            <Text style={styles.sectionTitle}>Top Synqs</Text>
+            <Text style={styles.sectionSubtitle}>
+              The people you have connected with the most.
+            </Text>
+          </View>
+          <View style={styles.synqsContainer}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={styles.connItem}>
+                <View
+                  style={[styles.imageCircle, { backgroundColor: "#151515" }]}
+                />
+                <View
+                  style={{
+                    height: 9,
+                    width: 48,
+                    backgroundColor: "#1f1f1f",
+                    borderRadius: 6,
+                    marginTop: 5,
+                  }}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.topSynqsSection}>
+        <View style={styles.topSynqsHeading}>
+          <Text style={styles.sectionTitle}>Top Synqs</Text>
+          <Text style={styles.sectionSubtitle}>
+            The people you have connected with the most.
+          </Text>
+        </View>
+
+        <View style={styles.synqsContainer}>
+          {topSynqs.slice(0, 3).map((item, i) => (
+            <View key={item.id || i} style={styles.connItem}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() =>
+                  router.push({
+                    pathname: "/friend-profile",
+                    params: { friendId: item.id },
+                  })
+                }
+              >
+                <View style={styles.imageCircle}>
+                  <ExpoImage
+                    source={{ uri: resolveAvatar(item.imageUrl) }}
+                    style={styles.connImg}
+                    cachePolicy="memory-disk"
+                    transition={0}
+                  />
+                  {i === 0 && (
+                    <View style={styles.crown}>
+                      <Icon name="star" size={8} color="black" />
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+
+              <Text style={styles.connName} numberOfLines={1}>
+                {item.name.split(" ")[0]}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  const renderFriendsListHeader = () => {
+    const topSynqsBlock = renderTopSynqsSection();
+    return (
+      <>
+        {topSynqsBlock}
+        <View
+          style={[
+            styles.allFriendsHeader,
+            topSynqsBlock == null && styles.allFriendsHeaderFlushTop,
+          ]}
+        >
+          <Text style={styles.allFriendsTitle}>All friends</Text>
+          <Text style={styles.allFriendsSubtitle}>Your circle, your people.</Text>
+        </View>
+      </>
+    );
+  };
 
   const renderFriendRow = ({ item }: { item: Friend }) => {
     const locationLine = friendLocationLineWithProximity(meProfile, item);
@@ -425,20 +537,19 @@ export default function FriendsScreen() {
           onPress={() => setSearchModalVisible(true)}
         />
       </View>
-      <View style={styles.headerDivider} />
       {showFriendSearch && (
-        <View style={styles.searchBarWrap}>
-          <Ionicons name="search-outline" size={18} color={MUTED2} />
+        <View style={styles.searchBarSubtle}>
+          <Ionicons name="search-outline" size={16} color="rgba(255,255,255,0.35)" />
           <TextInput
-            placeholder="Search friends..."
-            placeholderTextColor="rgba(255,255,255,0.3)"
-            style={styles.searchBarInput}
+            placeholder="Search"
+            placeholderTextColor="rgba(255,255,255,0.28)"
+            style={styles.searchBarSubtleInput}
             value={searchText}
             onChangeText={setSearchText}
           />
           {searchText.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchText("")}>
-              <Ionicons name="close-circle" size={18} color={MUTED2} />
+            <TouchableOpacity onPress={() => setSearchText("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.35)" />
             </TouchableOpacity>
           )}
         </View>
@@ -446,31 +557,31 @@ export default function FriendsScreen() {
 
       {isFriendsInitialLoading ? (
         <View style={{ paddingBottom: 20 }}>
+          {renderFriendsListHeader()}
           {["1", "2", "3"].map((k) => renderSkeletonRow(k))}
         </View>
       ) : (
-        <>
-          <FlatList
-            style={styles.friendsList}
-            data={filteredFriends}
-            keyExtractor={(item) => item.id}
-            renderItem={renderFriendRow}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            onScrollBeginDrag={Keyboard.dismiss}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            ListFooterComponent={<View style={{ height: 40 }} />}
-            contentContainerStyle={listIsEmpty ? styles.friendsListContentEmpty : styles.friendsListContent}
-            ListEmptyComponent={
-              <FriendsListEmpty
-                hasFriends={friends.length > 0}
-                searchText={searchText}
-                onAddFriends={() => setSearchModalVisible(true)}
-                onClearSearch={() => setSearchText("")}
-              />
-            }
-          />
-        </>
+        <FlatList
+          style={styles.friendsList}
+          data={filteredFriends}
+          keyExtractor={(item) => item.id}
+          renderItem={renderFriendRow}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onScrollBeginDrag={Keyboard.dismiss}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListFooterComponent={<View style={{ height: 40 }} />}
+          contentContainerStyle={listIsEmpty ? styles.friendsListContentEmpty : styles.friendsListContent}
+          ListHeaderComponent={renderFriendsListHeader()}
+          ListEmptyComponent={
+            <FriendsListEmpty
+              hasFriends={friends.length > 0}
+              searchText={searchText}
+              onAddFriends={() => setSearchModalVisible(true)}
+              onClearSearch={() => setSearchText("")}
+            />
+          }
+        />
       )}
       {isFriendsRefreshing && !isFriendsInitialLoading && (
         <View style={styles.refreshingDot} />
@@ -1194,7 +1305,76 @@ const styles = StyleSheet.create({
   headerTitleBlock: { flex: 1, paddingRight: 12 },
   headerTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   headerAction: { paddingLeft: 12, paddingVertical: 6 },
-  headerDivider: { marginTop: 16, height: 1, backgroundColor: BORDER },
+  searchBarSubtle: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+    gap: 8,
+  },
+  searchBarSubtleInput: {
+    flex: 1,
+    color: TEXT,
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    paddingVertical: 0,
+    minHeight: 22,
+  },
+  topSynqsSection: { marginTop: 18, marginBottom: 4 },
+  topSynqsHeading: { marginBottom: 12 },
+  sectionTitle: { color: TEXT, fontSize: 21, fontFamily: fonts.heavy, letterSpacing: 0.2, marginBottom: 6 },
+  sectionSubtitle: {
+    color: MUTED2,
+    fontFamily: fonts.book,
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: 0.1,
+  },
+  synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 14 },
+  connItem: { alignItems: "center", width: 72 },
+  imageCircle: {
+    width: 55,
+    height: 55,
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  connImg: { width: 55, height: 55, borderRadius: 50, backgroundColor: "#222" },
+  crown: {
+    position: "absolute",
+    bottom: -1,
+    right: -1,
+    backgroundColor: ACCENT,
+    padding: 2,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "black",
+    zIndex: 10,
+  },
+  connName: { color: TEXT, fontSize: 13, marginTop: 8, textAlign: "center", fontFamily: fonts.heavy },
+  allFriendsHeader: { marginTop: 22, marginBottom: 6 },
+  allFriendsHeaderFlushTop: { marginTop: 18 },
+  allFriendsTitle: {
+    color: TEXT,
+    fontSize: 21,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
+    marginBottom: 6,
+  },
+  allFriendsSubtitle: {
+    color: MUTED2,
+    fontFamily: fonts.book,
+    fontSize: 14,
+    lineHeight: 20,
+    letterSpacing: 0.1,
+  },
   friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
   separator: {
     height: 1,
@@ -1410,25 +1590,6 @@ const styles = StyleSheet.create({
   addBtnText: { color: "#061006", fontFamily: fonts.heavy, fontSize: 14, letterSpacing: 0.2 },
   acceptOutlineText: { color: ACCENT },
   addBtnDisabledText: { color: "rgba(255,255,255,0.85)" },
-  searchBarWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: SURFACE,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginTop: 14,
-    marginBottom: 6,
-  },
-  searchBarInput: {
-    flex: 1,
-    color: TEXT,
-    marginLeft: 8,
-    fontFamily: fonts.medium,
-    fontSize: 15,
-  },
   suggestedHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
