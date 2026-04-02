@@ -4,6 +4,7 @@ import {
   BORDER,
   BUTTON_RADIUS,
   fonts,
+  Friend,
   MODAL_RADIUS,
   MUTED,
   MUTED2,
@@ -38,8 +39,7 @@ import { auth, db, storage } from "../../src/lib/firebase";
 import { matchesPlanEvent } from "../../src/lib/planEvents";
 import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
-  connectionProfileCacheByUser,
-  connectionsCacheByUser,
+  friendsListCacheByUser,
   pruneSocialCachesToFriendIds,
   warmFriendsAndConnectionsCache,
 } from "../../src/lib/socialCache";
@@ -50,12 +50,6 @@ import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
 
-type Connection = {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  synqCount: number;
-};
 export default function ProfileScreen() {
   const isFocused = useIsFocused();
   const scrollRef = useRef<ScrollView>(null);
@@ -71,19 +65,18 @@ export default function ProfileScreen() {
   const [planHighlightId, setPlanHighlightId] = useState<string | null>(null);
 
   const myId = auth.currentUser?.uid ?? "";
-  const cachedConnections = myId ? connectionsCacheByUser[myId] ?? [] : [];
+  const cachedFriendsForNames = myId ? friendsListCacheByUser[myId] ?? [] : [];
+  const [friendsForHostNames, setFriendsForHostNames] = useState<Friend[]>(cachedFriendsForNames);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isQRExpanded, setQRExpanded] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [connections, setConnections] = useState<Connection[]>(cachedConnections);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [interests, setInterests] = useState<string[]>([]);
   const [city, setCity] = useState<string | null>(null);
   const [state, setState] = useState<string | null>(null);
   const [memo, setMemo] = useState("");
-  const [hasLoadedConnections, setHasLoadedConnections] = useState(cachedConnections.length > 0);
   const [requestCount, setRequestCount] = useState(0);
   const [events, setEvents] = useState<
     { id: string; date: string; title: string; time?: string; location?: string }[]
@@ -117,11 +110,12 @@ export default function ProfileScreen() {
       const selfName = auth.currentUser?.displayName?.trim();
       if (selfName) m[myId] = selfName;
     }
-    connections.forEach((c) => {
-      if (c.id && c.name) m[c.id] = c.name;
+    friendsForHostNames.forEach((f) => {
+      const name = (f.displayName || "").trim();
+      if (f.id && name) m[f.id] = name;
     });
     return m;
-  }, [myId, connections]);
+  }, [myId, friendsForHostNames]);
 
   const showAlert = (title: string, message: string) => {
     setAlertTitle(title);
@@ -208,9 +202,6 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!auth.currentUser?.uid) return;
     const myId = auth.currentUser.uid;
-    if (!connectionProfileCacheByUser[myId]) {
-      connectionProfileCacheByUser[myId] = {};
-    }
 
     const userDocRef = doc(db, "users", myId);
 
@@ -255,39 +246,12 @@ export default function ProfileScreen() {
       const friendIds = new Set(snapshot.docs.map((d) => d.id));
       pruneSocialCachesToFriendIds(myId, friendIds);
 
-      const profileCache = connectionProfileCacheByUser[myId];
-      const friendDocs = snapshot.docs.map((friendDoc) => ({
-        id: friendDoc.id,
-        synqCount: friendDoc.data().synqCount || 0,
-      }));
-
-      const cachedVisible = friendDocs
-        .map(({ id, synqCount }) => {
-          const cached = profileCache[id];
-          if (!cached) return null;
-          return { ...cached, synqCount } as Connection;
-        })
-        .filter(Boolean) as Connection[];
-
-      if (cachedVisible.length > 0) {
-        setConnections(cachedVisible.sort((a, b) => b.synqCount - a.synqCount));
-        setHasLoadedConnections(true);
+      try {
+        await warmFriendsAndConnectionsCache(myId);
+        setFriendsForHostNames(friendsListCacheByUser[myId] ?? []);
+      } catch (e) {
+        console.error("[ProfileScreen] warmFriendsAndConnectionsCache:", e);
       }
-      await warmFriendsAndConnectionsCache(myId);
-      const validFriends = friendDocs
-        .map(({ id, synqCount }) => {
-          const profile = profileCache[id];
-          if (!profile) return null;
-          return {
-            ...profile,
-            synqCount,
-          } as Connection;
-        })
-        .filter(Boolean)
-        .sort((a: any, b: any) => b.synqCount - a.synqCount) as Connection[];
-      connectionsCacheByUser[myId] = validFriends;
-      setConnections(validFriends);
-      setHasLoadedConnections(true);
     });
 
     return () => {
@@ -469,100 +433,31 @@ export default function ProfileScreen() {
             <Text style={styles.locationText}>{locationLower}</Text>
           </View>
         )}
-
-        {memo.trim() !== "" && (
-          <Text style={styles.profileMemoText}>{memo.trim()}</Text>
-        )}
       </View>
+
+      {memo.trim() !== "" && (
+        <View style={styles.memoRow}>
+          <View style={styles.memoContainer}>
+            <Text style={styles.profileMemoText}>{memo.trim()}</Text>
+          </View>
+        </View>
+      )}
 
       <View style={styles.section}>
-        <View style={styles.sectionTitleRow}>
-          <Text style={[styles.sectionTitle, styles.sectionTitleInline]}>Top Synqs</Text>
-          <TouchableOpacity
-            style={styles.sectionInfoBtn}
-            onPress={() => {
-              showAlert(
-                "Top Synqs",
-                "Your top Synqs are the people you connect with the most!"
-              );
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="About top synqs"
-          >
-            <Icon name="information-circle-outline" size={18} color="#444" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.synqsContainer}>
-          {!hasLoadedConnections ? (
-            [0, 1, 2].map((i) => (
-              <View key={i} style={styles.connItem}>
-                <View
-                  style={[
-                    styles.imageCircle,
-                    {
-                      borderColor: "#222",
-                      borderWidth: 2,
-                      backgroundColor: "#151515",
-                    },
-                  ]}
-                />
-                <View
-                  style={{
-                    height: 10,
-                    width: 46,
-                    backgroundColor: "#1f1f1f",
-                    borderRadius: 6,
-                    marginTop: 6,
-                  }}
-                />
-              </View>
-            ))
-          ) : connections.length > 0 ? (
-            connections.slice(0, 3).map((item, i) => (
-              <View key={item.id || i} style={styles.connItem}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/friend-profile",
-                      params: { friendId: item.id },
-                    })
-                  }
-                >
-                  <View
-                    style={[
-                      styles.imageCircle,
-                      { borderColor: ACCENT, borderWidth: 1 },
-                    ]}
-                  >
-                    <ExpoImage
-                      source={{ uri: resolveAvatar(item.imageUrl) }}
-                      style={styles.connImg}
-                      cachePolicy="memory-disk"
-                      transition={0}
-                    />
-                    {i === 0 && (
-                      <View style={styles.crown}>
-                        <Icon name="star" size={10} color="black" />
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-
-                <Text style={styles.connName} numberOfLines={1}>
-                  {item.name.split(" ")[0]}
-                </Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.emptyText}>
-              Start messaging to see your top synqs.
-            </Text>
-          )}
-        </View>
+        <MonthlyMemo
+          ACCENT={ACCENT}
+          setShowEventModal={setShowEventModal}
+          showEventModal={showEventModal}
+          newEvent={newEvent}
+          setNewEvent={setNewEvent}
+          saveEvent={saveEvent}
+          events={events}
+          deleteEvent={deleteEvent}
+          viewerUid={myId}
+          hostDisplayNameByUid={hostDisplayNameByUid}
+          highlightEventId={planHighlightId}
+        />
       </View>
-
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Interests</Text>
         <View style={styles.interestsWrapper}>
@@ -580,21 +475,6 @@ export default function ProfileScreen() {
             <Text style={styles.addRectText}>+ Add</Text>
           </TouchableOpacity>
         </View>
-      </View>
-      <View style={styles.section}>
-        <MonthlyMemo
-          ACCENT={ACCENT}
-          setShowEventModal={setShowEventModal}
-          showEventModal={showEventModal}
-          newEvent={newEvent}
-          setNewEvent={setNewEvent}
-          saveEvent={saveEvent}
-          events={events}
-          deleteEvent={deleteEvent}
-          viewerUid={myId}
-          hostDisplayNameByUid={hostDisplayNameByUid}
-          highlightEventId={planHighlightId}
-        />
       </View>
 
       <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
@@ -785,39 +665,30 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     fontFamily: fonts.medium,
   },
+  memoRow: {
+    marginTop: 10,
+    alignSelf: "stretch",
+    alignItems: "center",
+  },
+  memoContainer: {
+    maxWidth: 240,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
   profileMemoText: {
     color: MUTED,
-    fontSize: 16,
-    lineHeight: 23,
-    marginTop: 10,
-    paddingHorizontal: 16,
+    fontSize: 12,
+    lineHeight: 16,
     textAlign: "center",
     fontFamily: fonts.medium,
-    alignSelf: "stretch",
   },
   section: { marginTop: 20 },
   sectionTitle: { color: TEXT, fontSize: 21, fontFamily: fonts.heavy, marginBottom: 12, letterSpacing: 0.2 },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  sectionTitleRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
-  sectionTitleInline: { marginBottom: 0 },
-  sectionInfoBtn: { marginLeft: 6, paddingVertical: 0 },
-  synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 20 },
-  connItem: { alignItems: "center", width: 80 },
-  imageCircle: { width: 72, height: 72, borderRadius: 36, justifyContent: "center", alignItems: "center", position: "relative" },
-  connImg: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#222" },
-  crown: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    backgroundColor: ACCENT,
-    padding: 3,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "black",
-    zIndex: 10,
-  },
-  connName: { color: TEXT, fontSize: 14, marginTop: 10, textAlign: "center", fontFamily: fonts.heavy },
-  emptyText: { color: MUTED2, fontFamily: fonts.medium, fontSize: 15 },
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
   interestRect: {
     backgroundColor: SURFACE,

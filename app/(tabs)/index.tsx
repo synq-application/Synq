@@ -1047,9 +1047,6 @@ export default function SynqScreen() {
               </View>
             </View>
             <View style={styles.headerDivider} />
-            <Text style={styles.headerSubtitleActive}>
-              Tap one or more friends to start a chat and plan together.
-            </Text>
 
             <View style={styles.activeListWrap}>
             <FlatList
@@ -1691,16 +1688,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.55,
     shadowRadius: 6,
     elevation: 3,
-  },
-  headerSubtitleActive: {
-    color: MUTED2,
-    fontSize: 14,
-    fontFamily: fonts.medium,
-    lineHeight: 20,
-    textAlign: "center",
-    marginTop: 12,
-    maxWidth: 320,
-    alignSelf: "center",
   },
   headerDivider: {
     marginTop: 16,

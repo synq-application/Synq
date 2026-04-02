@@ -365,9 +365,6 @@ export default function FriendsScreen() {
         <View style={styles.topSynqsSection}>
           <View style={styles.topSynqsHeading}>
             <Text style={styles.sectionTitle}>Top Synqs</Text>
-            <Text style={styles.sectionSubtitle}>
-              The people you have connected with the most.
-            </Text>
           </View>
           <View style={styles.synqsContainer}>
             {[0, 1, 2].map((i) => (
@@ -395,9 +392,6 @@ export default function FriendsScreen() {
       <View style={styles.topSynqsSection}>
         <View style={styles.topSynqsHeading}>
           <Text style={styles.sectionTitle}>Top Synqs</Text>
-          <Text style={styles.sectionSubtitle}>
-            The people you have connected with the most.
-          </Text>
         </View>
 
         <View style={styles.synqsContainer}>
@@ -449,7 +443,6 @@ export default function FriendsScreen() {
           ]}
         >
           <Text style={styles.allFriendsTitle}>All friends</Text>
-          <Text style={styles.allFriendsSubtitle}>Your circle, your people.</Text>
         </View>
       </>
     );
@@ -1325,13 +1318,6 @@ const styles = StyleSheet.create({
   topSynqsSection: { marginTop: 18, marginBottom: 4 },
   topSynqsHeading: { marginBottom: 12 },
   sectionTitle: { color: TEXT, fontSize: 21, fontFamily: fonts.heavy, letterSpacing: 0.2, marginBottom: 6 },
-  sectionSubtitle: {
-    color: MUTED2,
-    fontFamily: fonts.book,
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: 0.1,
-  },
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 14 },
   connItem: { alignItems: "center", width: 72 },
   imageCircle: {
@@ -1367,13 +1353,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
     marginBottom: 6,
-  },
-  allFriendsSubtitle: {
-    color: MUTED2,
-    fontFamily: fonts.book,
-    fontSize: 14,
-    lineHeight: 20,
-    letterSpacing: 0.1,
   },
   friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
   separator: {
