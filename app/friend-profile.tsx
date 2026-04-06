@@ -97,7 +97,6 @@ export default function FriendProfile() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
-  /** Resolves planHostUid → display name so “{name}’s plan” shows the real host, not the profile owner. */
   const [hostDisplayNameByUid, setHostDisplayNameByUid] = useState<Record<string, string>>({});
 
   const showAlert = (title: string, message: string) => {
@@ -106,7 +105,6 @@ export default function FriendProfile() {
     setAlertVisible(true);
   };
 
-  /** True if this user is in the same shared plan as this friend (not "same calendar row" solo). */
   const isInSharedPlanWithFriend = (e: any, myUid: string, friendUid: string) => {
     if (!e || !friendUid) return false;
     if (e.joinedFromFriendUid === friendUid) return true;
@@ -600,7 +598,6 @@ export default function FriendProfile() {
   const planLooksJoined = (e: any) =>
     !!(joinedPlanKeys[eventKey(e)] || joinedPlanKeys[eventKeyLoose(e)]);
 
-  /** Friend’s copy of a plan they joined from you — you shouldn’t see Join on your own event. */
   const isViewerHostOfFriendsPlan = (event: any) => {
     if (!viewerId || !friendKey) return false;
     const vid = String(viewerId).trim();
@@ -959,7 +956,6 @@ export default function FriendProfile() {
           accessibilityRole="button"
           accessibilityLabel="Close profile photo preview"
         >
-          {/* No expo-blur: avoids native ExpoBlurView when the binary lacks the module (e.g. Expo Go mismatch). */}
           <View style={styles.avatarPreviewDim} pointerEvents="none" />
           <ExpoImage
             source={{ uri: avatarUri }}

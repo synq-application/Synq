@@ -38,11 +38,8 @@ type Props = {
   saveEvent: (event?: any) => void;
   deleteEvent: (id: string) => void;
   events: EventItem[];
-  /** Current user id — used for host vs guest attribution on shared plans. */
   viewerUid?: string;
-  /** uid → display name (friends + self) for resolving "{Host}'s plan". */
   hostDisplayNameByUid?: Record<string, string>;
-  /** Emphasize one plan row (e.g. opened from a push notification). */
   highlightEventId?: string | null;
 };
 
@@ -77,7 +74,6 @@ export default function OpenPlans({
     return `${head}, and ${tail} are interested`;
   };
 
-  /** Host line + optional "others interested" for shared plans. */
   const planAttributionLines = (event: EventItem): { primary: string | null; secondary: string | null } => {
     const isJoinedPlan =
       !!event.joinedFromId ||
@@ -481,7 +477,6 @@ const DateBtn = ({
 
 const styles = StyleSheet.create({
   container: { width: "100%", alignSelf: "stretch" },
-  /** Matches profile (me) section titles; parent supplies top rule. */
   sectionTitle: {
     color: TEXT,
     fontSize: 20,
@@ -489,7 +484,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     marginBottom: 10,
   },
-  /** No outer border — each plan row uses `card` border only (avoids double frame). */
   plansBox: {
     paddingVertical: 2,
     paddingHorizontal: 0,
@@ -545,7 +539,6 @@ const styles = StyleSheet.create({
   title: { color: "white", fontSize: 15 },
   meta: { color: "#777", marginTop: 3, fontSize: 13 },
   joinedMeta: { marginTop: 6, fontSize: 12.5, fontFamily: fonts.medium },
-  /** Matches friend profile `planOwnerLine` — muted, not accent. */
   hostPlanLine: {
     color: "rgba(255,255,255,0.45)",
     fontSize: 12,

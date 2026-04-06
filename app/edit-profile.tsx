@@ -26,9 +26,6 @@ const fonts = {
   medium: 'Avenir-Medium',
 };
 
-/**
- * US-only state name -> abbreviation mapping
- */
 const US_STATE_ABBREV: Record<string, string> = {
   Alabama: "AL",
   Alaska: "AK",

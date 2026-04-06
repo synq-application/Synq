@@ -60,7 +60,6 @@ export const resolveAvatar = (url?: any) => {
   return DEFAULT_AVATAR;
 };
 
-/** Warm disk/memory cache for a remote avatar or default URL (no-op for invalid). */
 export const prefetchResolvedAvatar = (url?: any) => {
   const resolved = resolveAvatar(url);
   if (typeof resolved === "string" && resolved.startsWith("http")) {
@@ -93,7 +92,6 @@ export const wrapChatTitle = (text: string, maxChars = 30) => {
     return lines.join('\n');
   };
 
-/** One line from friend city/locationDisplay for list rows. */
 export function friendLocationLine(friend: any): string | null {
   const loc =
     typeof friend?.locationDisplay === "string" && friend.locationDisplay.trim()

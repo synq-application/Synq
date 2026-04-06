@@ -6,14 +6,13 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { auth } from "../src/lib/firebase";
 
@@ -150,7 +149,6 @@ export default function DeleteAccountScreen() {
         <View style={styles.footerSpace} />
       </ScrollView>
 
-      {/* ✅ Confirm Modal */}
       <ConfirmModal
         visible={showConfirm}
         title="Delete account?"
@@ -164,7 +162,6 @@ export default function DeleteAccountScreen() {
         }}
       />
 
-      {/* ✅ Alert Modal */}
       <AlertModal
         visible={alertVisible}
         title={alertConfig?.title}

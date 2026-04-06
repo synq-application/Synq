@@ -237,7 +237,6 @@ export default function FriendsScreen() {
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
 
-  /** Keep modal "open" in state while viewing friend profile so back() restores it without a second sheet animation. */
   const routeShowsFriendProfile =
     (pathname ?? "").includes("friend-profile") ||
     segments.some((s) => typeof s === "string" && s.includes("friend-profile"));
@@ -1379,7 +1378,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 360,
   },
-  /** Friends list empty (no icon) — vertically centered in the list area. */
   emptyStateMain: {
     flex: 1,
     paddingHorizontal: SPACE_5,
@@ -1394,7 +1392,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
   },
-  /** Matches `headerTitle` on this screen (28 / Heavy) for visual consistency. */
   emptyHeroTitle: {
     color: TEXT,
     fontFamily: fonts.heavy,

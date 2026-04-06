@@ -2,7 +2,6 @@ import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from "react-native";
 
-/** Shared by Add / Added and Your plan so row pills match exactly. */
 const PLAN_PILL_LAYOUT: ViewStyle = {
   marginLeft: "auto",
   minWidth: 88,
@@ -33,11 +32,8 @@ type Props = {
   fonts: any;
   onPressPlan?: (event: EventItem) => void;
   isPlanJoined?: (event: EventItem) => boolean;
-  /** When true, this row is the viewer’s own plan on the friend’s list — show label, not interest CTA. */
   isViewerHostOfPlan?: (event: EventItem) => boolean;
-  /** uid → display name for resolving “{host}’s plan” from each event’s planHostUid. */
   hostDisplayNameByUid: Record<string, string>;
-  /** When planHostUid is missing (legacy), use this profile’s first name as host. */
   profileFallbackFirstName?: string;
 };
 

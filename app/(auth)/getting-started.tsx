@@ -1,4 +1,4 @@
-import { onboardingContentTopPadding, ONBOARDING_H_PADDING } from "@/constants/onboardingLayout";
+import { ONBOARDING_H_PADDING, onboardingContentTopPadding } from "@/constants/onboardingLayout";
 import {
   ACCENT,
   BG,
@@ -8,9 +8,6 @@ import {
   synqSvg,
   TEXT,
 } from "@/constants/Variables";
-
-/** Slightly wider than default CTAs so both buttons feel balanced on this screen. */
-const GET_STARTED_CTA_WIDTH = "84%";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -22,6 +19,7 @@ import {
   View,
 } from "react-native";
 import { SvgXml } from "react-native-svg";
+const GET_STARTED_CTA_WIDTH = "84%";
 
 export default function GetStartedScreen() {
   return (
