@@ -2,11 +2,6 @@ import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore"
 import { auth, db } from "./firebase";
 import { eventKeyLoose, filterOutPastOpenPlans } from "./planEvents";
 
-/**
- * Host can always read friends' user docs. When a friend joins your plan, their client may not
- * be allowed to update YOUR events array (Firestore rules). This merges attendee ids/names from
- * each friend's events into your hosted plan rows.
- */
 export async function reconcileHostOpenPlansFromFriends(hostUid: string): Promise<void> {
   const user = auth.currentUser;
   if (!user || user.uid !== hostUid) return;

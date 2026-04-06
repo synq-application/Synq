@@ -1,7 +1,3 @@
-/**
- * Shared identity for open-plan rows across users (join, sync, delete).
- * planHostUid = canonical creator / host uid for the plan (set on create + join).
- */
 
 export function eventKey(event: any): string {
   return `${String(event?.title || "").trim().toLowerCase()}|${String(event?.date || "").trim()}|${String(
@@ -43,10 +39,6 @@ export function matchesPlanEvent(e: any, target: any, siblingEvents: any[]): boo
   return sameLoose.length === 1;
 }
 
-/**
- * When syncing to the plan host's user doc, strict matching can fail (e.g. time/location drift).
- * Match the host's row by title+date + planHostUid (or legacy row with no planHostUid yet).
- */
 export function matchesPlanEventForHostSync(
   e: any,
   target: any,
@@ -66,7 +58,6 @@ export function matchesPlanEventForHostSync(
   return candidates.length === 1 && candidates[0] === e;
 }
 
-/** Calendar day of `eventDateStr` (YYYY-MM-DD) is strictly before today in local time. */
 export function isOpenPlanDatePast(eventDateStr: string, now: Date = new Date()): boolean {
   const raw = String(eventDateStr || "").trim();
   if (!raw) return false;
@@ -78,7 +69,6 @@ export function isOpenPlanDatePast(eventDateStr: string, now: Date = new Date())
   return todayStart.getTime() > eventDayStart.getTime();
 }
 
-/** Drop plans whose calendar date is before today (local). */
 export function filterOutPastOpenPlans<T extends { date?: string }>(
   events: T[] | null | undefined
 ): T[] {

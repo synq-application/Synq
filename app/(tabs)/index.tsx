@@ -97,10 +97,6 @@ function setSynqStatus(setSynq: Dispatch<SetStateAction<SynqUi>>, status: SynqSt
   setSynq((s) => ({ ...s, status }));
 }
 
-/**
- * Native Messages (iPhone)–style bubble metrics: ~252pt max width @ 375pt screen width,
- * 17pt body, ~11×8pt insets, ~18pt corner radius (no tail).
- */
 const IMESSAGE_REF_SCREEN_WIDTH = 375;
 const IMESSAGE_BUBBLE_MAX_WIDTH_PT = 252;
 const IMESSAGE_BUBBLE_FONT_SIZE = 17;
@@ -109,11 +105,8 @@ const IMESSAGE_BUBBLE_PADDING_H = 9;
 const IMESSAGE_BUBBLE_PADDING_V = 8;
 const IMESSAGE_BUBBLE_CORNER_RADIUS = 18;
 const MESSAGE_BUBBLE_MIN_HEIGHT = 36;
-/** Horizontal padding of the transcript (Messages ~10–12pt from sheet edge). */
 const IMESSAGE_CHAT_HORIZONTAL_INSET = 8;
-/** Outer edge from transcript content to bubble on the screen side (tighter than 12pt). */
 const IMESSAGE_BUBBLE_OUTER_MARGIN = 6;
-/** Must match `styles.chatAvatar` width + `marginRight`. */
 const IMESSAGE_INCOMING_AVATAR_BLOCK = 34 + 7;
 
 function iMessageBubbleColumnMaxWidth(windowWidth: number, isOutgoing: boolean) {
@@ -125,10 +118,6 @@ function iMessageBubbleColumnMaxWidth(windowWidth: number, isOutgoing: boolean) 
   return Math.max(32, Math.min(scaled252, capFromLayout));
 }
 
-/**
- * iMessage-style width: after wrapping, the bubble is only as wide as the longest line (+ padding),
- * not the full max column width (avoids empty space on the right of short last lines).
- */
 function ChatMessageBubble({
   text,
   bubbleCap,
@@ -241,7 +230,6 @@ export default function SynqScreen() {
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  /** One sheet for inbox + thread: avoids dismiss/present when switching panes. */
   const [messagesModalVisible, setMessagesModalVisible] = useState(false);
   const [messagesPane, setMessagesPane] = useState<"inbox" | "chat">("inbox");
   const isChatPaneOpen = messagesModalVisible && messagesPane === "chat";
@@ -297,7 +285,6 @@ export default function SynqScreen() {
     }
   };
 
-  /** Single tap opens maps (after double-tap window); double tap hearts — mirrors Instagram-style idea cards. */
   const onIdeaBubblePress = (
     item: { id: string; reactions?: Record<string, string> },
     mapsPayload: { name: string; address: string }
@@ -1644,7 +1631,6 @@ const styles = StyleSheet.create({
   activeSynqRoot: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
   activeListWrap: { flex: 1, position: "relative" },
   activeFriendsList: { flex: 1 },
-  /** Extra bottom padding so last rows scroll above the fade overlay. */
   activeListContent: { paddingTop: 20, paddingBottom: 108, paddingHorizontal: 0 },
   activeListFade: {
     position: "absolute",
@@ -1655,7 +1641,6 @@ const styles = StyleSheet.create({
     zIndex: 1,
     elevation: 2,
   },
-  /** Friends-tab–style tokens, bumped for legibility on Synq active empty list. */
   activeEmptyWrap: {
     alignItems: "center",
     paddingHorizontal: SPACE_5,
@@ -1893,7 +1878,6 @@ const styles = StyleSheet.create({
   modalTitle: { color: 'white', fontSize: 22, fontFamily: fonts.medium },
   messagesInboxTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
-  /** Symmetric vertical padding so the between-row hairline sits centered in the gap (iMessage-style). */
   inboxItem: {
     paddingTop: 12,
     paddingBottom: 12,
@@ -1910,7 +1894,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minHeight: 56,
   },
-  /** Hairline between rows; vertically centered between adjacent avatar rows via item padding + this block. */
   inboxSeparatorBetween: {
     paddingLeft: 20 + 60 + 14,
     paddingRight: 40,
@@ -1940,15 +1923,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     marginRight: 7,
   },
-  /**
-   * alignItems prevents default stretch so the bubble shrink-wraps to text (no trailing void).
-   * maxWidth in JSX caps the column; Text maxWidth = cap − horizontal padding for wrapping.
-   */
   messageBubbleColumn: {
     flexGrow: 0,
     flexShrink: 1,
   },
-  /** Padding overridden in ChatMessageBubble (font-scaled). No minWidth — width comes from measurement. */
   bubble: {
     minHeight: MESSAGE_BUBBLE_MIN_HEIGHT,
     paddingVertical: IMESSAGE_BUBBLE_PADDING_V,

@@ -83,7 +83,6 @@ export default function EditSynqModal({
                 Share what you’re up to or what you’re down for
               </Text>
 
-              {/* input */}
               <TextInput
                 style={styles.panelInput}
                 value={memo}

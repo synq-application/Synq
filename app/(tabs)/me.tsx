@@ -70,9 +70,7 @@ const allActivities = Object.values(presetActivities).flat();
 type ProfilePressableProps = {
   onPress: () => void;
   children: React.ReactNode;
-  /** Outer wrapper (touch target layout). */
   style?: StyleProp<ViewStyle>;
-  /** Inner scaled view — use for flex layouts (e.g. row buttons). */
   contentStyle?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
   accessibilityRole?: "button";
@@ -397,7 +395,6 @@ export default function ProfileScreen() {
     };
   }, []);
 
-  /** Remove plans whose calendar day has passed (local), including after midnight while the app stays open. */
   const prunePastEventsToFirestore = useCallback(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -424,7 +421,6 @@ export default function ProfileScreen() {
     return () => sub.remove();
   }, [prunePastEventsToFirestore]);
 
-  /** Merge attendee names from friends' copies of your plans (works even if rules block joiner from updating your doc). */
   useEffect(() => {
     if (!auth.currentUser?.uid) return;
     const myUid = auth.currentUser.uid;
@@ -499,7 +495,6 @@ export default function ProfileScreen() {
     }
   };
 
-  /** Deep link so any phone camera / QR app can open Synq to this profile (requires Synq installed). */
   const profileQrUrl = useMemo(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return "";
@@ -978,7 +973,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.2,
   },
-  /** Matches friends tab Top Synqs horizontal row */
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 14 },
   connItem: { alignItems: "center", width: 72 },
   connAvatarPress: { alignItems: "center" },
@@ -1064,12 +1058,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: fonts.medium,
   },
-  /** First block after hero — tight to Edit profile; no top rule. */
   sectionAfterHero: {
     marginTop: 4,
     paddingTop: 6,
   },
-  /** Hairline + padding between Recent Synqs → Open plans → Interests. */
   section: {
     marginTop: 14,
     paddingTop: 12,

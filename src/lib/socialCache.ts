@@ -45,10 +45,6 @@ type PersistedSocialCache = {
   suggested: any[];
 };
 
-/**
- * Drops cache entries for users no longer in `friendIds` (e.g. after unfriend).
- * Keeps Top Synqs / friends UI from showing removed people from stale AsyncStorage or memory.
- */
 export function pruneSocialCachesToFriendIds(userId: string, friendIds: Set<string>) {
   if (!userId) return;
 

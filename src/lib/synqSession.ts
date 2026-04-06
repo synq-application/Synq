@@ -7,7 +7,6 @@ export function synqStatusStorageKey(uid: string) {
   return `synq-status:${uid}`;
 }
 
-/** True when the user doc represents a non-expired Synq session (matches Synq tab init logic). */
 export function computeSynqActiveFromUserData(data: DocumentData | undefined): boolean {
   if (!data || data.status !== "available" || !data.synqStartedAt) return false;
   const startTime = data.synqStartedAt.toDate().getTime();
