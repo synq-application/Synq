@@ -27,20 +27,20 @@ import {
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import LocationUpdateModal from "../components/LocationUpdateModal";
 import { ACCENT, BG, fonts, TYPE_CAPTION } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
+import { LOCATION_PROMPT_CHECK_REQUEST } from "../src/lib/locationPromptEvents";
 import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
 } from "../src/lib/socialCache";
 import { startSynqGlanceWidgetSync } from "../src/lib/syncSynqWidget";
 import { SynqBootProvider } from "../src/lib/synqBootContext";
-import { LOCATION_PROMPT_CHECK_REQUEST } from "../src/lib/locationPromptEvents";
 import {
   computeSynqActiveFromUserData,
   readCachedSynqActive,
 } from "../src/lib/synqSession";
-import LocationUpdateModal from "../components/LocationUpdateModal";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -413,7 +413,6 @@ export default function RootLayout() {
             messageId: pending.messageId,
           });
         }, 700);
-        // Safety re-emit in case the Synq tab listener mounts slightly later.
         timeoutId2 = setTimeout(() => {
           DeviceEventEmitter.emit("openChat", {
             chatId: pending.chatId,

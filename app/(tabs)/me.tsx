@@ -37,6 +37,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -48,7 +49,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import QRCode from "react-native-qrcode-svg";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
@@ -318,7 +318,6 @@ export default function ProfileScreen() {
     };
 
     try {
-      // Always prioritize removing from my own calendar so UX reflects the action I took.
       await removeFromUserCalendar(myUid);
     } catch (e) {
       showAlert("Error", "Could not delete event.");

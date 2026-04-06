@@ -434,8 +434,6 @@ export default function FriendProfile() {
             .filter(Boolean)
         )
       );
-      // Backfill attendee IDs from names (older plans may only have names),
-      // so propagation includes everyone consistently.
       const sourceIdsSet = new Set(initialSourceIds);
       const sourceNameSet = new Set(sourceNames.map((n) => n.toLowerCase()));
       try {

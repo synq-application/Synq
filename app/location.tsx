@@ -14,8 +14,9 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { stateAbbreviations } from "../assets/Mocks";
 import {
-  onboardingContentTopPadding,
   ONBOARDING_DIVIDER_MARGIN_TOP,
   ONBOARDING_DIVIDER_WIDTH,
   ONBOARDING_H_PADDING,
@@ -24,22 +25,21 @@ import {
   ONBOARDING_SUBTITLE_SIZE,
   ONBOARDING_TITLE_LINE_HEIGHT,
   ONBOARDING_TITLE_SIZE,
+  onboardingContentTopPadding,
 } from "../constants/onboardingLayout";
 import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
+  MUTED,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
-  MUTED,
   TEXT,
   fonts,
 } from "../constants/Variables";
-import { stateAbbreviations } from "../assets/Mocks";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, db } from "../src/lib/firebase";
-import AlertModal from "./alert-modal";
 import { useAuthRefresh } from "./_layout";
+import AlertModal from "./alert-modal";
 
 const US_STATE_ABBREV: Record<string, string> = stateAbbreviations;
 
@@ -85,7 +85,7 @@ export default function LocationDetails() {
 
   const fillFromCurrentLocation = async () => {
     try {
-      setLocationUsed(true); // hide the row immediately
+      setLocationUsed(true); 
       setLocating(true);
 
       const { status } =

@@ -46,8 +46,8 @@ import {
   Dimensions,
   FlatList,
   Keyboard,
-  SectionList,
   Modal,
+  SectionList,
   StatusBar,
   StyleSheet,
   Text,
@@ -772,7 +772,6 @@ function SearchModal({
         )
           .then(async (snap) => {
             if (snap.exists()) return true;
-            // Legacy compatibility: some friend request docs may not use sender uid as doc id.
             const legacyQ = query(
               collection(db, "users", myId, "friendRequests"),
               where("from", "==", targetId),

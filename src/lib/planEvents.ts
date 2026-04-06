@@ -26,14 +26,12 @@ export function matchesPlanEvent(e: any, target: any, siblingEvents: any[]): boo
     if (sameHostLoose.length === 1) return true;
   }
 
-  // Join template has host id but creator's row predates planHostUid — disambiguate by single unmarked row.
   if (hostT && !hostE && eventKeyLoose(e) === eventKeyLoose(target)) {
     const sameLoose = siblingEvents.filter((x) => eventKeyLoose(x) === eventKeyLoose(target));
     const withoutHost = sameLoose.filter((x) => !String(x?.planHostUid || "").trim());
     if (withoutHost.length === 1 && withoutHost[0] === e) return true;
   }
 
-  // Delete: template is host's old row (no planHostUid) but joiner's copy has planHostUid — single row with that host.
   if (!hostT && hostE && eventKeyLoose(e) === eventKeyLoose(target)) {
     const sameLoose = siblingEvents.filter((x) => eventKeyLoose(x) === eventKeyLoose(target));
     const withHost = sameLoose.filter((x) => String(x?.planHostUid || "").trim() === hostE);
