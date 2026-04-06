@@ -67,3 +67,23 @@ export function matchesPlanEventForHostSync(
   );
   return candidates.length === 1 && candidates[0] === e;
 }
+
+/** Calendar day of `eventDateStr` (YYYY-MM-DD) is strictly before today in local time. */
+export function isOpenPlanDatePast(eventDateStr: string, now: Date = new Date()): boolean {
+  const raw = String(eventDateStr || "").trim();
+  if (!raw) return false;
+  const parts = raw.split("-").map(Number);
+  if (parts.length < 3 || parts.some((n) => Number.isNaN(n))) return false;
+  const [y, m, d] = parts;
+  const eventDayStart = new Date(y, m - 1, d);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return todayStart.getTime() > eventDayStart.getTime();
+}
+
+/** Drop plans whose calendar date is before today (local). */
+export function filterOutPastOpenPlans<T extends { date?: string }>(
+  events: T[] | null | undefined
+): T[] {
+  if (!Array.isArray(events)) return [];
+  return events.filter((e) => !isOpenPlanDatePast(String(e?.date || "")));
+}

@@ -1,4 +1,5 @@
-import React from "react";
+import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from "react-native";
 
 /** Shared by Add / Added and Your plan so row pills match exactly. */
@@ -50,6 +51,8 @@ export default function FriendOpenPlans({
   hostDisplayNameByUid,
   profileFallbackFirstName,
 }: Props) {
+  const visibleEvents = useMemo(() => filterOutPastOpenPlans(events), [events]);
+
   const parseDate = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);
     return new Date(y, m - 1, d);
@@ -76,13 +79,13 @@ export default function FriendOpenPlans({
 
   return (
     <View style={styles.container}>
-      {events.length === 0 && (
+      {visibleEvents.length === 0 && (
         <Text style={styles.empty}>
           Nothing planned right now 👀
         </Text>
       )}
 
-      {events.map((p) => {
+      {visibleEvents.map((p) => {
         const d = parseDate(p.date);
         const canJoin = typeof onPressPlan === "function";
         const joined = isPlanJoined?.(p) ?? false;

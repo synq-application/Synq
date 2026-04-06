@@ -1,6 +1,7 @@
 import { ACCENT, BORDER, fonts, TEXT } from "@/constants/Variables";
+import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -124,6 +125,8 @@ export default function OpenPlans({
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<EventItem | null>(null);
 
+  const visibleEvents = useMemo(() => filterOutPastOpenPlans(events), [events]);
+
   const closePickers = () => setPicker(null);
 
   const formatTime = (d: Date) =>
@@ -178,11 +181,11 @@ export default function OpenPlans({
       <Text style={styles.sectionTitle}>Open plans</Text>
 
       <View style={styles.plansBox}>
-      {!events.length && (
+      {!visibleEvents.length && (
         <Text style={styles.empty}>Nothing planned… yet 👀</Text>
       )}
 
-      {[...events]
+      {[...visibleEvents]
         .sort((a, b) => {
           const baseA = parseDate(a.date);
           const baseB = parseDate(b.date);
@@ -512,14 +515,14 @@ const styles = StyleSheet.create({
     marginRight: 12,
     alignSelf: "stretch",
     flexDirection: "column",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "flex-start",
   },
   dateNumberWrap: {
     flex: 1,
     width: "100%",
     justifyContent: "center",
-    alignItems: "flex-start",
+    alignItems: "center",
     minHeight: 0,
   },
   day: {
@@ -527,6 +530,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: fonts.heavy,
     letterSpacing: 0.3,
+    width: "100%",
+    textAlign: "center",
   },
   date: {
     color: "white",
@@ -534,6 +539,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     lineHeight: 23,
     letterSpacing: -0.5,
+    textAlign: "center",
+    width: "100%",
   },
   title: { color: "white", fontSize: 15 },
   meta: { color: "#777", marginTop: 3, fontSize: 13 },
@@ -573,5 +580,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: fonts.heavy,
     letterSpacing: 0.4,
+    width: "100%",
+    textAlign: "center",
   },
 });

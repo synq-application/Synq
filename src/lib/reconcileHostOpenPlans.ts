@@ -1,6 +1,6 @@
 import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { eventKeyLoose } from "./planEvents";
+import { eventKeyLoose, filterOutPastOpenPlans } from "./planEvents";
 
 /**
  * Host can always read friends' user docs. When a friend joins your plan, their client may not
@@ -16,6 +16,11 @@ export async function reconcileHostOpenPlansFromFriends(hostUid: string): Promis
   if (!meSnap.exists()) return;
 
   let events = Array.isArray(meSnap.data()?.events) ? [...(meSnap.data() as any).events] : [];
+  const beforePrune = events.length;
+  events = filterOutPastOpenPlans(events);
+  if (events.length < beforePrune) {
+    await updateDoc(meRef, { events });
+  }
   if (events.length === 0) return;
 
   const friendsSnap = await getDocs(collection(db, "users", hostUid, "friends"));

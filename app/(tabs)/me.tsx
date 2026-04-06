@@ -21,8 +21,10 @@ import { router, useLocalSearchParams } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
+  AppStateStatus,
   Keyboard,
   Modal,
   Pressable,
@@ -38,7 +40,7 @@ import QRCode from "react-native-qrcode-svg";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
-import { matchesPlanEvent } from "../../src/lib/planEvents";
+import { filterOutPastOpenPlans, matchesPlanEvent } from "../../src/lib/planEvents";
 import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
   friendRelationCacheByUser,
@@ -81,9 +83,21 @@ export default function ProfileScreen() {
   const [state, setState] = useState<string | null>(null);
   const [memo, setMemo] = useState("");
   const [requestCount, setRequestCount] = useState(0);
-  const [events, setEvents] = useState<
-    { id: string; date: string; title: string; time?: string; location?: string }[]
-  >([]);
+  type OpenPlanEvent = {
+    id: string;
+    date: string;
+    title: string;
+    time?: string;
+    location?: string;
+    planHostUid?: string;
+    joinedFromId?: string;
+    joinedFromIds?: string[];
+    joinedFromName?: string;
+    joinedFromNames?: string[];
+    joinedFromFriendUid?: string;
+  };
+
+  const [events, setEvents] = useState<OpenPlanEvent[]>([]);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
@@ -240,7 +254,12 @@ export default function ProfileScreen() {
         setCity(userData.city || null);
         const stateAbbr = stateAbbreviations[userData.state] || userData.state || null;
         setState(stateAbbr);
-        setEvents(userData.events || []);
+        const rawEvents = (userData.events || []) as OpenPlanEvent[];
+        const prunedEvents = filterOutPastOpenPlans(rawEvents);
+        if (prunedEvents.length < rawEvents.length) {
+          updateDoc(userDocRef, { events: prunedEvents }).catch(() => {});
+        }
+        setEvents(prunedEvents);
         setInterests(userData.interests || []);
         setSelectedInterests(userData.interests || []);
         setProfileImage(userData?.imageurl || null);
@@ -289,6 +308,33 @@ export default function ProfileScreen() {
       unsubscribeFriends();
     };
   }, []);
+
+  /** Remove plans whose calendar day has passed (local), including after midnight while the app stays open. */
+  const prunePastEventsToFirestore = useCallback(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    setEvents((prev) => {
+      const pruned = filterOutPastOpenPlans(prev);
+      if (pruned.length === prev.length) return prev;
+      updateDoc(doc(db, "users", uid), { events: pruned }).catch(() => {});
+      return pruned;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isFocused) return;
+    prunePastEventsToFirestore();
+    const id = setInterval(() => prunePastEventsToFirestore(), 60_000);
+    return () => clearInterval(id);
+  }, [isFocused, prunePastEventsToFirestore]);
+
+  useEffect(() => {
+    const onAppState = (next: AppStateStatus) => {
+      if (next === "active") prunePastEventsToFirestore();
+    };
+    const sub = AppState.addEventListener("change", onAppState);
+    return () => sub.remove();
+  }, [prunePastEventsToFirestore]);
 
   /** Merge attendee names from friends' copies of your plans (works even if rules block joiner from updating your doc). */
   useEffect(() => {
