@@ -241,8 +241,10 @@ export default function SynqScreen() {
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [isChatVisible, setIsChatVisible] = useState(false);
-  const [isInboxVisible, setIsInboxVisible] = useState(false);
+  /** One sheet for inbox + thread: avoids dismiss/present when switching panes. */
+  const [messagesModalVisible, setMessagesModalVisible] = useState(false);
+  const [messagesPane, setMessagesPane] = useState<"inbox" | "chat">("inbox");
+  const isChatPaneOpen = messagesModalVisible && messagesPane === "chat";
   const [isExploreVisible, setIsExploreVisible] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [pendingNewChat, setPendingNewChat] = useState<{
@@ -322,12 +324,12 @@ export default function SynqScreen() {
   };
 
   useEffect(() => {
-    if (isChatVisible) return;
+    if (isChatPaneOpen) return;
     Object.values(ideaMapOpenTimerRef.current).forEach((t) => {
       if (t) clearTimeout(t);
     });
     ideaMapOpenTimerRef.current = {};
-  }, [isChatVisible]);
+  }, [isChatPaneOpen]);
 
   useEffect(() => {
     let index = 0;
@@ -345,13 +347,13 @@ export default function SynqScreen() {
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(activePulseOpacity, {
-          toValue: 0.78,
-          duration: 1200,
+          toValue: 0.45,
+          duration: 1000,
           useNativeDriver: true,
         }),
         Animated.timing(activePulseOpacity, {
           toValue: 1,
-          duration: 1200,
+          duration: 1000,
           useNativeDriver: true,
         }),
       ])
@@ -374,8 +376,8 @@ export default function SynqScreen() {
         } catch {}
         setPendingNewChat(null);
         setActiveChatId(data.chatId);
-        setIsChatVisible(true);
-        setIsInboxVisible(false);
+        setMessagesModalVisible(true);
+        setMessagesPane("chat");
         const mid = typeof data.messageId === "string" && data.messageId.trim() ? data.messageId.trim() : null;
         setPendingScrollToMessageId(mid);
         await markChatRead(data.chatId);
@@ -403,8 +405,8 @@ export default function SynqScreen() {
       } catch {}
       setPendingNewChat(null);
       setActiveChatId(chatId);
-      setIsChatVisible(true);
-      setIsInboxVisible(false);
+      setMessagesModalVisible(true);
+      setMessagesPane("chat");
       const rawMid = data.messageId;
       const mid =
         typeof rawMid === "string" && rawMid.trim()
@@ -616,7 +618,7 @@ export default function SynqScreen() {
   }, [status]);
 
   useEffect(() => {
-    if (!activeChatId || !isChatVisible) return;
+    if (!activeChatId || !isChatPaneOpen) return;
     const q = query(collection(db, 'chats', activeChatId, 'messages'), orderBy('createdAt', 'asc'));
 
     return onSnapshot(q, (snap) => {
@@ -627,10 +629,10 @@ export default function SynqScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     });
-  }, [activeChatId, isChatVisible]);
+  }, [activeChatId, isChatPaneOpen]);
 
   useEffect(() => {
-    if (!isChatVisible) return;
+    if (!isChatPaneOpen) return;
     const prefetchUri = (url: unknown) => {
       const uri = resolveAvatar(url as string | undefined);
       if (uri) ExpoImage.prefetch(uri).catch(() => {});
@@ -655,7 +657,7 @@ export default function SynqScreen() {
         ExpoImage.prefetch(m.venueImage).catch(() => {});
       }
     });
-  }, [activeChatId, isChatVisible, pendingNewChat, allChats, messages]);
+  }, [activeChatId, isChatPaneOpen, pendingNewChat, allChats, messages]);
 
   useEffect(() => {
     let timer: any;
@@ -824,7 +826,8 @@ export default function SynqScreen() {
         setActiveChatId(null);
         setMessages([]);
       }
-      setIsChatVisible(true);
+      setMessagesModalVisible(true);
+      setMessagesPane("chat");
       setSelectedFriends([]);
     } catch {}
   };
@@ -1019,7 +1022,10 @@ export default function SynqScreen() {
             <View style={styles.activeHeaderBlock}>
               <View style={styles.headerTitleRow}>
                 <TouchableOpacity
-                  onPress={() => setIsInboxVisible(true)}
+                  onPress={() => {
+                    setMessagesModalVisible(true);
+                    setMessagesPane("inbox");
+                  }}
                   style={styles.headerIconContainer}
                   accessibilityRole="button"
                   accessibilityLabel="Open messages"
@@ -1047,6 +1053,22 @@ export default function SynqScreen() {
               </View>
             </View>
             <View style={styles.headerDivider} />
+
+            {memo.trim() !== "" ? (
+              <View style={styles.activeMemoRow}>
+                <View style={styles.activeMemoCard}>
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={20}
+                    color={ACCENT}
+                    style={styles.activeMemoIcon}
+                  />
+                  <Text style={styles.activeMemoText} numberOfLines={6}>
+                    {memo.trim()}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
 
             <View style={styles.activeListWrap}>
             <FlatList
@@ -1177,12 +1199,13 @@ export default function SynqScreen() {
             styles={styles}
           />
         )}
-        <Modal visible={isInboxVisible} animationType="slide" presentationStyle="pageSheet">
+        <Modal visible={messagesModalVisible} animationType="slide" presentationStyle="pageSheet">
+          {messagesPane === "inbox" ? (
           <View style={styles.modalBg}>
             <View style={styles.modalHeader}>
               <Text style={styles.messagesInboxTitle}>Messages</Text>
               <TouchableOpacity
-                onPress={() => setIsInboxVisible(false)}
+                onPress={() => setMessagesModalVisible(false)}
                 accessibilityRole="button"
                 accessibilityLabel="Close messages"
               >
@@ -1235,8 +1258,7 @@ export default function SynqScreen() {
                       prefetchParticipantAvatars(item);
                       setPendingNewChat(null);
                       setActiveChatId(item.id);
-                      setIsInboxVisible(false);
-                      setIsChatVisible(true);
+                      setMessagesPane("chat");
                       await markChatRead(item.id);
                     }}
                   >
@@ -1285,7 +1307,7 @@ export default function SynqScreen() {
                 setPendingDeleteChatId(null);
                 if (!chatId) return;
                 if (activeChatId === chatId) {
-                  setIsChatVisible(false);
+                  setMessagesModalVisible(false);
                   setActiveChatId(null);
                   setPendingNewChat(null);
                 }
@@ -1297,9 +1319,7 @@ export default function SynqScreen() {
               }}
             />
           </View>
-        </Modal>
-
-        <Modal visible={isChatVisible} animationType="slide" presentationStyle="pageSheet">
+          ) : (
           <View style={styles.modalBg}>
             <View
               style={[
@@ -1332,7 +1352,8 @@ export default function SynqScreen() {
               </View>
               <TouchableOpacity
                 onPress={() => {
-                  setIsChatVisible(false);
+                  Keyboard.dismiss();
+                  setMessagesPane("inbox");
                   setShowAICard(false);
                   setShowOptionsList(false);
                   setPendingNewChat(null);
@@ -1575,6 +1596,7 @@ export default function SynqScreen() {
               currentCategory={currentCategory}
             />
           </View>
+          )}
         </Modal>
 
         <EditSynqModal
@@ -1678,21 +1700,47 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
   },
   activeStatusDot: {
-    width: 11,
-    height: 11,
-    borderRadius: 5.5,
-    marginRight: 11,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    marginRight: 10,
     backgroundColor: "#34D399",
     shadowColor: "#34D399",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.55,
-    shadowRadius: 6,
+    shadowRadius: 5,
     elevation: 3,
   },
   headerDivider: {
     marginTop: 16,
     height: 1,
     backgroundColor: BORDER,
+  },
+  activeMemoRow: {
+    marginTop: 14,
+    width: "100%",
+  },
+  activeMemoCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#111",
+    borderRadius: BUTTON_RADIUS,
+    borderWidth: 1,
+    borderColor: "#222",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  activeMemoIcon: {
+    marginTop: 2,
+    marginRight: 12,
+  },
+  activeMemoText: {
+    flex: 1,
+    color: TEXT,
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: fonts.book,
+    textAlign: "left",
   },
   headerTitle: {
     color: TEXT,
