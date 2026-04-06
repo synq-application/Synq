@@ -93,64 +93,13 @@ export const wrapChatTitle = (text: string, maxChars = 30) => {
     return lines.join('\n');
   };
 
-const EARTH_RADIUS_MI = 3958.7613;
-
-/** Valid lat/lng pair from a Firestore user doc, or null. */
-export function readLatLng(data: any): { lat: number; lng: number } | null {
-  const lat = typeof data?.lat === "number" ? data.lat : null;
-  const lng = typeof data?.lng === "number" ? data.lng : null;
-  if (lat === null || lng === null) return null;
-  return { lat, lng };
-}
-
-/** Great-circle distance in miles (WGS84 sphere). */
-export function haversineMiles(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return EARTH_RADIUS_MI * c;
-}
-
-/** Short UI string for separation in miles (US-style). */
-export function formatProximityMiles(miles: number): string {
-  if (!Number.isFinite(miles) || miles < 0) return "";
-  if (miles < 1) return "< 1 mile away";
-  if (miles < 10) {
-    const r = Math.round(miles * 10) / 10;
-    if (Math.abs(r - Math.round(r)) < 1e-6) return `${Math.round(r)} mi away`;
-    return `${r.toFixed(1)} mi away`;
-  }
-  return `${Math.round(miles)} mi away`;
-}
-
-/**
- * One line for Synq active list: "City, ST - <1 mile away" when both users have coords;
- * otherwise city/locationDisplay only, or distance only if no place string.
- */
-export function friendLocationLineWithProximity(me: any, friend: any): string | null {
+/** One line from friend city/locationDisplay for list rows. */
+export function friendLocationLine(friend: any): string | null {
   const loc =
     typeof friend?.locationDisplay === "string" && friend.locationDisplay.trim()
       ? friend.locationDisplay.trim()
       : friend?.city
         ? `${friend.city}${friend.state ? `, ${friend.state}` : ""}`
         : null;
-
-  const a = readLatLng(me);
-  const b = readLatLng(friend);
-  const dist =
-    a && b ? formatProximityMiles(haversineMiles(a.lat, a.lng, b.lat, b.lng)) : null;
-
-  if (loc && dist) return `${loc} · ${dist}`;
-  if (loc) return loc;
-  if (dist) return dist;
-  return null;
+  return loc;
 }

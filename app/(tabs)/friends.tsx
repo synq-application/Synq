@@ -81,7 +81,7 @@ import {
   warmSuggestedCache,
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
-import { friendLocationLineWithProximity, resolveAvatar } from "../helpers";
+import { friendLocationLine, resolveAvatar } from "../helpers";
 
 const { width } = Dimensions.get("window");
 
@@ -236,7 +236,6 @@ export default function FriendsScreen() {
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [meProfile, setMeProfile] = useState<Record<string, unknown> | null>(null);
 
   /** Keep modal "open" in state while viewing friend profile so back() restores it without a second sheet animation. */
   const routeShowsFriendProfile =
@@ -258,15 +257,6 @@ export default function FriendsScreen() {
       return () => clearTimeout(t);
     }, [])
   );
-
-  useEffect(() => {
-    if (!auth.currentUser) return;
-    const uid = auth.currentUser.uid;
-    const unsubMe = onSnapshot(doc(db, "users", uid), (snap) => {
-      setMeProfile(snap.exists() ? (snap.data() as Record<string, unknown>) : null);
-    });
-    return () => unsubMe();
-  }, []);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -449,7 +439,7 @@ export default function FriendsScreen() {
   };
 
   const renderFriendRow = ({ item }: { item: Friend }) => {
-    const locationLine = friendLocationLineWithProximity(meProfile, item);
+    const locationLine = friendLocationLine(item);
     const fallbackLoc =
       typeof (item as any)?.location === "string" && (item as any).location.trim()
         ? (item as any).location

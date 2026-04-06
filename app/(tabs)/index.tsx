@@ -73,7 +73,7 @@ import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
 import {
   formatTime,
-  friendLocationLineWithProximity,
+  friendLocationLine,
   parseIdeaText,
   resolveAvatar,
   SynqStatus,
@@ -1085,7 +1085,7 @@ export default function SynqScreen() {
               }
               renderItem={({ item }) => {
                 const friendMemo = item.memo?.trim();
-                const locationLine = friendLocationLineWithProximity(userProfile, item);
+                const locationLine = friendLocationLine(item);
                 return (
                 <TouchableOpacity
                   onPress={() =>
