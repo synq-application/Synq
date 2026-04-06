@@ -9,7 +9,7 @@ import {
   useSegments,
 } from "expo-router";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, {
   createContext,
   useContext,
@@ -118,7 +118,6 @@ export default function RootLayout() {
     cachedSynqActive: boolean;
   } | null>(null);
   const synqBootUidRef = useRef<string | null>(null);
-  const didLogUserLocationsRef = useRef(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
 
   const [pendingNotificationTap, setPendingNotificationTap] = useState<
@@ -292,51 +291,6 @@ export default function RootLayout() {
 
     return unsub;
   }, []);
-
-  useEffect(() => {
-    if (!user || didLogUserLocationsRef.current) return;
-    didLogUserLocationsRef.current = true;
-
-    const logAllUsersLocationSnapshot = async () => {
-      try {
-        const snap = await getDocs(collection(db, "users"));
-        const rows = snap.docs.map((d) => {
-          const data = d.data() as any;
-          const lat = typeof data?.lat === "number" ? data.lat : null;
-          const lng = typeof data?.lng === "number" ? data.lng : null;
-          return {
-            uid: d.id,
-            name: data?.displayName || `${data?.firstName || ""} ${data?.lastName || ""}`.trim() || "Unknown",
-            location: data?.city && data?.state ? `${data.city}, ${data.state}` : "No location",
-            lat,
-            lng,
-            hasCoords: lat !== null && lng !== null,
-          };
-        });
-
-        const withCoords = rows.filter((r) => r.hasCoords).length;
-        const withoutCoords = rows.length - withCoords;
-
-        console.log("[Location Audit] Users (name | location | coordinates):");
-        rows.forEach(({ name, location, lat, lng, hasCoords }) => {
-          if (hasCoords) {
-            console.log(
-              `${name} | ${location} | Coordinates: yes — lat ${lat}, lng ${lng}`
-            );
-          } else {
-            console.log(`${name} | ${location} | Coordinates: no`);
-          }
-        });
-        console.log(
-          `[Location Audit] total=${rows.length}, withCoords=${withCoords}, withoutCoords=${withoutCoords}`
-        );
-      } catch (e) {
-        console.log("[Location Audit] Failed to fetch users for audit", e);
-      }
-    };
-
-    logAllUsersLocationSnapshot();
-  }, [user]);
 
   useEffect(() => {
     if (!user || !authReady || !navReady) return;
