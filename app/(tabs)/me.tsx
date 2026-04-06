@@ -13,15 +13,16 @@ import {
   TEXT,
 } from "@/constants/Variables";
 import { useIsFocused } from "@react-navigation/native";
+import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
 import {
   AppState,
   AppStateStatus,
@@ -36,6 +37,17 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import QRCode from "react-native-qrcode-svg";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
@@ -55,9 +67,86 @@ import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
 
+type ProfilePressableProps = {
+  onPress: () => void;
+  children: React.ReactNode;
+  /** Outer wrapper (touch target layout). */
+  style?: StyleProp<ViewStyle>;
+  /** Inner scaled view — use for flex layouts (e.g. row buttons). */
+  contentStyle?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+  accessibilityRole?: "button";
+  disabled?: boolean;
+  haptic?: boolean;
+};
+
+function ProfilePressable({
+  onPress,
+  children,
+  style,
+  contentStyle,
+  accessibilityLabel,
+  accessibilityRole,
+  disabled,
+  haptic = true,
+}: ProfilePressableProps) {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+  return (
+    <Pressable
+      disabled={disabled}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole ?? "button"}
+      onPress={() => {
+        if (haptic && !disabled) {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+        onPress();
+      }}
+      onPressIn={() => {
+        if (!disabled) scale.value = withSpring(0.96, { damping: 16, stiffness: 380 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 16, stiffness: 380 });
+      }}
+      style={style}
+    >
+      <Animated.View style={[animatedStyle, contentStyle]}>{children}</Animated.View>
+    </Pressable>
+  );
+}
+
 export default function ProfileScreen() {
   const isFocused = useIsFocused();
+  const reducedMotion = useReducedMotion();
   const scrollRef = useRef<ScrollView>(null);
+
+  const avatarPulse = useSharedValue(1);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      cancelAnimation(avatarPulse);
+      avatarPulse.value = 1;
+      return;
+    }
+    avatarPulse.value = withRepeat(
+      withSequence(
+        withTiming(1.02, { duration: 2200, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+    return () => {
+      cancelAnimation(avatarPulse);
+    };
+  }, [reducedMotion]);
+
+  const avatarPulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: avatarPulse.value }],
+  }));
   const params = useLocalSearchParams<{ focusEventId?: string | string[] }>();
   const focusEventIdRaw = params.focusEventId;
   const focusEventId =
@@ -440,48 +529,12 @@ export default function ProfileScreen() {
       <StatusBar barStyle="light-content" />
 
       <View style={styles.heroOuter}>
-        {/** Flat screen BG — green comes only from flare layers below (no top band). */}
         <View style={styles.heroGradient}>
-          {/**
-           * Cool teal “studio” light — deep base + hint of brand green (not candy mint).
-           * Kept to upper-right so it never reads as a top banner.
-           */}
-          <LinearGradient
-            pointerEvents="none"
-            colors={[
-              "rgba(14, 42, 32, 0.65)",
-              "rgba(0, 255, 133, 0.07)",
-              "rgba(0, 255, 133, 0.02)",
-              "transparent",
-            ]}
-            locations={[0, 0.1, 0.24, 1]}
-            start={{ x: 1, y: 0 }}
-            end={{ x: 0.1, y: 0.72 }}
-            style={[styles.heroFlareLayer, { opacity: 0.5 }]}
-          />
-          {/* Single bloom — high in the hero only (no blobs straddling the fold) */}
-          <View pointerEvents="none" style={[styles.heroFlareBlob, styles.heroFlareBlobA]} />
-          <LinearGradient
-            pointerEvents="none"
-            colors={["transparent", "rgba(0, 0, 0, 0.06)"]}
-            locations={[0.55, 1]}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={styles.heroSheen}
-          />
-          {/** Feather to screen BG — removes hard clip where hero meets Recent Synqs */}
-          <LinearGradient
-            pointerEvents="none"
-            colors={["transparent", BG]}
-            locations={[0, 1]}
-            style={styles.heroBottomFeather}
-          />
-
           <View style={styles.header}>
-            <TouchableOpacity
+            <ProfilePressable
               style={styles.headerIconContainer}
+              contentStyle={styles.headerIconInner}
               onPress={() => router.push("/notifications")}
-              accessibilityRole="button"
               accessibilityLabel="Notifications"
             >
               <Icon name="notifications-outline" size={26} color="white" />
@@ -490,16 +543,16 @@ export default function ProfileScreen() {
                   <Text style={styles.badgeText}>{requestCount}</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </ProfilePressable>
 
-            <TouchableOpacity
+            <ProfilePressable
               style={styles.headerIconContainer}
+              contentStyle={styles.headerIconInner}
               onPress={() => router.push("/settings")}
-              accessibilityRole="button"
               accessibilityLabel="Settings"
             >
               <Icon name="settings-outline" size={26} color="white" />
-            </TouchableOpacity>
+            </ProfilePressable>
           </View>
 
           <View style={styles.profileSection}>
@@ -517,20 +570,30 @@ export default function ProfileScreen() {
                 )}
               </View>
 
-              <View style={styles.avatarGlowWrap}>
-                <TouchableOpacity onPress={pickImage} style={styles.imageWrapper} disabled={isUploading}>
+              <Animated.View style={[styles.avatarGlowWrap, avatarPulseStyle]}>
+                <ProfilePressable
+                  onPress={pickImage}
+                  disabled={isUploading}
+                  contentStyle={styles.imageWrapper}
+                  accessibilityLabel="Change profile photo"
+                >
                   <ExpoImage
                     source={{ uri: resolveAvatar(profileImage) }}
                     style={styles.profileImg}
                     cachePolicy="memory-disk"
-                    transition={0}
+                    transition={220}
                   />
-                </TouchableOpacity>
-              </View>
+                </ProfilePressable>
+              </Animated.View>
 
-              <TouchableOpacity onPress={() => setQRExpanded(true)} style={styles.qrToggle}>
+              <ProfilePressable
+                style={styles.qrToggle}
+                contentStyle={styles.qrToggleInner}
+                onPress={() => setQRExpanded(true)}
+                accessibilityLabel="Expand QR code"
+              >
                 <Icon name="qr-code-outline" size={13} color="black" />
-              </TouchableOpacity>
+              </ProfilePressable>
             </View>
 
             <Text style={styles.nameText}>{auth.currentUser?.displayName}</Text>
@@ -547,15 +610,15 @@ export default function ProfileScreen() {
               </View>
             )}
 
-            <TouchableOpacity
-              style={styles.editProfileBtn}
+            <ProfilePressable
+              style={{ alignSelf: "center" }}
+              contentStyle={styles.editProfileBtn}
               onPress={() => router.push("/edit-profile")}
-              accessibilityRole="button"
               accessibilityLabel="Edit profile"
             >
               <Icon name="create-outline" size={15} color={ACCENT} />
               <Text style={styles.editProfileBtnText}>Edit profile</Text>
-            </TouchableOpacity>
+            </ProfilePressable>
           </View>
 
           {memo.trim() !== "" && (
@@ -579,15 +642,15 @@ export default function ProfileScreen() {
                   .split(/\s+/)[0] || "Friend";
               return (
                 <View key={friend.id} style={styles.connItem}>
-                  <TouchableOpacity
-                    activeOpacity={0.85}
+                  <ProfilePressable
+                    style={styles.connAvatarPress}
+                    contentStyle={styles.connAvatarPressInner}
                     onPress={() =>
                       router.push({
                         pathname: "/friend-profile",
                         params: { friendId: friend.id },
                       })
                     }
-                    accessibilityRole="button"
                     accessibilityLabel={`${firstName}, last Synq ${formatLastSynq(at)}`}
                   >
                     <View style={styles.imageCircle}>
@@ -595,7 +658,7 @@ export default function ProfileScreen() {
                         source={{ uri: resolveAvatar(friend.imageurl) }}
                         style={styles.connImg}
                         cachePolicy="memory-disk"
-                        transition={0}
+                        transition={220}
                       />
                       {i === 0 && (
                         <View style={styles.crown}>
@@ -603,7 +666,7 @@ export default function ProfileScreen() {
                         </View>
                       )}
                     </View>
-                  </TouchableOpacity>
+                  </ProfilePressable>
                   <Text style={styles.connName} numberOfLines={1}>
                     {firstName}
                   </Text>
@@ -618,15 +681,15 @@ export default function ProfileScreen() {
                 ? "Add friends to see recent Synqs here."
                 : "No Synqs yet — connect from the home tab and your history will show up."}
             </Text>
-            <TouchableOpacity
+            <ProfilePressable
               style={styles.recentSynqEmptyCta}
+              contentStyle={styles.recentSynqEmptyCtaInner}
               onPress={() => router.push("/(tabs)/friends")}
-              accessibilityRole="button"
               accessibilityLabel="Open friends"
             >
               <Text style={styles.recentSynqEmptyCtaText}>Friends</Text>
               <Icon name="chevron-forward" size={14} color={ACCENT} />
-            </TouchableOpacity>
+            </ProfilePressable>
           </View>
         )}
       </View>
@@ -653,33 +716,50 @@ export default function ProfileScreen() {
             <Text style={styles.interestsEmptyText}>
               Add a few interests so friends know what you are into.
             </Text>
-            <TouchableOpacity onPress={() => setShowInputModal(true)} style={styles.interestsEmptyCta}>
+            <ProfilePressable
+              style={styles.interestsEmptyCta}
+              contentStyle={styles.interestsEmptyCtaInner}
+              onPress={() => setShowInputModal(true)}
+              accessibilityLabel="Add interests"
+            >
               <Text style={styles.interestsEmptyCtaText}>Add interests</Text>
               <Icon name="chevron-forward" size={16} color={ACCENT} />
-            </TouchableOpacity>
+            </ProfilePressable>
           </View>
         ) : (
           <View style={styles.interestsWrapper}>
             {interests.map((interest, i) => (
-              <TouchableOpacity
+              <ProfilePressable
                 key={i}
-                style={styles.interestRect}
+                style={styles.interestRectOuter}
+                contentStyle={styles.interestRect}
                 onPress={() => handleDeleteInterest(interest)}
+                accessibilityLabel={`Interest ${interest}, tap to remove`}
               >
                 <Text style={styles.interestText}>{interest}</Text>
-              </TouchableOpacity>
+              </ProfilePressable>
             ))}
 
-            <TouchableOpacity onPress={() => setShowInputModal(true)} style={styles.addRect}>
+            <ProfilePressable
+              style={styles.addRectOuter}
+              contentStyle={styles.addRect}
+              onPress={() => setShowInputModal(true)}
+              accessibilityLabel="Add more interests"
+            >
               <Text style={styles.addRectText}>+ Add</Text>
-            </TouchableOpacity>
+            </ProfilePressable>
           </View>
         )}
       </View>
 
-      <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
+      <ProfilePressable
+        style={{ alignSelf: "center" }}
+        contentStyle={styles.signOutBtn}
+        onPress={handleSignOut}
+        accessibilityLabel="Sign out"
+      >
         <Text style={styles.signOutText}>Sign Out</Text>
-      </TouchableOpacity>
+      </ProfilePressable>
 
       <Modal visible={isQRExpanded} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -804,45 +884,7 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
     paddingHorizontal: 20,
     paddingBottom: 8,
-    overflow: "hidden",
     position: "relative",
-  },
-  heroFlareLayer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    zIndex: 1,
-  },
-  heroFlareBlob: {
-    position: "absolute",
-    borderRadius: 9999,
-    zIndex: 1,
-  },
-  /** Upper-right only — kept away from bottom edge to avoid fold clipping */
-  heroFlareBlobA: {
-    width: 280,
-    height: 280,
-    top: -88,
-    right: -108,
-    backgroundColor: "rgba(0, 200, 130, 0.055)",
-  },
-  heroSheen: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    zIndex: 1,
-  },
-  heroBottomFeather: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 52,
-    zIndex: 2,
   },
   header: {
     flexDirection: "row",
@@ -853,6 +895,13 @@ const styles = StyleSheet.create({
   },
   headerIconContainer: {
     width: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerIconInner: {
+    position: "relative",
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -895,6 +944,7 @@ const styles = StyleSheet.create({
   },
   profileImg: { width: "100%", height: "100%" },
   qrToggle: { position: "absolute", bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
+  qrToggleInner: { alignItems: "center", justifyContent: "center" },
   nameText: { color: ACCENT, fontSize: 26, fontFamily: fonts.heavy, letterSpacing: 0.2, marginTop: 10 },
   locationRow: {
     flexDirection: "row",
@@ -932,6 +982,8 @@ const styles = StyleSheet.create({
   /** Matches friends tab Top Synqs horizontal row */
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 14 },
   connItem: { alignItems: "center", width: 72 },
+  connAvatarPress: { alignItems: "center" },
+  connAvatarPressInner: { borderRadius: 50, overflow: "hidden" },
   imageCircle: {
     width: 55,
     height: 55,
@@ -978,12 +1030,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     textAlign: "center",
   },
-  recentSynqEmptyCta: {
+  recentSynqEmptyCta: { marginTop: 10, alignSelf: "center" },
+  recentSynqEmptyCtaInner: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
-    marginTop: 10,
   },
   recentSynqEmptyCtaText: {
     color: ACCENT,
@@ -1047,12 +1099,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     textAlign: "center",
   },
-  interestsEmptyCta: {
+  interestsEmptyCta: { marginTop: 14, alignSelf: "center" },
+  interestsEmptyCtaInner: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
-    marginTop: 14,
   },
   interestsEmptyCtaText: {
     color: ACCENT,
@@ -1062,6 +1114,7 @@ const styles = StyleSheet.create({
   },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
+  interestRectOuter: { marginRight: 8, marginBottom: 8 },
   interestRect: {
     backgroundColor: SURFACE,
     borderWidth: 1,
@@ -1069,10 +1122,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    marginRight: 8,
-    marginBottom: 8,
   },
   interestText: { color: TEXT, fontFamily: fonts.book, fontSize: 13 },
+  addRectOuter: { marginBottom: 8 },
   addRect: {
     flexDirection: "row",
     alignItems: "center",
@@ -1082,7 +1134,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    marginBottom: 8,
   },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13 },
   signOutBtn: { alignSelf: "center", marginTop: 20, paddingVertical: 14, paddingHorizontal: 60, borderRadius: BUTTON_RADIUS + 8, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
