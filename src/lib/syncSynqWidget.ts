@@ -4,6 +4,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import type { DocumentData } from "firebase/firestore";
 import { auth, db } from "./firebase";
+import { computeSynqActiveFromUserData } from "./synqSession";
 
 const isExpoGo =
   Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -19,7 +20,7 @@ export function mapUserDocToWidgetProps(data: DocumentData | undefined): {
   memo: string;
   isActive: boolean;
 } {
-  const isAvailable = data?.status === "available";
+  const isAvailable = computeSynqActiveFromUserData(data);
   const rawMemo = typeof data?.memo === "string" ? data.memo.trim() : "";
   const memo =
     rawMemo.length > 120 ? `${rawMemo.slice(0, 117)}…` : rawMemo;

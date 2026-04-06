@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const {
   onDocumentCreated,
   onDocumentUpdated,
@@ -379,10 +380,114 @@ function firstNameFromDisplay(name) {
   return String(name || "").trim().split(/\s+/)[0] || "Someone";
 }
 
+/** Must match app `EXPIRATION_HOURS` in constants/Variables.ts */
+const SYNQ_EXPIRATION_HOURS = 12;
+const SYNQ_EXPIRATION_MS = SYNQ_EXPIRATION_HOURS * 60 * 60 * 1000;
+
+function synqStartedAtMillis(userData) {
+  const t = userData?.synqStartedAt;
+  if (!t) return null;
+  if (typeof t.toMillis === "function") return t.toMillis();
+  if (typeof t._seconds === "number") return t._seconds * 1000;
+  return null;
+}
+
 function isSynqActive(userData) {
   if (!userData || typeof userData !== "object") return false;
-  return String(userData.status || "").trim().toLowerCase() === "available" && !!userData.synqStartedAt;
+  if (String(userData.status || "").trim().toLowerCase() !== "available") return false;
+  const ms = synqStartedAtMillis(userData);
+  if (ms == null) return false;
+  return Date.now() - ms <= SYNQ_EXPIRATION_MS;
 }
+
+/**
+ * Deactivates Synq for users past the window (server-side, no app open required).
+ * Also clears legacy rows that are still `available` but missing `synqStartedAt`.
+ */
+exports.expireStaleSynq = onSchedule(
+  {
+    schedule: "every 60 minutes",
+    region: "us-central1",
+    timeZone: "Etc/UTC",
+  },
+  async () => {
+    const db = admin.firestore();
+    const cutoffTs = admin.firestore.Timestamp.fromMillis(Date.now() - SYNQ_EXPIRATION_MS);
+    const deactivatePayload = { status: "inactive", memo: "" };
+
+    try {
+      const expiredByTime = await db
+        .collection("users")
+        .where("status", "==", "available")
+        .where("synqStartedAt", "<", cutoffTs)
+        .get();
+
+      if (!expiredByTime.empty) {
+        let batch = db.batch();
+        let n = 0;
+        for (const doc of expiredByTime.docs) {
+          batch.update(doc.ref, deactivatePayload);
+          n += 1;
+          if (n >= 500) {
+            await batch.commit();
+            batch = db.batch();
+            n = 0;
+          }
+        }
+        if (n > 0) await batch.commit();
+        logger.info("expireStaleSynq: deactivated by synqStartedAt age", {
+          count: expiredByTime.size,
+        });
+      }
+
+      const FieldPath = admin.firestore.FieldPath;
+      let lastDoc = null;
+      let legacyTotal = 0;
+      let reads = 0;
+      const maxLegacyReads = 8000;
+
+      while (reads < maxLegacyReads) {
+        let q = db
+          .collection("users")
+          .where("status", "==", "available")
+          .orderBy(FieldPath.documentId())
+          .limit(500);
+        if (lastDoc) q = q.startAfter(lastDoc);
+        const page = await q.get();
+        if (page.empty) break;
+        reads += page.size;
+
+        const refs = page.docs.filter((d) => !d.data().synqStartedAt).map((d) => d.ref);
+        if (refs.length) {
+          let lb = db.batch();
+          let c = 0;
+          for (const ref of refs) {
+            lb.update(ref, deactivatePayload);
+            legacyTotal += 1;
+            c += 1;
+            if (c >= 500) {
+              await lb.commit();
+              lb = db.batch();
+              c = 0;
+            }
+          }
+          if (c > 0) await lb.commit();
+        }
+
+        lastDoc = page.docs[page.docs.length - 1];
+        if (page.size < 500) break;
+      }
+
+      if (legacyTotal) {
+        logger.info("expireStaleSynq: deactivated legacy missing synqStartedAt", {
+          count: legacyTotal,
+        });
+      }
+    } catch (e) {
+      logger.error("expireStaleSynq", e);
+    }
+  }
+);
 
 /** When a friend’s id is added to a hosted open plan, notify the host. */
 exports.onOpenPlanInterest = onDocumentUpdated(
