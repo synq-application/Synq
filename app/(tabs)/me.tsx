@@ -8,14 +8,16 @@ import {
   MODAL_RADIUS,
   MUTED,
   MUTED2,
+  RADIUS_LG,
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
+import { useIsFocused } from "@react-navigation/native";
 import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
-import { useIsFocused } from "@react-navigation/native";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
@@ -39,13 +41,14 @@ import { auth, db, storage } from "../../src/lib/firebase";
 import { matchesPlanEvent } from "../../src/lib/planEvents";
 import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
+  friendRelationCacheByUser,
   friendsListCacheByUser,
   pruneSocialCachesToFriendIds,
   warmFriendsAndConnectionsCache,
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
-import { prefetchResolvedAvatar, resolveAvatar } from "../helpers";
+import { formatLastSynq, prefetchResolvedAvatar, resolveAvatar } from "../helpers";
 import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
@@ -115,6 +118,32 @@ export default function ProfileScreen() {
       if (f.id && name) m[f.id] = name;
     });
     return m;
+  }, [myId, friendsForHostNames]);
+
+  const recentSynqRows = useMemo(() => {
+    if (!myId) return [];
+    const rel = friendRelationCacheByUser[myId];
+    if (!rel) return [];
+    const toDate = (raw: unknown): Date | null => {
+      if (raw == null) return null;
+      try {
+        const d =
+          typeof (raw as { toDate?: () => Date }).toDate === "function"
+            ? (raw as { toDate: () => Date }).toDate()
+            : new Date(raw as string | number);
+        return Number.isNaN(d.getTime()) ? null : d;
+      } catch {
+        return null;
+      }
+    };
+    const rows: { friend: Friend; at: Date }[] = [];
+    for (const f of friendsForHostNames) {
+      const d = toDate(rel[f.id]?.lastSynqAt);
+      if (!d) continue;
+      rows.push({ friend: f, at: d });
+    }
+    rows.sort((a, b) => b.at.getTime() - a.at.getTime());
+    return rows.slice(0, 3);
   }, [myId, friendsForHostNames]);
 
   const showAlert = (title: string, message: string) => {
@@ -364,84 +393,197 @@ export default function ProfileScreen() {
     >
       <StatusBar barStyle="light-content" />
 
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerIconContainer}
-          onPress={() => router.push("/notifications")}
-          accessibilityRole="button"
-          accessibilityLabel="Notifications"
-        >
-          <Icon name="notifications-outline" size={26} color="white" />
-          {requestCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{requestCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+      <View style={styles.heroOuter}>
+        {/** Flat screen BG — green comes only from flare layers below (no top band). */}
+        <View style={styles.heroGradient}>
+          {/**
+           * Cool teal “studio” light — deep base + hint of brand green (not candy mint).
+           * Kept to upper-right so it never reads as a top banner.
+           */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              "rgba(14, 42, 32, 0.65)",
+              "rgba(0, 255, 133, 0.07)",
+              "rgba(0, 255, 133, 0.02)",
+              "transparent",
+            ]}
+            locations={[0, 0.1, 0.24, 1]}
+            start={{ x: 1, y: 0 }}
+            end={{ x: 0.1, y: 0.72 }}
+            style={[styles.heroFlareLayer, { opacity: 0.5 }]}
+          />
+          {/* Single bloom — high in the hero only (no blobs straddling the fold) */}
+          <View pointerEvents="none" style={[styles.heroFlareBlob, styles.heroFlareBlobA]} />
+          <LinearGradient
+            pointerEvents="none"
+            colors={["transparent", "rgba(0, 0, 0, 0.06)"]}
+            locations={[0.55, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.heroSheen}
+          />
+          {/** Feather to screen BG — removes hard clip where hero meets Recent Synqs */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={["transparent", BG]}
+            locations={[0, 1]}
+            style={styles.heroBottomFeather}
+          />
 
-        <TouchableOpacity
-          style={styles.headerIconContainer}
-          onPress={() => router.push("/settings")}
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-        >
-          <Icon name="settings-outline" size={26} color="white" />
-        </TouchableOpacity>
-      </View>
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.headerIconContainer}
+              onPress={() => router.push("/notifications")}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+            >
+              <Icon name="notifications-outline" size={26} color="white" />
+              {requestCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{requestCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
-      <View style={styles.profileSection}>
-        <View style={styles.qrContainer}>
-          <View style={styles.qrBg}>
-            {profileQrUrl ? (
-              <QRCode
-                value={profileQrUrl}
-                size={160}
-                color="black"
-                backgroundColor="white"
-              />
-            ) : (
-              <View style={{ width: 160, height: 160, backgroundColor: "#eee" }} />
-            )}
-          </View>
-
-          <View style={styles.avatarGlowWrap}>
-            <TouchableOpacity onPress={pickImage} style={styles.imageWrapper} disabled={isUploading}>
-              <ExpoImage
-                source={{ uri: resolveAvatar(profileImage) }}
-                style={styles.profileImg}
-                cachePolicy="memory-disk"
-                transition={0}
-              />
+            <TouchableOpacity
+              style={styles.headerIconContainer}
+              onPress={() => router.push("/settings")}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+            >
+              <Icon name="settings-outline" size={26} color="white" />
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={() => setQRExpanded(true)} style={styles.qrToggle}>
-            <Icon name="qr-code-outline" size={13} color="black" />
-          </TouchableOpacity>
+          <View style={styles.profileSection}>
+            <View style={styles.qrContainer}>
+              <View style={styles.qrBg}>
+                {profileQrUrl ? (
+                  <QRCode
+                    value={profileQrUrl}
+                    size={160}
+                    color="black"
+                    backgroundColor="white"
+                  />
+                ) : (
+                  <View style={{ width: 160, height: 160, backgroundColor: "#eee" }} />
+                )}
+              </View>
+
+              <View style={styles.avatarGlowWrap}>
+                <TouchableOpacity onPress={pickImage} style={styles.imageWrapper} disabled={isUploading}>
+                  <ExpoImage
+                    source={{ uri: resolveAvatar(profileImage) }}
+                    style={styles.profileImg}
+                    cachePolicy="memory-disk"
+                    transition={0}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity onPress={() => setQRExpanded(true)} style={styles.qrToggle}>
+                <Icon name="qr-code-outline" size={13} color="black" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.nameText}>{auth.currentUser?.displayName}</Text>
+
+            {locationLower && (
+              <View style={styles.locationRow}>
+                <Icon
+                  name="location-outline"
+                  size={18}
+                  color="rgba(255,255,255,0.35)"
+                  style={styles.locationIcon}
+                />
+                <Text style={styles.locationText}>{locationLower}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.editProfileBtn}
+              onPress={() => router.push("/edit-profile")}
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile"
+            >
+              <Icon name="create-outline" size={15} color={ACCENT} />
+              <Text style={styles.editProfileBtnText}>Edit profile</Text>
+            </TouchableOpacity>
+          </View>
+
+          {memo.trim() !== "" && (
+            <View style={styles.memoRow}>
+              <View style={styles.memoContainer}>
+                <Text style={styles.profileMemoText}>{memo.trim()}</Text>
+              </View>
+            </View>
+          )}
         </View>
+      </View>
 
-        <Text style={styles.nameText}>{auth.currentUser?.displayName}</Text>
-
-        {locationLower && (
-          <View style={styles.locationRow}>
-            <Icon
-              name="location-outline"
-              size={18}
-              color="rgba(255,255,255,0.35)"
-              style={styles.locationIcon}
-            />
-            <Text style={styles.locationText}>{locationLower}</Text>
+      <View style={styles.sectionAfterHero}>
+        <Text style={styles.sectionTitle}>Recent Synqs</Text>
+        {recentSynqRows.length > 0 ? (
+          <View style={styles.synqsContainer}>
+            {recentSynqRows.map(({ friend, at }, i) => {
+              const firstName =
+                String(friend.displayName || "Friend")
+                  .trim()
+                  .split(/\s+/)[0] || "Friend";
+              return (
+                <View key={friend.id} style={styles.connItem}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/friend-profile",
+                        params: { friendId: friend.id },
+                      })
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`${firstName}, last Synq ${formatLastSynq(at)}`}
+                  >
+                    <View style={styles.imageCircle}>
+                      <ExpoImage
+                        source={{ uri: resolveAvatar(friend.imageurl) }}
+                        style={styles.connImg}
+                        cachePolicy="memory-disk"
+                        transition={0}
+                      />
+                      {i === 0 && (
+                        <View style={styles.crown}>
+                          <Icon name="star" size={8} color="black" />
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                  <Text style={styles.connName} numberOfLines={1}>
+                    {firstName}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.recentSynqEmpty}>
+            <Text style={styles.recentSynqEmptyText}>
+              {friendsForHostNames.length === 0
+                ? "Add friends to see recent Synqs here."
+                : "No Synqs yet — connect from the home tab and your history will show up."}
+            </Text>
+            <TouchableOpacity
+              style={styles.recentSynqEmptyCta}
+              onPress={() => router.push("/(tabs)/friends")}
+              accessibilityRole="button"
+              accessibilityLabel="Open friends"
+            >
+              <Text style={styles.recentSynqEmptyCtaText}>Friends</Text>
+              <Icon name="chevron-forward" size={14} color={ACCENT} />
+            </TouchableOpacity>
           </View>
         )}
       </View>
-
-      {memo.trim() !== "" && (
-        <View style={styles.memoRow}>
-          <View style={styles.memoContainer}>
-            <Text style={styles.profileMemoText}>{memo.trim()}</Text>
-          </View>
-        </View>
-      )}
 
       <View style={styles.section}>
         <MonthlyMemo
@@ -460,21 +602,33 @@ export default function ProfileScreen() {
       </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Interests</Text>
-        <View style={styles.interestsWrapper}>
-          {interests.map((interest, i) => (
-            <TouchableOpacity
-              key={i}
-              style={styles.interestRect}
-              onPress={() => handleDeleteInterest(interest)}
-            >
-              <Text style={styles.interestText}>{interest}</Text>
+        {interests.length === 0 ? (
+          <View style={styles.interestsEmpty}>
+            <Text style={styles.interestsEmptyText}>
+              Add a few interests so friends know what you are into.
+            </Text>
+            <TouchableOpacity onPress={() => setShowInputModal(true)} style={styles.interestsEmptyCta}>
+              <Text style={styles.interestsEmptyCtaText}>Add interests</Text>
+              <Icon name="chevron-forward" size={16} color={ACCENT} />
             </TouchableOpacity>
-          ))}
+          </View>
+        ) : (
+          <View style={styles.interestsWrapper}>
+            {interests.map((interest, i) => (
+              <TouchableOpacity
+                key={i}
+                style={styles.interestRect}
+                onPress={() => handleDeleteInterest(interest)}
+              >
+                <Text style={styles.interestText}>{interest}</Text>
+              </TouchableOpacity>
+            ))}
 
-          <TouchableOpacity onPress={() => setShowInputModal(true)} style={styles.addRect}>
-            <Text style={styles.addRectText}>+ Add</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity onPress={() => setShowInputModal(true)} style={styles.addRect}>
+              <Text style={styles.addRectText}>+ Add</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <TouchableOpacity onPress={handleSignOut} style={styles.signOutBtn}>
@@ -599,11 +753,57 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   scrollContent: { paddingBottom: 70, paddingHorizontal: 20 },
+  heroOuter: { marginHorizontal: -20, marginTop: 0 },
+  heroGradient: {
+    backgroundColor: BG,
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    overflow: "hidden",
+    position: "relative",
+  },
+  heroFlareLayer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  heroFlareBlob: {
+    position: "absolute",
+    borderRadius: 9999,
+    zIndex: 1,
+  },
+  /** Upper-right only — kept away from bottom edge to avoid fold clipping */
+  heroFlareBlobA: {
+    width: 280,
+    height: 280,
+    top: -88,
+    right: -108,
+    backgroundColor: "rgba(0, 200, 130, 0.055)",
+  },
+  heroSheen: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  heroBottomFeather: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 52,
+    zIndex: 2,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 88,
     alignItems: "flex-start",
+    zIndex: 2,
   },
   headerIconContainer: {
     width: 40,
@@ -624,7 +824,7 @@ const styles = StyleSheet.create({
     borderColor: "black",
   },
   badgeText: { color: "white", fontSize: 10, fontFamily: fonts.black },
-  profileSection: { alignItems: "center", marginTop: 4 },
+  profileSection: { alignItems: "center", marginTop: 4, zIndex: 3 },
   qrContainer: { width: 200, height: 200, justifyContent: "center", alignItems: "center" },
   qrBg: { position: "absolute", opacity: 0.4, backgroundColor: "white", borderRadius: 25, padding: 10 },
   avatarGlowWrap: {
@@ -665,10 +865,91 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     fontFamily: fonts.medium,
   },
-  memoRow: {
+  editProfileBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  editProfileBtnText: {
+    color: ACCENT,
+    fontFamily: fonts.heavy,
+    fontSize: 13,
+    letterSpacing: 0.2,
+  },
+  /** Matches friends tab Top Synqs horizontal row */
+  synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 14 },
+  connItem: { alignItems: "center", width: 72 },
+  imageCircle: {
+    width: 55,
+    height: 55,
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  connImg: { width: 55, height: 55, borderRadius: 50, backgroundColor: "#222" },
+  crown: {
+    position: "absolute",
+    bottom: -1,
+    right: -1,
+    backgroundColor: ACCENT,
+    padding: 2,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "black",
+    zIndex: 10,
+  },
+  connName: {
+    color: TEXT,
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: "center",
+    fontFamily: fonts.heavy,
+  },
+  recentSynqEmpty: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: SURFACE,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  recentSynqEmptyText: {
+    color: MUTED,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.medium,
+    textAlign: "center",
+  },
+  recentSynqEmptyCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
     marginTop: 10,
+  },
+  recentSynqEmptyCtaText: {
+    color: ACCENT,
+    fontFamily: fonts.heavy,
+    fontSize: 13,
+    letterSpacing: 0.2,
+  },
+  memoRow: {
+    marginTop: 6,
     alignSelf: "stretch",
     alignItems: "center",
+    zIndex: 3,
   },
   memoContainer: {
     maxWidth: 240,
@@ -686,8 +967,53 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: fonts.medium,
   },
-  section: { marginTop: 20 },
-  sectionTitle: { color: TEXT, fontSize: 21, fontFamily: fonts.heavy, marginBottom: 12, letterSpacing: 0.2 },
+  /** First block after hero — tight to Edit profile; no top rule. */
+  sectionAfterHero: {
+    marginTop: 4,
+    paddingTop: 6,
+  },
+  /** Hairline + padding between Recent Synqs → Open plans → Interests. */
+  section: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BORDER,
+  },
+  sectionTitle: {
+    color: TEXT,
+    fontSize: 20,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
+    marginBottom: 8,
+  },
+  interestsEmpty: {
+    backgroundColor: SURFACE,
+    borderRadius: RADIUS_LG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+  },
+  interestsEmptyText: {
+    color: MUTED,
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: fonts.medium,
+    textAlign: "center",
+  },
+  interestsEmptyCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    marginTop: 14,
+  },
+  interestsEmptyCtaText: {
+    color: ACCENT,
+    fontFamily: fonts.heavy,
+    fontSize: 14,
+    letterSpacing: 0.2,
+  },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
   interestRect: {
@@ -713,7 +1039,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13 },
-  signOutBtn: { alignSelf: "center", marginTop: 22, paddingVertical: 14, paddingHorizontal: 60, borderRadius: BUTTON_RADIUS + 8, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
+  signOutBtn: { alignSelf: "center", marginTop: 20, paddingVertical: 14, paddingHorizontal: 60, borderRadius: BUTTON_RADIUS + 8, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
   signOutText: { color: "#666", fontFamily: fonts.heavy, fontSize: 13, letterSpacing: 2, textTransform: "uppercase" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" },
   qrModalBox: { backgroundColor: "white", padding: 25, borderRadius: MODAL_RADIUS + 18 },

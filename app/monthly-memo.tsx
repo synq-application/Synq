@@ -1,4 +1,4 @@
-import { ACCENT, fonts, MUTED2, TEXT } from "@/constants/Variables";
+import { ACCENT, BORDER, fonts, TEXT } from "@/constants/Variables";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useState } from "react";
 import {
@@ -175,11 +175,9 @@ export default function OpenPlans({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Open plans</Text>
-      <Text style={styles.subtitle}>
-        {`Share what you're up to, friends can tap in.`}
-      </Text>
+      <Text style={styles.sectionTitle}>Open plans</Text>
 
+      <View style={styles.plansBox}>
       {!events.length && (
         <Text style={styles.empty}>Nothing planned… yet 👀</Text>
       )}
@@ -208,7 +206,8 @@ export default function OpenPlans({
             (baseB.getTime() + minutesB * 60000)
           );
         })
-        .map((p) => {
+        .map((p, index, arr) => {
+          const isLast = index === arr.length - 1;
           const d = parseDate(p.date);
           const isJoinedPlan =
             !!p.joinedFromId ||
@@ -224,6 +223,7 @@ export default function OpenPlans({
                 styles.card,
                 isJoinedPlan && styles.joinedCard,
                 isHighlighted && { borderColor: ACCENT, borderWidth: 2 },
+                isLast && { marginBottom: 0 },
               ]}
               onLongPress={() => handleDelete(p)}
             >
@@ -231,9 +231,9 @@ export default function OpenPlans({
               <Text style={styles.month}>
                 {d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()}
               </Text>
-
-              <Text style={styles.date}>{d.getDate()}</Text>
-
+              <View style={styles.dateNumberWrap}>
+                <Text style={styles.date}>{d.getDate()}</Text>
+              </View>
               <Text style={styles.day}>
                 {d
                   .toLocaleDateString("en-US", { weekday: "short" })
@@ -267,6 +267,7 @@ export default function OpenPlans({
             </TouchableOpacity>
           );
         })}
+      </View>
 
       <TouchableOpacity
         style={styles.addBtn}
@@ -477,31 +478,63 @@ const DateBtn = ({
 
 const styles = StyleSheet.create({
   container: { width: "100%", alignSelf: "stretch" },
-  header: {
+  /** Matches profile (me) section titles; parent supplies top rule. */
+  sectionTitle: {
     color: TEXT,
     fontSize: 20,
     fontFamily: fonts.heavy,
-    marginBottom: 6,
     letterSpacing: 0.2,
+    marginBottom: 10,
   },
-  subtitle: {
-    color: MUTED2,
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    lineHeight: 18,
-    marginBottom: 14,
-    paddingRight: 8,
+  /** No outer border — each plan row uses `card` border only (avoids double frame). */
+  plansBox: {
+    paddingVertical: 2,
+    paddingHorizontal: 0,
   },
-  empty: { color: "#666", marginBottom: 16 },
-  card: { backgroundColor: "#0d0d0d", borderRadius: 20, padding: 14, marginBottom: 10, flexDirection: "row" },
-  joinedCard: {
+  empty: { color: "#666", marginBottom: 0, fontSize: 13, lineHeight: 18 },
+  card: {
+    backgroundColor: "#0d0d0d",
+    borderRadius: 14,
     borderWidth: 1,
+    borderColor: BORDER,
+    paddingVertical: 10,
+    paddingLeft: 10,
+    paddingRight: 12,
+    marginBottom: 6,
+    flexDirection: "row",
+  },
+  joinedCard: {
     borderColor: "rgba(43,255,136,0.35)",
     backgroundColor: "rgba(43,255,136,0.07)",
   },
-  dateBlock: { width: 48, alignItems: "center", marginRight: 12 },
-  day: { color: "#666", fontSize: 10 },
-  date: { color: "white", fontSize: 18 },
+  dateBlock: {
+    width: 52,
+    marginRight: 12,
+    alignSelf: "stretch",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    justifyContent: "flex-start",
+  },
+  dateNumberWrap: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    minHeight: 0,
+  },
+  day: {
+    color: "#888",
+    fontSize: 11,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.3,
+  },
+  date: {
+    color: "white",
+    fontSize: 19,
+    fontFamily: fonts.heavy,
+    lineHeight: 23,
+    letterSpacing: -0.5,
+  },
   title: { color: "white", fontSize: 15 },
   meta: { color: "#777", marginTop: 3, fontSize: 13 },
   joinedMeta: { marginTop: 6, fontSize: 12.5, fontFamily: fonts.medium },
@@ -521,7 +554,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    marginTop: 0,
+    marginTop: 20,
     marginBottom: 8,
     alignSelf: "center",
   },
@@ -536,8 +569,9 @@ const styles = StyleSheet.create({
   dateBtn: { borderWidth: 1, borderColor: "#333", borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
   cancel: { color: "#aaa", fontSize: 14 },
   month: {
-  color: "#666",
-  fontSize: 10,
-  marginBottom: 2,
-},
+    color: "#888",
+    fontSize: 11,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.4,
+  },
 });
