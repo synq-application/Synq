@@ -3,6 +3,7 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
+  MODAL_RADIUS,
   MUTED2,
   TEXT,
   fonts,
@@ -18,7 +19,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import AlertModal from "../app/alert-modal";
 import { auth, db } from "../src/lib/firebase";
 
 const US_STATE_ABBREV: Record<string, string> = {
@@ -165,6 +165,14 @@ export default function LocationUpdateModal({ visible, onClose, onSaved }: Props
     }
   };
 
+  const dismissAlert = () => {
+    setAlertVisible(false);
+    if (closeAfterAlert) {
+      setCloseAfterAlert(false);
+      onSaved();
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="fade" transparent>
       <View style={styles.overlay}>
@@ -193,20 +201,23 @@ export default function LocationUpdateModal({ visible, onClose, onSaved }: Props
           <TouchableOpacity onPress={onClose} style={styles.cancelBtn} activeOpacity={0.8}>
             <Text style={styles.cancelText}>Not now</Text>
           </TouchableOpacity>
-
-          <AlertModal
-            visible={alertVisible}
-            title={alertTitle}
-            message={alertMessage}
-            onClose={() => {
-              setAlertVisible(false);
-              if (closeAfterAlert) {
-                setCloseAfterAlert(false);
-                onSaved();
-              }
-            }}
-          />
         </View>
+
+        {alertVisible ? (
+          <View style={styles.alertLayer} pointerEvents="auto">
+            <View style={styles.alertCard}>
+              {alertTitle ? <Text style={styles.alertTitle}>{alertTitle}</Text> : null}
+              <Text style={styles.alertMessage}>{alertMessage}</Text>
+              <TouchableOpacity
+                style={styles.alertButton}
+                onPress={dismissAlert}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.alertButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
       </View>
     </Modal>
   );
@@ -268,6 +279,50 @@ const styles = StyleSheet.create({
   cancelText: {
     color: MUTED2,
     fontFamily: fonts.medium,
+    fontSize: 14,
+  },
+  alertLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  alertCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: BG,
+    borderRadius: MODAL_RADIUS,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: "center",
+  },
+  alertTitle: {
+    color: TEXT,
+    fontSize: 18,
+    fontFamily: fonts.heavy,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  alertMessage: {
+    color: MUTED2,
+    fontSize: 14,
+    fontFamily: fonts.book,
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  alertButton: {
+    backgroundColor: ACCENT,
+    borderRadius: BUTTON_RADIUS,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+  },
+  alertButtonText: {
+    color: "#061006",
+    fontFamily: fonts.heavy,
     fontSize: 14,
   },
 });

@@ -578,7 +578,7 @@ export default function SynqScreen() {
 
           const data = uSnap.data();
 
-          if (data?.status === 'available') {
+          if (computeSynqActiveFromUserData(data)) {
             friendState.set(fid, { id: fid, ...data });
             const uri = resolveAvatar(data?.imageurl);
             if (uri) {

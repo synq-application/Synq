@@ -268,12 +268,15 @@ export default function OpenPlans({
         })}
       </View>
 
-      <TouchableOpacity
-        style={styles.addBtn}
-        onPress={() => setShowEventModal(true)}
-      >
-        <Text style={styles.addBtnText}>+ Add plan</Text>
-      </TouchableOpacity>
+      <View style={styles.addBtnRow}>
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => setShowEventModal(true)}
+          accessibilityLabel="Add plan"
+        >
+          <Text style={styles.addBtnText}>+ Add plan</Text>
+        </TouchableOpacity>
+      </View>
 
       <Modal visible={showEventModal} transparent animationType="fade">
         <TouchableWithoutFeedback
@@ -488,7 +491,14 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     paddingHorizontal: 0,
   },
-  empty: { color: "#666", marginBottom: 0, fontSize: 13, lineHeight: 18 },
+  empty: {
+    color: "#666",
+    marginBottom: 0,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "left",
+    alignSelf: "stretch",
+  },
   card: {
     backgroundColor: "#0d0d0d",
     borderRadius: 14,
@@ -545,6 +555,10 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontFamily: fonts.medium,
   },
+  addBtnRow: {
+    width: "100%",
+    alignItems: "flex-start",
+  },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -556,7 +570,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginTop: 20,
     marginBottom: 8,
-    alignSelf: "center",
   },
   addBtnText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 0 },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" },

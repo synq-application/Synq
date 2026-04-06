@@ -8,7 +8,6 @@ import {
   MODAL_RADIUS,
   MUTED,
   MUTED2,
-  RADIUS_LG,
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
@@ -669,22 +668,11 @@ export default function ProfileScreen() {
             })}
           </View>
         ) : (
-          <View style={styles.recentSynqEmpty}>
-            <Text style={styles.recentSynqEmptyText}>
-              {friendsForHostNames.length === 0
-                ? "Add friends to see recent Synqs here."
-                : "No Synqs yet — connect from the home tab and your history will show up."}
-            </Text>
-            <ProfilePressable
-              style={styles.recentSynqEmptyCta}
-              contentStyle={styles.recentSynqEmptyCtaInner}
-              onPress={() => router.push("/(tabs)/friends")}
-              accessibilityLabel="Open friends"
-            >
-              <Text style={styles.recentSynqEmptyCtaText}>Friends</Text>
-              <Icon name="chevron-forward" size={14} color={ACCENT} />
-            </ProfilePressable>
-          </View>
+          <Text style={styles.profileHelperText}>
+            {friendsForHostNames.length === 0
+              ? "Add friends to see recent Synqs here."
+              : "No Synqs yet — connect from the home tab and your history will show up."}
+          </Text>
         )}
       </View>
 
@@ -706,20 +694,19 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Interests</Text>
         {interests.length === 0 ? (
-          <View style={styles.interestsEmpty}>
-            <Text style={styles.interestsEmptyText}>
+          <>
+            <Text style={styles.profileHelperText}>
               Add a few interests so friends know what you are into.
             </Text>
-            <ProfilePressable
-              style={styles.interestsEmptyCta}
-              contentStyle={styles.interestsEmptyCtaInner}
+            <TouchableOpacity
+              style={styles.interestsAddPlanBtn}
               onPress={() => setShowInputModal(true)}
               accessibilityLabel="Add interests"
+              activeOpacity={0.85}
             >
-              <Text style={styles.interestsEmptyCtaText}>Add interests</Text>
-              <Icon name="chevron-forward" size={16} color={ACCENT} />
-            </ProfilePressable>
-          </View>
+              <Text style={styles.interestsAddPlanBtnText}>+ Add</Text>
+            </TouchableOpacity>
+          </>
         ) : (
           <View style={styles.interestsWrapper}>
             {interests.map((interest, i) => (
@@ -1008,33 +995,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: fonts.heavy,
   },
-  recentSynqEmpty: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: SURFACE,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  recentSynqEmptyText: {
-    color: MUTED,
+  profileHelperText: {
+    color: MUTED2,
     fontSize: 13,
-    lineHeight: 18,
-    fontFamily: fonts.medium,
-    textAlign: "center",
-  },
-  recentSynqEmptyCta: { marginTop: 10, alignSelf: "center" },
-  recentSynqEmptyCtaInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  recentSynqEmptyCtaText: {
-    color: ACCENT,
-    fontFamily: fonts.heavy,
-    fontSize: 13,
-    letterSpacing: 0.2,
+    lineHeight: 19,
+    fontFamily: fonts.book,
+    textAlign: "left",
+    marginTop: 2,
   },
   memoRow: {
     marginTop: 6,
@@ -1075,33 +1042,21 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     marginBottom: 8,
   },
-  interestsEmpty: {
-    backgroundColor: SURFACE,
-    borderRadius: RADIUS_LG,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-  },
-  interestsEmptyText: {
-    color: MUTED,
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: fonts.medium,
-    textAlign: "center",
-  },
-  interestsEmptyCta: { marginTop: 14, alignSelf: "center" },
-  interestsEmptyCtaInner: {
+  interestsAddPlanBtn: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
+    borderWidth: 1,
+    borderColor: ACCENT,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 12,
+    alignSelf: "flex-start",
   },
-  interestsEmptyCtaText: {
+  interestsAddPlanBtnText: {
     color: ACCENT,
     fontFamily: fonts.heavy,
-    fontSize: 14,
-    letterSpacing: 0.2,
+    fontSize: 13,
   },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },

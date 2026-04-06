@@ -425,14 +425,11 @@ export default function FriendsScreen() {
     return (
       <>
         {topSynqsBlock}
-        <View
-          style={[
-            styles.allFriendsHeader,
-            topSynqsBlock == null && styles.allFriendsHeaderFlushTop,
-          ]}
-        >
-          <Text style={styles.allFriendsTitle}>All friends</Text>
-        </View>
+        {topSynqsBlock != null ? (
+          <View style={styles.friendsListAfterTopSynqsSpacer} />
+        ) : (
+          <View style={styles.friendsListHeaderSpacerNoTopSynqs} />
+        )}
       </>
     );
   };
@@ -1333,15 +1330,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   connName: { color: TEXT, fontSize: 13, marginTop: 8, textAlign: "center", fontFamily: fonts.heavy },
-  allFriendsHeader: { marginTop: 22, marginBottom: 6 },
-  allFriendsHeaderFlushTop: { marginTop: 18 },
-  allFriendsTitle: {
-    color: TEXT,
-    fontSize: 21,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
-    marginBottom: 6,
-  },
+  friendsListAfterTopSynqsSpacer: { height: 22 },
+  friendsListHeaderSpacerNoTopSynqs: { height: 18 },
   friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
   separator: {
     height: 1,
@@ -1395,8 +1385,8 @@ const styles = StyleSheet.create({
   emptyHeroTitle: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 34,
+    lineHeight: 40,
     letterSpacing: 0.2,
     textAlign: "center",
     width: "100%",
@@ -1420,8 +1410,7 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   emptyPrimaryCtaWrap: {
-    alignSelf: "stretch",
-    width: "100%",
+    alignSelf: "center",
     marginTop: SPACE_6 + SPACE_3,
   },
   emptyPrimaryCta: {
@@ -1429,12 +1418,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: SPACE_3,
-    width: "100%",
     backgroundColor: ACCENT,
     borderRadius: BUTTON_RADIUS,
-    paddingVertical: 18,
+    paddingVertical: 16,
     paddingHorizontal: SPACE_5,
-    minHeight: 56,
+    minHeight: 52,
   },
   emptyPrimaryCtaText: {
     color: "#061006",
