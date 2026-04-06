@@ -485,10 +485,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
-    marginBottom: 10,
+    marginBottom: 16,
   },
   plansBox: {
-    paddingVertical: 2,
+    paddingVertical: 0,
     paddingHorizontal: 0,
   },
   empty: {
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    marginTop: 20,
+    marginTop: 16,
     marginBottom: 8,
   },
   addBtnText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 0 },

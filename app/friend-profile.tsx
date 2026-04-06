@@ -23,7 +23,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -40,6 +40,7 @@ import Icon from "react-native-vector-icons/Ionicons";
 import {
   eventKey,
   eventKeyLoose,
+  filterOutPastOpenPlans,
   matchesPlanEvent,
   matchesPlanEventForHostSync,
 } from "../src/lib/planEvents";
@@ -104,6 +105,11 @@ export default function FriendProfile() {
     setAlertMessage(message);
     setAlertVisible(true);
   };
+
+  const showFriendOpenPlansSection = useMemo(
+    () => filterOutPastOpenPlans(friend?.events).length > 0,
+    [friend?.events]
+  );
 
   const isInSharedPlanWithFriend = (e: any, myUid: string, friendUid: string) => {
     if (!e || !friendUid) return false;
@@ -866,25 +872,27 @@ export default function FriendProfile() {
             )}
           </View>
         </View>
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, styles.openPlansTitle]}>Open plans</Text>
-          <Text style={styles.openPlansSubtitle}>
-            {`Tap a plan to add it to your open plans and let ${
-              friend.displayName?.trim().split(/\s+/)[0] || "your friend"
-            } know you're interested.`}
-          </Text>
+        {showFriendOpenPlansSection ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.openPlansTitle]}>Open plans</Text>
+            <Text style={styles.openPlansSubtitle}>
+              {`Tap a plan to add it to your open plans and let ${
+                friend.displayName?.trim().split(/\s+/)[0] || "your friend"
+              } know you're interested.`}
+            </Text>
 
-          <MonthlyMemoReadOnly
-            events={friend.events || []}
-            ACCENT={ACCENT}
-            fonts={fonts}
-            onPressPlan={handlePlanPress}
-            isPlanJoined={planLooksJoined}
-            isViewerHostOfPlan={isViewerHostOfFriendsPlan}
-            hostDisplayNameByUid={hostDisplayNameByUid}
-            profileFallbackFirstName={friend.displayName?.split(" ")[0] || "Friend"}
-          />
-        </View>
+            <MonthlyMemoReadOnly
+              events={friend.events || []}
+              ACCENT={ACCENT}
+              fonts={fonts}
+              onPressPlan={handlePlanPress}
+              isPlanJoined={planLooksJoined}
+              isViewerHostOfPlan={isViewerHostOfFriendsPlan}
+              hostDisplayNameByUid={hostDisplayNameByUid}
+              profileFallbackFirstName={friend.displayName?.split(" ")[0] || "Friend"}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.footerActions}>
           {isFriend ? (

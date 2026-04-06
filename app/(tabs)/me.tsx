@@ -1001,7 +1001,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontFamily: fonts.book,
     textAlign: "left",
-    marginTop: 2,
   },
   memoRow: {
     marginTop: 6,
@@ -1030,8 +1029,8 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
   section: {
-    marginTop: 14,
-    paddingTop: 12,
+    marginTop: 16,
+    paddingTop: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: BORDER,
   },
@@ -1040,7 +1039,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
-    marginBottom: 8,
+    marginBottom: 14,
   },
   interestsAddPlanBtn: {
     flexDirection: "row",
@@ -1050,7 +1049,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    marginTop: 12,
+    marginTop: 16,
     alignSelf: "flex-start",
   },
   interestsAddPlanBtnText: {
@@ -1082,7 +1081,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13 },
-  signOutBtn: { alignSelf: "center", marginTop: 20, paddingVertical: 14, paddingHorizontal: 60, borderRadius: BUTTON_RADIUS + 8, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
+  signOutBtn: { alignSelf: "center", marginTop: 40, paddingVertical: 14, paddingHorizontal: 60, borderRadius: BUTTON_RADIUS + 8, borderWidth: 1.5, borderColor: "#222", backgroundColor: "#0a0a0a" },
   signOutText: { color: "#666", fontFamily: fonts.heavy, fontSize: 13, letterSpacing: 2, textTransform: "uppercase" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" },
   qrModalBox: { backgroundColor: "white", padding: 25, borderRadius: MODAL_RADIUS + 18 },
