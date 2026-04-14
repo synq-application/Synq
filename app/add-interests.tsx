@@ -12,7 +12,6 @@ import {
 import {
   onboardingContentTopPadding,
   ONBOARDING_DIVIDER_MARGIN_TOP,
-  ONBOARDING_DIVIDER_WIDTH,
   ONBOARDING_H_PADDING,
   ONBOARDING_SUBTITLE_MARGIN_TOP,
   ONBOARDING_SUBTITLE_SIZE,
@@ -109,7 +108,6 @@ export default function InterestsOnboarding() {
     return (
         <View style={[styles.container, { paddingTop: onboardingContentTopPadding() }]}>
             <Text style={styles.title}>Add your interests</Text>
-            <View style={styles.divider} />
             <Text style={styles.subtitle}>
                 This helps Synq suggest plans and helps friends find common ground.
             </Text>
@@ -179,16 +177,11 @@ const styles = StyleSheet.create({
         fontFamily: fonts.heavy,
         letterSpacing: 0.2,
     },
-    divider: {
-        marginTop: ONBOARDING_DIVIDER_MARGIN_TOP,
-        height: 1,
-        backgroundColor: "rgba(255,255,255,0.08)",
-        width: ONBOARDING_DIVIDER_WIDTH,
-    },
-    subtitle: {
-        color: MUTED,
-        fontSize: ONBOARDING_SUBTITLE_SIZE,
-        marginTop: ONBOARDING_SUBTITLE_MARGIN_TOP,
+  subtitle: {
+    color: MUTED,
+    fontSize: ONBOARDING_SUBTITLE_SIZE,
+    marginTop:
+      ONBOARDING_DIVIDER_MARGIN_TOP + 1 + ONBOARDING_SUBTITLE_MARGIN_TOP,
         fontFamily: fonts.book,
         lineHeight: 22,
     },
