@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { PhoneAuthProvider, signInWithCredential } from "firebase/auth";
 import React, { useMemo, useState } from "react";
@@ -17,6 +18,8 @@ import {
 
 import {
   onboardingAuthInnerMarginTop,
+  ONBOARDING_BACK_LEFT,
+  ONBOARDING_BACK_TOP,
   ONBOARDING_DIVIDER_MARGIN_TOP,
   ONBOARDING_DIVIDER_WIDTH,
   ONBOARDING_H_PADDING,
@@ -74,6 +77,9 @@ export default function Verify() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={20} color={ACCENT} />
+        </TouchableOpacity>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[
@@ -116,10 +122,6 @@ export default function Verify() {
               ) : (
                 <Text style={styles.primaryButtonText}>Verify</Text>
               )}
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => router.back()} style={styles.backLink} activeOpacity={0.7}>
-              <Text style={styles.back}>Back</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -190,6 +192,18 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },
-  backLink: { marginTop: 18, alignSelf: "flex-start" },
-  back: { color: MUTED, fontSize: 15, fontFamily: fonts.book },
+  backBtn: {
+    position: "absolute",
+    top: ONBOARDING_BACK_TOP,
+    left: ONBOARDING_BACK_LEFT,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
 });

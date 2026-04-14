@@ -20,6 +20,7 @@ import {
   synqSvg,
   TEXT,
 } from "@/constants/Variables";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from "react";
@@ -80,8 +81,8 @@ export default function EmailSignup() {
         <View pointerEvents="none" style={styles.bgSvgWrap}>
           <SvgXml xml={synqSvg} width="120%" height="120%" />
         </View>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} activeOpacity={0.7}>
-          <Text style={styles.closeText}>Back</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={20} color={ACCENT} />
         </TouchableOpacity>
 
         <KeyboardAvoidingView
@@ -165,8 +166,20 @@ const styles = StyleSheet.create({
     opacity: 0.35,
     transform: [{ rotate: "-8deg" }],
   },
-  closeBtn: { position: "absolute", top: ONBOARDING_BACK_TOP, left: ONBOARDING_BACK_LEFT, zIndex: 10 },
-  closeText: { fontSize: 16, color: ACCENT, fontFamily: fonts.book },
+  backBtn: {
+    position: "absolute",
+    top: ONBOARDING_BACK_TOP,
+    left: ONBOARDING_BACK_LEFT,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
   container: { flex: 1, paddingHorizontal: ONBOARDING_H_PADDING },
   scrollContent: { flexGrow: 1, paddingBottom: ONBOARDING_SCROLL_BOTTOM },
   inner: { width: "100%" },

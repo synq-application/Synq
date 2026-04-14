@@ -5,7 +5,7 @@ const { height: WINDOW_HEIGHT } = Dimensions.get("window");
 /** Horizontal inset for onboarding form columns (auth + post-auth). */
 export const ONBOARDING_H_PADDING = 22;
 
-/** Top offset for absolute back controls (chevron / text). */
+/** Top offset for absolute back controls (chevron). */
 export const ONBOARDING_BACK_TOP = 56;
 
 /** Left inset for back controls — lines up with form content. */
