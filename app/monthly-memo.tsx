@@ -1,7 +1,7 @@
 import { ACCENT, BORDER, fonts, TEXT } from "@/constants/Variables";
 import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -120,6 +120,19 @@ export default function OpenPlans({
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<EventItem | null>(null);
+
+  const minimumSelectableDate = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  useEffect(() => {
+    if (showEventModal) {
+      setSelectedDate(getInitialDate());
+      setPicker(null);
+    }
+  }, [showEventModal]);
 
   const visibleEvents = useMemo(() => filterOutPastOpenPlans(events), [events]);
 
@@ -357,6 +370,7 @@ export default function OpenPlans({
                       display="spinner"
                       themeVariant="dark"
                       textColor="white"
+                      minimumDate={minimumSelectableDate}
                       onChange={(e, d) => {
                         if (d) {
                           setDate(d);

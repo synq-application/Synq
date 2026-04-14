@@ -271,10 +271,16 @@ export default function ProfileScreen() {
       planHostUid: auth.currentUser.uid,
     };
 
-    const updatedEvents = [...events, newItem];
-
+    const ref = doc(db, "users", auth.currentUser.uid);
     try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+      const snap = await getDoc(ref);
+      const raw = snap.exists()
+        ? (snap.data() as { events?: unknown }).events
+        : undefined;
+      const existing = Array.isArray(raw) ? (raw as OpenPlanEvent[]) : [];
+      const updatedEvents = [...existing, newItem];
+
+      await updateDoc(ref, {
         events: updatedEvents,
       });
 
