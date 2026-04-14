@@ -17,16 +17,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { stateAbbreviations } from "../assets/Mocks";
 import {
-  ONBOARDING_DIVIDER_MARGIN_TOP,
   ONBOARDING_DIVIDER_WIDTH,
   ONBOARDING_H_PADDING,
   ONBOARDING_SCROLL_BOTTOM,
-  ONBOARDING_SUBTITLE_MARGIN_TOP,
   ONBOARDING_SUBTITLE_SIZE,
-  ONBOARDING_TITLE_LINE_HEIGHT,
   ONBOARDING_TITLE_SIZE,
   onboardingContentTopPadding,
-} from "../constants/onboardingLayout";
+} from "@/constants/onboardingLayout";
 import {
   ACCENT,
   BG,
@@ -202,7 +199,7 @@ export default function LocationDetails() {
                 onboardingContentTopPadding(),
                 insets.top + 24
               ),
-              paddingBottom: ONBOARDING_SCROLL_BOTTOM + 12 + insets.bottom,
+              paddingBottom: ONBOARDING_SCROLL_BOTTOM + 48 + insets.bottom,
             },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -211,13 +208,16 @@ export default function LocationDetails() {
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
-        <Text style={styles.title}>Where do you live?</Text>
-        <View style={styles.divider} />
-        <Text style={styles.subtitle}>
-          This helps friends see who is nearby for a quick Synq.
-        </Text>
+        <View style={styles.innerContent}>
+          <View style={styles.headerSection}>
+            <Text style={styles.title}>Where do you live?</Text>
+            <View style={styles.divider} />
+            <Text style={styles.subtitle}>
+              This helps friends see who is nearby for a quick Synq.
+            </Text>
+          </View>
 
-        <View style={{ marginTop: 24 }}>
+        <View style={styles.formBlock}>
           <TextInput
             value={city}
             onChangeText={setCity}
@@ -281,6 +281,7 @@ export default function LocationDetails() {
           message={alertMessage}
           onClose={() => setAlertVisible(false)}
         />
+        </View>
         </ScrollView>
       </View>
     </TouchableWithoutFeedback>
@@ -295,16 +296,26 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: ONBOARDING_SCROLL_BOTTOM + 48,
+  },
+  innerContent: {
+    width: "100%",
+  },
+  headerSection: {
+    marginBottom: 10,
+  },
+  formBlock: {
+    marginTop: 4,
   },
   title: {
     color: TEXT,
     fontSize: ONBOARDING_TITLE_SIZE,
-    lineHeight: ONBOARDING_TITLE_LINE_HEIGHT,
+    lineHeight: 38,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },
   divider: {
-    marginTop: ONBOARDING_DIVIDER_MARGIN_TOP,
+    marginTop: 8,
     height: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
     width: ONBOARDING_DIVIDER_WIDTH,
@@ -312,7 +323,7 @@ const styles = StyleSheet.create({
   subtitle: {
     color: MUTED,
     fontSize: ONBOARDING_SUBTITLE_SIZE,
-    marginTop: ONBOARDING_SUBTITLE_MARGIN_TOP,
+    marginBottom: 10,
     fontFamily: fonts.book,
     lineHeight: 22,
   },
@@ -324,6 +335,7 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_RADIUS,
     paddingHorizontal: 14,
     fontSize: 16,
+    fontFamily: fonts.medium,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
   },
@@ -363,16 +375,20 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    marginTop: 24,
+    marginTop: 32,
     alignSelf: "center",
     width: PRIMARY_CTA_WIDTH,
     backgroundColor: ACCENT,
     height: PRIMARY_CTA_HEIGHT,
-    borderRadius: BUTTON_RADIUS,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-  buttonText: { color: "black", fontSize: 16, fontWeight: "800" },
+  buttonText: {
+    color: "black",
+    fontSize: 18,
+    fontFamily: fonts.heavy,
+  },
 
   skipButton: { marginTop: 20, alignSelf: "center" },
   skipText: {
