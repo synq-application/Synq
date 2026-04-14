@@ -1,6 +1,7 @@
 import { Asset } from "expo-asset";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
+import { Image as ExpoImage } from "expo-image";
 import * as Notifications from "expo-notifications";
 import {
   Stack,
@@ -18,17 +19,17 @@ import React, {
   useState,
 } from "react";
 import {
-  ActivityIndicator,
+  Animated,
   DeviceEventEmitter,
+  Easing,
   InteractionManager,
   Platform,
-  Text,
   View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import LocationUpdateModal from "../components/LocationUpdateModal";
-import { ACCENT, BG, fonts, TYPE_CAPTION } from "../constants/Variables";
+import { ACCENT, BG } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../src/lib/locationPromptEvents";
 import {
@@ -41,6 +42,8 @@ import {
   computeSynqActiveFromUserData,
   readCachedSynqActive,
 } from "../src/lib/synqSession";
+
+const SPLASH_LOGO = require("../assets/SYNQ-2.png");
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -114,10 +117,13 @@ export default function RootLayout() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [assetsReady, setAssetsReady] = useState(false);
+  const [minimumSplashElapsed, setMinimumSplashElapsed] = useState(false);
   const [synqBoot, setSynqBoot] = useState<{
     cachedSynqActive: boolean;
   } | null>(null);
   const synqBootUidRef = useRef<string | null>(null);
+  const splashOpacity = useRef(new Animated.Value(0)).current;
+  const splashScale = useRef(new Animated.Value(0.88)).current;
   const [showLocationModal, setShowLocationModal] = useState(false);
 
   const [pendingNotificationTap, setPendingNotificationTap] = useState<
@@ -251,6 +257,13 @@ export default function RootLayout() {
       cancelled = true;
     };
   }, [user?.uid]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setMinimumSplashElapsed(true);
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -439,6 +452,29 @@ export default function RootLayout() {
   const synqBootReady = user == null || synqBoot !== null;
   const appReady =
     authReady && navReady && assetsReady && synqBootReady;
+  const showSplash = !appReady || !minimumSplashElapsed;
+
+  useEffect(() => {
+    if (!showSplash) return;
+    splashOpacity.setValue(0);
+    splashScale.setValue(0.88);
+    const anim = Animated.parallel([
+      Animated.timing(splashOpacity, {
+        toValue: 1,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(splashScale, {
+        toValue: 1,
+        friction: 7,
+        tension: 72,
+        useNativeDriver: true,
+      }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [showSplash]);
 
   const locationModals =
     user && authReady ? (
@@ -462,7 +498,7 @@ export default function RootLayout() {
           <SynqBootProvider
             value={synqBoot ?? { cachedSynqActive: false }}
           >
-            {!appReady ? (
+            {showSplash ? (
               <View
                 style={{
                   flex: 1,
@@ -471,17 +507,22 @@ export default function RootLayout() {
                   justifyContent: "center",
                 }}
               >
-                <ActivityIndicator color={ACCENT} size="small" />
-                <Text
+                <Animated.View
                   style={{
-                    marginTop: 10,
-                    color: "rgba(255,255,255,0.55)",
-                    fontFamily: fonts.medium,
-                    fontSize: TYPE_CAPTION,
+                    opacity: splashOpacity,
+                    transform: [{ scale: splashScale }],
                   }}
                 >
-                  Loading Synq...
-                </Text>
+                  <ExpoImage
+                    source={SPLASH_LOGO}
+                    style={{ width: 300, height: 220 }}
+                    contentFit="contain"
+                    transition={0}
+                    cachePolicy="memory-disk"
+                    accessibilityRole="image"
+                    accessibilityLabel="Synq"
+                  />
+                </Animated.View>
               </View>
             ) : (
               <Stack screenOptions={{ headerShown: false }}>
