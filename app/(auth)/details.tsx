@@ -1,5 +1,4 @@
 import {
-  ONBOARDING_DIVIDER_WIDTH,
   ONBOARDING_H_PADDING,
   ONBOARDING_SCROLL_BOTTOM,
   ONBOARDING_SUBTITLE_SIZE,
@@ -156,7 +155,6 @@ export default function Details() {
         <View style={styles.innerContent}>
           <View style={styles.headerSection}>
             <Text style={styles.title}>What’s your name?</Text>
-            <View style={styles.divider} />
             <Text style={styles.subtitle}>Help friends recognize you on Synq.</Text>
           </View>
 
@@ -261,15 +259,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },
-  divider: {
-    marginTop: 8,
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    width: ONBOARDING_DIVIDER_WIDTH,
-  },
   subtitle: {
     color: MUTED,
     fontSize: ONBOARDING_SUBTITLE_SIZE,
+    marginTop: 9,
     marginBottom: 10,
     fontFamily: fonts.book,
     lineHeight: 22,
