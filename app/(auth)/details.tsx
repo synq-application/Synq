@@ -1,3 +1,11 @@
+import {
+  ONBOARDING_DIVIDER_WIDTH,
+  ONBOARDING_H_PADDING,
+  ONBOARDING_SCROLL_BOTTOM,
+  ONBOARDING_SUBTITLE_SIZE,
+  ONBOARDING_TITLE_SIZE,
+  onboardingContentTopPadding,
+} from "@/constants/onboardingLayout";
 import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -19,23 +27,12 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import {
-  onboardingContentTopPadding,
-  ONBOARDING_DIVIDER_MARGIN_TOP,
-  ONBOARDING_DIVIDER_WIDTH,
-  ONBOARDING_H_PADDING,
-  ONBOARDING_SCROLL_BOTTOM,
-  ONBOARDING_SUBTITLE_MARGIN_TOP,
-  ONBOARDING_SUBTITLE_SIZE,
-  ONBOARDING_TITLE_LINE_HEIGHT,
-  ONBOARDING_TITLE_SIZE,
-} from "@/constants/onboardingLayout";
-import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
+  MUTED,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
-  MUTED,
   TEXT,
   fonts,
 } from "../../constants/Variables";
@@ -259,12 +256,13 @@ const styles = StyleSheet.create({
   title: {
     color: TEXT,
     fontSize: ONBOARDING_TITLE_SIZE,
-    lineHeight: ONBOARDING_TITLE_LINE_HEIGHT,
+    // Single-line headline: slightly tighter than shared onboarding line height
+    lineHeight: 38,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },
   divider: {
-    marginTop: ONBOARDING_DIVIDER_MARGIN_TOP,
+    marginTop: 8,
     height: 1,
     backgroundColor: "rgba(255,255,255,0.08)",
     width: ONBOARDING_DIVIDER_WIDTH,
@@ -272,7 +270,7 @@ const styles = StyleSheet.create({
   subtitle: {
     color: MUTED,
     fontSize: ONBOARDING_SUBTITLE_SIZE,
-    marginTop: ONBOARDING_SUBTITLE_MARGIN_TOP,
+    marginBottom: 10,
     fontFamily: fonts.book,
     lineHeight: 22,
   },
