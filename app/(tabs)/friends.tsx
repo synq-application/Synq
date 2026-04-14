@@ -516,6 +516,7 @@ export default function FriendsScreen() {
           onPress={() => setSearchModalVisible(true)}
         />
       </View>
+      <View style={styles.friendsHeaderDivider} />
       {showFriendSearch && (
         <View style={styles.searchBarSubtle}>
           <Ionicons name="search-outline" size={16} color="rgba(255,255,255,0.35)" />
@@ -1282,6 +1283,10 @@ const styles = StyleSheet.create({
   },
   headerTitleBlock: { flex: 1, paddingRight: 12 },
   headerTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
+  friendsHeaderDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
   headerAction: { paddingLeft: 12, paddingVertical: 6 },
   searchBarSubtle: {
     flexDirection: "row",
