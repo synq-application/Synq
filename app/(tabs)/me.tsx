@@ -1,4 +1,8 @@
 import {
+  ONBOARDING_DIVIDER_WIDTH,
+  ONBOARDING_H_PADDING,
+} from "@/constants/onboardingLayout";
+import {
   ACCENT,
   BG,
   BORDER,
@@ -8,6 +12,8 @@ import {
   MODAL_RADIUS,
   MUTED,
   MUTED2,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
@@ -32,7 +38,6 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View
 } from "react-native";
@@ -48,6 +53,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
@@ -162,7 +168,6 @@ export default function ProfileScreen() {
   const [isQRExpanded, setQRExpanded] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [interests, setInterests] = useState<string[]>([]);
   const [city, setCity] = useState<string | null>(null);
@@ -435,14 +440,6 @@ export default function ProfileScreen() {
     return () => clearTimeout(t);
   }, [events]);
 
-  const filteredActivities = useMemo(
-    () =>
-      allActivities.filter((item) =>
-        item.name.toLowerCase().includes(searchQuery.toLowerCase())
-      ),
-    [searchQuery]
-  );
-
   const handleDeleteInterest = (interestName: string) => {
     setPendingInterestDelete(interestName);
   };
@@ -494,7 +491,6 @@ export default function ProfileScreen() {
         interests: selectedInterests,
       });
       setShowInputModal(false);
-      setSearchQuery("");
     } catch (e) {
       showAlert("Error", "Could not save interests.");
     }
@@ -764,63 +760,67 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      <Modal visible={showInputModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={{ flex: 1, width: "100%" }}
-            onPress={() => setShowInputModal(false)}
-          />
-          <View style={styles.interestContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>What are you into?</Text>
-              <TouchableOpacity onPress={() => setShowInputModal(false)}>
-                <Icon name="close" size={24} color="white" />
-              </TouchableOpacity>
+      <Modal
+        visible={showInputModal}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.interestModalFullscreen} edges={["top", "left", "right", "bottom"]}>
+            <StatusBar barStyle="light-content" />
+            <View style={styles.interestSheet}>
+            <View style={styles.interestSheetTop}>
+              <View style={styles.interestSheetHeaderRow}>
+                <View style={styles.interestSheetTitleWrap}>
+                  <Text style={styles.interestSheetTitle}>What are you into?</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowInputModal(false)}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Close interests"
+                  accessibilityRole="button"
+                >
+                  <Icon name="close-circle" size={28} color="#444" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.interestSheetDivider} />
             </View>
 
-            <View style={styles.searchBarContainer}>
-              <Icon name="search-outline" size={18} color="#666" style={{ marginLeft: 12 }} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search interests..."
-                placeholderTextColor="#666"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCapitalize="none"
-              />
+            <View style={styles.interestPillsSection}>
+              <ScrollView
+                style={styles.interestPillsScroll}
+                contentContainerStyle={styles.interestPillsWrap}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                onScrollBeginDrag={Keyboard.dismiss}
+                showsVerticalScrollIndicator={false}
+              >
+                {allActivities.map((item) => {
+                  const active = selectedInterests.includes(item.name);
+                  return (
+                    <TouchableOpacity
+                      key={item.name}
+                      onPress={() =>
+                        setSelectedInterests((prev) =>
+                          active ? prev.filter((i) => i !== item.name) : [...prev, item.name]
+                        )
+                      }
+                      activeOpacity={0.85}
+                      style={[styles.interestPill, active && styles.interestPillOn]}
+                    >
+                      <Text style={styles.interestText}>{item.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             </View>
 
-            <ScrollView
-              contentContainerStyle={styles.interestGrid}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              onScrollBeginDrag={Keyboard.dismiss}
-            >
-              {filteredActivities.map((item) => {
-                const active = selectedInterests.includes(item.name);
-                return (
-                  <TouchableOpacity
-                    key={item.name}
-                    onPress={() =>
-                      setSelectedInterests((prev) =>
-                        active ? prev.filter((i) => i !== item.name) : [...prev, item.name]
-                      )
-                    }
-                    style={[styles.chip, active && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {item.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            <TouchableOpacity onPress={saveInterests} style={styles.saveBtn}>
-              <Text style={styles.saveBtnText}>Save Changes</Text>
+            <TouchableOpacity onPress={saveInterests} style={styles.interestSaveBtn}>
+              <Text style={styles.interestSaveBtnText}>Save Changes</Text>
             </TouchableOpacity>
           </View>
-        </View>
+          </SafeAreaView>
+        </SafeAreaProvider>
       </Modal>
       <AlertModal
   visible={alertVisible}
@@ -1091,16 +1091,84 @@ const styles = StyleSheet.create({
   signOutText: { color: "#666", fontFamily: fonts.heavy, fontSize: 13, letterSpacing: 2, textTransform: "uppercase" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" },
   qrModalBox: { backgroundColor: "white", padding: 25, borderRadius: MODAL_RADIUS + 18 },
-  interestContent: { backgroundColor: "#0a0a0a", width: "100%", height: "85%", marginTop: "auto", borderTopLeftRadius: MODAL_RADIUS + 18, borderTopRightRadius: MODAL_RADIUS + 18, padding: 30, alignItems: "center" },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", width: "100%", alignItems: "center", marginBottom: 25 },
-  modalTitle: { color: TEXT, fontSize: 26, fontFamily: fonts.black },
-  searchBarContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#1a1a1a", borderRadius: 18, width: "100%", marginBottom: 20, borderWidth: 1, borderColor: BORDER },
-  searchInput: { flex: 1, color: TEXT, padding: 14, fontFamily: fonts.medium, fontSize: 16 },
-  interestGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", paddingBottom: 30 },
-  chip: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 30, backgroundColor: "#111", borderWidth: 1, borderColor: "#222", margin: 6 },
-  chipActive: { backgroundColor: ACCENT, borderColor: ACCENT },
-  chipText: { color: "#555", fontFamily: fonts.heavy },
-  chipTextActive: { color: "black" },
-  saveBtn: { backgroundColor: ACCENT, width: "100%", padding: 20, borderRadius: 22, marginBottom: 20, alignItems: "center" },
-  saveBtnText: { color: "black", fontFamily: fonts.black, fontSize: 17 },
+  interestModalFullscreen: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+  interestSheet: {
+    flex: 1,
+    backgroundColor: BG,
+    width: "100%",
+    paddingHorizontal: ONBOARDING_H_PADDING,
+    paddingTop: 36,
+  },
+  interestSheetTop: {
+    marginBottom: 0,
+  },
+  interestSheetHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  interestSheetTitleWrap: {
+    flex: 1,
+    marginRight: 12,
+  },
+  interestSheetTitle: {
+    color: TEXT,
+    fontSize: 28,
+    lineHeight: 34,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
+  },
+  interestSheetDivider: {
+    marginTop: 8,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    width: ONBOARDING_DIVIDER_WIDTH,
+  },
+  interestPillsSection: {
+    flex: 1,
+    marginTop: 16,
+    marginBottom: 8,
+    minHeight: 0,
+  },
+  interestPillsScroll: {
+    flex: 1,
+  },
+  interestPillsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingBottom: 6,
+  },
+  interestPill: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    marginRight: 10,
+    marginBottom: 10,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  interestPillOn: {
+    backgroundColor: "rgba(125,255,166,0.18)",
+    borderColor: "rgba(125,255,166,0.6)",
+  },
+  interestSaveBtn: {
+    marginTop: 20,
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
+    backgroundColor: ACCENT,
+    height: PRIMARY_CTA_HEIGHT,
+    borderRadius: BUTTON_RADIUS,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  interestSaveBtnText: {
+    color: "black",
+    fontSize: 18,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
+  },
 });
