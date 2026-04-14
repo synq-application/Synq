@@ -10,7 +10,6 @@ import {
   fonts,
   Friend,
   MODAL_RADIUS,
-  MUTED,
   MUTED2,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
@@ -172,7 +171,6 @@ export default function ProfileScreen() {
   const [interests, setInterests] = useState<string[]>([]);
   const [city, setCity] = useState<string | null>(null);
   const [state, setState] = useState<string | null>(null);
-  const [memo, setMemo] = useState("");
   const [requestCount, setRequestCount] = useState(0);
   type OpenPlanEvent = {
     id: string;
@@ -359,7 +357,6 @@ export default function ProfileScreen() {
         setInterests(userData.interests || []);
         setSelectedInterests(userData.interests || []);
         setProfileImage(userData?.imageurl || null);
-        setMemo(typeof userData.memo === "string" ? userData.memo : "");
         prefetchResolvedAvatar(userData?.imageurl);
       }
     });
@@ -615,14 +612,6 @@ export default function ProfileScreen() {
               <Text style={styles.editProfileBtnText}>Edit profile</Text>
             </ProfilePressable>
           </View>
-
-          {memo.trim() !== "" && (
-            <View style={styles.memoRow}>
-              <View style={styles.memoContainer}>
-                <Text style={styles.profileMemoText}>{memo.trim()}</Text>
-              </View>
-            </View>
-          )}
         </View>
       </View>
 
@@ -1007,28 +996,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontFamily: fonts.book,
     textAlign: "left",
-  },
-  memoRow: {
-    marginTop: 6,
-    alignSelf: "stretch",
-    alignItems: "center",
-    zIndex: 3,
-  },
-  memoContainer: {
-    maxWidth: 240,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 999,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  profileMemoText: {
-    color: MUTED,
-    fontSize: 12,
-    lineHeight: 16,
-    textAlign: "center",
-    fontFamily: fonts.medium,
   },
   sectionAfterHero: {
     marginTop: 4,
