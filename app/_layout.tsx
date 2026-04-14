@@ -46,7 +46,7 @@ import {
   readCachedSynqActive,
 } from "../src/lib/synqSession";
 
-const SPLASH_LOGO = require("../assets/SYNQ-2.png");
+const SPLASH_LOGO = require("../assets/logo.png");
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -273,7 +273,7 @@ export default function RootLayout() {
     const preloadAssets = async () => {
       try {
         await Asset.loadAsync([
-          require("../assets/SYNQ-2.png"),
+          require("../assets/logo.png"),
           require("../assets/pulse.gif"),
         ]);
       } catch {} finally {
