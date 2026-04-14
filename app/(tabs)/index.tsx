@@ -1199,10 +1199,22 @@ export default function SynqScreen() {
                 <Ionicons name="close-circle" size={28} color="#444" />
               </TouchableOpacity>
             </View>
+            <View style={styles.messagesHeaderDivider} />
 
             <FlatList
               data={allChats}
               keyExtractor={(item) => item.id}
+              ListEmptyComponent={
+                <View style={styles.inboxEmptyWrap}>
+                  <View style={styles.inboxEmptyIconWrap}>
+                    <Ionicons name="chatbubbles-outline" size={28} color={ACCENT} />
+                  </View>
+                  <Text style={styles.inboxEmptyTitle}>No messages yet</Text>
+                  <Text style={styles.inboxEmptySub}>
+                    Start a plan with a friend and your conversations will show up here.
+                  </Text>
+                </View>
+              }
               ItemSeparatorComponent={() => (
                 <View style={styles.inboxSeparatorBetween}>
                   <View style={styles.inboxSeparatorLine} />
@@ -1358,6 +1370,14 @@ export default function SynqScreen() {
                   ref={flatListRef}
                   data={messages}
                   keyExtractor={(item) => item.id}
+                  ListEmptyComponent={
+                    <View style={styles.chatEmptyWrap}>
+                      <Ionicons name="sparkles-outline" size={24} color={MUTED} />
+                      <Text style={styles.chatEmptyText}>
+                        Say hi to kick this Synq off.
+                      </Text>
+                    </View>
+                  }
                   keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
                   keyboardShouldPersistTaps="handled"
                   onContentSizeChange={() => {
@@ -1875,6 +1895,11 @@ const styles = StyleSheet.create({
   },
   modalBg: { flex: 1, backgroundColor: BG },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
+  messagesHeaderDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    marginHorizontal: 20,
+  },
   modalTitle: { color: 'white', fontSize: 22, fontFamily: fonts.medium },
   messagesInboxTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
@@ -1888,6 +1913,7 @@ const styles = StyleSheet.create({
   },
   inboxListContent: {
     paddingBottom: 20,
+    flexGrow: 1,
   },
   inboxItemRow: {
     flexDirection: "row",
@@ -2215,5 +2241,53 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.30)",
     fontSize: 12,
     marginLeft: 6,
+  },
+  inboxEmptyWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    paddingVertical: 64,
+    marginTop: 30,
+  },
+  inboxEmptyIconWrap: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(43,255,136,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(43,255,136,0.24)",
+    marginBottom: 14,
+  },
+  inboxEmptyTitle: {
+    color: TEXT,
+    fontSize: 24,
+    fontFamily: fonts.heavy,
+    textAlign: "center",
+    letterSpacing: 0.2,
+  },
+  inboxEmptySub: {
+    marginTop: 10,
+    color: MUTED2,
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: fonts.medium,
+    textAlign: "center",
+    maxWidth: 320,
+  },
+  chatEmptyWrap: {
+    flex: 1,
+    minHeight: 180,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    opacity: 0.95,
+  },
+  chatEmptyText: {
+    color: MUTED2,
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    textAlign: "center",
   },
 });
