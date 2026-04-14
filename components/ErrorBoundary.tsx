@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ACCENT, BG, fonts, TYPE_BODY, TYPE_TITLE } from "../constants/Variables";
+import { captureClientError } from "../src/lib/sentryInit";
 
 type Props = { children: ReactNode };
 
@@ -17,6 +18,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (__DEV__) {
       console.error("ErrorBoundary:", error, info.componentStack);
     }
+    captureClientError(error, { componentStack: info.componentStack });
   }
 
   private reset = () => {

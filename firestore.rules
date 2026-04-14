@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // True if uid appears in the signed-in user's friends list.
+    function isFriend(uid) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)/friends/$(uid));
+    }
+
+    // Recipient (signed-in user) has an incoming request from uid.
+    function hasIncomingFriendRequestFrom(uid) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)/friendRequests/$(uid));
+    }
+
+    // Signed-in user has an outgoing request to uid (doc at uid's friendRequests/{auth.uid}).
+    function hasOutgoingFriendRequestTo(uid) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(uid)/friendRequests/$(request.auth.uid));
+    }
+
+    // No bulk enumeration: each user doc is readable only with a direct relationship.
+    function canReadUserProfile(uid) {
+      return isSelf(uid) || isFriend(uid) || hasIncomingFriendRequestFrom(uid)
+        || hasOutgoingFriendRequestTo(uid);
+    }
+
+    function chatParticipants(chatId) {
+      return get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+    }
+
+    function isChatParticipant(chatId) {
+      return signedIn() && request.auth.uid in chatParticipants(chatId);
+    }
+
+    match /users/{userId} {
+      allow read: if canReadUserProfile(userId);
+      allow create: if isSelf(userId);
+      allow update: if isSelf(userId);
+      allow delete: if false;
+
+      match /friends/{friendId} {
+        allow read: if isSelf(userId) || isSelf(friendId) || isFriend(userId);
+        allow create, update, delete: if isSelf(userId) || isSelf(friendId);
+      }
+
+      match /friendRequests/{fromId} {
+        allow read: if isSelf(userId) || isSelf(fromId);
+        allow create, update: if isSelf(fromId);
+        allow delete: if isSelf(userId) || isSelf(fromId);
+      }
+
+      match /notificationLocks/{lockId} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+
+    match /chats/{chatId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.participants;
+      allow create: if signedIn()
+        && request.auth.uid in request.resource.data.participants;
+      allow update: if signedIn() && request.auth.uid in resource.data.participants;
+      allow delete: if signedIn() && request.auth.uid in resource.data.participants;
+
+      match /messages/{messageId} {
+        allow read: if isChatParticipant(chatId);
+        allow create: if isChatParticipant(chatId);
+        allow update, delete: if isChatParticipant(chatId);
+      }
+    }
+  }
+}

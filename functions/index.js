@@ -7,8 +7,8 @@ const {
 } = require("firebase-functions/v2/firestore");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
-const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
+const { logError, logWarn, logInfo } = require("./serverLog");
 
 if (admin.apps.length === 0) {
     admin.initializeApp();
@@ -52,13 +52,13 @@ exports.onUserPushTokenWrite = onDocumentWritten(
       });
       if (cleared > 0) {
         await batch.commit();
-        logger.info("onUserPushTokenWrite: cleared duplicate pushToken from other users", {
+        logInfo("onUserPushTokenWrite_cleared_dupes", {
           userId,
           cleared,
         });
       }
     } catch (e) {
-      logger.error("onUserPushTokenWrite", e);
+      logError("onUserPushTokenWrite", e, { userId });
     }
   }
 );
@@ -79,7 +79,7 @@ exports.onMessageSent = onDocumentCreated({
         const chatData = chatDoc.data();
         const senderId = String(messageData.senderId ?? "").trim();
         if (!senderId) {
-            logger.warn("onMessageSent: missing senderId", { chatId });
+            logWarn("onMessageSent_missing_senderId", { chatId });
             return;
         }
 
@@ -105,7 +105,7 @@ exports.onMessageSent = onDocumentCreated({
             if (!token) continue;
 
             if (senderPushToken && token === senderPushToken) {
-                logger.warn("onMessageSent: skip push — recipient shares device token with sender", {
+                logWarn("onMessageSent_skip_same_device_token", {
                     chatId,
                     recipientId,
                 });
@@ -113,7 +113,7 @@ exports.onMessageSent = onDocumentCreated({
             }
 
             if (sentTokens.has(token)) {
-                logger.info("onMessageSent: skip duplicate Expo token for another recipient", {
+                logInfo("onMessageSent_skip_duplicate_token", {
                     chatId,
                     recipientId,
                 });
@@ -138,7 +138,7 @@ exports.onMessageSent = onDocumentCreated({
             });
         }
     } catch (error) {
-        logger.error("Error in onMessageSent:", error);
+        logError("onMessageSent", error, { chatId });
     }
 });
 
@@ -171,7 +171,7 @@ exports.onMessageReaction = onDocumentUpdated(
       if (!chatDoc.exists) return;
       chatData = chatDoc.data() || {};
     } catch (e) {
-      logger.error("onMessageReaction: chat read", e);
+      logError("onMessageReaction_chat_read", e, { chatId });
       return;
     }
 
@@ -189,7 +189,7 @@ exports.onMessageReaction = onDocumentUpdated(
 
         const reactorToken = reactorDoc.data()?.pushToken || null;
         if (reactorToken && authorToken === reactorToken) {
-          logger.warn("onMessageReaction: skip — author and reactor share device token", {
+          logWarn("onMessageReaction_skip_same_device_token", {
             chatId,
             messageId,
           });
@@ -218,7 +218,7 @@ exports.onMessageReaction = onDocumentUpdated(
           },
         });
       } catch (err) {
-        logger.error("onMessageReaction: push", err);
+        logError("onMessageReaction_push", err, { chatId, messageId });
       }
     }
   }
@@ -279,7 +279,7 @@ exports.deleteMyAccount = onCall(
 
       return { ok: true };
     } catch (error) {
-      logger.error("Error in deleteMyAccount:", error);
+      logError("deleteMyAccount", error, { uid });
       throw new HttpsError("internal", error?.message || "Failed to delete account.");
     }
   }
@@ -325,7 +325,7 @@ exports.onFriendRequestSent = onDocumentCreated({
         if (!token) return;
 
         if (senderPushToken && token === senderPushToken) {
-            logger.warn("onFriendRequestSent: skip push — same device token as sender", {
+            logWarn("onFriendRequestSent_skip_same_device_token", {
                 userId,
                 requestId,
             });
@@ -345,7 +345,7 @@ exports.onFriendRequestSent = onDocumentCreated({
             },
         });
     } catch (error) {
-        logger.error("Error in onFriendRequestSent:", error);
+        logError("onFriendRequestSent", error, { userId, requestId });
     }
 });
 
@@ -435,7 +435,7 @@ exports.expireStaleSynq = onSchedule(
           }
         }
         if (n > 0) await batch.commit();
-        logger.info("expireStaleSynq: deactivated by synqStartedAt age", {
+        logInfo("expireStaleSynq_by_age", {
           count: expiredByTime.size,
         });
       }
@@ -479,12 +479,12 @@ exports.expireStaleSynq = onSchedule(
       }
 
       if (legacyTotal) {
-        logger.info("expireStaleSynq: deactivated legacy missing synqStartedAt", {
+        logInfo("expireStaleSynq_legacy_missing_started_at", {
           count: legacyTotal,
         });
       }
     } catch (e) {
-      logger.error("expireStaleSynq", e);
+      logError("expireStaleSynq", e, {});
     }
   }
 );
@@ -509,7 +509,7 @@ exports.onOpenPlanInterest = onDocumentUpdated(
         const snap = await hostDocRef.get();
         hostPushToken = snap.data()?.pushToken;
       } catch (e) {
-        logger.error("onOpenPlanInterest: could not read host push token", e);
+        logError("onOpenPlanInterest_host_token", e, { hostUid });
         return;
       }
     }
@@ -543,7 +543,7 @@ exports.onOpenPlanInterest = onDocumentUpdated(
             joinerPushToken = jd?.pushToken || null;
           }
         } catch (e) {
-          logger.warn("onOpenPlanInterest: joiner profile", e);
+          logError("onOpenPlanInterest_joiner_profile", e, { hostUid, joinerId });
         }
 
         const planTitle = String(ev?.title || "").trim();
@@ -556,7 +556,7 @@ exports.onOpenPlanInterest = onDocumentUpdated(
           String(eventMatchKey(ev)).replace(/[/\s]/g, "_");
 
         if (joinerPushToken && hostPushToken === joinerPushToken) {
-          logger.warn("onOpenPlanInterest: skip push — same device token as joiner", {
+          logWarn("onOpenPlanInterest_skip_same_device_token", {
             hostUid,
             joinerId,
           });
@@ -583,7 +583,7 @@ exports.onOpenPlanInterest = onDocumentUpdated(
             planTitle: planTitle || null,
           });
         } catch (error) {
-          logger.error("Error in onOpenPlanInterest push:", error);
+          logError("onOpenPlanInterest_push", error, { hostUid, joinerId });
         }
       }
     }
@@ -602,7 +602,7 @@ exports.onFriendAccepted = onDocumentCreated({
   const friendDocData = friendSnap.data() || {};
 
   if (friendDocData.notifyOnCreate !== true) {
-    logger.info("Skipping friend accepted notification (notifyOnCreate != true).", {
+    logInfo("onFriendAccepted_skip_no_notify", {
       userId,
       friendId,
     });
@@ -619,7 +619,7 @@ exports.onFriendAccepted = onDocumentCreated({
 
   const alreadySent = await notifRef.get();
   if (alreadySent.exists) {
-    logger.info("Skipping duplicate friend accepted notification.", { userId, friendId });
+    logInfo("onFriendAccepted_skip_duplicate", { userId, friendId });
     return;
   }
 
@@ -634,7 +634,7 @@ exports.onFriendAccepted = onDocumentCreated({
 
     const accepterToken = accepterData?.pushToken || null;
     if (accepterToken && friendUserData.pushToken === accepterToken) {
-      logger.warn("onFriendAccepted: skip push — same device token as accepter", {
+      logWarn("onFriendAccepted_skip_same_device_token", {
         userId,
         friendId,
       });
@@ -656,7 +656,7 @@ exports.onFriendAccepted = onDocumentCreated({
       type: "friend_accepted",
     });
   } catch (error) {
-    logger.error("Error in onFriendAccepted:", error);
+    logError("onFriendAccepted", error, { userId, friendId });
   }
 });
 
@@ -704,7 +704,7 @@ exports.onFriendSynqActivated = onDocumentUpdated(
         if (!isSynqActive(friendData)) continue;
 
         if (activatedPushToken && recipientToken === activatedPushToken) {
-          logger.warn("onFriendSynqActivated: skip push — same device token", {
+          logWarn("onFriendSynqActivated_skip_same_device_token", {
             activatedUserId,
             recipientId,
           });
@@ -723,11 +723,14 @@ exports.onFriendSynqActivated = onDocumentUpdated(
             },
           });
         } catch (pushErr) {
-          logger.error("onFriendSynqActivated: push send failed", pushErr);
+          logError("onFriendSynqActivated_push", pushErr, {
+            activatedUserId,
+            recipientId,
+          });
         }
       }
     } catch (err) {
-      logger.error("onFriendSynqActivated", err);
+      logError("onFriendSynqActivated", err, { activatedUserId });
     }
   }
 );
@@ -796,7 +799,7 @@ exports.getSynqSuggestions = onCall(
 
             return { suggestions: enrichedSuggestions };
         } catch (error) {
-            logger.error(">>> TOP-LEVEL CRITICAL ERROR:", error);
+            logError("getSynqSuggestions", error, { uid: request.auth?.uid });
             throw new HttpsError("internal", error?.message || "Unknown error");
         }
     }

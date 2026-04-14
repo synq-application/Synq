@@ -28,6 +28,9 @@ import {
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { initSentry } from "../src/lib/sentryInit";
+
+initSentry();
 import LocationUpdateModal from "../components/LocationUpdateModal";
 import { ACCENT, BG } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
