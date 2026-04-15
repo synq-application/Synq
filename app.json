@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1A6B58"
+      "backgroundColor": "#090A0B"
     },
     "ios": {
       "supportsTablet": true,
@@ -27,7 +27,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
-        "backgroundColor": "#1A6B58"
+        "backgroundColor": "#090A0B"
       },
       "package": "com.stefaniebaarman.synq",
       "edgeToEdgeEnabled": true,

@@ -9,6 +9,7 @@ import {
   useRouter,
   useSegments,
 } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, {
@@ -19,9 +20,7 @@ import React, {
   useState,
 } from "react";
 import {
-  Animated,
   DeviceEventEmitter,
-  Easing,
   InteractionManager,
   Platform,
   View,
@@ -46,6 +45,9 @@ import {
   readCachedSynqActive,
 } from "../src/lib/synqSession";
 
+void SplashScreen.preventAutoHideAsync();
+
+/** Must match app.json expo.splash.backgroundColor (BG) */
 const SPLASH_LOGO = require("../assets/logo.png");
 
 Notifications.setNotificationHandler({
@@ -125,8 +127,6 @@ export default function RootLayout() {
     cachedSynqActive: boolean;
   } | null>(null);
   const synqBootUidRef = useRef<string | null>(null);
-  const splashOpacity = useRef(new Animated.Value(0)).current;
-  const splashScale = useRef(new Animated.Value(0.88)).current;
   const [showLocationModal, setShowLocationModal] = useState(false);
 
   const [pendingNotificationTap, setPendingNotificationTap] = useState<
@@ -267,6 +267,11 @@ export default function RootLayout() {
     }, 1000);
     return () => clearTimeout(timeoutId);
   }, []);
+
+  useEffect(() => {
+    if (!assetsReady) return;
+    void SplashScreen.hideAsync();
+  }, [assetsReady]);
 
   useEffect(() => {
     let mounted = true;
@@ -457,28 +462,6 @@ export default function RootLayout() {
     authReady && navReady && assetsReady && synqBootReady;
   const showSplash = !appReady || !minimumSplashElapsed;
 
-  useEffect(() => {
-    if (!showSplash) return;
-    splashOpacity.setValue(0);
-    splashScale.setValue(0.88);
-    const anim = Animated.parallel([
-      Animated.timing(splashOpacity, {
-        toValue: 1,
-        duration: 520,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.spring(splashScale, {
-        toValue: 1,
-        friction: 7,
-        tension: 72,
-        useNativeDriver: true,
-      }),
-    ]);
-    anim.start();
-    return () => anim.stop();
-  }, [showSplash]);
-
   const locationModals =
     user && authReady ? (
       <LocationUpdateModal
@@ -510,22 +493,15 @@ export default function RootLayout() {
                   justifyContent: "center",
                 }}
               >
-                <Animated.View
-                  style={{
-                    opacity: splashOpacity,
-                    transform: [{ scale: splashScale }],
-                  }}
-                >
-                  <ExpoImage
-                    source={SPLASH_LOGO}
-                    style={{ width: 300, height: 220 }}
-                    contentFit="contain"
-                    transition={0}
-                    cachePolicy="memory-disk"
-                    accessibilityRole="image"
-                    accessibilityLabel="Synq"
-                  />
-                </Animated.View>
+                <ExpoImage
+                  source={SPLASH_LOGO}
+                  style={{ width: 300, height: 220 }}
+                  contentFit="contain"
+                  transition={0}
+                  cachePolicy="memory-disk"
+                  accessibilityRole="image"
+                  accessibilityLabel="Synq"
+                />
               </View>
             ) : (
               <Stack screenOptions={{ headerShown: false }}>
