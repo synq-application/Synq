@@ -38,7 +38,6 @@ import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
 } from "../src/lib/socialCache";
-import { startSynqGlanceWidgetSync } from "../src/lib/syncSynqWidget";
 import { SynqBootProvider } from "../src/lib/synqBootContext";
 import {
   computeSynqActiveFromUserData,
@@ -214,10 +213,6 @@ export default function RootLayout() {
     });
 
     return () => sub.remove();
-  }, []);
-
-  useEffect(() => {
-    return startSynqGlanceWidgetSync();
   }, []);
 
   useEffect(() => {
