@@ -1083,10 +1083,10 @@ const styles = StyleSheet.create({
   },
   interestSheetTitle: {
     color: TEXT,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 22,
+    lineHeight: 28,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   interestSheetDivider: {
     marginTop: 8,
