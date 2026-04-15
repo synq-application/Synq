@@ -34,8 +34,8 @@ import {
   Keyboard,
   Modal,
   Pressable,
-  Share,
   ScrollView,
+  Share,
   StatusBar,
   StyleSheet,
   Text,
@@ -737,7 +737,7 @@ export default function ProfileScreen() {
           <Text style={styles.profileHelperText}>
             {friendsForHostNames.length === 0
               ? "Add friends to see recent Synqs here."
-              : "No Synqs yet — connect from the home tab and your history will show up."}
+              : "No Synqs yet. Start a Synq with a friend to see it here."}
           </Text>
         )}
       </View>
