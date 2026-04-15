@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Notifications from "expo-notifications";
 import {
   addDoc,
@@ -26,15 +25,12 @@ import {
   DeviceEventEmitter,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   PixelRatio,
-  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   useWindowDimensions,
@@ -43,7 +39,6 @@ import {
   type NativeSyntheticEvent,
   type TextLayoutEventData,
 } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ACCENT,
@@ -72,14 +67,14 @@ import {
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
 import {
-  formatTime,
-  friendLocationLine,
-  parseIdeaText,
   resolveAvatar,
   SynqStatus,
   wrapChatTitle,
 } from '../helpers';
 import { openInMaps } from '../map-utils';
+import ActiveSynqSection from '../../src/components/synq/ActiveSynqSection';
+import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
+import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
 import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
 
@@ -1005,159 +1000,23 @@ export default function SynqScreen() {
       <View style={[styles.container, tabletContentStyle]}>
         <StatusBar barStyle="light-content" />
         {status === 'active' && (
-          <View style={styles.activeSynqRoot}>
-            <View style={styles.activeHeaderBlock}>
-              <View style={styles.headerTitleRow}>
-                <TouchableOpacity
-                  onPress={() => {
-                    setMessagesModalVisible(true);
-                    setMessagesPane("inbox");
-                  }}
-                  style={styles.headerIconContainer}
-                  accessibilityRole="button"
-                  accessibilityLabel="Open messages"
-                >
-                  <Ionicons name="chatbubbles-outline" size={28} color="white" />
-                  {hasUnread && <View style={styles.badge} />}
-                </TouchableOpacity>
-                <View style={styles.synqHeaderTitleCenter}>
-                  <View style={styles.headerTitleWithIndicator}>
-                    <Animated.View
-                      style={[styles.activeStatusDot, { opacity: activePulseOpacity }]}
-                      accessibilityLabel="Synq session live"
-                    />
-                    <Text style={styles.headerTitle}>Synq is active</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setIsEditModalVisible(true)}
-                  style={styles.headerIconContainer}
-                  accessibilityRole="button"
-                  accessibilityLabel="Edit Synq memo and settings"
-                >
-                  <Ionicons name="create-outline" size={26} color="white" />
-                </TouchableOpacity>
-              </View>
-            </View>
-            <View style={styles.headerDivider} />
-
-            {memo.trim() !== "" ? (
-              <View style={styles.activeMemoRow}>
-                <View style={styles.activeMemoCard}>
-                  <Ionicons
-                    name="chatbubble-ellipses-outline"
-                    size={20}
-                    color={ACCENT}
-                    style={styles.activeMemoIcon}
-                  />
-                  <Text style={styles.activeMemoText} numberOfLines={6}>
-                    {memo.trim()}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            <View style={styles.activeListWrap}>
-            <FlatList
-              style={styles.activeFriendsList}
-              data={availableFriends}
-              keyExtractor={(item) => item.id}
-              ListEmptyComponent={
-                <View style={styles.activeEmptyWrap}>
-                  <Text style={styles.activeEmptyTitle}>No free friends right now.</Text>
-                  <Text style={styles.activeEmptySub}>
-                    {`Add more connections to increase the chances of having overlapping free time!`}
-                  </Text>
-                </View>
-              }
-              renderItem={({ item }) => {
-                const friendMemo = item.memo?.trim();
-                const locationLine = friendLocationLine(item);
-                return (
-                <TouchableOpacity
-                  onPress={() =>
-                    setSelectedFriends((prev) =>
-                      prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
-                    )
-                  }
-                  style={[styles.friendCard, selectedFriends.includes(item.id) && { borderColor: ACCENT }]}
-                >
-                  <ExpoImage
-                    source={{ uri: resolveAvatar(item.imageurl) }}
-                    style={styles.friendImg}
-                    cachePolicy="memory-disk"
-                    transition={0}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.whiteBold}>{item.displayName}</Text>
-
-                    {locationLine ? (
-                      <View style={styles.locationRow}>
-                        <Ionicons
-                          name="location-outline"
-                          size={14}
-                          color="#999"
-                          style={{ marginRight: 4 }}
-                        />
-                        <Text style={styles.locationText}>{locationLine}</Text>
-                      </View>
-                    ) : null}
-
-                    {friendMemo ? (
-                      <Text style={styles.friendMemoInline} numberOfLines={2}>
-                        {friendMemo}
-                      </Text>
-                    ) : null}
-                  </View>
-
-                  {selectedFriends.includes(item.id) && <Ionicons name="checkmark-circle" size={24} color={ACCENT} />}
-                </TouchableOpacity>
-                );
-              }}
-              contentContainerStyle={styles.activeListContent}
-            />
-            <LinearGradient
-              pointerEvents="none"
-              colors={["rgba(9,10,11,0)", "rgba(9,10,11,0.38)", BG]}
-              locations={[0, 0.45, 1]}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={styles.activeListFade}
-            />
-            </View>
-
-            <View
-              style={[
-                styles.activeFooterBlock,
-                { paddingBottom: Math.max(44, 24 + insets.bottom) },
-              ]}
-            >
-              <TouchableOpacity
-                style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
-                onPress={handleConnect}
-                disabled={!selectedFriends.length}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  selectedFriends.length === 0
-                    ? 'Select friends who are free to start planning'
-                    : `Start plan with ${selectedFriends.length} friend${selectedFriends.length === 1 ? '' : 's'}`
-                }
-              >
-                <Text style={styles.btnText}>
-                  {selectedFriends.length === 0 ? 'Select friends' : 'Start plan'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={endSynq}
-                style={styles.deactivateLink}
-                accessibilityRole="button"
-                accessibilityLabel="End Synq"
-              >
-                <Text style={styles.deactivateLinkText}>End Synq</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <ActiveSynqSection
+            styles={styles}
+            memo={memo}
+            hasUnread={hasUnread}
+            activePulseOpacity={activePulseOpacity}
+            availableFriends={availableFriends}
+            selectedFriends={selectedFriends}
+            setSelectedFriends={setSelectedFriends}
+            handleConnect={handleConnect}
+            endSynq={endSynq}
+            insetsBottom={insets.bottom}
+            openMessagesInbox={() => {
+              setMessagesModalVisible(true);
+              setMessagesPane("inbox");
+            }}
+            openEditModal={() => setIsEditModalVisible(true)}
+          />
         )}
         {(status === 'activating' || status === 'finding' || status === 'optimizing') && (
           <View style={styles.activatingContainer}>
@@ -1188,395 +1047,81 @@ export default function SynqScreen() {
         )}
         <Modal visible={messagesModalVisible} animationType="slide" presentationStyle="pageSheet">
           {messagesPane === "inbox" ? (
-          <View style={styles.modalBg}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.messagesInboxTitle}>Messages</Text>
-              <TouchableOpacity
-                onPress={() => setMessagesModalVisible(false)}
-                accessibilityRole="button"
-                accessibilityLabel="Close messages"
-              >
-                <Ionicons name="close-circle" size={28} color="#444" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.messagesHeaderDivider} />
-
-            <FlatList
-              data={allChats}
-              keyExtractor={(item) => item.id}
-              ListEmptyComponent={
-                <View style={styles.inboxEmptyWrap}>
-                  <View style={styles.inboxEmptyIconWrap}>
-                    <Ionicons name="chatbubbles-outline" size={28} color={ACCENT} />
-                  </View>
-                  <Text style={styles.inboxEmptyTitle}>No messages yet</Text>
-                  <Text style={styles.inboxEmptySub}>
-                    Start a plan with a friend and your conversations will show up here.
-                  </Text>
-                </View>
-              }
-              ItemSeparatorComponent={() => (
-                <View style={styles.inboxSeparatorBetween}>
-                  <View style={styles.inboxSeparatorLine} />
-                </View>
-              )}
-              contentContainerStyle={styles.inboxListContent}
-              renderItem={({ item, index }) => {
-                const myId = auth.currentUser?.uid;
-                const updatedAtMs = item.updatedAt?.toMillis?.() ?? 0;
-                const lastReadMs = myId ? item.lastReadBy?.[myId]?.toMillis?.() ?? 0 : 0;
-                const lastSender = item.lastMessageSenderId;
-                const isUnreadThread =
-                  !!myId && !!lastSender && lastSender !== myId && updatedAtMs > lastReadMs;
-                return (
-                <Swipeable
-                  rightThreshold={24}
-                  onSwipeableOpen={(direction) => {
-                    if (direction === "right") {
-                      handleDeleteChat(item.id);
-                    }
+            <MessagesInboxPane
+              styles={styles}
+              allChats={allChats}
+              currentUserId={auth.currentUser?.uid}
+              getChatTitle={getChatTitle}
+              renderAvatarStack={renderAvatarStack}
+              onCloseMessages={() => setMessagesModalVisible(false)}
+              onOpenChat={async (item) => {
+                prefetchParticipantAvatars(item);
+                setPendingNewChat(null);
+                setActiveChatId(item.id);
+                setMessagesPane("chat");
+                await markChatRead(item.id);
+              }}
+              onDeleteChat={handleDeleteChat}
+              renderDeleteConfirmModal={
+                <ConfirmModal
+                  visible={showDeleteChatModal}
+                  title="Delete Chat"
+                  message="Are you sure you want to delete this conversation?"
+                  confirmText="Delete"
+                  destructive
+                  onCancel={() => {
+                    setShowDeleteChatModal(false);
+                    setPendingDeleteChatId(null);
                   }}
-                  renderRightActions={() => (
-                    <TouchableOpacity
-                      style={styles.deleteAction}
-                      onPress={() => handleDeleteChat(item.id)}
-                      accessibilityRole="button"
-                      accessibilityLabel="Delete conversation"
-                    >
-                      <Ionicons name="trash" size={24} color="white" />
-                    </TouchableOpacity>
-                  )}
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.inboxItem,
-                      index === 0 && styles.inboxItemFirst,
-                      isUnreadThread && styles.inboxItemUnread,
-                    ]}
-                    onPress={async () => {
-                      prefetchParticipantAvatars(item);
+                  onConfirm={async () => {
+                    const chatId = pendingDeleteChatId;
+                    setShowDeleteChatModal(false);
+                    setPendingDeleteChatId(null);
+                    if (!chatId) return;
+                    if (activeChatId === chatId) {
+                      setMessagesModalVisible(false);
+                      setActiveChatId(null);
                       setPendingNewChat(null);
-                      setActiveChatId(item.id);
-                      setMessagesPane("chat");
-                      await markChatRead(item.id);
-                    }}
-                  >
-                    <View style={styles.inboxItemRow}>
-                      <View style={styles.avatarColumn}>
-                        {renderAvatarStack(item.participantImages)}
-                      </View>
-                      <View style={styles.inboxTextCol}>
-                        <Text
-                          style={[styles.whiteBold, isUnreadThread && styles.unreadChatTitle]}
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                        >
-                          {getChatTitle(item)}
-                        </Text>
-                        {(() => {
-                          const lm =
-                            typeof item.lastMessage === "string" ? item.lastMessage.trim() : "";
-                          if (!lm || lm === "Synq established!") return null;
-                          return (
-                            <Text style={styles.grayText} numberOfLines={1}>
-                              {lm}
-                            </Text>
-                          );
-                        })()}
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                </Swipeable>
-                );
-              }}
-            />
-            <ConfirmModal
-              visible={showDeleteChatModal}
-              title="Delete Chat"
-              message="Are you sure you want to delete this conversation?"
-              confirmText="Delete"
-              destructive
-              onCancel={() => {
-                setShowDeleteChatModal(false);
-                setPendingDeleteChatId(null);
-              }}
-              onConfirm={async () => {
-                const chatId = pendingDeleteChatId;
-                setShowDeleteChatModal(false);
-                setPendingDeleteChatId(null);
-                if (!chatId) return;
-                if (activeChatId === chatId) {
-                  setMessagesModalVisible(false);
-                  setActiveChatId(null);
-                  setPendingNewChat(null);
-                }
-                setAllChats((prev) => prev.filter((c) => c.id !== chatId));
-                try {
-                  await deleteDoc(doc(db, "chats", chatId));
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                } catch {}
-              }}
-            />
-          </View>
-          ) : (
-          <View style={styles.modalBg}>
-            <View
-              style={[
-                styles.modalHeader,
-                { paddingTop: Math.max(4, insets.top - 26) },
-              ]}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View>
-                  <Text style={styles.modalTitle}>
-                    {activeChat ? getChatTitle(activeChat) : 'Synq Chat'}
-                  </Text>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      Keyboard.dismiss();
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setIsExploreVisible(true);
-                    }}
-                    style={styles.aiChip}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Open Synq AI place suggestions"
-                  >
-                    <Ionicons name="sparkles" size={14} color={ACCENT} />
-                    <Text style={styles.aiChipText}>{rotatingAIText}</Text>
-                    <Ionicons name="chevron-forward" size={14} color="#666" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  Keyboard.dismiss();
-                  setMessagesPane("inbox");
-                  setShowAICard(false);
-                  setShowOptionsList(false);
-                  setPendingNewChat(null);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Close chat"
-              >
-                <Ionicons name="close-circle" size={28} color="#444" />
-              </TouchableOpacity>
-            </View>
-
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={60}>
-              <View style={{ flex: 1 }}>
-                <FlatList
-                  ref={flatListRef}
-                  data={messages}
-                  keyExtractor={(item) => item.id}
-                  ListEmptyComponent={
-                    <View style={styles.chatEmptyWrap}>
-                      <Ionicons name="sparkles-outline" size={24} color={MUTED} />
-                      <Text style={styles.chatEmptyText}>
-                        Say hi to kick this Synq off.
-                      </Text>
-                    </View>
-                  }
-                  keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-                  keyboardShouldPersistTaps="handled"
-                  onContentSizeChange={() => {
-                    if (pendingScrollToMessageId) return;
-                    flatListRef.current?.scrollToEnd({ animated: true });
-                  }}
-                  onLayout={() => {
-                    if (pendingScrollToMessageId) return;
-                    flatListRef.current?.scrollToEnd({ animated: true });
-                  }}
-                  onScrollToIndexFailed={(info) => {
-                    setTimeout(() => {
-                      try {
-                        flatListRef.current?.scrollToIndex({
-                          index: info.index,
-                          animated: true,
-                          viewPosition: 0.4,
-                        });
-                      } catch {}
-                    }, 350);
-                  }}
-                  renderItem={({ item }) => {
-                    const isMe = item.senderId === auth.currentUser?.uid;
-                    const isSystemIdea = item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
-                    const senderAvatar =
-                      resolveAvatar(
-                        activeChat?.participantImages?.[item.senderId] || item.imageurl
-                      );
-                    if (isSystemIdea) {
-                      const { name, address } = parseIdeaText(item.text);
-                      const ideaHeartCount =
-                        item.reactions &&
-                        Object.values(item.reactions).filter((v) => v === "heart").length;
-
-                      return (
-                        <View style={styles.centeredIdeaContainer}>
-                          <View style={{ width: "85%", alignSelf: "center" }}>
-                            <Pressable
-                              onPress={() =>
-                                onIdeaBubblePress(
-                                  { id: item.id, reactions: item.reactions },
-                                  { name, address }
-                                )
-                              }
-                            >
-                              <View
-                                style={[
-                                  styles.ideaBubble,
-                                  { width: "100%", position: "relative", overflow: "visible" },
-                                ]}
-                              >
-                                {item.venueImage ? (
-                                  <ExpoImage
-                                    source={{ uri: item.venueImage }}
-                                    style={styles.ideaImage}
-                                    contentFit="cover"
-                                    cachePolicy="memory-disk"
-                                    transition={0}
-                                    recyclingKey={item.venueImage}
-                                  />
-                                ) : null}
-                                <Text style={styles.ideaText}>{item.text}</Text>
-                                {ideaHeartCount ? (
-                                  <View style={styles.heartReaction}>
-                                    {Array.from({ length: ideaHeartCount }, (_, i) => (
-                                      <Ionicons
-                                        key={i}
-                                        name="heart"
-                                        size={14}
-                                        color="#FF2D55"
-                                        style={{ marginLeft: i > 0 ? 3 : 0 }}
-                                      />
-                                    ))}
-                                  </View>
-                                ) : null}
-                              </View>
-                            </Pressable>
-                          </View>
-
-                          <Text style={styles.timestampCentered}>{formatTime(item.createdAt)}</Text>
-                        </View>
-                      );
                     }
-                    const bubbleCap = iMessageBubbleColumnMaxWidth(windowWidth, isMe);
-                    const heartCount =
-                      item.reactions &&
-                      Object.values(item.reactions).filter((v) => v === "heart").length;
-                    return (
-                      <View
-                        style={[
-                          styles.msgContainer,
-                          {
-                            alignItems: isMe ? "flex-end" : "flex-start",
-                          },
-                        ]}
-                      >
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "flex-end",
-                          }}
-                        >
-                          {!isMe && (
-                            <ExpoImage
-                              source={{ uri: senderAvatar }}
-                              style={styles.chatAvatar}
-                              cachePolicy="memory-disk"
-                              transition={0}
-                              recyclingKey={senderAvatar}
-                            />
-                          )}
-
-                          <View
-                            style={[
-                              styles.messageBubbleColumn,
-                              {
-                                maxWidth: bubbleCap,
-                                alignSelf: isMe ? "flex-end" : "flex-start",
-                                alignItems: isMe ? "flex-end" : "flex-start",
-                              },
-                            ]}
-                          >
-                            <ChatMessageBubble
-                              text={item.text}
-                              bubbleCap={bubbleCap}
-                              isMe={isMe}
-                              heartCount={heartCount || 0}
-                              onPress={() =>
-                                onMessageBubblePress({
-                                  id: item.id,
-                                  reactions: item.reactions,
-                                })
-                              }
-                            />
-                          </View>
-                        </View>
-                        <Text
-                          style={{
-                            color: "#444",
-                            fontSize: 11,
-                            marginTop: 4,
-                            marginLeft: isMe ? 0 : 44,
-                            alignSelf: isMe ? "flex-end" : "flex-start",
-                          }}
-                        >
-                          {formatTime(item.createdAt)}
-                        </Text>
-                      </View>
-                    );
-                  }}
-                  contentContainerStyle={{
-                    flexGrow: 1,
-                    padding: 20,
+                    setAllChats((prev) => prev.filter((c) => c.id !== chatId));
+                    try {
+                      await deleteDoc(doc(db, "chats", chatId));
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    } catch {}
                   }}
                 />
-
-                {showAICard && (
-                  <View style={styles.inChatAICardContainer}>
-                    <View style={styles.inChatAICard}>
-                      <View style={styles.aiCardHeader}>
-                        <Ionicons name="sparkles" size={16} color={ACCENT} style={{ marginRight: 8 }} />
-                        <Text style={styles.aiCardTitleSmall}>Synq Suggestion</Text>
-                        <TouchableOpacity style={{ marginLeft: 'auto' }} onPress={() => setShowAICard(false)}>
-                          <Ionicons name="close-circle" size={28} color="#444" />
-                        </TouchableOpacity>
-                      </View>
-                      <Text style={styles.aiCardBodySmall}>{aiResponse}</Text>
-                      <TouchableOpacity style={styles.aiShareBtnSmall} onPress={sendAISuggestionToChat}>
-                        <Text style={styles.aiShareBtnText}>Send to Chat</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={[styles.input, styles.inputMultiline]}
-                  value={inputText}
-                  onChangeText={setInputText}
-                  placeholder="Message..."
-                  placeholderTextColor="#666"
-                  multiline
-                  textAlignVertical="top"
-                  scrollEnabled
-                  returnKeyType="default"
-                />
-                <TouchableOpacity
-                  onPress={sendMessage}
-                  style={styles.sendBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel="Send message"
-                >
-                  <Ionicons name="send" size={18} color="black" />
-                </TouchableOpacity>
-              </View>
-
-            </KeyboardAvoidingView>
-            <ExploreModal
+              }
+            />
+          ) : (
+            <>
+              <MessagesChatPane
+              styles={styles}
+              insetsTop={insets.top}
+              activeChat={activeChat}
+              getChatTitle={getChatTitle}
+              rotatingAIText={rotatingAIText}
+              pendingScrollToMessageId={pendingScrollToMessageId}
+              flatListRef={flatListRef}
+              messages={messages}
+              showAICard={showAICard}
+              aiResponse={aiResponse}
+              inputText={inputText}
+              setInputText={setInputText}
+              setMessagesPane={setMessagesPane}
+              setShowAICard={setShowAICard}
+              setShowOptionsList={setShowOptionsList}
+              setPendingNewChat={setPendingNewChat}
+              setIsExploreVisible={setIsExploreVisible}
+              sendMessage={sendMessage}
+              sendAISuggestionToChat={sendAISuggestionToChat}
+              onMessageBubblePress={onMessageBubblePress}
+              onIdeaBubblePress={onIdeaBubblePress}
+              ChatMessageBubble={ChatMessageBubble}
+              iMessageBubbleColumnMaxWidth={iMessageBubbleColumnMaxWidth}
+              windowWidth={windowWidth}
+              currentUserId={auth.currentUser?.uid}
+            />
+              <ExploreModal
               visible={isExploreVisible}
               onClose={() => {
                 setIsExploreVisible(false);
@@ -1601,8 +1146,8 @@ export default function SynqScreen() {
                 setShowOptionsList(false);
               }}
               currentCategory={currentCategory}
-            />
-          </View>
+              />
+            </>
           )}
         </Modal>
 
