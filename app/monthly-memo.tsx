@@ -240,16 +240,16 @@ export default function OpenPlans({
               onLongPress={() => handleDelete(p)}
             >
             <View style={styles.dateBlock}>
-              <Text style={styles.month}>
-                {d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()}
-              </Text>
-              <View style={styles.dateNumberWrap}>
-                <Text style={styles.date}>{d.getDate()}</Text>
-              </View>
               <Text style={styles.day}>
                 {d
                   .toLocaleDateString("en-US", { weekday: "short" })
                   .toUpperCase()}
+              </Text>
+              <View style={styles.dateNumberWrap}>
+                <Text style={styles.date}>{d.getDate()}</Text>
+              </View>
+              <Text style={styles.month}>
+                {d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()}
               </Text>
             </View>
               <View style={{ flex: 1 }}>

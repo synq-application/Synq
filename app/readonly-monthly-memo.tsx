@@ -97,6 +97,11 @@ export default function FriendOpenPlans({
                   .toUpperCase()}
               </Text>
               <Text style={styles.date}>{d.getDate()}</Text>
+              <Text style={styles.month}>
+                {d
+                  .toLocaleDateString("en-US", { month: "short" })
+                  .toUpperCase()}
+              </Text>
             </View>
 
             <View style={{ flex: 1 }}>
@@ -208,6 +213,12 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 18,
     fontWeight: "600",
+  },
+
+  month: {
+    color: "#666",
+    fontSize: 10,
+    marginTop: 2,
   },
 
   title: {
