@@ -2,6 +2,7 @@ import { Asset } from "expo-asset";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { Image as ExpoImage } from "expo-image";
+import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
 import {
   Stack,
@@ -12,6 +13,7 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import React, {
   createContext,
   useContext,
@@ -25,6 +27,7 @@ import {
   Platform,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { initSentry } from "../src/lib/sentryInit";
@@ -98,6 +101,14 @@ async function registerForPushNotificationsAsync() {
 
 const AuthContext = createContext({ refreshAuth: () => {} });
 export const useAuthRefresh = () => useContext(AuthContext);
+const PENDING_INVITE_FROM_UID_KEY = "synq:pendingInviteFromUid";
+const PENDING_INVITE_CODE_KEY = "synq:pendingInviteCode";
+
+function cleanUid(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim();
+  return v ? v : null;
+}
 
 function snoozedUntilMsFromField(raw: unknown): number {
   if (typeof raw === "string") return Date.parse(raw);
@@ -127,6 +138,8 @@ export default function RootLayout() {
   } | null>(null);
   const synqBootUidRef = useRef<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const inviteProcessingRef = useRef(false);
+  const inviteAttemptsRef = useRef<Set<string>>(new Set());
 
   const [pendingNotificationTap, setPendingNotificationTap] = useState<
     | { kind: "chat"; chatId: string; messageId?: string }
@@ -140,6 +153,35 @@ export default function RootLayout() {
   const refreshAuth = () => {
     setUser(auth.currentUser ? ({ ...auth.currentUser } as User) : null);
   };
+
+  useEffect(() => {
+    const captureInviteFromUrl = async (url: string | null) => {
+      if (!url) return;
+      try {
+        const parsed = Linking.parse(url);
+        const path = String(parsed.path || "").trim();
+        const fromRaw = parsed.queryParams?.from ?? parsed.queryParams?.inviteFrom;
+        const fromUid = cleanUid(Array.isArray(fromRaw) ? fromRaw[0] : fromRaw);
+        if (fromUid) {
+          await AsyncStorage.setItem(PENDING_INVITE_FROM_UID_KEY, fromUid);
+          return;
+        }
+        const invitePathMatch = path.match(/^(?:invite|i)\/([^/?#]+)/i);
+        const inviteCode = cleanUid(
+          invitePathMatch ? decodeURIComponent(invitePathMatch[1] || "") : null
+        );
+        if (inviteCode) {
+          await AsyncStorage.setItem(PENDING_INVITE_CODE_KEY, inviteCode);
+        }
+      } catch {}
+    };
+
+    void Linking.getInitialURL().then(captureInviteFromUrl);
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      void captureInviteFromUrl(url);
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     const str = (v: unknown): string | undefined => {
@@ -380,6 +422,61 @@ export default function RootLayout() {
 
     if (inAuthGroup) router.replace("/(tabs)");
   }, [authReady, navReady, user, segments]);
+
+  useEffect(() => {
+    if (!authReady || !navReady || !user?.uid) return;
+    if (!user.displayName) return;
+    if (inviteProcessingRef.current) return;
+
+    const processPendingInvite = async () => {
+      const fromUidRaw = await AsyncStorage.getItem(PENDING_INVITE_FROM_UID_KEY);
+      const fromUid = cleanUid(fromUidRaw);
+      const inviteCodeRaw = await AsyncStorage.getItem(PENDING_INVITE_CODE_KEY);
+      const inviteCode = cleanUid(inviteCodeRaw);
+      if (!fromUid && !inviteCode) return;
+      if (fromUid === user.uid) {
+        await AsyncStorage.multiRemove([
+          PENDING_INVITE_FROM_UID_KEY,
+          PENDING_INVITE_CODE_KEY,
+        ]);
+        return;
+      }
+
+      const attemptValue = fromUid || inviteCode || "";
+      const attemptKey = `${user.uid}:${attemptValue}`;
+      if (inviteAttemptsRef.current.has(attemptKey)) return;
+      inviteAttemptsRef.current.add(attemptKey);
+      inviteProcessingRef.current = true;
+      try {
+        const functions = getFunctions(undefined, "us-central1");
+        const acceptInviteFromLink = httpsCallable(functions, "acceptInviteFromLink");
+        await acceptInviteFromLink({
+          ...(fromUid ? { fromUid } : {}),
+          ...(inviteCode ? { inviteCode } : {}),
+        });
+        await AsyncStorage.multiRemove([
+          PENDING_INVITE_FROM_UID_KEY,
+          PENDING_INVITE_CODE_KEY,
+        ]);
+      } catch (err: any) {
+        const code = String(err?.code || "");
+        const shouldDropInvite =
+          code.includes("invalid-argument") ||
+          code.includes("already-exists") ||
+          code.includes("failed-precondition");
+        if (shouldDropInvite) {
+          await AsyncStorage.multiRemove([
+            PENDING_INVITE_FROM_UID_KEY,
+            PENDING_INVITE_CODE_KEY,
+          ]);
+        }
+      } finally {
+        inviteProcessingRef.current = false;
+      }
+    };
+
+    void processPendingInvite();
+  }, [authReady, navReady, user?.uid, user?.displayName]);
 
   useEffect(() => {
     if (!authReady || !navReady || !assetsReady) return;

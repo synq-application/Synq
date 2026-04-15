@@ -94,6 +94,56 @@ describe("Firestore", () => {
       await assertSucceeds(getDoc(doc(bobDb, "users", "alice")));
     });
 
+    test("friend requests reject self-invites and duplicates", async () => {
+      const alice = testEnv.authenticatedContext("alice");
+      const bob = testEnv.authenticatedContext("bob");
+      const aliceDb = alice.firestore();
+      const bobDb = bob.firestore();
+
+      await assertSucceeds(
+        setDoc(doc(aliceDb, "users", "alice"), { displayName: "Alice" })
+      );
+      await assertSucceeds(
+        setDoc(doc(bobDb, "users", "bob"), { displayName: "Bob" })
+      );
+
+      await assertFails(
+        setDoc(doc(aliceDb, "users", "alice", "friendRequests", "alice"), {
+          from: "alice",
+          to: "alice",
+          senderName: "Alice",
+        })
+      );
+
+      await assertSucceeds(
+        setDoc(doc(aliceDb, "users", "bob", "friendRequests", "alice"), {
+          from: "alice",
+          to: "bob",
+          senderName: "Alice",
+        })
+      );
+
+      await assertFails(
+        setDoc(doc(bobDb, "users", "alice", "friendRequests", "bob"), {
+          from: "bob",
+          to: "alice",
+          senderName: "Bob",
+        })
+      );
+    });
+
+    test("clients cannot read or write invite attribution logs", async () => {
+      const alice = testEnv.authenticatedContext("alice");
+      const aliceDb = alice.firestore();
+      await assertFails(
+        setDoc(doc(aliceDb, "invites", "alice_bob"), {
+          fromUid: "alice",
+          toUid: "bob",
+        })
+      );
+      await assertFails(getDoc(doc(aliceDb, "invites", "alice_bob")));
+    });
+
     test("only chat participants can read chat and messages", async () => {
       const alice = testEnv.authenticatedContext("alice");
       const bob = testEnv.authenticatedContext("bob");
@@ -167,6 +217,8 @@ describe("Firestore", () => {
 
       await assertSucceeds(
         setDoc(doc(bobDb, "users", "alice", "friendRequests", "bob"), {
+          from: "bob",
+          to: "alice",
           senderName: "Bob",
         })
       );

@@ -24,6 +24,7 @@ import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
@@ -33,6 +34,7 @@ import {
   Keyboard,
   Modal,
   Pressable,
+  Share,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -167,6 +169,7 @@ export default function ProfileScreen() {
   const [isQRExpanded, setQRExpanded] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string>("");
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [interests, setInterests] = useState<string[]>([]);
   const [city, setCity] = useState<string | null>(null);
@@ -500,6 +503,68 @@ export default function ProfileScreen() {
       queryParams: { friendId: uid },
     });
   }, [auth.currentUser?.uid]);
+  const inviteShareUrl = useMemo(() => {
+    if (!inviteCode) return "";
+    return `synq://invite/${encodeURIComponent(inviteCode)}`;
+  }, [inviteCode]);
+
+  const fetchInviteCode = useCallback(async (): Promise<string> => {
+    if (inviteCode) return inviteCode;
+    const functions = getFunctions(undefined, "us-central1");
+    const getOrCreateInviteCode = httpsCallable(functions, "getOrCreateInviteCode");
+    const result = await getOrCreateInviteCode({});
+    const code = String((result.data as any)?.inviteCode || "").trim();
+    if (!code) {
+      throw new Error("Could not create invite code.");
+    }
+    setInviteCode(code);
+    return code;
+  }, [inviteCode]);
+
+  useEffect(() => {
+    if (!auth.currentUser?.uid) {
+      setInviteCode("");
+      return;
+    }
+    let cancelled = false;
+    const ensureInviteCode = async () => {
+      try {
+        const code = await fetchInviteCode();
+        if (!cancelled && code) setInviteCode(code);
+      } catch {}
+    };
+    void ensureInviteCode();
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.currentUser?.uid, fetchInviteCode]);
+
+  const shareProfile = async () => {
+    const fallbackUid = auth.currentUser?.uid;
+    const fallbackUrl = fallbackUid
+      ? `synq://invite?inviteFrom=${encodeURIComponent(fallbackUid)}`
+      : "";
+    try {
+      const code = await fetchInviteCode();
+      const url = `synq://invite/${encodeURIComponent(code)}`;
+      await Share.share({
+        message: `Join me on Synq and let's connect: ${url}`,
+        url,
+      });
+    } catch {
+      if (!fallbackUrl) {
+        showAlert(
+          "We couldn't generate your invite link yet. Please try again in a moment.",
+          "Share unavailable"
+        );
+        return;
+      }
+      await Share.share({
+        message: `Join me on Synq and let's connect: ${fallbackUrl}`,
+        url: fallbackUrl,
+      });
+    }
+  };
 
   const locationLower =
     city && state ? `${city}, ${state}` : null;
@@ -603,15 +668,24 @@ export default function ProfileScreen() {
               </View>
             )}
 
-            <ProfilePressable
-              style={{ alignSelf: "center" }}
-              contentStyle={styles.editProfileBtn}
-              onPress={() => router.push("/edit-profile")}
-              accessibilityLabel="Edit profile"
-            >
-              <Icon name="create-outline" size={15} color={ACCENT} />
-              <Text style={styles.editProfileBtnText}>Edit profile</Text>
-            </ProfilePressable>
+            <View style={styles.profileActionsRow}>
+              <ProfilePressable
+                contentStyle={styles.editProfileBtn}
+                onPress={() => router.push("/edit-profile")}
+                accessibilityLabel="Edit profile"
+              >
+                <Icon name="create-outline" size={13} color={ACCENT} />
+                <Text style={styles.editProfileBtnText}>Edit profile</Text>
+              </ProfilePressable>
+              <ProfilePressable
+                contentStyle={styles.editProfileBtn}
+                onPress={shareProfile}
+                accessibilityLabel="Share profile"
+              >
+                <Icon name="share-social-outline" size={13} color={ACCENT} />
+                <Text style={styles.editProfileBtnText}>Share profile</Text>
+              </ProfilePressable>
+            </View>
           </View>
         </View>
       </View>
@@ -944,19 +1018,26 @@ const styles = StyleSheet.create({
   editProfileBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 11,
     borderRadius: 999,
     backgroundColor: SURFACE,
     borderWidth: 1,
     borderColor: BORDER,
   },
+  profileActionsRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
   editProfileBtnText: {
     color: ACCENT,
     fontFamily: fonts.heavy,
-    fontSize: 13,
+    fontSize: 12,
     letterSpacing: 0.2,
   },
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 14 },

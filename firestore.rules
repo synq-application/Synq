@@ -55,13 +55,24 @@ service cloud.firestore {
 
       match /friendRequests/{fromId} {
         allow read: if isSelf(userId) || isSelf(fromId);
-        allow create, update: if isSelf(fromId);
+        allow create: if isSelf(fromId)
+          && fromId != userId
+          && request.resource.data.from == fromId
+          && request.resource.data.to == userId
+          && !exists(/databases/$(database)/documents/users/$(userId)/friends/$(fromId))
+          && !exists(/databases/$(database)/documents/users/$(fromId)/friends/$(userId))
+          && !exists(/databases/$(database)/documents/users/$(fromId)/friendRequests/$(userId));
+        allow update: if isSelf(fromId);
         allow delete: if isSelf(userId) || isSelf(fromId);
       }
 
       match /notificationLocks/{lockId} {
         allow read, write: if isSelf(userId);
       }
+    }
+
+    match /invites/{inviteId} {
+      allow read, write: if false;
     }
 
     match /chats/{chatId} {

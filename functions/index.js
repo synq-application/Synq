@@ -14,6 +14,31 @@ if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 
+const INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const INVITE_CODE_LENGTH = 7;
+
+function randomInviteCode(length = INVITE_CODE_LENGTH) {
+  let out = "";
+  for (let i = 0; i < length; i += 1) {
+    const idx = Math.floor(Math.random() * INVITE_CODE_ALPHABET.length);
+    out += INVITE_CODE_ALPHABET[idx];
+  }
+  return out;
+}
+
+async function reserveUniqueInviteCode(db, maxAttempts = 25) {
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const code = randomInviteCode();
+    const snap = await db
+      .collection("users")
+      .where("inviteCode", "==", code)
+      .limit(1)
+      .get();
+    if (snap.empty) return code;
+  }
+  throw new HttpsError("resource-exhausted", "Could not reserve invite code.");
+}
+
 /**
  * Expo push tokens identify a device+install, not a user. If two accounts log in on
  * the same phone, both user docs can end up with the same token — then "notify the
@@ -305,6 +330,167 @@ exports.removeFriendMutual = onCall(
     batch.delete(db.collection("users").doc(otherUid).collection("friendRequests").doc(uid));
     await batch.commit();
     return { ok: true };
+  }
+);
+
+/** Returns current user's invite code; creates one if missing. */
+exports.getOrCreateInviteCode = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Must be logged in.");
+    }
+    const uid = String(request.auth.uid || "").trim();
+    const db = admin.firestore();
+    const userRef = db.collection("users").doc(uid);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+      throw new HttpsError("failed-precondition", "User profile not found.");
+    }
+    const existing = String(userSnap.data()?.inviteCode || "").trim().toUpperCase();
+    if (existing) {
+      return { inviteCode: existing };
+    }
+    const inviteCode = await reserveUniqueInviteCode(db);
+    await userRef.set(
+      {
+        inviteCode,
+        inviteCodeCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return { inviteCode };
+  }
+);
+
+/** Accepts invite-link attribution and creates a safe friend request to inviter. */
+exports.acceptInviteFromLink = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Must be logged in.");
+    }
+    const toUid = String(request.auth.uid || "").trim();
+    const fromUidInput = String(request.data?.fromUid || "").trim();
+    const inviteCode = String(request.data?.inviteCode || "")
+      .trim()
+      .toUpperCase();
+
+    const db = admin.firestore();
+    let fromUid = fromUidInput;
+    if (!fromUid) {
+      if (!inviteCode) {
+        throw new HttpsError("invalid-argument", "Missing inviter id or invite code.");
+      }
+      const inviterByCodeSnap = await db
+        .collection("users")
+        .where("inviteCode", "==", inviteCode)
+        .limit(1)
+        .get();
+      if (inviterByCodeSnap.empty) {
+        throw new HttpsError("failed-precondition", "Invite code no longer exists.");
+      }
+      fromUid = inviterByCodeSnap.docs[0].id;
+    }
+    if (fromUid === toUid) {
+      throw new HttpsError("invalid-argument", "Cannot invite yourself.");
+    }
+
+    const inviterRef = db.collection("users").doc(fromUid);
+    const recipientRef = db.collection("users").doc(toUid);
+    const recipientToInviterReqRef = inviterRef.collection("friendRequests").doc(toUid);
+    const inviterToRecipientReqRef = recipientRef.collection("friendRequests").doc(fromUid);
+    const inviterFriendRef = inviterRef.collection("friends").doc(toUid);
+    const recipientFriendRef = recipientRef.collection("friends").doc(fromUid);
+    const inviteLogRef = db.collection("invites").doc(`${fromUid}_${toUid}`);
+
+    const [
+      inviterSnap,
+      recipientSnap,
+      recipientToInviterReqSnap,
+      inviterToRecipientReqSnap,
+      inviterFriendSnap,
+      recipientFriendSnap,
+    ] = await Promise.all([
+      inviterRef.get(),
+      recipientRef.get(),
+      recipientToInviterReqRef.get(),
+      inviterToRecipientReqRef.get(),
+      inviterFriendRef.get(),
+      recipientFriendRef.get(),
+    ]);
+
+    if (!inviterSnap.exists) {
+      throw new HttpsError("failed-precondition", "Inviter no longer exists.");
+    }
+    if (!recipientSnap.exists) {
+      throw new HttpsError("failed-precondition", "Recipient profile missing.");
+    }
+
+    const alreadyFriends = inviterFriendSnap.exists || recipientFriendSnap.exists;
+    if (alreadyFriends) {
+      await inviteLogRef.set(
+        {
+          fromUid,
+          toUid,
+          inviteCode: inviteCode || null,
+          status: "already_friends",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return { ok: true, status: "already_friends" };
+    }
+
+    if (recipientToInviterReqSnap.exists || inviterToRecipientReqSnap.exists) {
+      await inviteLogRef.set(
+        {
+          fromUid,
+          toUid,
+          inviteCode: inviteCode || null,
+          status: "request_exists",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return { ok: true, status: "request_exists" };
+    }
+
+    const recipientData = recipientSnap.data() || {};
+    const senderName = String(
+      recipientData.displayName || request.auth.token.name || "Someone"
+    ).trim() || "Someone";
+    const senderImageUrl =
+      typeof recipientData.imageurl === "string" ? recipientData.imageurl : null;
+
+    const batch = db.batch();
+    batch.set(recipientToInviterReqRef, {
+      from: toUid,
+      to: fromUid,
+      senderName,
+      senderImageUrl,
+      source: "invite_link",
+      status: "pending",
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    batch.set(
+      inviteLogRef,
+      {
+        fromUid,
+        toUid,
+        inviteCode: inviteCode || null,
+        status: "request_created",
+        source: "invite_link",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    await batch.commit();
+    return { ok: true, status: "request_created" };
   }
 );
 
