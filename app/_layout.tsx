@@ -133,6 +133,7 @@ export default function RootLayout() {
     | { kind: "chat"; chatId: string; messageId?: string }
     | { kind: "notifications" }
     | { kind: "friend_profile"; friendId: string }
+    | { kind: "synq_home" }
     | { kind: "me"; focusEventId?: string }
     | null
   >(null);
@@ -184,12 +185,7 @@ export default function RootLayout() {
       }
 
       if (type === "friend_synq_active") {
-        const friendId = str(data.fromUserId);
-        if (friendId) {
-          setPendingNotificationTap({ kind: "friend_profile", friendId });
-        } else {
-          setPendingNotificationTap({ kind: "notifications" });
-        }
+        setPendingNotificationTap({ kind: "synq_home" });
         return;
       }
 
@@ -409,6 +405,11 @@ export default function RootLayout() {
         pathname: "/friend-profile",
         params: { friendId: pending.friendId },
       });
+      return;
+    }
+
+    if (pending.kind === "synq_home") {
+      router.push("/(tabs)");
       return;
     }
 
