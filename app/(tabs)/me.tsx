@@ -510,43 +510,44 @@ export default function ProfileScreen() {
   }, [isFocused]);
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-      onScrollBeginDrag={Keyboard.dismiss}
-    >
+    <View style={styles.screen}>
       <StatusBar barStyle="light-content" />
 
-      <View style={styles.heroOuter}>
-        <View style={styles.heroGradient}>
-          <View style={styles.header}>
-            <ProfilePressable
-              style={styles.headerIconContainer}
-              contentStyle={styles.headerIconInner}
-              onPress={() => router.push("/notifications")}
-              accessibilityLabel="Notifications"
-            >
-              <Icon name="notifications-outline" size={26} color="white" />
-              {requestCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{requestCount}</Text>
-                </View>
-              )}
-            </ProfilePressable>
+      <View style={styles.header}>
+        <ProfilePressable
+          style={styles.headerIconContainer}
+          contentStyle={styles.headerIconInner}
+          onPress={() => router.push("/notifications")}
+          accessibilityLabel="Notifications"
+        >
+          <Icon name="notifications-outline" size={26} color="white" />
+          {requestCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{requestCount}</Text>
+            </View>
+          )}
+        </ProfilePressable>
 
-            <ProfilePressable
-              style={styles.headerIconContainer}
-              contentStyle={styles.headerIconInner}
-              onPress={() => router.push("/settings")}
-              accessibilityLabel="Settings"
-            >
-              <Icon name="settings-outline" size={26} color="white" />
-            </ProfilePressable>
-          </View>
+        <ProfilePressable
+          style={styles.headerIconContainer}
+          contentStyle={styles.headerIconInner}
+          onPress={() => router.push("/settings")}
+          accessibilityLabel="Settings"
+        >
+          <Icon name="settings-outline" size={26} color="white" />
+        </ProfilePressable>
+      </View>
 
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        onScrollBeginDrag={Keyboard.dismiss}
+      >
+        <View style={styles.heroOuter}>
+          <View style={styles.heroGradient}>
           <View style={styles.profileSection}>
             <View style={styles.qrContainer}>
               <View style={styles.qrBg}>
@@ -732,6 +733,7 @@ export default function ProfileScreen() {
       >
         <Text style={styles.signOutText}>Sign Out</Text>
       </ProfilePressable>
+      </ScrollView>
 
       <Modal visible={isQRExpanded} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -848,13 +850,15 @@ export default function ProfileScreen() {
           await firebaseSignOut(auth);
         }}
       />
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
-  scrollContent: { paddingBottom: 70, paddingHorizontal: 20 },
+  /** Matches `friends` tab: padded screen, header outside scroll so icon row aligns with other tabs. */
+  screen: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 70 },
   heroOuter: { marginHorizontal: -20, marginTop: 0 },
   heroGradient: {
     backgroundColor: BG,
