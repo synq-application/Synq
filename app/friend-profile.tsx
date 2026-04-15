@@ -1102,9 +1102,9 @@ const styles = StyleSheet.create({
   },
 
   imageCircle: {
-    width: 78,
-    height: 78,
-    borderRadius: 38,
+    width: 55,
+    height: 55,
+    borderRadius: 50,
     borderWidth: 2,
     borderColor: BORDER,
     justifyContent: "center",
@@ -1112,9 +1112,9 @@ const styles = StyleSheet.create({
   },
 
   connImg: {
-    width: 70,
-    height: 70,
-    borderRadius: 34,
+    width: 55,
+    height: 55,
+    borderRadius: 50,
   },
 
   connName: {
