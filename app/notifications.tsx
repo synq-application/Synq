@@ -304,7 +304,7 @@ export default function NotificationsScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Ionicons name="chevron-back" size={26} color="#888" />
+          <Ionicons name="chevron-back" size={22} color="#888" />
         </TouchableOpacity>
 
         <View style={{ flex: 1 }}>

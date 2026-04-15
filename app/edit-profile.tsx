@@ -313,7 +313,7 @@ export default function EditProfileScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={26} color="#888" />
+            <Ionicons name="chevron-back" size={22} color="#888" />
           </TouchableOpacity>
           <View style={styles.headerTitleBlock}>
             <Text style={styles.headerTitle}>Edit profile</Text>

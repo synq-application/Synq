@@ -97,7 +97,7 @@ export default function DeleteAccountScreen() {
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={26} color="black" />
+          <Ionicons name="chevron-back" size={22} color="black" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Delete account</Text>
       </View>
