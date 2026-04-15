@@ -1066,7 +1066,7 @@ export default function SynqScreen() {
                 <View style={styles.activeEmptyWrap}>
                   <Text style={styles.activeEmptyTitle}>No free friends right now.</Text>
                   <Text style={styles.activeEmptySub}>
-                    {`In the meantime, add more connections to increase the chances of having overlapping free time!`}
+                    {`Add more connections to increase the chances of having overlapping free time!`}
                   </Text>
                 </View>
               }
