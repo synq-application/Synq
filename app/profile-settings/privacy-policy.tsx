@@ -10,15 +10,25 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ACCENT, BG } from "../../constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BORDER,
+  MUTED,
+  RADIUS_MD,
+  SPACE_1,
+  SPACE_3,
+  SPACE_4,
+  SPACE_5,
+  SPACE_6,
+  SURFACE,
+  TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_TITLE,
+  fonts,
+} from "../../constants/Variables";
 
 const BACKGROUND = BG;
-const SURFACE = "#161616";
-
-const fonts = {
-  heavy: "Avenir-Heavy",
-  medium: "Avenir-Medium",
-};
 
 export default function PrivacyPolicyScreen() {
   const Section = ({
@@ -310,53 +320,58 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BACKGROUND },
 
   header: {
-    height: 72,
-    backgroundColor: ACCENT,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACE_4 + SPACE_1,
+    paddingTop: SPACE_3,
+    paddingBottom: SPACE_3,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    marginRight: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#1F1F1F",
     alignItems: "center",
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: TYPE_TITLE,
     fontFamily: fonts.heavy,
-    color: "black",
-    marginLeft: 6,
+    color: "white",
   },
 
-  scrollContent: { paddingBottom: 40 },
+  scrollContent: {
+    paddingBottom: SPACE_6 + SPACE_1,
+    paddingTop: SPACE_3,
+  },
 
-  section: { marginTop: 6 },
+  section: { marginTop: 2 },
   sectionTitle: {
-    color: "#666",
-    fontSize: 14,
+    color: MUTED,
+    fontSize: TYPE_CAPTION + 1,
     fontFamily: fonts.medium,
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginLeft: 25,
-    marginBottom: 10,
-    marginTop: 10,
+    marginLeft: SPACE_5 + 1,
+    marginBottom: SPACE_3 - 2,
+    marginTop: SPACE_3 - 2,
   },
   card: {
     backgroundColor: SURFACE,
-    marginHorizontal: 20,
-    borderRadius: 16,
-    padding: 18,
+    marginHorizontal: SPACE_4 + SPACE_1,
+    borderRadius: RADIUS_MD,
+    padding: SPACE_4 + 2,
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#202020",
+    borderColor: BORDER,
   },
 
   text: {
-    color: "#EAEAEA",
+    color: "white",
     fontFamily: fonts.medium,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: TYPE_BODY,
+    lineHeight: 24,
     marginBottom: 10,
   },
   bold: {
@@ -368,23 +383,23 @@ const styles = StyleSheet.create({
   bulletRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
   bulletDot: { color: ACCENT, marginRight: 10, fontSize: 18, lineHeight: 22 },
   bulletText: {
-    color: "#EAEAEA",
+    color: "white",
     fontFamily: fonts.medium,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: TYPE_BODY,
+    lineHeight: 24,
     flex: 1,
     flexShrink: 1,
     minWidth: 0,
   },
 
   lastUpdated: {
-    color: "#777",
+    color: "#A8A8A8",
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION + 1,
     lineHeight: 18,
     marginTop: 24,
-    marginHorizontal: 20,
+    marginHorizontal: SPACE_5 + 1,
   },
 
-  footerSpace: { height: 24 },
+  footerSpace: { height: SPACE_5 },
 });
