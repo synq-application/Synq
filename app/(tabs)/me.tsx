@@ -44,15 +44,9 @@ import {
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import Animated, {
-  cancelAnimation,
-  Easing,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withSpring,
-  withTiming,
 } from "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/Ionicons";
@@ -82,6 +76,7 @@ type ProfilePressableProps = {
   accessibilityRole?: "button";
   disabled?: boolean;
   haptic?: boolean;
+  animatePress?: boolean;
 };
 
 function ProfilePressable({
@@ -93,10 +88,11 @@ function ProfilePressable({
   accessibilityRole,
   disabled,
   haptic = true,
+  animatePress = true,
 }: ProfilePressableProps) {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{ scale: animatePress ? scale.value : 1 }],
   }));
   return (
     <Pressable
@@ -104,16 +100,23 @@ function ProfilePressable({
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={accessibilityRole ?? "button"}
       onPress={() => {
+        if (animatePress) {
+          scale.value = withSpring(1, { damping: 16, stiffness: 380 });
+        }
         if (haptic && !disabled) {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
         onPress();
       }}
       onPressIn={() => {
-        if (!disabled) scale.value = withSpring(0.96, { damping: 16, stiffness: 380 });
+        if (!disabled && animatePress) {
+          scale.value = withSpring(0.96, { damping: 16, stiffness: 380 });
+        }
       }}
       onPressOut={() => {
-        scale.value = withSpring(1, { damping: 16, stiffness: 380 });
+        if (animatePress) {
+          scale.value = withSpring(1, { damping: 16, stiffness: 380 });
+        }
       }}
       style={style}
     >
@@ -124,33 +127,7 @@ function ProfilePressable({
 
 export default function ProfileScreen() {
   const isFocused = useIsFocused();
-  const reducedMotion = useReducedMotion();
   const scrollRef = useRef<ScrollView>(null);
-
-  const avatarPulse = useSharedValue(1);
-
-  useEffect(() => {
-    if (reducedMotion) {
-      cancelAnimation(avatarPulse);
-      avatarPulse.value = 1;
-      return;
-    }
-    avatarPulse.value = withRepeat(
-      withSequence(
-        withTiming(1.02, { duration: 2200, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
-    );
-    return () => {
-      cancelAnimation(avatarPulse);
-    };
-  }, [reducedMotion]);
-
-  const avatarPulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: avatarPulse.value }],
-  }));
   const params = useLocalSearchParams<{ focusEventId?: string | string[] }>();
   const focusEventIdRaw = params.focusEventId;
   const focusEventId =
@@ -166,7 +143,9 @@ export default function ProfileScreen() {
   const cachedFriendsForNames = myId ? friendsListCacheByUser[myId] ?? [] : [];
   const [friendsForHostNames, setFriendsForHostNames] = useState<Friend[]>(cachedFriendsForNames);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [avatarRenderVersion, setAvatarRenderVersion] = useState(0);
   const [isQRExpanded, setQRExpanded] = useState(false);
+  const [isPickingImage, setIsPickingImage] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string>("");
@@ -195,6 +174,7 @@ export default function ProfileScreen() {
   const [alertMessage, setAlertMessage] = useState("");
   const [pendingInterestDelete, setPendingInterestDelete] = useState<string | null>(null);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const resolvedProfileImage = useMemo(() => resolveAvatar(profileImage), [profileImage]);
 
   const [showEventModal, setShowEventModal] = useState(false);
 
@@ -445,18 +425,24 @@ export default function ProfileScreen() {
   };
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") return;
+    setIsPickingImage(true);
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") return;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7,
+      });
 
-    if (!result.canceled && result.assets[0].uri) {
-      uploadImage(result.assets[0].uri);
+      if (!result.canceled && result.assets[0]?.uri) {
+        await uploadImage(result.assets[0].uri);
+      }
+    } finally {
+      setAvatarRenderVersion((prev) => prev + 1);
+      setIsPickingImage(false);
     }
   };
 
@@ -628,21 +614,25 @@ export default function ProfileScreen() {
                 )}
               </View>
 
-              <Animated.View style={[styles.avatarGlowWrap, avatarPulseStyle]}>
+              <View style={styles.avatarGlowWrap}>
                 <ProfilePressable
                   onPress={pickImage}
-                  disabled={isUploading}
+                  disabled={isUploading || isPickingImage}
                   contentStyle={styles.imageWrapper}
                   accessibilityLabel="Change profile photo"
+                  animatePress={false}
                 >
                   <ExpoImage
-                    source={{ uri: resolveAvatar(profileImage) }}
+                    key={`${resolvedProfileImage}-${avatarRenderVersion}`}
+                    source={{ uri: resolvedProfileImage }}
                     style={styles.profileImg}
                     cachePolicy="memory-disk"
-                    transition={220}
+                    contentFit="cover"
+                    recyclingKey={`${resolvedProfileImage}-${avatarRenderVersion}`}
+                    transition={0}
                   />
                 </ProfilePressable>
-              </Animated.View>
+              </View>
 
               <ProfilePressable
                 style={styles.qrToggle}
