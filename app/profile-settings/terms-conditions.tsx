@@ -57,82 +57,105 @@ export default function TermsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Synq Terms</Text>
-          <Text style={styles.heroSubtitle}>
-            Last updated: January 2026
-          </Text>
-        </View>
-
-        <Section title="1. Agreement">
+        <Section title="1. Acceptance">
           <P>
-            These Terms & Conditions govern your use of Synq.
-            By accessing or using Synq, you agree to these Terms.
+            These Terms & Conditions govern your use of Synq. By creating an
+            account, accessing, or using the app, you agree to these Terms.
           </P>
         </Section>
 
         <Section title="2. Eligibility">
           <P>
-            You must be at least 13 years old to use Synq. If you are under the age
-            required in your country to consent to online services, you may use Synq
-            only with a parent or guardian’s consent.
+            You must be at least 13 years old to use Synq. If the law where you
+            live requires a higher age to use online services without parental
+            permission, you may only use Synq with the required consent.
           </P>
         </Section>
 
-        <Section title="3. Your account">
+        <Section title="3. Accounts">
           <P>
-            You are responsible for maintaining the confidentiality of your account and
-            for all activity that occurs under it. You agree to provide accurate
-            information and keep it up to date.
+            You may sign up using email/password or a phone number, depending on
+            the options we offer. You agree to provide accurate information, keep
+            your account details up to date, and keep your login credentials secure.
           </P>
           <P>
-            We may suspend or terminate accounts that violate these Terms or that we
-            reasonably believe create risk or harm to Synq or other users.
-          </P>
-        </Section>
-
-        <Section title="4. How Synq works">
-          <P>
-            Synq helps you coordinate real-life plans by showing availability and enabling
-            messaging. Availability and certain features may be optional, and you control
-            what you share through in-app settings.
+            You are responsible for activity that happens through your account. We
+            may restrict or suspend accounts that violate these Terms or create
+            risk for Synq or other users.
           </P>
         </Section>
 
-        <Section title="5. Community expectations">
+        <Section title="4. The Service">
+          <P>
+            Synq helps people coordinate real-world plans. The app may let you
+            create a profile, add interests, set availability, share plans,
+            connect with friends, message other users, and receive notifications.
+          </P>
+          <P>
+            Some features depend on optional permissions, such as photo-library
+            access for profile photos, push notifications, and foreground
+            location for filling in your city, state, and saved coordinates.
+            If you decline a permission, some features may not work fully.
+          </P>
+        </Section>
+
+        <Section title="5. User Content">
+          <P>
+            You keep ownership of the content you submit to Synq, including your
+            profile details, profile photo, interests, status text, plans, and
+            messages.
+          </P>
+          <P>
+            You give Synq a limited license to host, store, process, display, and
+            transmit that content only as needed to operate the service, including
+            showing it to intended recipients, generating notification previews,
+            and supporting account and safety workflows.
+          </P>
+          <P>
+            You are responsible for your content and confirm that you have the
+            rights needed to share it.
+          </P>
+        </Section>
+
+        <Section title="6. Acceptable Use">
           <P>Use Synq respectfully. You agree not to:</P>
           <View style={styles.bullets}>
             <Bullet>Harass, bully, threaten, or impersonate others.</Bullet>
-            <Bullet>Share unlawful, hateful, or sexually explicit content.</Bullet>
-            <Bullet>Use Synq to spam, scam, or solicit others.</Bullet>
+            <Bullet>Share unlawful, hateful, exploitative, or sexually explicit content.</Bullet>
+            <Bullet>Use Synq to spam, scam, scrape, or solicit people improperly.</Bullet>
             <Bullet>Attempt to access accounts, data, or systems you do not own.</Bullet>
-            <Bullet>Reverse engineer, disrupt, or interfere with the App.</Bullet>
+            <Bullet>Interfere with the app, reverse engineer it, or bypass security controls.</Bullet>
+            <Bullet>Use the service in a way that violates another person’s privacy or rights.</Bullet>
           </View>
-        </Section>
-
-        <Section title="6. User content">
-          <P>
-            You own the content you post or send (like messages, photos, and profile info).
-            You grant Synq a limited license to host, store, and display that content only
-            as needed to operate the App.
-          </P>
-          <P>
-            You are responsible for your content and for ensuring you have the rights to
-            share it.
-          </P>
         </Section>
 
         <Section title="7. Privacy">
           <P>
-            Your privacy matters. Our Privacy Policy explains what data we collect and how
-            it’s used. By using Synq, you agree to our Privacy Policy.
+            Our Privacy Policy explains how Synq handles account information,
+            profile information, friend connections, messages, optional location,
+            push tokens, and technical/diagnostic data. By using Synq, you also
+            acknowledge that Privacy Policy.
           </P>
         </Section>
 
-        <Section title="8. Safety & real-world meetups">
+        <Section title="8. Third-Party Services">
           <P>
-            Synq is not responsible for offline interactions. Use good judgment when meeting
-            people in person.
+            Synq relies on third-party providers to operate features, including
+            infrastructure, authentication, storage, notifications, crash/error
+            reporting, and place suggestions. Those providers may have their own
+            terms and privacy practices.
+          </P>
+          <P>
+            Suggestions generated through mapping or AI-powered features are for
+            convenience only and may be incomplete, inaccurate, or unavailable.
+          </P>
+        </Section>
+
+        <Section title="9. Safety & Real-World Meetups">
+          <P>
+            Synq is a coordination tool, not a background-check or emergency
+            service. We are not responsible for offline interactions between users.
+            Use good judgment when meeting people in person.
           </P>
           <View style={styles.bullets}>
             <Bullet>Meet in public places and tell a friend your plans.</Bullet>
@@ -140,41 +163,51 @@ export default function TermsScreen() {
           </View>
         </Section>
 
-        <Section title="9. Termination">
+        <Section title="10. Suspension, Termination, and Deletion">
           <P>
-            You may stop using Synq at any time. We may suspend or terminate your access if
-            you violate these Terms, if required by law, or to protect users and the platform.
+            You may stop using Synq at any time. You may also request deletion of
+            your account through the app where available.
+          </P>
+          <P>
+            We may suspend or terminate access if you violate these Terms, if law
+            requires us to do so, or if needed to protect Synq, our users, or our
+            service providers.
           </P>
         </Section>
 
-        <Section title="10. Disclaimers">
+        <Section title="11. Disclaimers">
           <P>
-            Synq is provided “as is” without warranties of any kind. We do not guarantee the
-            App will be uninterrupted, secure, or error-free.
+            Synq is provided "as is" and "as available" without warranties of any
+            kind, to the fullest extent permitted by law. We do not guarantee that
+            the app will always be uninterrupted, secure, accurate, or error-free.
           </P>
         </Section>
 
-        <Section title="11. Limitation of liability">
+        <Section title="12. Limitation of Liability">
           <P>
-            To the fullest extent permitted by law, Synq will not be liable for indirect,
-            incidental, special, consequential, or punitive damages, or any loss of data,
-            profits, or goodwill arising from your use of the App.
+            To the fullest extent permitted by law, Synq will not be liable for
+            indirect, incidental, special, consequential, exemplary, or punitive
+            damages, or for loss of data, profits, goodwill, or business
+            opportunity arising from your use of the app.
           </P>
         </Section>
 
-        <Section title="12. Changes to these terms">
+        <Section title="13. Changes to These Terms">
           <P>
-            We may update these Terms from time to time. If we make material changes, we’ll
-            update the “Last updated” date and may provide additional notice in the App.
+            We may update these Terms from time to time. If we make material
+            changes, we will update the "Last updated" date and may also provide
+            additional notice inside the app.
           </P>
         </Section>
 
-        <Section title="13. Contact">
+        <Section title="14. Contact">
           <P>
             Questions about these Terms? Email{" "}
             <Text style={styles.bold}>synqapp@gmail.com</Text>.
           </P>
         </Section>
+
+        <Text style={styles.lastUpdated}>Last updated: May 11, 2026</Text>
 
         <View style={styles.footerSpace} />
       </ScrollView>
@@ -207,27 +240,6 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: { paddingBottom: 40 },
-
-  hero: {
-    margin: 20,
-    backgroundColor: SURFACE,
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#202020",
-  },
-  heroTitle: {
-    fontSize: 20,
-    fontFamily: fonts.heavy,
-    color: "white",
-    marginBottom: 6,
-  },
-  heroSubtitle: {
-    fontSize: 14.5,
-    fontFamily: fonts.medium,
-    color: "#BDBDBD",
-    lineHeight: 20,
-  },
 
   section: { marginTop: 6 },
   sectionTitle: {
@@ -267,6 +279,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     flex: 1,
+  },
+
+  lastUpdated: {
+    color: "#777",
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 24,
+    marginHorizontal: 20,
   },
 
   footerSpace: { height: 24 },
