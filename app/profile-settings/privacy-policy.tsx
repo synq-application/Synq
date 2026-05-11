@@ -104,10 +104,6 @@ export default function PrivacyPolicyScreen() {
               to app behavior.
             </Bullet>
             <Bullet>
-              <Text style={styles.bold}>Diagnostics:</Text> crash and error data
-              if Sentry reporting is enabled for your build.
-            </Bullet>
-            <Bullet>
               <Text style={styles.bold}>Feedback and support information:</Text>{" "}
               if you use the feedback flow or email us, we may receive the
               message contents, the optional contact email you provide, and basic
@@ -128,7 +124,7 @@ export default function PrivacyPolicyScreen() {
             <Bullet>Directly from you when you create an account, build your profile, message, add plans, or contact us.</Bullet>
             <Bullet>From your device when you enable permissions like notifications, photo-library access, or foreground location.</Bullet>
             <Bullet>From other users when they send you friend requests, connect with you, or interact with you in chats and shared plans.</Bullet>
-            <Bullet>From service providers that help us run Synq, including Firebase, Expo, Google, and Sentry.</Bullet>
+            <Bullet>From service providers that help us run Synq, including Firebase, Expo, and Google.</Bullet>
           </View>
         </Section>
 
@@ -189,9 +185,8 @@ export default function PrivacyPolicyScreen() {
             <Bullet>
               <Text style={styles.bold}>To service providers:</Text> Firebase
               Authentication, Firestore, Storage, and Cloud Functions; Expo
-              notifications; Google services used for venue suggestions; Sentry
-              when enabled for crash reporting; and your email app/provider when
-              you use the in-app feedback mail flow.
+              notifications; Google services used for venue suggestions; and
+              your email app/provider when you use the in-app feedback mail flow.
             </Bullet>
             <Bullet>
               <Text style={styles.bold}>For legal, security, or compliance reasons:</Text>{" "}
@@ -370,7 +365,7 @@ const styles = StyleSheet.create({
   },
 
   bullets: { marginTop: 6 },
-  bulletRow: { flexDirection: "row", marginBottom: 10 },
+  bulletRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
   bulletDot: { color: ACCENT, marginRight: 10, fontSize: 18, lineHeight: 22 },
   bulletText: {
     color: "#EAEAEA",
@@ -378,6 +373,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
 
   lastUpdated: {

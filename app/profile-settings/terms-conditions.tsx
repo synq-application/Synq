@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   bold: { fontFamily: fonts.heavy, color: "white" },
 
   bullets: { marginTop: 6 },
-  bulletRow: { flexDirection: "row", marginBottom: 10 },
+  bulletRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
   bulletDot: { color: ACCENT, marginRight: 10, fontSize: 18, lineHeight: 22 },
   bulletText: {
     color: "#EAEAEA",
@@ -279,6 +279,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
 
   lastUpdated: {
