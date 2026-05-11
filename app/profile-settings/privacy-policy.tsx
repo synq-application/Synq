@@ -263,7 +263,7 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="11. Children">
           <P>
-            Synq is not intended for children under 13. If we learn that we have
+            Synq is not intended for children under 16. If we learn that we have
             collected personal information from a child who was not permitted to
             use the service, we may delete that information and disable the
             account.

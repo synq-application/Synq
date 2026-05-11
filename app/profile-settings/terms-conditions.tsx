@@ -66,7 +66,7 @@ export default function TermsScreen() {
 
         <Section title="2. Eligibility">
           <P>
-            You must be at least 13 years old to use Synq. If the law where you
+            You must be at least 16 years old to use Synq. If the law where you
             live requires a higher age to use online services without parental
             permission, you may only use Synq with the required consent.
           </P>
