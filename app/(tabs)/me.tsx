@@ -1012,9 +1012,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 11,
     borderRadius: 999,
-    backgroundColor: SURFACE,
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: ACCENT,
   },
   profileActionsRow: {
     marginTop: 12,
