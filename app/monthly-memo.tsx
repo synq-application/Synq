@@ -287,7 +287,7 @@ export default function OpenPlans({
           onPress={() => setShowEventModal(true)}
           accessibilityLabel="Add plan"
         >
-          <Text style={styles.addBtnText}>+ Add plan</Text>
+          <Text style={styles.addBtnText}>+ Add</Text>
         </TouchableOpacity>
       </View>
 
