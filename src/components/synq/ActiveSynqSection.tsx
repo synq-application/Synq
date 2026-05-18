@@ -173,23 +173,25 @@ export default function ActiveSynqSection({
           { paddingBottom: Math.max(44, 24 + insetsBottom) },
         ]}
       >
-        <TouchableOpacity
-          style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
-          onPress={handleConnect}
-          disabled={!selectedFriends.length}
-          accessibilityRole="button"
-          accessibilityLabel={
-            selectedFriends.length === 0
-              ? "Select friends who are free to start planning"
-              : `Start plan with ${selectedFriends.length} friend${
-                  selectedFriends.length === 1 ? "" : "s"
-                }`
-          }
-        >
-          <Text style={styles.btnText}>
-            {selectedFriends.length === 0 ? "Select friends" : "Start plan"}
-          </Text>
-        </TouchableOpacity>
+        {availableFriends.length > 0 ? (
+          <TouchableOpacity
+            style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
+            onPress={handleConnect}
+            disabled={!selectedFriends.length}
+            accessibilityRole="button"
+            accessibilityLabel={
+              selectedFriends.length === 0
+                ? "Select friends who are free to start planning"
+                : `Start plan with ${selectedFriends.length} friend${
+                    selectedFriends.length === 1 ? "" : "s"
+                  }`
+            }
+          >
+            <Text style={styles.btnText}>
+              {selectedFriends.length === 0 ? "Select friends" : "Start plan"}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
         <TouchableOpacity
           onPress={endSynq}
