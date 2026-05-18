@@ -791,7 +791,7 @@ export default function FriendProfile() {
 
           {lastSynq && (
             <Text style={styles.lastSynqText}>
-              Last synq: {formatLastSynq(lastSynq)}
+              Last Synq: {formatLastSynq(lastSynq)}
             </Text>
           )}
         </View>
