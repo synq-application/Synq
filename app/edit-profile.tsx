@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { ACCENT, BG, BUTTON_RADIUS, MUTED2 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
+import { filterOrReject } from "@/src/lib/contentFilter";
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
 
@@ -226,6 +227,11 @@ export default function EditProfileScreen() {
 
   const handleSave = async () => {
     if (!auth.currentUser) return;
+    const nameCheck = filterOrReject(displayName.trim());
+    if (!nameCheck.ok) {
+      showAlert(nameCheck.reason, "Content not allowed");
+      return;
+    }
     setSaving(true);
 
     try {
