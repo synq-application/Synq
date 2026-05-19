@@ -186,6 +186,14 @@ export default function SettingsScreen() {
           <SettingItem label="Sign out" onPress={confirmSignOut} />
         </View>
 
+        <Text style={styles.groupTitle}>Safety</Text>
+        <View style={styles.group}>
+          <SettingItem
+            label="Report a safety issue"
+            onPress={() => router.push("/profile-settings/safety-report")}
+          />
+        </View>
+
         <Text style={styles.groupTitle}>More</Text>
         <View style={styles.group}>
           <SettingItem

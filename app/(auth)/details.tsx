@@ -25,6 +25,7 @@ import {
   View
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
+import { filterOrReject } from "@/src/lib/contentFilter";
 import {
   ACCENT,
   BG,
@@ -108,6 +109,11 @@ export default function Details() {
     try {
       setLoading(true);
       const fullName = `${firstName.trim()} ${lastName.trim()}`;
+      const nameCheck = filterOrReject(fullName);
+      if (!nameCheck.ok) {
+        showAlert(nameCheck.reason, "Content not allowed");
+        return;
+      }
       await updateProfile(auth.currentUser, {
         displayName: fullName,
         photoURL: image ?? null, 

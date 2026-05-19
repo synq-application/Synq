@@ -84,6 +84,7 @@ import {
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
 import { friendLocationLine, resolveAvatar } from "../helpers";
+import { useBlockedUsers } from "@/src/lib/blockedUsers";
 
 const { width } = Dimensions.get("window");
 
@@ -337,11 +338,14 @@ export default function FriendsScreen() {
     };
   }, []);
 
-  const filteredFriends = friends.filter((f) =>
-    (f.displayName || "")
+  const { isBlocked } = useBlockedUsers();
+
+  const filteredFriends = friends.filter((f) => {
+    if (isBlocked(f.id)) return false;
+    return (f.displayName || "")
       .toLowerCase()
-      .includes(searchText.toLowerCase())
-  );
+      .includes(searchText.toLowerCase());
+  });
 
   const showFriendSearch = friends.length > 0 && !isFriendsInitialLoading;
   const listIsEmpty = filteredFriends.length === 0;

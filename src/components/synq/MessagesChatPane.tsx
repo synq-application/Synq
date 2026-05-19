@@ -37,6 +37,11 @@ type Props = {
   sendMessage: () => void;
   sendAISuggestionToChat: () => void;
   onMessageBubblePress: (item: { id: string; reactions?: Record<string, string> }) => void;
+  onMessageLongPress?: (item: {
+    id: string;
+    senderId: string;
+    text: string;
+  }) => void;
   onIdeaBubblePress: (
     item: { id: string; reactions?: Record<string, string> },
     mapsPayload: { name: string; address: string }
@@ -74,6 +79,7 @@ export default function MessagesChatPane({
   sendMessage,
   sendAISuggestionToChat,
   onMessageBubblePress,
+  onMessageLongPress,
   onIdeaBubblePress,
   ChatMessageBubble,
   iMessageBubbleColumnMaxWidth,
@@ -267,18 +273,29 @@ export default function MessagesChatPane({
                         },
                       ]}
                     >
-                      <ChatMessageBubble
-                        text={item.text}
-                        bubbleCap={bubbleCap}
-                        isMe={isMe}
-                        heartCount={heartCount || 0}
-                        onPress={() =>
-                          onMessageBubblePress({
+                      <Pressable
+                        onLongPress={() =>
+                          onMessageLongPress?.({
                             id: item.id,
-                            reactions: item.reactions,
+                            senderId: item.senderId,
+                            text: item.text,
                           })
                         }
-                      />
+                        delayLongPress={400}
+                      >
+                        <ChatMessageBubble
+                          text={item.text}
+                          bubbleCap={bubbleCap}
+                          isMe={isMe}
+                          heartCount={heartCount || 0}
+                          onPress={() =>
+                            onMessageBubblePress({
+                              id: item.id,
+                              reactions: item.reactions,
+                            })
+                          }
+                        />
+                      </Pressable>
                     </View>
                   </View>
                   <Text

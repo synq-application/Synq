@@ -9,6 +9,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 const admin = require("firebase-admin");
 const { logError, logWarn, logInfo } = require("./serverLog");
+const { registerModerationExports } = require("./moderation");
 
 if (admin.apps.length === 0) {
     admin.initializeApp();
@@ -87,6 +88,14 @@ exports.onUserPushTokenWrite = onDocumentWritten(
     }
   }
 );
+
+const moderation = registerModerationExports();
+exports.filterMessageOnCreate = moderation.filterMessageOnCreate;
+exports.submitReport = moderation.submitReport;
+exports.blockUser = moderation.blockUser;
+exports.unblockUser = moderation.unblockUser;
+exports.moderateContent = moderation.moderateContent;
+exports.checkOpenModerationReports = moderation.checkOpenModerationReports;
 
 exports.onMessageSent = onDocumentCreated({
     document: "chats/{chatId}/messages/{messageId}",
