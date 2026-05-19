@@ -14,6 +14,7 @@ import {
   profileScreenSectionTitle,
   SURFACE,
   TEXT,
+  tabScreenMainHeaderTitle,
   TYPE_BODY,
   TYPE_CAPTION,
 } from "@/constants/Variables";
@@ -1273,7 +1274,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitleBlock: { flex: 1, paddingRight: 12 },
-  headerTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
+  headerTitle: tabScreenMainHeaderTitle,
   headerAction: { paddingLeft: 12, paddingVertical: 6 },
   searchBarSubtle: {
     flexDirection: "row",

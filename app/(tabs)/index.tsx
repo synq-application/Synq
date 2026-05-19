@@ -56,6 +56,7 @@ import {
   SPACE_4,
   SPACE_5,
   TEXT,
+  tabScreenMainHeaderTitle,
   TYPE_BODY
 } from '../../constants/Variables';
 import { auth, db } from '../../src/lib/firebase';
@@ -1293,10 +1294,7 @@ const styles = StyleSheet.create({
     textAlign: "left",
   },
   headerTitle: {
-    color: TEXT,
-    fontSize: 28,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
+    ...tabScreenMainHeaderTitle,
     textAlign: "center",
   },
   headerIconContainer: { width: 40, alignItems: 'center', justifyContent: 'center' },
@@ -1444,7 +1442,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
   },
   modalTitle: { color: 'white', fontSize: 22, fontFamily: fonts.medium },
-  messagesInboxTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
+  messagesInboxTitle: tabScreenMainHeaderTitle,
   deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
   inboxItem: {
     paddingTop: 12,

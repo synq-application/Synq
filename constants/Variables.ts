@@ -55,6 +55,14 @@ export const profileScreenSectionTitle: TextStyle = {
   marginBottom: 12,
 };
 
+/** Main tab headings: Friends, Synq active state — identical scale and weight. */
+export const tabScreenMainHeaderTitle: TextStyle = {
+  color: TEXT,
+  fontSize: 28,
+  fontFamily: fonts.heavy,
+  letterSpacing: 0.2,
+};
+
 /** Shared pill style for low-emphasis destructive actions (End Synq, Sign Out). */
 export const destructiveActionBtn: ViewStyle = {
   alignSelf: "center",
