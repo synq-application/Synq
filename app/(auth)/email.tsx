@@ -1,5 +1,4 @@
 import {
-  onboardingAuthInnerMarginTop,
   ONBOARDING_BACK_LEFT,
   ONBOARDING_BACK_TOP,
   ONBOARDING_DIVIDER_MARGIN_TOP,
@@ -8,6 +7,7 @@ import {
   ONBOARDING_SCROLL_BOTTOM,
   ONBOARDING_TITLE_LINE_HEIGHT,
   ONBOARDING_TITLE_SIZE,
+  onboardingAuthInnerMarginTop,
 } from "@/constants/onboardingLayout";
 import {
   ACCENT,
@@ -26,7 +26,6 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -36,12 +35,12 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View,
+  View
 } from "react-native";
 import { SvgXml } from "react-native-svg";
-import AlertModal from "../alert-modal";
 import { auth } from "../../src/lib/firebase";
 import { usePreAuthTermsGate } from "../../src/lib/usePreAuthTermsGate";
+import AlertModal from "../alert-modal";
 
 export default function EmailSignup() {
   const termsReady = usePreAuthTermsGate("email");

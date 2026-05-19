@@ -69,6 +69,14 @@ service cloud.firestore {
       match /notificationLocks/{lockId} {
         allow read, write: if isSelf(userId);
       }
+
+      match /blocked/{blockedId} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+
+    match /moderationQueue/{reportId} {
+      allow read, write: if false;
     }
 
     match /invites/{inviteId} {

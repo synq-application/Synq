@@ -80,7 +80,6 @@ function registerModerationExports() {
     {
       document: "chats/{chatId}/messages/{messageId}",
       region: "us-central1",
-      secrets: ["MODERATION_EMAIL_API_KEY"],
     },
     async (event) => {
       const snap = event.data;
@@ -115,9 +114,7 @@ function registerModerationExports() {
     }
   );
 
-  const submitReport = onCall(
-    { region: "us-central1", secrets: ["MODERATION_EMAIL_API_KEY"] },
-    async (request) => {
+  const submitReport = onCall({ region: "us-central1" }, async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
     const reporterId = request.auth.uid;
     const {
@@ -171,9 +168,7 @@ function registerModerationExports() {
   }
   );
 
-  const blockUser = onCall(
-    { region: "us-central1", secrets: ["MODERATION_EMAIL_API_KEY"] },
-    async (request) => {
+  const blockUser = onCall({ region: "us-central1" }, async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
     const blockerId = request.auth.uid;
     const blockedUserId = String(request.data?.blockedUserId || "").trim();
@@ -220,12 +215,7 @@ function registerModerationExports() {
     return { ok: true };
   });
 
-  const moderateContent = onCall(
-    {
-      region: "us-central1",
-      secrets: ["MODERATION_EMAIL_API_KEY"],
-    },
-    async (request) => {
+  const moderateContent = onCall({ region: "us-central1" }, async (request) => {
       if (!request.auth?.token?.admin) {
         throw new HttpsError("permission-denied", "Admin only.");
       }
@@ -272,7 +262,6 @@ function registerModerationExports() {
     {
       schedule: "every day 09:00",
       region: "us-central1",
-      secrets: ["MODERATION_EMAIL_API_KEY"],
     },
     async () => {
       const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
