@@ -51,6 +51,9 @@ import {
 } from "../src/lib/socialCache";
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
+import ReportModal from "./report-modal";
+import { useBlockedUsers } from "@/src/lib/blockedUsers";
+import { blockUser, unblockUser } from "@/src/lib/moderation";
 import { formatLastSynq, resolveAvatar } from "./helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
 
@@ -98,6 +101,11 @@ export default function FriendProfile() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showOptionsSheet, setShowOptionsSheet] = useState(false);
+  const { isBlocked } = useBlockedUsers();
+  const userIsBlocked = friendKey ? isBlocked(friendKey) : false;
   const [hostDisplayNameByUid, setHostDisplayNameByUid] = useState<Record<string, string>>({});
 
   const showAlert = (title: string, message: string) => {
@@ -758,6 +766,15 @@ export default function FriendProfile() {
           <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
             <Icon name="chevron-back" size={22} color={TEXT} />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.optionsBtn}
+            onPress={() => setShowOptionsSheet(true)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="More options"
+          >
+            <Icon name="ellipsis-horizontal" size={22} color={TEXT} />
+          </TouchableOpacity>
         </View>
         <View style={styles.header}>
           <TouchableOpacity
@@ -895,7 +912,9 @@ export default function FriendProfile() {
         ) : null}
 
         <View style={styles.footerActions}>
-          {isFriend ? (
+          {userIsBlocked ? (
+            <Text style={styles.blockedHint}>You’ve blocked this user.</Text>
+          ) : isFriend ? (
             <TouchableOpacity
               activeOpacity={0.8}
               style={styles.removeFriendBtn}
@@ -917,6 +936,103 @@ export default function FriendProfile() {
           )}
         </View>
       </ScrollView>
+      <Modal visible={showOptionsSheet} transparent animationType="fade">
+        <View style={styles.optionsOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setShowOptionsSheet(false)}
+          />
+          <View style={styles.optionsSheetGroup}>
+            <View style={styles.optionsSheet}>
+              {userIsBlocked ? (
+                <TouchableOpacity
+                  style={styles.optionsRow}
+                  onPress={async () => {
+                    setShowOptionsSheet(false);
+                    if (!friendKey) return;
+                    try {
+                      await unblockUser(friendKey);
+                      setAlertTitle("Unblocked");
+                      setAlertMessage("You can connect with this person again.");
+                      setAlertVisible(true);
+                    } catch {
+                      setAlertTitle("Error");
+                      setAlertMessage("Could not unblock user.");
+                      setAlertVisible(true);
+                    }
+                  }}
+                >
+                  <Icon name="person-add-outline" size={22} color={TEXT} />
+                  <Text style={styles.optionsRowText}>Unblock user</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.optionsRow}
+                    onPress={() => {
+                      setShowOptionsSheet(false);
+                      setShowReportModal(true);
+                    }}
+                  >
+                    <Icon name="flag-outline" size={22} color={TEXT} />
+                    <Text style={styles.optionsRowText}>Report user</Text>
+                  </TouchableOpacity>
+                  <View style={styles.optionsDivider} />
+                  <TouchableOpacity
+                    style={styles.optionsRow}
+                    onPress={() => {
+                      setShowOptionsSheet(false);
+                      setShowBlockModal(true);
+                    }}
+                  >
+                    <Icon name="ban-outline" size={22} color="#FF453A" />
+                    <Text style={[styles.optionsRowText, styles.optionsDestructive]}>
+                      Block user
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.optionsCancel}
+              onPress={() => setShowOptionsSheet(false)}
+            >
+              <Text style={styles.optionsCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <ReportModal
+        visible={showReportModal}
+        reportedUserId={friendKey}
+        contentType="user"
+        onClose={() => setShowReportModal(false)}
+        onSubmitted={() => {
+          setAlertTitle("Report submitted");
+          setAlertMessage("Thanks. We review reports within 24 hours.");
+          setAlertVisible(true);
+        }}
+      />
+      <ConfirmModal
+        visible={showBlockModal}
+        title="Block user?"
+        message={`${friend?.displayName || "This user"} will be removed from your feed immediately. We'll be notified to review any concerns.`}
+        confirmText="Block"
+        destructive
+        onCancel={() => setShowBlockModal(false)}
+        onConfirm={async () => {
+          setShowBlockModal(false);
+          if (!friendKey) return;
+          try {
+            await blockUser(friendKey);
+            goBackOrHome();
+          } catch {
+            setAlertTitle("Error");
+            setAlertMessage("Could not block user.");
+            setAlertVisible(true);
+          }
+        }}
+      />
       <ConfirmModal
         visible={showRemoveModal}
         title="Remove Friend"
@@ -986,9 +1102,26 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 20 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  topBar: { marginTop: 4, marginBottom: 6 },
+  topBar: {
+    marginTop: 4,
+    marginBottom: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
 
   backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  optionsBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -1090,6 +1223,64 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   footerActions: { marginTop: 20, marginBottom: 24, alignItems: "center" },
+
+  blockedHint: {
+    color: MUTED2,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    textAlign: "center",
+  },
+
+  optionsOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  optionsSheetGroup: {
+    paddingHorizontal: 12,
+    paddingBottom: 34,
+  },
+  optionsSheet: {
+    backgroundColor: "#161616",
+    borderRadius: MODAL_RADIUS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    overflow: "hidden",
+  },
+  optionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    gap: 14,
+  },
+  optionsRowText: {
+    color: TEXT,
+    fontSize: 17,
+    fontFamily: fonts.medium,
+  },
+  optionsDestructive: {
+    color: "#FF453A",
+  },
+  optionsDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: BORDER,
+    marginLeft: 54,
+  },
+  optionsCancel: {
+    marginTop: 10,
+    backgroundColor: "#161616",
+    borderRadius: MODAL_RADIUS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  optionsCancelText: {
+    color: TEXT,
+    fontSize: 17,
+    fontFamily: fonts.heavy,
+  },
 
   synqsContainer: {
     flexDirection: "row",
