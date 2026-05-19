@@ -70,6 +70,8 @@ async function removeFriendMutualInternal(db, uid, friendId) {
   batch.delete(db.doc(`users/${friendId}/friends/${uid}`));
   batch.delete(db.doc(`users/${uid}/friendRequests/${friendId}`));
   batch.delete(db.doc(`users/${friendId}/friendRequests/${uid}`));
+  batch.delete(db.doc(`users/${uid}/outgoingFriendRequests/${friendId}`));
+  batch.delete(db.doc(`users/${friendId}/outgoingFriendRequests/${uid}`));
   await batch.commit();
 }
 

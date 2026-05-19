@@ -28,10 +28,10 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/users/$(uid)/friendRequests/$(request.auth.uid));
     }
 
-    // No bulk enumeration: each user doc is readable only with a direct relationship.
+    // Profiles readable with a direct relationship, or by any signed-in user for Add friends search/suggestions.
     function canReadUserProfile(uid) {
       return isSelf(uid) || isFriend(uid) || hasIncomingFriendRequestFrom(uid)
-        || hasOutgoingFriendRequestTo(uid);
+        || hasOutgoingFriendRequestTo(uid) || signedIn();
     }
 
     function chatParticipants(chatId) {
@@ -64,6 +64,11 @@ service cloud.firestore {
           && !exists(/databases/$(database)/documents/users/$(fromId)/friendRequests/$(userId));
         allow update: if isSelf(fromId);
         allow delete: if isSelf(userId) || isSelf(fromId);
+      }
+
+      // Sender-owned index of outgoing requests (avoids collection-group queries in clients).
+      match /outgoingFriendRequests/{targetId} {
+        allow read, create, update, delete: if isSelf(userId);
       }
 
       match /notificationLocks/{lockId} {

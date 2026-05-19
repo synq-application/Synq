@@ -21,6 +21,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useEffect, useMemo, useState } from "react";
@@ -384,7 +385,8 @@ export default function FriendProfile() {
       const meData = meSnap.exists() ? (meSnap.data() as any) : {};
       const senderName = meData?.displayName || user.displayName || "Someone";
       const senderImageUrl = meData?.imageurl || null;
-      await setDoc(doc(db, "users", friendKey, "friendRequests", user.uid), {
+      const batch = writeBatch(db);
+      batch.set(doc(db, "users", friendKey, "friendRequests", user.uid), {
         from: user.uid,
         to: friendKey,
         senderName,
@@ -392,6 +394,13 @@ export default function FriendProfile() {
         status: "pending",
         sentAt: serverTimestamp(),
       });
+      batch.set(doc(db, "users", user.uid, "outgoingFriendRequests", friendKey), {
+        to: friendKey,
+        displayName: friend.displayName || null,
+        imageurl: friend.imageurl || null,
+        sentAt: serverTimestamp(),
+      });
+      await batch.commit();
       setRequestSent(true);
     } catch (e) {
       console.error("Failed to send friend request", e);

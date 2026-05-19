@@ -225,34 +225,55 @@ export async function warmSuggestedCache(userId: string): Promise<void> {
   }
 
   warmSuggestedInFlight[userId] = (async () => {
+    try {
     const myFriendsSnap = await getDocs(collection(db, "users", userId, "friends"));
     const myFriendIds = myFriendsSnap.docs.map((d) => d.id);
-    const usersSnap = await getDocs(collection(db, "users"));
-    const users = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
+    const exclude = new Set([userId, ...myFriendIds]);
+    const mutualCounts = new Map<string, number>();
 
-    const suggestionsWithMutuals = await Promise.all(
-      users.map(async (user) => {
-        if (user.id === userId || myFriendIds.includes(user.id)) return null;
+    // Only read friends-of-friends through your friends' lists (allowed by rules).
+    await Promise.all(
+      myFriendIds.map(async (friendId) => {
         try {
-          const theirFriendsSnap = await getDocs(collection(db, "users", user.id, "friends"));
-          const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
-          const mutuals = theirFriendIds.filter((id) => myFriendIds.includes(id));
-          if (mutuals.length === 0) return null;
-          return { ...user, mutualCount: mutuals.length };
+          const theirFriendsSnap = await getDocs(
+            collection(db, "users", friendId, "friends")
+          );
+          theirFriendsSnap.docs.forEach((d) => {
+            const candidateId = d.id;
+            if (exclude.has(candidateId)) return;
+            mutualCounts.set(candidateId, (mutualCounts.get(candidateId) || 0) + 1);
+          });
         } catch {
-          return null;
+          // Skip if this friend's list is not readable.
         }
       })
     );
 
-    const nextSuggested = suggestionsWithMutuals
-      .filter(Boolean)
-      .sort((a: any, b: any) => b.mutualCount - a.mutualCount)
+    const ranked = [...mutualCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
       .slice(0, 8);
 
-    nextSuggested.forEach((user: any) => prefetchImage(user?.imageurl));
+    const nextSuggested: any[] = [];
+    for (const [candidateId, mutualCount] of ranked) {
+      try {
+        const profileSnap = await getDoc(doc(db, "users", candidateId));
+        if (!profileSnap.exists()) continue;
+        nextSuggested.push({
+          id: candidateId,
+          ...(profileSnap.data() as object),
+          mutualCount,
+        });
+      } catch {
+        // Profile not readable — skip.
+      }
+    }
+
+    nextSuggested.forEach((user) => prefetchImage(user?.imageurl));
     suggestedCacheByUser[userId] = nextSuggested;
     await persistSocialCache(userId);
+    } catch (err) {
+      console.error("[warmSuggestedCache] failed:", err);
+    }
   })();
 
   try {

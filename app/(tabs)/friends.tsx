@@ -56,6 +56,7 @@ import {
 } from "firebase/firestore";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   DeviceEventEmitter,
   Dimensions,
   FlatList,
@@ -326,7 +327,6 @@ export default function FriendsScreen() {
   const [hasLoadedTopSynqs, setHasLoadedTopSynqs] = useState(cachedTopSynqs.length > 0);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
-  const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [sortMode, setSortMode] = useState<FriendsSortMode>("alphabetical");
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
@@ -413,8 +413,6 @@ export default function FriendsScreen() {
         } else {
           setIsFriendsInitialLoading(true);
         }
-        setIsFriendsRefreshing(cachedVisible.length > 0);
-
         await warmFriendsAndConnectionsCache(myId);
         const fetchedFriends: Friend[] = friendIds.map(
           (friendId) =>
@@ -438,7 +436,6 @@ export default function FriendsScreen() {
         console.error("[FriendsScreen] Error fetching friend data:", err);
       } finally {
         setIsFriendsInitialLoading(false);
-        setIsFriendsRefreshing(false);
         setTopSynqs(connectionsCacheByUser[myId] ?? []);
         setHasLoadedTopSynqs(true);
       }
@@ -768,10 +765,6 @@ export default function FriendsScreen() {
           }
         />
       )}
-      {isFriendsRefreshing && !isFriendsInitialLoading && (
-        <View style={styles.refreshingDot} />
-      )}
-
         <SearchModal
           visible={showAddFriendsModal}
           onClose={() => setSearchModalVisible(false)}
@@ -802,11 +795,11 @@ function SearchModal({
   const [results, setResults] = useState<any[]>([]);
   const [suggested, setSuggested] = useState<any[]>([]);
   const [incomingRequestsRows, setIncomingRequestsRows] = useState<any[]>([]);
+  const [outgoingRequestsRows, setOutgoingRequestsRows] = useState<any[]>([]);
   const [pendingRequestIds, setPendingRequestIds] = useState<Record<string, boolean>>({});
   const [incomingRequestIds, setIncomingRequestIds] = useState<Record<string, boolean>>({});
   const [acceptedIds, setAcceptedIds] = useState<Record<string, boolean>>({});
   const [isSearching, setIsSearching] = useState(false);
-  const [isSuggestedRefreshing, setIsSuggestedRefreshing] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{
     title?: string;
@@ -836,31 +829,33 @@ function SearchModal({
   useEffect(() => {
     if (!visible || !auth.currentUser) return;
 
-    const fetchSuggested = async () => {
-      try {
-        const myId = auth.currentUser!.uid;
-        const cachedSuggested = suggestedCacheByUser[myId] ?? [];
-        if (cachedSuggested.length > 0) {
-          setSuggested(cachedSuggested);
-        }
-        setIsSuggestedRefreshing(cachedSuggested.length > 0);
-
-        await warmSuggestedCache(myId);
-        const nextSuggested = (suggestedCacheByUser[myId] ?? []).filter(
+    const fetchSuggested = () => {
+      const myId = auth.currentUser!.uid;
+      const applySuggested = (list: any[]) => {
+        const visible = list.filter(
           (u) => !currentFriends.includes(u.id) && u.id !== myId
         );
-        suggestedCacheByUser[myId] = nextSuggested;
-        nextSuggested.forEach((user) => {
+        setSuggested(visible);
+        hydratePendingForUsers(visible.map((u) => u.id));
+        hydrateIncomingForUsers(visible.map((u) => u.id));
+        visible.forEach((user) => {
           ExpoImage.prefetch(resolveAvatar(user?.imageurl)).catch(() => {});
         });
-        setSuggested(nextSuggested);
-        hydratePendingForUsers(nextSuggested.map((u) => u.id));
-        hydrateIncomingForUsers(nextSuggested.map((u) => u.id));
-      } catch (e) {
-        console.error("[Suggested] error:", e);
-      } finally {
-        setIsSuggestedRefreshing(false);
+      };
+
+      const cached = suggestedCacheByUser[myId] ?? [];
+      if (cached.length > 0) {
+        applySuggested(cached);
       }
+
+      void warmSuggestedCache(myId)
+        .then(() => {
+          if (!auth.currentUser || auth.currentUser.uid !== myId) return;
+          const next = suggestedCacheByUser[myId] ?? [];
+          suggestedCacheByUser[myId] = next;
+          applySuggested(next);
+        })
+        .catch((e) => console.error("[Suggested] refresh failed:", e));
     };
 
     fetchSuggested();
@@ -875,48 +870,123 @@ function SearchModal({
     const reqRef = collection(db, "users", myId, "friendRequests");
     const unsubscribe = onSnapshot(
       reqRef,
-      async (snapshot) => {
-        const rows = await Promise.all(
-          snapshot.docs.map(async (d) => {
-            const data = d.data() as Record<string, unknown>;
-            const friendRequestDocId = d.id;
-            const senderId =
-              (typeof data.from === "string" && data.from) ||
-              (typeof data.fromId === "string" && data.fromId) ||
-              friendRequestDocId;
-            let displayName =
+      (snapshot) => {
+        const rows = snapshot.docs.map((d) => {
+          const data = d.data() as Record<string, unknown>;
+          const friendRequestDocId = d.id;
+          const senderId =
+            (typeof data.from === "string" && data.from) ||
+            (typeof data.fromId === "string" && data.fromId) ||
+            friendRequestDocId;
+          return {
+            id: senderId,
+            friendRequestDocId,
+            displayName:
               (typeof data.senderName === "string" && data.senderName) ||
               (typeof data.fromName === "string" && data.fromName) ||
-              "Someone";
-            let imageurl =
+              "Someone",
+            imageurl:
               (typeof data.senderImageUrl === "string" && data.senderImageUrl) ||
               (typeof data.fromImageUrl === "string" && data.fromImageUrl) ||
               (typeof data.fromImageurl === "string" && data.fromImageurl) ||
-              null;
-            try {
-              const senderSnap = await getDoc(doc(db, "users", senderId));
-              if (senderSnap.exists()) {
-                const u = senderSnap.data() as Record<string, unknown>;
-                displayName = (u.displayName as string) || displayName;
-                imageurl = (u.imageurl as string | null | undefined) ?? imageurl;
-              }
-            } catch {
-              /* keep embedded request fields */
-            }
-            return {
-              id: senderId,
-              friendRequestDocId,
-              displayName,
-              imageurl,
-            };
-          })
-        );
+              null,
+          };
+        });
         rows.forEach((user) => {
           ExpoImage.prefetch(resolveAvatar(user?.imageurl)).catch(() => {});
+          incomingCheckCacheRef.current[user.id] = true;
         });
         setIncomingRequestsRows(rows);
+        setIncomingRequestIds((prev) => {
+          const next = { ...prev };
+          rows.forEach((r) => {
+            next[r.id] = true;
+          });
+          return next;
+        });
+        rows.forEach((row) => {
+          void getDoc(doc(db, "users", row.id))
+            .then((senderSnap) => {
+              if (!senderSnap.exists()) return;
+              const u = senderSnap.data() as Record<string, unknown>;
+              setIncomingRequestsRows((prev) =>
+                prev.map((r) =>
+                  r.id === row.id
+                    ? {
+                        ...r,
+                        displayName: (u.displayName as string) || r.displayName,
+                        imageurl: (u.imageurl as string | null | undefined) ?? r.imageurl,
+                      }
+                    : r
+                )
+              );
+            })
+            .catch(() => {});
+        });
       },
       (e) => console.error("[SearchModal] friendRequests snapshot:", e)
+    );
+    return () => unsubscribe();
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !auth.currentUser) {
+      setOutgoingRequestsRows([]);
+      return;
+    }
+    const myId = auth.currentUser.uid;
+    const outgoingRef = collection(db, "users", myId, "outgoingFriendRequests");
+    const unsubscribe = onSnapshot(
+      outgoingRef,
+      (snapshot) => {
+        const rows = snapshot.docs.map((d) => {
+          const data = d.data() as Record<string, unknown>;
+          return {
+            id: d.id,
+            displayName:
+              (typeof data.displayName === "string" && data.displayName) ||
+              (typeof data.toName === "string" && data.toName) ||
+              "User",
+            imageurl:
+              (typeof data.imageurl === "string" && data.imageurl) || null,
+          };
+        });
+
+        rows.forEach((user) => {
+          pendingCheckCacheRef.current[user.id] = true;
+          ExpoImage.prefetch(resolveAvatar(user.imageurl)).catch(() => {});
+        });
+        setOutgoingRequestsRows(rows);
+        setPendingRequestIds((prev) => {
+          const next = { ...prev };
+          rows.forEach((r) => {
+            next[r.id] = true;
+          });
+          return next;
+        });
+        rows.forEach((row) => {
+          if (row.displayName !== "User" && row.imageurl) return;
+          void getDoc(doc(db, "users", row.id))
+            .then((recipientSnap) => {
+              if (!recipientSnap.exists()) return;
+              const u = recipientSnap.data() as Record<string, unknown>;
+              setOutgoingRequestsRows((prev) =>
+                prev.map((r) =>
+                  r.id === row.id
+                    ? {
+                        ...r,
+                        displayName: (u.displayName as string) || r.displayName,
+                        imageurl: (u.imageurl as string | null | undefined) ?? r.imageurl,
+                      }
+                    : r
+                )
+              );
+              ExpoImage.prefetch(resolveAvatar(u.imageurl as string)).catch(() => {});
+            })
+            .catch(() => {});
+        });
+      },
+      (e) => console.error("[SearchModal] outgoingFriendRequests snapshot:", e)
     );
     return () => unsubscribe();
   }, [visible]);
@@ -927,82 +997,97 @@ function SearchModal({
   const incomingCheckCacheRef = React.useRef<Record<string, boolean>>({});
   const incomingCheckInFlightRef = React.useRef<Record<string, Promise<boolean>>>({});
 
-  const hydratePendingForUsers = async (userIds: string[]) => {
+  const hydratePendingForUsers = (userIds: string[]) => {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
     const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
-    const checks = uniqueIds.map(async (targetId) => {
+
+    uniqueIds.forEach((targetId) => {
       if (currentFriends.includes(targetId)) {
         pendingCheckCacheRef.current[targetId] = false;
-        return [targetId, false] as const;
+        setPendingRequestIds((prev) => ({ ...prev, [targetId]: false }));
+        return;
       }
       if (pendingCheckCacheRef.current[targetId] !== undefined) {
-        return [targetId, pendingCheckCacheRef.current[targetId]] as const;
+        setPendingRequestIds((prev) => ({
+          ...prev,
+          [targetId]: pendingCheckCacheRef.current[targetId],
+        }));
+        return;
       }
-      if (!pendingCheckInFlightRef.current[targetId]) {
-        pendingCheckInFlightRef.current[targetId] = getDoc(
-          doc(db, "users", targetId, "friendRequests", myId)
-        )
-          .then((snap) => snap.exists())
-          .catch(() => false);
+      const apply = (isPending: boolean) => {
+        pendingCheckCacheRef.current[targetId] = isPending;
+        setPendingRequestIds((prev) => ({ ...prev, [targetId]: isPending }));
+        if (isPending && auth.currentUser) {
+          void setDoc(
+            doc(db, "users", myId, "outgoingFriendRequests", targetId),
+            { to: targetId, sentAt: serverTimestamp() },
+            { merge: true }
+          ).catch(() => {});
+        }
+      };
+      const inFlight = pendingCheckInFlightRef.current[targetId];
+      if (inFlight) {
+        void inFlight.then(apply);
+        return;
       }
-      const exists = await pendingCheckInFlightRef.current[targetId];
-      pendingCheckCacheRef.current[targetId] = exists;
-      delete pendingCheckInFlightRef.current[targetId];
-      return [targetId, exists] as const;
-    });
-
-    const resolved = await Promise.all(checks);
-    setPendingRequestIds((prev) => {
-      const next = { ...prev };
-      resolved.forEach(([id, isPending]) => {
-        next[id] = isPending;
-      });
-      return next;
+      pendingCheckInFlightRef.current[targetId] = getDoc(
+        doc(db, "users", targetId, "friendRequests", myId)
+      )
+        .then((snap) => snap.exists())
+        .catch(() => false)
+        .finally(() => {
+          delete pendingCheckInFlightRef.current[targetId];
+        });
+      void pendingCheckInFlightRef.current[targetId].then(apply);
     });
   };
 
-  const hydrateIncomingForUsers = async (userIds: string[]) => {
+  const hydrateIncomingForUsers = (userIds: string[]) => {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
     const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
-    const checks = uniqueIds.map(async (targetId) => {
+
+    uniqueIds.forEach((targetId) => {
       if (currentFriends.includes(targetId) || acceptedIds[targetId]) {
         incomingCheckCacheRef.current[targetId] = false;
-        return [targetId, false] as const;
+        setIncomingRequestIds((prev) => ({ ...prev, [targetId]: false }));
+        return;
       }
       if (incomingCheckCacheRef.current[targetId] !== undefined) {
-        return [targetId, incomingCheckCacheRef.current[targetId]] as const;
+        setIncomingRequestIds((prev) => ({
+          ...prev,
+          [targetId]: incomingCheckCacheRef.current[targetId],
+        }));
+        return;
       }
-      if (!incomingCheckInFlightRef.current[targetId]) {
-        incomingCheckInFlightRef.current[targetId] = getDoc(
-          doc(db, "users", myId, "friendRequests", targetId)
-        )
-          .then(async (snap) => {
-            if (snap.exists()) return true;
-            const legacyQ = query(
-              collection(db, "users", myId, "friendRequests"),
-              where("from", "==", targetId),
-              limit(1)
-            );
-            const legacySnap = await getDocs(legacyQ);
-            return !legacySnap.empty;
-          })
-          .catch(() => false);
+      const apply = (isIncoming: boolean) => {
+        incomingCheckCacheRef.current[targetId] = isIncoming;
+        setIncomingRequestIds((prev) => ({ ...prev, [targetId]: isIncoming }));
+      };
+      const inFlight = incomingCheckInFlightRef.current[targetId];
+      if (inFlight) {
+        void inFlight.then(apply);
+        return;
       }
-      const exists = await incomingCheckInFlightRef.current[targetId];
-      incomingCheckCacheRef.current[targetId] = exists;
-      delete incomingCheckInFlightRef.current[targetId];
-      return [targetId, exists] as const;
-    });
-
-    const resolved = await Promise.all(checks);
-    setIncomingRequestIds((prev) => {
-      const next = { ...prev };
-      resolved.forEach(([id, isIncoming]) => {
-        next[id] = isIncoming;
-      });
-      return next;
+      incomingCheckInFlightRef.current[targetId] = getDoc(
+        doc(db, "users", myId, "friendRequests", targetId)
+      )
+        .then(async (snap) => {
+          if (snap.exists()) return true;
+          const legacyQ = query(
+            collection(db, "users", myId, "friendRequests"),
+            where("from", "==", targetId),
+            limit(1)
+          );
+          const legacySnap = await getDocs(legacyQ);
+          return !legacySnap.empty;
+        })
+        .catch(() => false)
+        .finally(() => {
+          delete incomingCheckInFlightRef.current[targetId];
+        });
+      void incomingCheckInFlightRef.current[targetId].then(apply);
     });
   };
 
@@ -1016,16 +1101,29 @@ function SearchModal({
     [incomingRequestsVisible]
   );
 
+  const outgoingRequestsVisible = useMemo(
+    () =>
+      outgoingRequestsRows.filter(
+        (r) => !currentFriends.includes(r.id) && !incomingIds.has(r.id)
+      ),
+    [outgoingRequestsRows, currentFriends, incomingIds]
+  );
+
+  const outgoingIds = useMemo(
+    () => new Set(outgoingRequestsVisible.map((r) => r.id)),
+    [outgoingRequestsVisible]
+  );
+
   const pymkSuggested = useMemo(
-    () => suggested.filter((u) => !incomingIds.has(u.id)),
-    [suggested, incomingIds]
+    () =>
+      suggested.filter((u) => !incomingIds.has(u.id) && !outgoingIds.has(u.id)),
+    [suggested, incomingIds, outgoingIds]
   );
 
   const addFriendsSections = useMemo(() => {
     const sections: {
       title: string;
       data: any[];
-      showRefresh?: boolean;
       isFirstSection?: boolean;
     }[] = [];
     if (incomingRequestsVisible.length > 0) {
@@ -1035,16 +1133,22 @@ function SearchModal({
         isFirstSection: sections.length === 0,
       });
     }
+    if (outgoingRequestsVisible.length > 0) {
+      sections.push({
+        title: "Sent requests",
+        data: outgoingRequestsVisible,
+        isFirstSection: sections.length === 0,
+      });
+    }
     if (pymkSuggested.length > 0) {
       sections.push({
         title: "People you may know",
         data: pymkSuggested,
-        showRefresh: true,
         isFirstSection: sections.length === 0,
       });
     }
     return sections;
-  }, [incomingRequestsVisible, pymkSuggested]);
+  }, [incomingRequestsVisible, outgoingRequestsVisible, pymkSuggested]);
 
   const searchUsers = (val: string) => {
     setQueryText(val);
@@ -1065,9 +1169,7 @@ function SearchModal({
         const usersRef = collection(db, "users");
         const snap = await getDocs(usersRef);
 
-        const mapped = snap.docs.map(
-          (d) => ({ id: d.id, ...d.data() } as any)
-        );
+        const mapped = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
 
         const normalize = (str: string) =>
           str.toLowerCase().trim().replace(/\s+/g, " ");
@@ -1084,10 +1186,7 @@ function SearchModal({
             fullName.includes(search) ||
             email.includes(search);
 
-          return (
-            u.id !== auth.currentUser?.uid &&
-            matches
-          );
+          return u.id !== auth.currentUser?.uid && matches;
         });
 
         setResults(filtered);
@@ -1095,6 +1194,7 @@ function SearchModal({
         hydrateIncomingForUsers(filtered.map((u) => u.id));
       } catch (e) {
         console.error("[SearchModal] Search failed", e);
+        setResults([]);
       } finally {
         setIsSearching(false);
       }
@@ -1141,7 +1241,16 @@ function SearchModal({
       });
       setAlertVisible(true);
 
-      setDoc(requestDocRef, payload).catch((e: any) => {
+      const outgoingRef = doc(db, "users", myId, "outgoingFriendRequests", targetId);
+      const batch = writeBatch(db);
+      batch.set(requestDocRef, payload);
+      batch.set(outgoingRef, {
+        to: targetId,
+        displayName: targetUser.displayName || null,
+        imageurl: targetUser.imageurl || null,
+        sentAt: serverTimestamp(),
+      });
+      batch.commit().catch((e: any) => {
         pendingCheckCacheRef.current[targetId] = false;
         setPendingRequestIds((prev) => ({ ...prev, [targetId]: false }));
         setAlertConfig({
@@ -1167,6 +1276,49 @@ function SearchModal({
       });
       setAlertVisible(true);
     }
+  };
+
+  const cancelOutgoingRequest = async (targetUser: any) => {
+    if (!auth.currentUser) return;
+    const myId = auth.currentUser.uid;
+    const targetId = targetUser.id;
+
+    pendingCheckCacheRef.current[targetId] = false;
+    setPendingRequestIds((prev) => ({ ...prev, [targetId]: false }));
+
+    try {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, "users", targetId, "friendRequests", myId));
+      batch.delete(doc(db, "users", myId, "outgoingFriendRequests", targetId));
+      await batch.commit();
+    } catch (e: any) {
+      pendingCheckCacheRef.current[targetId] = true;
+      setPendingRequestIds((prev) => ({ ...prev, [targetId]: true }));
+      setAlertConfig({
+        title: "Error",
+        message: e?.message || "Could not cancel request.",
+      });
+      setAlertVisible(true);
+    }
+  };
+
+  const handlePendingLongPress = (targetUser: any) => {
+    const isPending =
+      pendingRequestIds[targetUser.id] || outgoingIds.has(targetUser.id);
+    if (!isPending) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      "Cancel friend request?",
+      `Withdraw your request to ${targetUser.displayName || "this user"}?`,
+      [
+        { text: "Keep pending", style: "cancel" },
+        {
+          text: "Cancel request",
+          style: "destructive",
+          onPress: () => void cancelOutgoingRequest(targetUser),
+        },
+      ]
+    );
   };
 
   const acceptIncomingRequest = async (targetUser: any) => {
@@ -1264,8 +1416,9 @@ function SearchModal({
           />
         </View>
 
-        {!queryText && addFriendsSections.length > 0 && (
-          <View style={{ marginTop: 10, paddingBottom: 160 }}>
+        {!queryText ? (
+          <View style={{ flex: 1, marginTop: 10 }}>
+            {addFriendsSections.length > 0 ? (
             <SectionList
               sections={addFriendsSections}
               keyExtractor={(item) => item.id}
@@ -1275,6 +1428,7 @@ function SearchModal({
               keyboardDismissMode="on-drag"
               onScrollBeginDrag={Keyboard.dismiss}
               stickySectionHeadersEnabled={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
               ListFooterComponent={<View style={{ height: 40 }} />}
               SectionSeparatorComponent={() => null}
               renderSectionHeader={({ section }) => (
@@ -1285,14 +1439,12 @@ function SearchModal({
                   ]}
                 >
                   <Text style={styles.sectionLabel}>{section.title}</Text>
-                  {section.showRefresh && isSuggestedRefreshing ? (
-                    <View style={styles.suggestedRefreshingDot} />
-                  ) : null}
                 </View>
               )}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               renderItem={({ item, section }) => {
-                const isFriendRequests = !section.showRefresh;
+                const isFriendRequests = section.title === "Friend requests";
+                const isSentRequests = section.title === "Sent requests";
                 if (isFriendRequests) {
                   return (
                     <View style={styles.searchResult}>
@@ -1340,6 +1492,47 @@ function SearchModal({
                     </View>
                   );
                 }
+                if (isSentRequests) {
+                  return (
+                    <View style={styles.searchResult}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          router.push({
+                            pathname: "/friend-profile",
+                            params: { friendId: item.id },
+                          });
+                        }}
+                        style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.avatar}>
+                          <ExpoImage
+                            source={{ uri: resolveAvatar(item.imageurl) }}
+                            style={styles.img}
+                            cachePolicy="memory-disk"
+                            transition={0}
+                          />
+                        </View>
+                        <View style={{ paddingRight: 12 }}>
+                          <Text style={styles.friendName}>
+                            {item.displayName || "User"}
+                          </Text>
+                          <Text style={styles.mutualText}>Request sent</Text>
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onLongPress={() => handlePendingLongPress(item)}
+                        delayLongPress={400}
+                        style={[styles.addBtn, styles.addBtnDisabled]}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.addBtnText, styles.addBtnDisabledText]}>
+                          Pending
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                }
                 return (
                   <View style={styles.searchResult}>
                     <TouchableOpacity
@@ -1376,17 +1569,19 @@ function SearchModal({
                       onPress={() => {
                         if (incomingRequestIds[item.id]) {
                           acceptIncomingRequest(item);
-                        } else {
+                        } else if (!pendingRequestIds[item.id] && !acceptedIds[item.id]) {
                           sendInvite(item);
                         }
                       }}
+                      onLongPress={() => handlePendingLongPress(item)}
+                      delayLongPress={400}
                       style={[
                         styles.addBtn,
                         incomingRequestIds[item.id] && styles.acceptOutlineBtn,
                         (pendingRequestIds[item.id] || acceptedIds[item.id]) && styles.addBtnDisabled,
                       ]}
                       activeOpacity={0.8}
-                      disabled={!!pendingRequestIds[item.id] || !!acceptedIds[item.id]}
+                      disabled={!!acceptedIds[item.id]}
                     >
                       <Text
                         style={[
@@ -1408,8 +1603,9 @@ function SearchModal({
                 );
               }}
             />
+            ) : null}
           </View>
-        )}
+        ) : (
         <View style={{ flex: 1 }}>
           <FlatList
             data={results}
@@ -1447,12 +1643,14 @@ function SearchModal({
                       sendInvite(item);
                     }
                   }}
+                  onLongPress={() => handlePendingLongPress(item)}
+                  delayLongPress={400}
                   style={[
                     styles.addBtn,
                     incomingRequestIds[item.id] && styles.acceptOutlineBtn,
                     (currentFriends.includes(item.id) || pendingRequestIds[item.id] || acceptedIds[item.id]) && styles.addBtnDisabled
                   ]}
-                  disabled={currentFriends.includes(item.id) || !!pendingRequestIds[item.id] || !!acceptedIds[item.id]}
+                  disabled={currentFriends.includes(item.id) || !!acceptedIds[item.id]}
                 >
                   <Text
                     style={[
@@ -1474,6 +1672,7 @@ function SearchModal({
             )}
           />
         </View>
+        )}
       </View>
       <AlertModal
         visible={alertVisible}
@@ -1986,23 +2185,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  suggestedRefreshingDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 999,
-    backgroundColor: ACCENT,
-    opacity: 0.85,
-    marginRight: 2,
-  },
-  refreshingDot: {
-    position: "absolute",
-    top: 78,
-    right: 24,
-    width: 7,
-    height: 7,
-    borderRadius: 999,
-    backgroundColor: ACCENT,
-    opacity: 0.85,
   },
 });

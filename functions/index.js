@@ -307,6 +307,7 @@ exports.deleteMyAccount = onCall(
         await db.collection("chats").doc(chatId).delete();
       }
       await deleteCollectionInChunks(db.collection("users").doc(uid).collection("friendRequests"), 400);
+      await deleteCollectionInChunks(db.collection("users").doc(uid).collection("outgoingFriendRequests"), 400);
       await deleteCollectionInChunks(db.collection("users").doc(uid).collection("notificationLocks"), 400);
       await db.collection("users").doc(uid).delete();
       await admin.auth().deleteUser(uid);
@@ -337,6 +338,8 @@ exports.removeFriendMutual = onCall(
     batch.delete(db.collection("users").doc(otherUid).collection("friends").doc(uid));
     batch.delete(db.collection("users").doc(uid).collection("friendRequests").doc(otherUid));
     batch.delete(db.collection("users").doc(otherUid).collection("friendRequests").doc(uid));
+    batch.delete(db.collection("users").doc(uid).collection("outgoingFriendRequests").doc(otherUid));
+    batch.delete(db.collection("users").doc(otherUid).collection("outgoingFriendRequests").doc(uid));
     await batch.commit();
     return { ok: true };
   }
@@ -369,6 +372,134 @@ exports.getOrCreateInviteCode = onCall(
       { merge: true }
     );
     return { inviteCode };
+  }
+);
+
+function normalizeSearchText(str) {
+  return String(str || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function publicUserFields(doc) {
+  const data = doc.data() || {};
+  return {
+    id: doc.id,
+    displayName: data.displayName || "User",
+    imageurl: data.imageurl || null,
+    firstName: data.firstName || "",
+    lastName: data.lastName || "",
+    email: data.email || null,
+  };
+}
+
+/** Friend discovery search (server-side; clients cannot list /users). */
+exports.searchUsersForFriend = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Must be logged in.");
+    }
+    const myId = String(request.auth.uid || "").trim();
+    const query = normalizeSearchText(request.data?.query);
+    if (!query) {
+      return { users: [] };
+    }
+
+    const db = admin.firestore();
+    const myFriendsSnap = await db
+      .collection("users")
+      .doc(myId)
+      .collection("friends")
+      .get();
+    const exclude = new Set(myFriendsSnap.docs.map((d) => d.id));
+    exclude.add(myId);
+
+    const usersSnap = await db.collection("users").get();
+    const users = [];
+
+    for (const userDoc of usersSnap.docs) {
+      if (exclude.has(userDoc.id)) continue;
+      const fields = publicUserFields(userDoc);
+      const displayName = normalizeSearchText(fields.displayName);
+      const fullName = normalizeSearchText(
+        `${fields.firstName} ${fields.lastName}`
+      );
+      const email = normalizeSearchText(fields.email);
+      const matches =
+        displayName.includes(query) ||
+        fullName.includes(query) ||
+        email.includes(query);
+      if (!matches) continue;
+      users.push({
+        id: fields.id,
+        displayName: fields.displayName,
+        imageurl: fields.imageurl,
+        email: fields.email,
+      });
+      if (users.length >= 30) break;
+    }
+
+    return { users };
+  }
+);
+
+/** People-you-may-know via mutual friends (server-side). */
+exports.getSuggestedFriends = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Must be logged in.");
+    }
+    const myId = String(request.auth.uid || "").trim();
+    const db = admin.firestore();
+
+    const myFriendsSnap = await db
+      .collection("users")
+      .doc(myId)
+      .collection("friends")
+      .get();
+    const myFriendIds = myFriendsSnap.docs.map((d) => d.id);
+    const exclude = new Set([...myFriendIds, myId]);
+    const mutualCounts = new Map();
+
+    await Promise.all(
+      myFriendIds.map(async (friendId) => {
+        const theirFriendsSnap = await db
+          .collection("users")
+          .doc(friendId)
+          .collection("friends")
+          .get();
+        theirFriendsSnap.docs.forEach((d) => {
+          const uid = d.id;
+          if (exclude.has(uid)) return;
+          mutualCounts.set(uid, (mutualCounts.get(uid) || 0) + 1);
+        });
+      })
+    );
+
+    const ranked = [...mutualCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8);
+
+    const users = (
+      await Promise.all(
+        ranked.map(async ([uid, mutualCount]) => {
+          const snap = await db.collection("users").doc(uid).get();
+          if (!snap.exists) return null;
+          const fields = publicUserFields(snap);
+          return {
+            id: fields.id,
+            displayName: fields.displayName,
+            imageurl: fields.imageurl,
+            mutualCount,
+          };
+        })
+      )
+    ).filter(Boolean);
+
+    return { users };
   }
 );
 
