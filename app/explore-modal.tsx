@@ -1,7 +1,13 @@
-import { ACCENT } from "@/constants/Variables";
+import {
+    ACCENT,
+    BUTTON_RADIUS,
+    PRIMARY_CTA_HEIGHT,
+    PRIMARY_CTA_WIDTH,
+    fonts,
+} from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -13,6 +19,7 @@ import {
     TouchableWithoutFeedback,
     View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
     visible: boolean;
@@ -24,7 +31,7 @@ type Props = {
     showOptionsList: boolean;
     aiOptions: any[];
     selectedOption: any;
-    setSelectedOption: (item: any) => void;
+    setSelectedOption: (item: any | null) => void;
     sendAISuggestionToChat: () => void;
     currentCategory: string;
 };
@@ -44,6 +51,7 @@ export default function ExploreModal({
     currentCategory,
 }: Props) {
     const [pressed, setPressed] = useState<string | null>(null);
+    const insets = useSafeAreaInsets();
 
     if (!visible) return null;
 
@@ -154,31 +162,37 @@ export default function ExploreModal({
                                     </ScrollView>
                                 </>
                             ) : (
-                                <>
+                                <View style={styles.optionsView}>
                                     <View style={styles.header}>
-                                        <TouchableOpacity onPress={onBack} style={{ flexDirection: "row", alignItems: "center" }}>
-                                            <Ionicons name="chevron-back" size={24} color={ACCENT} />
-                                            <Text style={[styles.title, { marginLeft: 6 }]}>
+                                        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                                            <Ionicons name="chevron-back" size={22} color="#888" />
+                                        </TouchableOpacity>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.title} numberOfLines={1}>
                                                 {currentCategory}
                                             </Text>
-                                        </TouchableOpacity>
-
+                                        </View>
                                         <TouchableOpacity onPress={onClose}>
                                             <Ionicons name="close" size={26} color="#666" />
                                         </TouchableOpacity>
                                     </View>
 
                                     <FlatList
+                                        style={styles.optionsList}
                                         data={aiOptions}
                                         keyExtractor={(item) => item.name}
-                                        contentContainerStyle={{ padding: 20 }}
+                                        contentContainerStyle={{ padding: 20, paddingBottom: 8 }}
                                         renderItem={({ item }) => (
                                             <TouchableOpacity
                                                 style={[
                                                     styles.venueCard,
                                                     selectedOption?.name === item.name && styles.selectedCard,
                                                 ]}
-                                                onPress={() => setSelectedOption(item)}
+                                                onPress={() =>
+                                                    setSelectedOption(
+                                                        selectedOption?.name === item.name ? null : item
+                                                    )
+                                                }
                                             >
                                                 <ExpoImage
                                                     source={{ uri: item.imageUrl }}
@@ -201,14 +215,17 @@ export default function ExploreModal({
                                         )}
                                     />
 
-                                    <TouchableOpacity
-                                        style={selectedOption ? styles.sendBtnEnabled : styles.sendBtn}
-                                        disabled={!selectedOption}
-                                        onPress={sendAISuggestionToChat}
-                                    >
-                                        <Text style={styles.sendText}>Send Idea</Text>
-                                    </TouchableOpacity>
-                                </>
+                                    <View style={[styles.sendFooter, { paddingBottom: Math.max(insets.bottom, 16) + 4 }]}>
+                                        <TouchableOpacity
+                                            style={[styles.sendBtn, !selectedOption && { opacity: 0.5 }]}
+                                            disabled={!selectedOption}
+                                            onPress={sendAISuggestionToChat}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={styles.sendText}>Send idea</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
                             )}
                         </View>
                     </TouchableWithoutFeedback>
@@ -229,11 +246,26 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 30,
         borderTopRightRadius: 30,
     },
+    optionsView: {
+        flex: 1,
+    },
+    optionsList: {
+        flex: 1,
+    },
     header: {
         flexDirection: "row",
         justifyContent: "space-between",
         padding: 20,
         alignItems: "center",
+    },
+    backButton: {
+        marginRight: 12,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: "#1F1F1F",
+        alignItems: "center",
+        justifyContent: "center",
     },
     title: {
         color: "white",
@@ -307,23 +339,23 @@ const styles = StyleSheet.create({
         fontSize: 13,
     },
 
-    sendBtn: {
-        backgroundColor: "#555",
-        margin: 20,
-        padding: 16,
-        borderRadius: 12,
-        alignItems: "center",
+    sendFooter: {
+        paddingHorizontal: 20,
+        paddingTop: 6,
     },
-    sendBtnEnabled: {
+    sendBtn: {
+        alignSelf: "center",
+        width: PRIMARY_CTA_WIDTH,
+        height: PRIMARY_CTA_HEIGHT,
         backgroundColor: ACCENT,
-        margin: 20,
-        padding: 16,
-        borderRadius: 12,
+        borderRadius: BUTTON_RADIUS,
         alignItems: "center",
+        justifyContent: "center",
     },
     sendText: {
+        fontSize: 16,
         color: "black",
-        fontWeight: "bold",
+        fontFamily: fonts.medium,
     },
 
     thinkingOverlay: {
