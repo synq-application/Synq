@@ -11,6 +11,7 @@ import {
   SPACE_4,
   SPACE_5,
   SPACE_6,
+  profileScreenSectionTitle,
   SURFACE,
   TEXT,
   TYPE_BODY,
@@ -88,6 +89,14 @@ const { width } = Dimensions.get("window");
 const sortFriendsByName = (list: Friend[]) =>
   [...list].sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
 
+function splitDisplayName(displayName?: string | null) {
+  const raw = (displayName || "").trim();
+  if (!raw) return { first: "User", last: "" };
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+}
+
 const STAGGER_DELAYS = [0, 120] as const;
 
 function emptyEntering(reduced: boolean, delayMs: number) {
@@ -131,9 +140,16 @@ function FriendsHeaderAddButton({
   }));
 
   return (
-    <TouchableOpacity onPress={onPress} accessibilityLabel="Add friends">
+    <TouchableOpacity
+      onPress={() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      accessibilityLabel="Add friends"
+      activeOpacity={0.75}
+    >
       <Animated.View style={animatedStyle}>
-        <Icon name="add-circle-outline" size={30} color="white" />
+        <Icon name="add-circle-outline" size={30} color={TEXT} />
       </Animated.View>
     </TouchableOpacity>
   );
@@ -158,7 +174,8 @@ function FriendsEmptyMainContent({
         style={styles.emptyHeroBlock}
       >
         <Text style={styles.emptyHeroTitle}>
-          Your friends. Your plans.
+          <Text style={styles.emptyHeroAccent}>Your friends.</Text>
+          {"\n"}Your plans.
         </Text>
         <Text style={styles.emptyHeroSubtitle}>
           {`Build your circle — then see who's free.`}
@@ -332,12 +349,11 @@ export default function FriendsScreen() {
 
   const renderSkeletonRow = (key: string) => (
     <View key={key} style={styles.friendRow}>
-      <View style={[styles.avatar, { backgroundColor: "#151515" }]} />
+      <View style={[styles.avatar, styles.skeletonBlock]} />
       <View style={{ flex: 1 }}>
-        <View style={{ height: 14, width: "55%", backgroundColor: "#1f1f1f", borderRadius: 8, marginBottom: 8 }} />
-        <View style={{ height: 12, width: "38%", backgroundColor: "#1a1a1a", borderRadius: 8 }} />
+        <View style={[styles.skeletonBlock, { height: 14, width: "55%", marginBottom: 8 }]} />
+        <View style={[styles.skeletonBlock, { height: 12, width: "38%" }]} />
       </View>
-      <View style={{ height: 12, width: 12 }} />
     </View>
   );
 
@@ -352,24 +368,12 @@ export default function FriendsScreen() {
     if (!hasLoadedTopSynqs) {
       return (
         <View style={styles.topSynqsSection}>
-          <View style={styles.topSynqsHeading}>
-            <Text style={styles.sectionTitle}>Top Synqs</Text>
-          </View>
+          <Text style={styles.sectionTitle}>Top Synqs</Text>
           <View style={styles.synqsContainer}>
             {[0, 1, 2].map((i) => (
               <View key={i} style={styles.connItem}>
-                <View
-                  style={[styles.imageCircle, { backgroundColor: "#151515" }]}
-                />
-                <View
-                  style={{
-                    height: 9,
-                    width: 48,
-                    backgroundColor: "#1f1f1f",
-                    borderRadius: 6,
-                    marginTop: 5,
-                  }}
-                />
+                <View style={[styles.imageCircle, styles.skeletonBlock]} />
+                <View style={[styles.skeletonBlock, styles.skeletonConnLabel]} />
               </View>
             ))}
           </View>
@@ -379,15 +383,13 @@ export default function FriendsScreen() {
 
     return (
       <View style={styles.topSynqsSection}>
-        <View style={styles.topSynqsHeading}>
-          <Text style={styles.sectionTitle}>Top Synqs</Text>
-        </View>
+        <Text style={styles.sectionTitle}>Top Synqs</Text>
 
         <View style={styles.synqsContainer}>
           {topSynqs.slice(0, 3).map((item, i) => (
             <View key={item.id || i} style={styles.connItem}>
               <TouchableOpacity
-                activeOpacity={0.85}
+                activeOpacity={0.75}
                 onPress={() =>
                   router.push({
                     pathname: "/friend-profile",
@@ -395,16 +397,16 @@ export default function FriendsScreen() {
                   })
                 }
               >
-                <View style={styles.imageCircle}>
+                <View style={[styles.imageCircle, i === 0 && styles.imageCircleLead]}>
                   <ExpoImage
                     source={{ uri: resolveAvatar(item.imageUrl) }}
                     style={styles.connImg}
                     cachePolicy="memory-disk"
-                    transition={0}
+                    transition={120}
                   />
                   {i === 0 && (
                     <View style={styles.crown}>
-                      <Icon name="star" size={8} color="black" />
+                      <Ionicons name="star" size={8} color="#061006" />
                     </View>
                   )}
                 </View>
@@ -440,64 +442,53 @@ export default function FriendsScreen() {
       typeof (item as any)?.location === "string" && (item as any).location.trim()
         ? (item as any).location
         : "";
-    const locationText = locationLine || fallbackLoc || "No location";
+    const locationText = locationLine || fallbackLoc || "";
+    const nameParts = splitDisplayName(item.displayName);
 
     return (
     <TouchableOpacity
       style={styles.friendRow}
-      onPress={() =>
+      activeOpacity={0.65}
+      onPress={() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
           pathname: "/friend-profile",
           params: { friendId: item.id },
-        })
-      }
+        });
+      }}
     >
       <View style={styles.avatar}>
         <ExpoImage
           source={{ uri: resolveAvatar((item as any)?.imageurl) }}
           style={styles.img}
           cachePolicy="memory-disk"
-          transition={0}
+          transition={120}
         />
       </View>
 
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <Text
-          style={{
-            color: TEXT,
-            fontSize: 17,
-            marginBottom: 2,
-            fontFamily: fonts.heavy
-          }}
-        >
-          {item.displayName || "User"}
+      <View style={styles.friendRowContent}>
+        <Text style={styles.friendRowName} numberOfLines={1}>
+          <Text style={styles.friendNameAccent}>{nameParts.first}</Text>
+          {nameParts.last.length > 0 ? (
+            <Text style={styles.friendNameAccent}> {nameParts.last}</Text>
+          ) : null}
         </Text>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-          }}
-        >
-          <Ionicons
-            name="location-outline"
-            size={12}
-            color="rgba(255,255,255,0.45)"
-            style={{ marginRight: 4 }}
-          />
-          <Text
-            style={{
-              color: "rgba(255,255,255,0.6)",
-              fontSize: 13,
-              flex: 1,
-            }}
-            numberOfLines={2}
-          >
-            {locationText}
-          </Text>
-        </View>
+        {locationText.length > 0 && (
+          <View style={styles.friendRowMeta}>
+            <Ionicons
+              name="location-outline"
+              size={12}
+              color={MUTED2}
+              style={styles.friendRowMetaIcon}
+            />
+            <Text style={styles.friendRowLocation} numberOfLines={1}>
+              {locationText}
+            </Text>
+          </View>
+        )}
       </View>
 
-      <Icon name="chevron-forward" size={18} color="rgba(255,255,255,0.25)" />
+      <Icon name="chevron-forward" size={17} color="rgba(255,255,255,0.18)" />
     </TouchableOpacity>
     );
   };
@@ -518,17 +509,17 @@ export default function FriendsScreen() {
       </View>
       {showFriendSearch && (
         <View style={styles.searchBarSubtle}>
-          <Ionicons name="search-outline" size={16} color="rgba(255,255,255,0.35)" />
+          <Ionicons name="search-outline" size={14} color="rgba(255,255,255,0.22)" />
           <TextInput
             placeholder="Search"
-            placeholderTextColor="rgba(255,255,255,0.28)"
+            placeholderTextColor="rgba(255,255,255,0.22)"
             style={styles.searchBarSubtleInput}
             value={searchText}
             onChangeText={setSearchText}
           />
           {searchText.length > 0 && (
             <TouchableOpacity onPress={() => setSearchText("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.35)" />
+              <Ionicons name="close-circle" size={14} color={MUTED2} />
             </TouchableOpacity>
           )}
         </View>
@@ -1278,7 +1269,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 88,
-    alignItems: "flex-start",
+    marginBottom: 6,
+    alignItems: "center",
   },
   headerTitleBlock: { flex: 1, paddingRight: 12 },
   headerTitle: { color: TEXT, fontSize: 28, fontFamily: fonts.heavy, letterSpacing: 0.2 },
@@ -1286,23 +1278,23 @@ const styles = StyleSheet.create({
   searchBarSubtle: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 12,
-    paddingBottom: 10,
+    marginTop: 4,
+    marginBottom: 8,
+    paddingBottom: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.1)",
-    gap: 8,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+    gap: 6,
   },
   searchBarSubtleInput: {
     flex: 1,
     color: TEXT,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.book,
     fontSize: 15,
     paddingVertical: 0,
-    minHeight: 22,
+    minHeight: 20,
   },
-  topSynqsSection: { marginTop: 18, marginBottom: 4 },
-  topSynqsHeading: { marginBottom: 12 },
-  sectionTitle: { color: TEXT, fontSize: 21, fontFamily: fonts.heavy, letterSpacing: 0.2, marginBottom: 6 },
+  topSynqsSection: { marginTop: 12, marginBottom: 4 },
+  sectionTitle: profileScreenSectionTitle,
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 14 },
   connItem: { alignItems: "center", width: 72 },
   imageCircle: {
@@ -1313,11 +1305,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     position: "relative",
     overflow: "hidden",
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
   },
-  connImg: { width: 55, height: 55, borderRadius: 50, backgroundColor: "#222" },
+  imageCircleLead: {
+    borderWidth: 1.5,
+    borderColor: "rgba(0,255,133,0.45)",
+  },
+  connImg: { width: 55, height: 55, borderRadius: 50 },
   crown: {
     position: "absolute",
     bottom: -1,
@@ -1329,25 +1322,51 @@ const styles = StyleSheet.create({
     borderColor: "black",
     zIndex: 10,
   },
-  connName: { color: TEXT, fontSize: 13, marginTop: 8, textAlign: "center", fontFamily: fonts.heavy },
+  connName: { color: TEXT, fontSize: 13, marginTop: 8, textAlign: "center", fontFamily: fonts.medium },
+  skeletonBlock: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 8,
+  },
+  skeletonConnLabel: {
+    height: 9,
+    width: 48,
+    marginTop: 8,
+    borderRadius: 6,
+  },
   friendsListAfterTopSynqsSpacer: { height: 22 },
   friendsListHeaderSpacerNoTopSynqs: { height: 18 },
   friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
+  friendRowContent: { flex: 1, justifyContent: "center", paddingRight: 8 },
+  friendRowName: {
+    marginBottom: 3,
+  },
+  friendNameAccent: {
+    color: TEXT,
+    fontSize: 17,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.1,
+  },
+  friendRowMeta: { flexDirection: "row", alignItems: "center" },
+  friendRowMetaIcon: { marginRight: 4 },
+  friendRowLocation: {
+    color: MUTED,
+    fontSize: 13,
+    flex: 1,
+    fontFamily: fonts.book,
+  },
   separator: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    marginLeft: 66,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    marginLeft: 69,
   },
   avatar: {
     width: 55,
     height: 55,
     borderRadius: 50,
-    backgroundColor: SURFACE,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 14,
-    borderWidth: 1,
-    borderColor: BORDER
+    overflow: "hidden",
   },
   img: {
     width: 55,
@@ -1390,6 +1409,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     textAlign: "center",
     width: "100%",
+  },
+  emptyHeroAccent: {
+    color: ACCENT,
+    fontFamily: fonts.heavy,
+    fontSize: 34,
+    lineHeight: 40,
+    letterSpacing: 0.2,
   },
   emptyHeroSubtitle: {
     color: MUTED,
@@ -1473,13 +1499,7 @@ const styles = StyleSheet.create({
   popupLocation: { marginTop: 6, color: "rgba(255,255,255,0.35)", fontSize: 13, fontFamily: fonts.book },
   popupLocationText: { color: "rgba(255,255,255,0.35)", fontSize: 13, fontFamily: fonts.book },
   interestsContainer: { width: "100%", marginTop: 10, marginBottom: 10 },
-  sectionLabel: {
-    color: MUTED,
-    fontSize: 16,
-    fontFamily: fonts.heavy,
-    marginBottom: 10,
-    letterSpacing: 0.2,
-  },
+  sectionLabel: profileScreenSectionTitle,
   interestsScroll: { maxHeight: 150, width: "100%" },
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", paddingBottom: 4 },
   interestPill: {
