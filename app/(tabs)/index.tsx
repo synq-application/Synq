@@ -604,15 +604,34 @@ export default function SynqScreen() {
     if (!activeChatId || !isChatPaneOpen) return;
     const q = query(collection(db, 'chats', activeChatId, 'messages'), orderBy('createdAt', 'asc'));
 
-    return onSnapshot(q, (snap) => {
-      const newMessages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setMessages(newMessages);
+    return onSnapshot(
+      q,
+      (snap) => {
+        const newMessages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setMessages(newMessages);
 
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    });
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      },
+      () => {
+        setMessages([]);
+        setActiveChatId(null);
+        setMessagesPane("inbox");
+      }
+    );
   }, [activeChatId, isChatPaneOpen]);
+
+  useEffect(() => {
+    if (!messagesModalVisible || pendingNewChat) return;
+    const activeChatMissing =
+      !!activeChatId && !allChats.some((c) => c.id === activeChatId);
+    if (activeChatMissing || (allChats.length === 0 && messagesPane === "chat")) {
+      setActiveChatId(null);
+      setMessages([]);
+      setMessagesPane("inbox");
+    }
+  }, [messagesModalVisible, activeChatId, allChats, messagesPane, pendingNewChat]);
 
   useEffect(() => {
     if (!isChatPaneOpen) return;
@@ -907,7 +926,7 @@ export default function SynqScreen() {
 
     const myId = auth.currentUser?.uid;
 
-    const otherUsers = Object.entries(chat.participantNames)
+    const otherUsers = Object.entries(chat.participantNames || {})
       .filter(([uid]) => uid !== myId)
       .map(([_, name]) => name as string);
 
@@ -1047,6 +1066,7 @@ export default function SynqScreen() {
           />
         )}
         <Modal visible={messagesModalVisible} animationType="slide" presentationStyle="pageSheet">
+          <View style={styles.modalBg}>
           {messagesPane === "inbox" ? (
             <MessagesInboxPane
               styles={styles}
@@ -1054,7 +1074,13 @@ export default function SynqScreen() {
               currentUserId={auth.currentUser?.uid}
               getChatTitle={getChatTitle}
               renderAvatarStack={renderAvatarStack}
-              onCloseMessages={() => setMessagesModalVisible(false)}
+              onCloseMessages={() => {
+                setMessagesModalVisible(false);
+                setMessagesPane("inbox");
+                setActiveChatId(null);
+                setPendingNewChat(null);
+                setMessages([]);
+              }}
               onOpenChat={async (item) => {
                 prefetchParticipantAvatars(item);
                 setPendingNewChat(null);
@@ -1080,9 +1106,10 @@ export default function SynqScreen() {
                     setPendingDeleteChatId(null);
                     if (!chatId) return;
                     if (activeChatId === chatId) {
-                      setMessagesModalVisible(false);
                       setActiveChatId(null);
                       setPendingNewChat(null);
+                      setMessages([]);
+                      setMessagesPane("inbox");
                     }
                     setAllChats((prev) => prev.filter((c) => c.id !== chatId));
                     try {
@@ -1150,6 +1177,7 @@ export default function SynqScreen() {
               />
             </>
           )}
+          </View>
         </Modal>
 
         <EditSynqModal
