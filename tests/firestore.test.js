@@ -236,5 +236,54 @@ describe("Firestore", () => {
 
       await assertSucceeds(getDoc(doc(aliceDb, "users", "bob")));
     });
+
+    test("users can manage their own blocked list", async () => {
+      const alice = testEnv.authenticatedContext("alice");
+      const aliceDb = alice.firestore();
+
+      await assertSucceeds(
+        setDoc(doc(aliceDb, "users", "alice"), { displayName: "Alice" })
+      );
+      await assertSucceeds(
+        setDoc(doc(aliceDb, "users", "alice", "blocked", "bob"), {
+          blockedAt: new Date().toISOString(),
+        })
+      );
+      await assertSucceeds(getDoc(doc(aliceDb, "users", "alice", "blocked", "bob")));
+    });
+
+    test("users cannot read another user's blocked list", async () => {
+      const alice = testEnv.authenticatedContext("alice");
+      const bob = testEnv.authenticatedContext("bob");
+      const aliceDb = alice.firestore();
+      const bobDb = bob.firestore();
+
+      await assertSucceeds(
+        setDoc(doc(aliceDb, "users", "alice"), { displayName: "Alice" })
+      );
+      await assertSucceeds(
+        setDoc(doc(aliceDb, "users", "alice", "blocked", "bob"), {
+          blockedAt: new Date().toISOString(),
+        })
+      );
+
+      await assertFails(getDoc(doc(bobDb, "users", "alice", "blocked", "bob")));
+    });
+
+    test("clients cannot write to moderationQueue", async () => {
+      const alice = testEnv.authenticatedContext("alice");
+      const aliceDb = alice.firestore();
+
+      await assertSucceeds(
+        setDoc(doc(aliceDb, "users", "alice"), { displayName: "Alice" })
+      );
+
+      await assertFails(
+        setDoc(doc(aliceDb, "moderationQueue", "r1"), {
+          reporterId: "alice",
+          status: "open",
+        })
+      );
+    });
   });
 });
