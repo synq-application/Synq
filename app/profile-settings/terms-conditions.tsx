@@ -127,7 +127,20 @@ export default function TermsScreen() {
           </P>
         </Section>
 
-        <Section title="6. Acceptable Use">
+        <Section title="6. Community Standards">
+          <P>
+            Synq has zero tolerance for objectionable content or abusive users.
+            You must use Synq respectfully and may not post content or behave in
+            ways that harm others or violate these Terms.
+          </P>
+          <P>
+            We provide tools to report and block users. We review reports and aim
+            to remove violating content and suspend or ban offending accounts
+            within 24 hours of a valid report.
+          </P>
+        </Section>
+
+        <Section title="7. Acceptable Use">
           <P>Use Synq respectfully. You agree not to:</P>
           <View style={styles.bullets}>
             <Bullet>Harass, bully, threaten, or impersonate others.</Bullet>
@@ -139,7 +152,7 @@ export default function TermsScreen() {
           </View>
         </Section>
 
-        <Section title="7. Privacy">
+        <Section title="8. Privacy">
           <P>
             Our Privacy Policy explains how Synq handles account information,
             profile information, friend connections, messages, optional location,
@@ -148,7 +161,7 @@ export default function TermsScreen() {
           </P>
         </Section>
 
-        <Section title="8. Third-Party Services">
+        <Section title="9. Third-Party Services">
           <P>
             Synq relies on third-party providers to operate features, including
             infrastructure, authentication, storage, notifications, crash/error
@@ -173,7 +186,7 @@ export default function TermsScreen() {
           </View>
         </Section>
 
-        <Section title="10. Suspension, Termination, and Deletion">
+        <Section title="11. Suspension, Termination, and Deletion">
           <P>
             You may stop using Synq at any time. You may also request deletion of
             your account through the app where available.
@@ -193,7 +206,7 @@ export default function TermsScreen() {
           </P>
         </Section>
 
-        <Section title="12. Limitation of Liability">
+        <Section title="13. Limitation of Liability">
           <P>
             To the fullest extent permitted by law, Synq will not be liable for
             indirect, incidental, special, consequential, exemplary, or punitive
@@ -210,7 +223,7 @@ export default function TermsScreen() {
           </P>
         </Section>
 
-        <Section title="14. Contact">
+        <Section title="15. Contact">
           <P>
             Questions about these Terms? Email{" "}
             <Text style={styles.bold}>synqapp@gmail.com</Text>.

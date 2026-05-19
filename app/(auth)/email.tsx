@@ -41,8 +41,10 @@ import {
 import { SvgXml } from "react-native-svg";
 import AlertModal from "../alert-modal";
 import { auth } from "../../src/lib/firebase";
+import { usePreAuthTermsGate } from "../../src/lib/usePreAuthTermsGate";
 
 export default function EmailSignup() {
+  const termsReady = usePreAuthTermsGate("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -74,6 +76,10 @@ export default function EmailSignup() {
       setLoading(false);
     }
   };
+
+  if (!termsReady) {
+    return <View style={styles.root} />;
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>

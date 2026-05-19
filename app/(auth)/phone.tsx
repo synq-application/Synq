@@ -44,10 +44,12 @@ import {
 import { SvgXml } from "react-native-svg";
 import AlertModal from "../alert-modal";
 import { app, auth, firebaseConfig } from "../../src/lib/firebase";
+import { usePreAuthTermsGate } from "../../src/lib/usePreAuthTermsGate";
 
 const { width } = Dimensions.get("window");
 
 export default function Phone() {
+  const termsReady = usePreAuthTermsGate("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [countryCode, setCountryCode] = useState("+1");
   const [confirm, setConfirm] = useState<any>(null);
@@ -151,6 +153,10 @@ export default function Phone() {
       : "your number";
 
   const recaptchaConfig = (app as any)?.options ?? firebaseConfig;
+
+  if (!termsReady) {
+    return <View style={styles.root} />;
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>

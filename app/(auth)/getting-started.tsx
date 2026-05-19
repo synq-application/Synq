@@ -47,7 +47,7 @@ export default function GetStartedScreen() {
             <TouchableOpacity
               activeOpacity={0.9}
               style={styles.primaryBtn}
-              onPress={() => router.push("/(auth)/phone")}
+              onPress={() => router.push("/(auth)/community-terms?next=phone")}
             >
               <Text style={styles.primaryText}>Get started</Text>
             </TouchableOpacity>
@@ -55,7 +55,7 @@ export default function GetStartedScreen() {
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.secondaryBtn}
-              onPress={() => router.push("/(auth)/login")}
+              onPress={() => router.push("/(auth)/community-terms?next=login")}
             >
               <Text style={styles.secondaryText}>I already have an account</Text>
             </TouchableOpacity>
