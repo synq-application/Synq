@@ -82,6 +82,52 @@ export const destructiveActionBtnText: TextStyle = {
   textTransform: "uppercase",
 };
 
+/** Green outline Add / Add friend CTA (transparent fill). */
+export const synqOutlineAddBtn: ViewStyle = {
+  alignSelf: "center",
+  borderWidth: 1.5,
+  borderColor: ACCENT,
+  borderRadius: BUTTON_RADIUS,
+  paddingVertical: 13,
+  paddingHorizontal: 32,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "transparent",
+};
+
+export const synqOutlineAddBtnCompact: ViewStyle = {
+  borderWidth: 1.5,
+  borderColor: ACCENT,
+  borderRadius: BUTTON_RADIUS,
+  paddingVertical: 9,
+  paddingHorizontal: 18,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "transparent",
+};
+
+export const synqOutlineAddBtnText: TextStyle = {
+  color: ACCENT,
+  fontFamily: fonts.heavy,
+  fontSize: 15,
+};
+
+export const synqOutlineAddBtnTextCompact: TextStyle = {
+  color: ACCENT,
+  fontFamily: fonts.heavy,
+  fontSize: 13,
+  letterSpacing: 0.15,
+};
+
+export const synqOutlineAddBtnDisabled: ViewStyle = {
+  borderColor: "rgba(255,255,255,0.2)",
+  backgroundColor: "transparent",
+};
+
+export const synqOutlineAddBtnTextDisabled: TextStyle = {
+  color: MUTED2,
+};
+
 export interface Friend {
   id: string;
   displayName?: string;

@@ -20,8 +20,11 @@ export const connectionProfileCacheByUser: Record<string, Record<string, Omit<Co
 export const suggestedCacheByUser: Record<string, any[]> = {};
 /** viewerId -> profileId -> mutual friend profiles (for instant Mutual Friends UI). */
 export const mutualFriendsCacheByUser: Record<string, Record<string, Friend[]>> = {};
+/** viewerId -> target user ids with an outgoing friend request. */
+export const outgoingFriendRequestIdsCacheByUser: Record<string, Set<string>> = {};
 
 const warmFriendsInFlight: Record<string, Promise<void> | undefined> = {};
+const warmOutgoingInFlight: Record<string, Promise<void> | undefined> = {};
 const warmSuggestedInFlight: Record<string, Promise<void> | undefined> = {};
 const hydrateInFlight: Record<string, Promise<void> | undefined> = {};
 const CACHE_VERSION = 1;
@@ -46,7 +49,47 @@ type PersistedSocialCache = {
   connectionProfiles: Record<string, Omit<Connection, "synqCount">>;
   suggested: any[];
   mutualFriends: Record<string, Friend[]>;
+  outgoingFriendRequestIds: string[];
 };
+
+export function getCachedFriendRelationship(
+  viewerId: string,
+  friendKey: string
+): { isFriend: boolean; requestSent: boolean } {
+  if (!viewerId || !friendKey) {
+    return { isFriend: false, requestSent: false };
+  }
+  const isFriend =
+    (friendsListCacheByUser[viewerId]?.some((f) => f.id === friendKey) ?? false) ||
+    friendRelationCacheByUser[viewerId]?.[friendKey] != null;
+  const requestSent =
+    outgoingFriendRequestIdsCacheByUser[viewerId]?.has(friendKey) ?? false;
+  return { isFriend, requestSent };
+}
+
+export function setCachedOutgoingFriendRequest(
+  viewerId: string,
+  friendKey: string,
+  pending: boolean
+) {
+  if (!viewerId || !friendKey) return;
+  if (!outgoingFriendRequestIdsCacheByUser[viewerId]) {
+    outgoingFriendRequestIdsCacheByUser[viewerId] = new Set();
+  }
+  const set = outgoingFriendRequestIdsCacheByUser[viewerId];
+  if (pending) {
+    set.add(friendKey);
+  } else {
+    set.delete(friendKey);
+  }
+  void persistSocialCache(viewerId);
+}
+
+export function syncOutgoingFriendRequestsCache(viewerId: string, targetIds: string[]) {
+  if (!viewerId) return;
+  outgoingFriendRequestIdsCacheByUser[viewerId] = new Set(targetIds.filter(Boolean));
+  void persistSocialCache(viewerId);
+}
 
 export function pruneSocialCachesToFriendIds(userId: string, friendIds: Set<string>) {
   if (!userId) return;
@@ -129,6 +172,9 @@ async function persistSocialCache(userId: string) {
     connectionProfiles: connectionProfileCacheByUser[userId] ?? {},
     suggested: suggestedCacheByUser[userId] ?? [],
     mutualFriends: mutualFriendsCacheByUser[userId] ?? {},
+    outgoingFriendRequestIds: [
+      ...Array.from(outgoingFriendRequestIdsCacheByUser[userId] ?? []),
+    ],
   };
   try {
     await AsyncStorage.setItem(socialCacheKey(userId), JSON.stringify(payload));
@@ -154,6 +200,9 @@ export async function hydrateSocialCachesFromDisk(userId: string): Promise<void>
       connectionProfileCacheByUser[userId] = parsed.connectionProfiles ?? {};
       suggestedCacheByUser[userId] = parsed.suggested ?? [];
       mutualFriendsCacheByUser[userId] = parsed.mutualFriends ?? {};
+      outgoingFriendRequestIdsCacheByUser[userId] = new Set(
+        parsed.outgoingFriendRequestIds ?? []
+      );
 
       Object.values(friendProfileCacheByUser[userId]).forEach((friend: any) => {
         prefetchImage(friend?.imageurl);
@@ -271,6 +320,34 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
   }
 }
 
+export async function warmOutgoingFriendRequestsCache(userId: string): Promise<void> {
+  if (!userId) return;
+  if (warmOutgoingInFlight[userId]) {
+    await warmOutgoingInFlight[userId];
+    return;
+  }
+
+  warmOutgoingInFlight[userId] = (async () => {
+    try {
+      const snap = await getDocs(
+        collection(db, "users", userId, "outgoingFriendRequests")
+      );
+      syncOutgoingFriendRequestsCache(
+        userId,
+        snap.docs.map((d) => d.id)
+      );
+    } catch {
+      /* non-fatal */
+    }
+  })();
+
+  try {
+    await warmOutgoingInFlight[userId];
+  } finally {
+    warmOutgoingInFlight[userId] = undefined;
+  }
+}
+
 export async function warmSuggestedCache(userId: string): Promise<void> {
   if (!userId) return;
   if (warmSuggestedInFlight[userId]) {
@@ -340,5 +417,6 @@ export async function warmSuggestedCache(userId: string): Promise<void> {
 export function warmSocialCachesInBackground(userId: string) {
   if (!userId) return;
   warmFriendsAndConnectionsCache(userId).catch(() => {});
+  warmOutgoingFriendRequestsCache(userId).catch(() => {});
   warmSuggestedCache(userId).catch(() => {});
 }

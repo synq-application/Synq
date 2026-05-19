@@ -16,6 +16,12 @@ import {
   SPACE_5,
   SPACE_6,
   SURFACE,
+  synqOutlineAddBtn,
+  synqOutlineAddBtnCompact,
+  synqOutlineAddBtnDisabled,
+  synqOutlineAddBtnText,
+  synqOutlineAddBtnTextCompact,
+  synqOutlineAddBtnTextDisabled,
   tabScreenMainHeaderTitle,
   TEXT,
   TYPE_BODY,
@@ -89,16 +95,16 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Icon from "react-native-vector-icons/Ionicons";
 import { auth, db } from "../../src/lib/firebase";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
 import {
-  type Connection,
-  connectionsCacheByUser,
   friendProfileCacheByUser,
   friendsListCacheByUser,
+  setCachedOutgoingFriendRequest,
   suggestedCacheByUser,
+  syncOutgoingFriendRequestsCache,
   warmFriendsAndConnectionsCache,
+  warmOutgoingFriendRequestsCache,
   warmSuggestedCache,
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
@@ -179,11 +185,13 @@ function FriendsHeaderAddButton({
       activeOpacity={0.75}
     >
       <Animated.View style={[animatedStyle, styles.headerAddBtn]}>
-        <Ionicons name="person-add-outline" size={20} color={ACCENT} />
+        <Ionicons name="person-add-outline" size={22} color="rgba(0,255,133,0.88)" />
       </Animated.View>
     </TouchableOpacity>
   );
 }
+
+const SORT_MENU_FADE_MS = 280;
 
 function FriendsSortMenu({
   visible,
@@ -196,43 +204,86 @@ function FriendsSortMenu({
   onSelect: (mode: FriendsSortMode) => void;
   onClose: () => void;
 }) {
-  const options: { mode: FriendsSortMode; label: string; hint: string }[] = [
-    { mode: "alphabetical", label: "Alphabetical", hint: "A → Z by name" },
-    { mode: "distance", label: "Distance", hint: "Nearest first (uses city when needed)" },
+  const reduced = useReducedMotion();
+  const [modalVisible, setModalVisible] = useState(false);
+  const opacity = useSharedValue(0);
+
+  const options: { mode: FriendsSortMode; label: string }[] = [
+    { mode: "alphabetical", label: "Alphabetical" },
+    { mode: "distance", label: "Distance" },
   ];
 
+  const finishClose = useCallback(() => {
+    setModalVisible(false);
+    onClose();
+  }, [onClose]);
+
+  const dismiss = useCallback(() => {
+    if (reduced) {
+      finishClose();
+      return;
+    }
+    opacity.value = withTiming(
+      0,
+      { duration: SORT_MENU_FADE_MS, easing: Easing.in(Easing.cubic) },
+      (done) => {
+        if (done) runOnJS(finishClose)();
+      }
+    );
+  }, [reduced, finishClose, opacity]);
+
+  useEffect(() => {
+    if (!visible) return;
+    setModalVisible(true);
+    opacity.value = reduced
+      ? 1
+      : withTiming(1, { duration: SORT_MENU_FADE_MS, easing: Easing.out(Easing.cubic) });
+  }, [visible, reduced, opacity]);
+
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  if (!modalVisible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.sortMenuOverlay} onPress={onClose}>
-        <Pressable style={styles.sortMenuCard} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.sortMenuTitle}>Sort friends</Text>
-          {options.map((option) => {
+    <Modal visible transparent animationType="none" onRequestClose={dismiss}>
+      <Animated.View style={[styles.sortMenuOverlay, overlayStyle]}>
+        <Pressable style={styles.sortMenuBackdrop} onPress={dismiss} accessibilityRole="button" accessibilityLabel="Dismiss sort menu" />
+        <Pressable style={styles.sortMenuSheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.sortMenuHandle} />
+          <Text style={styles.sortMenuTitle}>Sort by</Text>
+          {options.map((option, index) => {
             const selected = sortMode === option.mode;
             return (
-              <TouchableOpacity
-                key={option.mode}
-                style={[styles.sortMenuOption, selected && styles.sortMenuOptionSelected]}
-                onPress={() => {
-                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  onSelect(option.mode);
-                  onClose();
-                }}
-                activeOpacity={0.75}
-              >
-                <View style={styles.sortMenuOptionText}>
-                  <Text style={styles.sortMenuOptionLabel}>{option.label}</Text>
-                  <Text style={styles.sortMenuOptionHint}>{option.hint}</Text>
-                </View>
-                {selected ? (
-                  <Ionicons name="checkmark" size={18} color={ACCENT} />
-                ) : (
-                  <View style={styles.sortMenuOptionSpacer} />
-                )}
-              </TouchableOpacity>
+              <View key={option.mode}>
+                {index > 0 ? <View style={styles.sortMenuSeparator} /> : null}
+                <TouchableOpacity
+                  style={styles.sortMenuOption}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    onSelect(option.mode);
+                    dismiss();
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text
+                    style={[
+                      styles.sortMenuOptionLabel,
+                      selected && styles.sortMenuOptionLabelSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {selected ? (
+                    <Ionicons name="checkmark" size={18} color={ACCENT} />
+                  ) : null}
+                </TouchableOpacity>
+              </View>
             );
           })}
         </Pressable>
-      </Pressable>
+      </Animated.View>
     </Modal>
   );
 }
@@ -272,14 +323,14 @@ function FriendsEmptyMainContent({
         style={styles.emptyPrimaryCtaWrap}
       >
         <TouchableOpacity
-          style={styles.emptyPrimaryCta}
+          style={[synqOutlineAddBtn, styles.emptyPrimaryCta]}
           onPress={onPressAdd}
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel="Add friends"
         >
-          <Ionicons name="person-add-outline" size={22} color="#061006" />
-          <Text style={styles.emptyPrimaryCtaText}>Add friends</Text>
+          <Ionicons name="person-add-outline" size={20} color={ACCENT} />
+          <Text style={synqOutlineAddBtnText}>Add friends</Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -325,10 +376,7 @@ export default function FriendsScreen() {
   const { openAddFriends } = useLocalSearchParams<{ openAddFriends?: string }>();
   const myId = auth.currentUser?.uid ?? "";
   const cachedFriends = myId ? friendsListCacheByUser[myId] ?? [] : [];
-  const cachedTopSynqs = myId ? connectionsCacheByUser[myId] ?? [] : [];
   const [friends, setFriends] = useState<Friend[]>(cachedFriends);
-  const [topSynqs, setTopSynqs] = useState<Connection[]>(cachedTopSynqs);
-  const [hasLoadedTopSynqs, setHasLoadedTopSynqs] = useState(cachedTopSynqs.length > 0);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [searchText, setSearchText] = useState("");
@@ -432,6 +480,7 @@ export default function FriendsScreen() {
         } else {
           setIsFriendsInitialLoading(true);
         }
+        void warmOutgoingFriendRequestsCache(myId);
         await warmFriendsAndConnectionsCache(myId);
         const fetchedFriends: Friend[] = friendIds.map(
           (friendId) =>
@@ -455,8 +504,6 @@ export default function FriendsScreen() {
         console.error("[FriendsScreen] Error fetching friend data:", err);
       } finally {
         setIsFriendsInitialLoading(false);
-        setTopSynqs(connectionsCacheByUser[myId] ?? []);
-        setHasLoadedTopSynqs(true);
       }
     });
 
@@ -514,10 +561,10 @@ export default function FriendsScreen() {
   const showFriendSearch = friends.length > 0 && !isFriendsInitialLoading;
   const listIsEmpty = displayFriends.length === 0;
 
-  const hasTopSynqActivity = topSynqs.some((t) => (t.synqCount ?? 0) > 0);
+  const renderFriendRowSeparator = () => <View style={styles.friendRowSeparator} />;
 
   const renderSkeletonRow = (key: string) => (
-    <View key={key} style={styles.friendCard}>
+    <View key={key} style={styles.friendRow}>
       <View style={[styles.avatarRing, styles.skeletonBlock]} />
       <View style={{ flex: 1 }}>
         <View style={[styles.skeletonBlock, { height: 14, width: "55%", marginBottom: 8 }]} />
@@ -526,139 +573,34 @@ export default function FriendsScreen() {
     </View>
   );
 
-  const renderPodiumSlot = (
-    item: Connection | undefined,
-    rank: number,
-    avatarSize: number,
-    key: string
-  ) => {
-    if (!item) return <View key={key} style={styles.podiumSlotEmpty} />;
+  const renderFriendsListHeader = () => {
+    if (friends.length === 0) return null;
 
-    const isFirst = rank === 1;
     return (
-      <View key={key} style={[styles.podiumSlot, isFirst && styles.podiumSlotFirst]}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push({
-              pathname: "/friend-profile",
-              params: { friendId: item.id },
-            });
-          }}
-          style={styles.podiumAvatarPress}
-        >
-          <View
-            style={[
-              styles.podiumAvatarRing,
-              isFirst && styles.podiumAvatarRingFirst,
-              { width: avatarSize + 6, height: avatarSize + 6, borderRadius: (avatarSize + 6) / 2 },
-            ]}
+      <View style={styles.allFriendsSection}>
+        <View style={styles.allFriendsSectionHeader}>
+          <Text style={[styles.listSectionLabel, styles.listSectionLabelRow]}>
+            All friends
+          </Text>
+          <TouchableOpacity
+            style={styles.sortBtn}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSortMenuVisible(true);
+            }}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Sort friends"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <ExpoImage
-              source={{ uri: resolveAvatar(item.imageUrl) }}
-              style={{
-                width: avatarSize,
-                height: avatarSize,
-                borderRadius: avatarSize / 2,
-              }}
-              cachePolicy="memory-disk"
-              transition={120}
+            <Ionicons
+              name="swap-vertical-outline"
+              size={18}
+              color={sortMenuVisible || sortMode === "distance" ? ACCENT : MUTED2}
             />
-          </View>
-        </TouchableOpacity>
-        <Text style={[styles.connName, isFirst && styles.connNameFirst]} numberOfLines={1}>
-          {item.name.split(" ")[0]}
-        </Text>
-      </View>
-    );
-  };
-
-  const renderTopSynqsPodium = () => (
-    <View style={styles.topSynqsCard}>
-      <LinearGradient
-        pointerEvents="none"
-        colors={["rgba(0,255,133,0.1)", "rgba(0,255,133,0.03)", "rgba(255,255,255,0.02)"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={styles.topSynqsCardInner}>
-        <Text style={[styles.listSectionLabel, styles.listSectionLabelCard]}>Top Synqs</Text>
-        <View style={styles.podiumRow}>
-          {(() => {
-            const topThree = topSynqs.slice(0, 3);
-            const slots: { item: Connection | undefined; rank: number; size: number }[] = [
-              { item: topThree[1], rank: 2, size: 52 },
-              { item: topThree[0], rank: 1, size: 68 },
-              { item: topThree[2], rank: 3, size: 52 },
-            ];
-            return slots.map((slot) =>
-              renderPodiumSlot(slot.item, slot.rank, slot.size, `podium-${slot.rank}`)
-            );
-          })()}
+          </TouchableOpacity>
         </View>
       </View>
-    </View>
-  );
-
-  const renderTopSynqsSection = () => {
-    if (!hasLoadedTopSynqs || !hasTopSynqActivity) {
-      return null;
-    }
-
-    return (
-      <View style={styles.topSynqsSection}>
-        {renderTopSynqsPodium()}
-      </View>
-    );
-  };
-
-  const renderFriendsListHeader = () => {
-    const topSynqsBlock = renderTopSynqsSection();
-    const showAllFriendsHeader = friends.length > 0;
-
-    return (
-      <>
-        {topSynqsBlock}
-        {showAllFriendsHeader ? (
-          <View
-            style={[
-              styles.allFriendsSection,
-              topSynqsBlock != null && styles.allFriendsSectionInset,
-            ]}
-          >
-            <View style={styles.allFriendsSectionHeader}>
-              <Text style={[styles.listSectionLabel, styles.listSectionLabelRow]}>
-                All friends
-              </Text>
-              <View style={styles.allFriendsTrailing}>
-                <View style={styles.friendCountPill}>
-                  <Text style={styles.friendCountPillText}>{friends.length}</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.sortBtn}
-                  onPress={() => {
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSortMenuVisible(true);
-                  }}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel="Sort friends"
-                >
-                  <Ionicons
-                    name="swap-vertical-outline"
-                    size={18}
-                    color={sortMode === "distance" ? ACCENT : MUTED2}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.friendsListHeaderSpacerNoTopSynqs} />
-        )}
-      </>
     );
   };
 
@@ -673,8 +615,8 @@ export default function FriendsScreen() {
 
     return (
     <TouchableOpacity
-      style={styles.friendCard}
-      activeOpacity={0.72}
+      style={styles.friendRow}
+      activeOpacity={0.82}
       onPress={() => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
@@ -713,10 +655,6 @@ export default function FriendsScreen() {
           </View>
         )}
       </View>
-
-      <View style={styles.friendChevronWrap}>
-        <Icon name="chevron-forward" size={16} color={MUTED3} />
-      </View>
     </TouchableOpacity>
     );
   };
@@ -727,48 +665,57 @@ export default function FriendsScreen() {
       <View style={styles.container}>
         <LinearGradient
           pointerEvents="none"
-          colors={["rgba(0,255,133,0.09)", "rgba(0,255,133,0.02)", "transparent"]}
-          locations={[0, 0.45, 1]}
+          colors={FRIENDS_AMBIENT_GRADIENT}
+          locations={[0, 0.5, 1]}
           style={styles.ambientGlow}
         />
         <StatusBar barStyle="light-content" />
 
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Friends</Text>
-        <FriendsHeaderAddButton
-          pulse={!isFriendsInitialLoading && friends.length === 0}
-          onPress={openAddFriendsModal}
-        />
-      </View>
-      {showFriendSearch && (
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={16} color={MUTED3} />
-          <TextInput
-            placeholder="Search"
-            placeholderTextColor={MUTED3}
-            style={styles.searchBarInput}
-            value={searchText}
-            onChangeText={setSearchText}
+      <View style={[styles.headerBlock, styles.screenPadding]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Friends</Text>
+          <FriendsHeaderAddButton
+            pulse={!isFriendsInitialLoading && friends.length === 0}
+            onPress={openAddFriendsModal}
           />
-          {searchText.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchText("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={14} color={MUTED2} />
-            </TouchableOpacity>
-          )}
         </View>
-      )}
+        {showFriendSearch && (
+          <View style={styles.searchBar}>
+            <Ionicons name="search-outline" size={17} color={MUTED2} />
+            <TextInput
+              placeholder="Search friends"
+              placeholderTextColor="rgba(255,255,255,0.38)"
+              style={styles.searchBarInput}
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+            {searchText.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchText("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={14} color={MUTED2} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
 
       {isFriendsInitialLoading ? (
-        <View style={{ paddingBottom: 20 }}>
-          {renderFriendsListHeader()}
-          {["1", "2", "3"].map((k) => renderSkeletonRow(k))}
+        <View style={styles.friendsList}>
+          <View style={styles.screenPadding}>{renderFriendsListHeader()}</View>
+          {["1", "2", "3"].map((k, i) => (
+            <View key={k}>
+              {i > 0 ? renderFriendRowSeparator() : null}
+              {renderSkeletonRow(k)}
+            </View>
+          ))}
         </View>
       ) : (
         <FlatList
           style={styles.friendsList}
+          scrollIndicatorInsets={{ right: 0 }}
           data={displayFriends}
           keyExtractor={(item) => item.id}
           renderItem={renderFriendRow}
+          ItemSeparatorComponent={renderFriendRowSeparator}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           onScrollBeginDrag={Keyboard.dismiss}
@@ -848,7 +795,7 @@ function AddFriendsUserRow({
   cardStyle?: ViewStyle;
 }) {
   return (
-    <View style={[styles.addFriendCard, cardStyle]}>
+    <View style={[styles.addFriendRow, cardStyle]}>
       <TouchableOpacity
         onPress={onPressProfile}
         style={styles.addFriendCardMain}
@@ -1139,6 +1086,10 @@ function SearchModal({
           pendingCheckCacheRef.current[user.id] = true;
           ExpoImage.prefetch(resolveAvatar(user.imageurl)).catch(() => {});
         });
+        syncOutgoingFriendRequestsCache(
+          myId,
+          rows.map((r) => r.id)
+        );
         setOutgoingRequestsRows(rows);
         setPendingRequestIds((prev) => {
           const next = { ...prev };
@@ -1201,6 +1152,7 @@ function SearchModal({
       const apply = (isPending: boolean) => {
         pendingCheckCacheRef.current[targetId] = isPending;
         setPendingRequestIds((prev) => ({ ...prev, [targetId]: isPending }));
+        setCachedOutgoingFriendRequest(myId, targetId, isPending);
         if (isPending && auth.currentUser) {
           void setDoc(
             doc(db, "users", myId, "outgoingFriendRequests", targetId),
@@ -1417,6 +1369,7 @@ function SearchModal({
       };
       pendingCheckCacheRef.current[targetId] = true;
       setPendingRequestIds((prev) => ({ ...prev, [targetId]: true }));
+      setCachedOutgoingFriendRequest(myId, targetId, true);
 
       setAlertConfig({
         title: "Sent!",
@@ -1436,6 +1389,7 @@ function SearchModal({
       batch.commit().catch((e: any) => {
         pendingCheckCacheRef.current[targetId] = false;
         setPendingRequestIds((prev) => ({ ...prev, [targetId]: false }));
+        setCachedOutgoingFriendRequest(myId, targetId, false);
         setAlertConfig({
           title: "Error",
           message: e?.message || "Could not send invite.",
@@ -1468,6 +1422,7 @@ function SearchModal({
 
     pendingCheckCacheRef.current[targetId] = false;
     setPendingRequestIds((prev) => ({ ...prev, [targetId]: false }));
+    setCachedOutgoingFriendRequest(myId, targetId, false);
 
     try {
       const batch = writeBatch(db);
@@ -1477,6 +1432,7 @@ function SearchModal({
     } catch (e: any) {
       pendingCheckCacheRef.current[targetId] = true;
       setPendingRequestIds((prev) => ({ ...prev, [targetId]: true }));
+      setCachedOutgoingFriendRequest(myId, targetId, true);
       setAlertConfig({
         title: "Error",
         message: e?.message || "Could not cancel request.",
@@ -1595,7 +1551,6 @@ function SearchModal({
     opts?: {
       onPress?: () => void;
       onLongPress?: () => void;
-      outline?: boolean;
       disabled?: boolean;
     }
   ) => (
@@ -1603,19 +1558,14 @@ function SearchModal({
       onPress={opts?.onPress}
       onLongPress={opts?.onLongPress}
       delayLongPress={opts?.onLongPress ? 400 : undefined}
-      style={[
-        styles.addFriendActionBtn,
-        opts?.outline && styles.addFriendActionBtnOutline,
-        opts?.disabled && styles.addFriendActionBtnDisabled,
-      ]}
+      style={[synqOutlineAddBtnCompact, opts?.disabled && synqOutlineAddBtnDisabled]}
       activeOpacity={0.8}
       disabled={opts?.disabled && !opts?.onLongPress}
     >
       <Text
         style={[
-          styles.addFriendActionBtnText,
-          opts?.outline && styles.addFriendActionBtnTextOutline,
-          opts?.disabled && styles.addFriendActionBtnTextDisabled,
+          synqOutlineAddBtnTextCompact,
+          opts?.disabled && synqOutlineAddBtnTextDisabled,
         ]}
       >
         {label}
@@ -1629,7 +1579,6 @@ function SearchModal({
     }
     if (incomingRequestIds[item.id]) {
       return renderAddActionButton(item, "Accept", {
-        outline: true,
         onPress: () => acceptIncomingRequest(item),
       });
     }
@@ -1650,7 +1599,6 @@ function SearchModal({
     }
     if (incomingRequestIds[item.id]) {
       return renderAddActionButton(item, "Accept", {
-        outline: true,
         onPress: () => acceptIncomingRequest(item),
       });
     }
@@ -1684,7 +1632,6 @@ function SearchModal({
                 <Text style={styles.addFriendDeclineBtnText}>Decline</Text>
               </TouchableOpacity>
               {renderAddActionButton(item, "Accept", {
-                outline: true,
                 onPress: () => acceptIncomingRequest(item),
               })}
             </View>
@@ -1737,8 +1684,8 @@ function SearchModal({
       <View style={styles.modalBody}>
         <LinearGradient
           pointerEvents="none"
-          colors={["rgba(0,255,133,0.09)", "rgba(0,255,133,0.02)", "transparent"]}
-          locations={[0, 0.45, 1]}
+          colors={FRIENDS_AMBIENT_GRADIENT}
+          locations={[0, 0.5, 1]}
           style={styles.modalAmbientGlow}
         />
         <StatusBar barStyle="light-content" />
@@ -1752,15 +1699,15 @@ function SearchModal({
             accessibilityRole="button"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="close-circle" size={28} color="#444" />
+            <Ionicons name="close-circle" size={26} color={MUTED2} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.addFriendsSearchBar}>
-          <Ionicons name="search-outline" size={16} color={MUTED3} />
+        <View style={[styles.searchBar, styles.addFriendsSearchSpacing]}>
+          <Ionicons name="search-outline" size={17} color={MUTED2} />
           <TextInput
             placeholder="Search by name..."
-            placeholderTextColor={MUTED3}
+            placeholderTextColor="rgba(255,255,255,0.4)"
             style={styles.searchBarInput}
             value={queryText}
             onChangeText={searchUsers}
@@ -1813,7 +1760,7 @@ function SearchModal({
                     showCount={section.title !== "People you may know"}
                   />
                 )}
-                ItemSeparatorComponent={() => <View style={styles.addFriendsItemGap} />}
+                ItemSeparatorComponent={() => <View style={styles.friendRowSeparator} />}
                 renderItem={({ item, section }) =>
                   renderAddFriendsItem(item, section.title)
                 }
@@ -1833,7 +1780,7 @@ function SearchModal({
                 results.length === 0 && styles.addFriendsListContentEmpty,
               ]}
               ListFooterComponent={<View style={{ height: 8 }} />}
-              ItemSeparatorComponent={() => <View style={styles.addFriendsItemGap} />}
+              ItemSeparatorComponent={() => <View style={styles.friendRowSeparator} />}
               ListEmptyComponent={
                 isSearching ? (
                   <View style={styles.addFriendsEmpty}>
@@ -1887,11 +1834,26 @@ function SearchModal({
     </>
   );
 }
+
+/** Friends tab surfaces — solid charcoals (not milky white overlays). */
+const FRIENDS_SURFACE = "#0A0B0D";
+const FRIENDS_SURFACE_RAISED = "#0E1012";
+const FRIENDS_SEARCH_BG = "#0A0B0D";
+const FRIENDS_BORDER = "rgba(255,255,255,0.035)";
+const FRIENDS_SEARCH_BORDER = "rgba(255,255,255,0.05)";
+const FRIENDS_AMBIENT_GRADIENT = [
+  "rgba(0,255,133,0.03)",
+  "rgba(0,255,133,0.008)",
+  "transparent",
+] as const;
+
 const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: BG },
   container: {
     flex: 1,
     backgroundColor: BG,
+  },
+  screenPadding: {
     paddingHorizontal: 20,
   },
   addFriendsOverlay: {
@@ -1918,266 +1880,197 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 280,
+    height: 200,
+    zIndex: 0,
+  },
+  headerBlock: {
+    marginTop: 88,
+    marginBottom: 4,
+    zIndex: 1,
+  },
+  friendRowSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 88,
-    marginBottom: 10,
-    minHeight: 44,
+    justifyContent: "space-between",
+    marginBottom: 14,
+    minHeight: 34,
   },
   headerTitle: {
     ...tabScreenMainHeaderTitle,
     flex: 1,
-    lineHeight: 34,
+    lineHeight: 32,
     includeFontPadding: false,
+    textAlignVertical: "center",
   },
   headerAddBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
+    width: 34,
+    height: 34,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerAction: { paddingLeft: 12, paddingVertical: 6 },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 16,
+    minHeight: 44,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderRadius: RADIUS_MD,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    gap: 8,
+    backgroundColor: FRIENDS_SEARCH_BG,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: FRIENDS_SEARCH_BORDER,
+    gap: 10,
   },
   searchBarInput: {
     flex: 1,
     color: TEXT,
     fontFamily: fonts.book,
-    fontSize: 15,
+    fontSize: 16,
     paddingVertical: 0,
-    minHeight: 20,
-  },
-  topSynqsSection: { marginTop: 6, marginBottom: 4 },
-  topSynqsCard: {
-    borderRadius: RADIUS_LG,
-    borderWidth: 1,
-    borderColor: "rgba(0,255,133,0.14)",
-    overflow: "hidden",
-    backgroundColor: SURFACE,
-  },
-  topSynqsCardInner: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 18,
+    minHeight: 22,
   },
   listSectionLabel: {
-    color: TEXT,
+    color: "rgba(255,255,255,0.94)",
     fontSize: TYPE_SECTION,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
-  },
-  listSectionLabelCard: {
-    marginBottom: 14,
+    letterSpacing: 0.15,
   },
   listSectionLabelRow: {
     flex: 1,
     paddingRight: 8,
     lineHeight: 26,
     includeFontPadding: false,
-  },
-  podiumRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "center",
-    gap: 12,
-    paddingTop: 4,
-  },
-  podiumSlot: {
-    flex: 1,
-    alignItems: "center",
-    maxWidth: 96,
-  },
-  podiumSlotFirst: {
-    marginBottom: 6,
-  },
-  podiumSlotEmpty: {
-    flex: 1,
-    maxWidth: 96,
-  },
-  podiumAvatarPress: {
-    alignItems: "center",
-    position: "relative",
-  },
-  podiumAvatarRing: {
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  podiumAvatarRingFirst: {
-    borderColor: ACCENT,
-    shadowColor: ACCENT,
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 6,
-  },
-  connName: {
-    color: TEXT,
-    fontSize: 13,
-    marginTop: 10,
-    textAlign: "center",
-    fontFamily: fonts.medium,
-  },
-  connNameFirst: {
-    fontSize: 14,
-    fontFamily: fonts.heavy,
-  },
-  skeletonBlock: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 8,
-  },
-  skeletonConnLabel: {
-    height: 9,
-    width: 48,
-    marginTop: 10,
-    borderRadius: 6,
-  },
-  allFriendsSection: {
-    marginTop: 12,
     marginBottom: 10,
   },
-  allFriendsSectionInset: {
-    paddingLeft: 16,
+  skeletonBlock: {
+    backgroundColor: FRIENDS_SURFACE_RAISED,
+    borderRadius: 8,
+  },
+  allFriendsSection: {
+    marginTop: 0,
+    marginBottom: 12,
+    paddingHorizontal: 20,
   },
   allFriendsSectionHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
-    minHeight: 32,
-  },
-  allFriendsTrailing: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexShrink: 0,
   },
   sortBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: FRIENDS_SURFACE,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: FRIENDS_BORDER,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+    marginBottom: 1,
   },
   sortMenuOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.78)",
     justifyContent: "flex-end",
-    paddingHorizontal: 20,
-    paddingBottom: 48,
   },
-  sortMenuCard: {
-    backgroundColor: "#141414",
-    borderRadius: RADIUS_LG,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingVertical: 8,
-    overflow: "hidden",
+  sortMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sortMenuSheet: {
+    backgroundColor: BG,
+    borderTopLeftRadius: RADIUS_LG,
+    borderTopRightRadius: RADIUS_LG,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    paddingTop: 10,
+    paddingBottom: 44,
+  },
+  sortMenuHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignSelf: "center",
+    marginBottom: 18,
   },
   sortMenuTitle: {
-    color: MUTED2,
-    fontSize: 12,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 8,
+    color: MUTED3,
+    fontSize: 13,
+    fontFamily: fonts.book,
+    letterSpacing: 0.15,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    includeFontPadding: false,
+  },
+  sortMenuSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    marginLeft: 20,
   },
   sortMenuOption: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-  },
-  sortMenuOptionSelected: {
-    backgroundColor: "rgba(0,255,133,0.06)",
-  },
-  sortMenuOptionText: {
-    flex: 1,
-    paddingRight: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
   },
   sortMenuOptionLabel: {
-    color: TEXT,
-    fontSize: 16,
-    fontFamily: fonts.heavy,
-  },
-  sortMenuOptionHint: {
-    color: MUTED3,
-    fontSize: 12,
+    flex: 1,
+    color: MUTED2,
+    fontSize: 17,
     fontFamily: fonts.book,
-    marginTop: 2,
+    letterSpacing: 0.02,
+    paddingRight: 12,
   },
-  sortMenuOptionSpacer: {
-    width: 18,
+  sortMenuOptionLabelSelected: {
+    color: TEXT,
+    fontFamily: fonts.medium,
   },
   friendCountPill: {
-    minWidth: 28,
-    height: 28,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
+    minWidth: 0,
+    paddingHorizontal: 0,
+    backgroundColor: "transparent",
+    borderWidth: 0,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   friendCountPillText: {
-    color: MUTED2,
-    fontSize: 13,
-    fontFamily: fonts.heavy,
-    lineHeight: 16,
+    color: MUTED3,
+    fontSize: 14,
+    fontFamily: fonts.book,
+    lineHeight: 26,
     includeFontPadding: false,
+    fontVariant: ["tabular-nums"],
   },
-  friendsListHeaderSpacerNoTopSynqs: { height: 18 },
-  friendCard: {
+  friendRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 14,
-    paddingHorizontal: 14,
-    marginBottom: 10,
-    borderRadius: RADIUS_MD,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
+    paddingHorizontal: 20,
   },
-  friendRowContent: { flex: 1, justifyContent: "center", paddingRight: 8 },
+  addFriendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  friendRowContent: { flex: 1, justifyContent: "center" },
   friendRowName: {
     marginBottom: 3,
   },
   friendNameAccent: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.1,
+    letterSpacing: 0.05,
   },
   friendRowMeta: { flexDirection: "row", alignItems: "center" },
   friendRowMetaIcon: { marginRight: 4 },
   friendRowLocation: {
-    color: MUTED,
+    color: MUTED2,
     fontSize: 13,
     flex: 1,
     fontFamily: fonts.book,
@@ -2196,32 +2089,22 @@ const styles = StyleSheet.create({
     marginRight: 14,
     overflow: "hidden",
   },
-  friendChevronWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   avatarRing: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    marginRight: 14,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.1)",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 12,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    backgroundColor: FRIENDS_SURFACE,
   },
   img: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
   mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
-  friendsList: { flex: 1 },
+  friendsList: { flex: 1, width: "100%" },
   friendsListContent: { paddingBottom: 40 },
   friendsListContentEmpty: { flexGrow: 1, paddingBottom: 40 },
   emptyStateCenter: {
@@ -2287,20 +2170,7 @@ const styles = StyleSheet.create({
   },
   emptyPrimaryCta: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     gap: SPACE_3,
-    backgroundColor: ACCENT,
-    borderRadius: BUTTON_RADIUS,
-    paddingVertical: 16,
-    paddingHorizontal: SPACE_5,
-    minHeight: 52,
-  },
-  emptyPrimaryCtaText: {
-    color: "#061006",
-    fontFamily: fonts.heavy,
-    fontSize: 17,
-    letterSpacing: 0.2,
   },
   emptySecondaryBtn: { marginTop: SPACE_4, paddingVertical: 8, paddingHorizontal: 12 },
   emptySecondaryBtnText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 15 },
@@ -2381,41 +2251,34 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 220,
+    height: 200,
+    zIndex: 0,
   },
   addFriendsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    minHeight: 44,
+    minHeight: 34,
     paddingTop: 40,
-    marginBottom: 4,
+    marginBottom: 14,
+  },
+  addFriendsSearchSpacing: {
+    marginTop: 0,
+    marginBottom: 20,
   },
   addFriendsTitle: {
     ...tabScreenMainHeaderTitle,
     flex: 1,
-    lineHeight: 34,
+    lineHeight: 32,
     includeFontPadding: false,
-  },
-  addFriendsSearchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 12,
-    marginBottom: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: RADIUS_MD,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    gap: 8,
   },
   addFriendsListWrap: { flex: 1 },
   addFriendsListContent: { paddingBottom: 32 },
   addFriendsListContentEmpty: { flexGrow: 1 },
   addFriendsSectionLabel: {
+    flex: 1,
     color: MUTED2,
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: fonts.medium,
     letterSpacing: 0.2,
     lineHeight: 20,
@@ -2423,30 +2286,20 @@ const styles = StyleSheet.create({
   },
   addFriendsSectionHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
     justifyContent: "space-between",
-    marginTop: 20,
-    marginBottom: 12,
-    minHeight: 24,
+    marginTop: 18,
+    marginBottom: 8,
+    minHeight: 18,
   },
   addFriendsSectionHeaderFirst: {
-    marginTop: 4,
+    marginTop: 0,
   },
   addFriendsSectionGap: { height: 8 },
-  addFriendsItemGap: { height: 10 },
-  addFriendCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: RADIUS_MD,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
   addFriendCardIncoming: {
-    borderColor: "rgba(0,255,133,0.22)",
-    backgroundColor: "rgba(0,255,133,0.04)",
+    borderLeftWidth: 2,
+    borderLeftColor: "rgba(0,255,133,0.45)",
+    paddingLeft: 10,
   },
   addFriendCardMain: {
     flex: 1,
@@ -2477,9 +2330,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   addFriendDeclineBtn: {
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: BORDER,
+    backgroundColor: FRIENDS_SURFACE,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: FRIENDS_BORDER,
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: BUTTON_RADIUS,
@@ -2490,32 +2343,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.15,
   },
-  addFriendActionBtn: {
-    backgroundColor: ACCENT,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: BUTTON_RADIUS,
-    minWidth: 72,
-    alignItems: "center",
-  },
-  addFriendActionBtnOutline: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: ACCENT,
-  },
-  addFriendActionBtnDisabled: {
-    opacity: 0.5,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 0,
-  },
-  addFriendActionBtnText: {
-    color: "#061006",
-    fontFamily: fonts.heavy,
-    fontSize: 13,
-    letterSpacing: 0.15,
-  },
-  addFriendActionBtnTextOutline: { color: ACCENT },
-  addFriendActionBtnTextDisabled: { color: "rgba(255,255,255,0.85)" },
   addFriendsEmpty: {
     flex: 1,
     alignItems: "center",
@@ -2527,9 +2354,9 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "rgba(0,255,133,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(0,255,133,0.18)",
+    backgroundColor: FRIENDS_SURFACE_RAISED,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: FRIENDS_BORDER,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: SPACE_4,
@@ -2542,7 +2369,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   addFriendsEmptyText: {
-    color: MUTED,
+    color: MUTED2,
     fontFamily: fonts.book,
     fontSize: 14,
     lineHeight: 21,

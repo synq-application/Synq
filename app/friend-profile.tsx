@@ -1,16 +1,21 @@
 import {
   ACCENT,
   BG,
-  BORDER,
   BUTTON_RADIUS,
   fonts,
   MODAL_RADIUS,
   MUTED2,
-  SURFACE,
-  TEXT
+  RADIUS_MD,
+  synqOutlineAddBtn,
+  synqOutlineAddBtnDisabled,
+  synqOutlineAddBtnText,
+  synqOutlineAddBtnTextDisabled,
+  TEXT,
+  TYPE_SECTION,
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
 import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   collection,
@@ -49,8 +54,11 @@ import {
   friendProfileCacheByUser,
   friendRelationCacheByUser,
   friendsListCacheByUser,
+  getCachedFriendRelationship,
   mutualFriendsCacheByUser,
+  setCachedOutgoingFriendRequest,
   warmFriendsAndConnectionsCache,
+  warmOutgoingFriendRequestsCache,
 } from "../src/lib/socialCache";
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
@@ -89,11 +97,7 @@ export default function FriendProfile() {
     viewerId && friendKey
       ? friendRelationCacheByUser[viewerId]?.[friendKey]?.lastSynqAt?.toDate?.() ?? null
       : null;
-  const cachedIsFriend =
-    !!viewerId &&
-    !!friendKey &&
-    ((friendsListCacheByUser[viewerId]?.some((f) => f.id === friendKey) ?? false) ||
-      friendRelationCacheByUser[viewerId]?.[friendKey] != null);
+  const cachedRelationship = getCachedFriendRelationship(viewerId, friendKey);
   const cachedMutualFriends =
     viewerId && friendKey
       ? mutualFriendsCacheByUser[viewerId]?.[friendKey] ?? []
@@ -103,9 +107,8 @@ export default function FriendProfile() {
   const [mutualFriends, setMutualFriends] = useState<any[]>(cachedMutualFriends);
   const [lastSynq, setLastSynq] = useState<Date | null>(cachedLastSynq);
   const [loading, setLoading] = useState(!cachedFriend);
-  const [isFriend, setIsFriend] = useState(cachedIsFriend);
-  const [requestSent, setRequestSent] = useState(false);
-  const [relationshipResolved, setRelationshipResolved] = useState(cachedIsFriend);
+  const [isFriend, setIsFriend] = useState(cachedRelationship.isFriend);
+  const [requestSent, setRequestSent] = useState(cachedRelationship.requestSent);
   const [actionLoading, setActionLoading] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [joinedPlanKeys, setJoinedPlanKeys] = useState<Record<string, boolean>>({});
@@ -204,12 +207,20 @@ export default function FriendProfile() {
     if (!friendKey) return;
 
     if (viewerId) {
+      void warmOutgoingFriendRequestsCache(viewerId).then(() => {
+        const rel = getCachedFriendRelationship(viewerId, friendKey);
+        setIsFriend(rel.isFriend);
+        setRequestSent(rel.requestSent);
+      });
       warmFriendsAndConnectionsCache(viewerId).then(() => {
         const warmed = friendProfileCacheByUser[viewerId]?.[friendKey];
         if (warmed) {
           setFriend(warmed);
           setLoading(false);
         }
+        const rel = getCachedFriendRelationship(viewerId, friendKey);
+        setIsFriend(rel.isFriend);
+        setRequestSent(rel.requestSent);
         const warmedMutuals = mutualFriendsCacheByUser[viewerId]?.[friendKey];
         if (warmedMutuals?.length) {
           setMutualFriends(warmedMutuals);
@@ -388,27 +399,39 @@ export default function FriendProfile() {
       const myId = user.uid;
       try {
         const friendSnap = await getDoc(doc(db, "users", myId, "friends", friendKey));
-        setIsFriend(friendSnap.exists());
-        if (!friendSnap.exists()) {
-          const pendingSnap = await getDoc(
-            doc(db, "users", friendKey, "friendRequests", myId)
-          );
-          setRequestSent(pendingSnap.exists());
-        } else {
+        const nextIsFriend = friendSnap.exists();
+        setIsFriend(nextIsFriend);
+        if (nextIsFriend) {
           setRequestSent(false);
+          setCachedOutgoingFriendRequest(myId, friendKey, false);
+          return;
         }
+        const pendingSnap = await getDoc(
+          doc(db, "users", friendKey, "friendRequests", myId)
+        );
+        const nextPending = pendingSnap.exists();
+        setRequestSent(nextPending);
+        setCachedOutgoingFriendRequest(myId, friendKey, nextPending);
       } catch {
-        setIsFriend(false);
-      } finally {
-        setRelationshipResolved(true);
+        /* keep cached relationship state */
       }
     };
     void checkRelationship();
   }, [friendKey]);
 
+  const ambientGlow = (
+    <LinearGradient
+      pointerEvents="none"
+      colors={PROFILE_AMBIENT_GRADIENT}
+      locations={[0, 0.5, 1]}
+      style={styles.ambientGlow}
+    />
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
+        {ambientGlow}
         <View style={styles.center}>
           <ActivityIndicator color={ACCENT} />
         </View>
@@ -419,6 +442,7 @@ export default function FriendProfile() {
   if (!friend) {
     return (
       <SafeAreaView style={styles.safeArea}>
+        {ambientGlow}
         <View style={styles.center}>
           <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
             <Icon name="chevron-back" size={22} color={TEXT} />
@@ -476,6 +500,7 @@ export default function FriendProfile() {
       });
       await batch.commit();
       setRequestSent(true);
+      setCachedOutgoingFriendRequest(user.uid, friendKey, true);
     } catch (e) {
       console.error("Failed to send friend request", e);
     } finally {
@@ -840,6 +865,7 @@ export default function FriendProfile() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {ambientGlow}
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
@@ -896,9 +922,40 @@ export default function FriendProfile() {
           )}
         </View>
 
+        <View style={styles.profileActionWrap}>
+          {userIsBlocked ? (
+            <Text style={styles.blockedHint}>You’ve blocked this user.</Text>
+          ) : isFriend ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.removeFriendBtn}
+              onPress={() => setShowRemoveModal(true)}
+            >
+              <Text style={styles.removeFriendText}>Remove friend</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[synqOutlineAddBtn, requestSent && synqOutlineAddBtnDisabled]}
+              onPress={addFriend}
+              disabled={requestSent || actionLoading}
+            >
+              <Text
+                style={[
+                  synqOutlineAddBtnText,
+                  requestSent && synqOutlineAddBtnTextDisabled,
+                ]}
+              >
+                {requestSent ? "Pending" : actionLoading ? "Sending..." : "Add friend"}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {mutualFriends.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Mutual Friends</Text>
+          <>
+          <View style={[styles.section, styles.sectionAfterAction]}>
+            <Text style={styles.profileSectionLabel}>Mutual friends</Text>
 
             <ScrollView
               horizontal
@@ -957,10 +1014,17 @@ export default function FriendProfile() {
               })}
             </ScrollView>
           </View>
+          <View style={styles.profileSeparator} />
+          </>
         )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Interests</Text>
+        <View
+          style={[
+            styles.section,
+            mutualFriends.length === 0 && styles.sectionAfterAction,
+          ]}
+        >
+          <Text style={styles.profileSectionLabel}>Interests</Text>
           <View style={styles.interestsWrapper}>
             {friend.interests?.length ? (
               friend.interests.map((interest: string, i: number) => (
@@ -975,7 +1039,10 @@ export default function FriendProfile() {
             )}
           </View>
         </View>
+
         {showFriendOpenPlansSection ? (
+          <>
+          <View style={styles.profileSeparator} />
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, styles.openPlansTitle]}>Open plans</Text>
             <Text style={styles.openPlansSubtitle}>
@@ -995,34 +1062,8 @@ export default function FriendProfile() {
               profileFallbackFirstName={friend.displayName?.split(" ")[0] || "Friend"}
             />
           </View>
+          </>
         ) : null}
-
-        <View style={styles.footerActions}>
-          {!relationshipResolved ? (
-            <ActivityIndicator color={ACCENT} size="small" />
-          ) : userIsBlocked ? (
-            <Text style={styles.blockedHint}>You’ve blocked this user.</Text>
-          ) : isFriend ? (
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={styles.removeFriendBtn}
-              onPress={() => setShowRemoveModal(true)}
-            >
-              <Text style={styles.removeFriendText}>Remove friend</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.addFriendBtn, requestSent && styles.addFriendBtnDisabled]}
-              onPress={addFriend}
-              disabled={requestSent || actionLoading}
-            >
-              <Text style={styles.addFriendText}>
-                {requestSent ? "Pending" : actionLoading ? "Sending..." : "Add Friend"}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
       </ScrollView>
       <Modal visible={showOptionsSheet} transparent animationType="fade">
         <View style={styles.optionsOverlay}>
@@ -1184,10 +1225,27 @@ export default function FriendProfile() {
 
 }
 
+const PROFILE_SURFACE = "#0A0B0D";
+const PROFILE_SURFACE_RAISED = "#0E1012";
+const PROFILE_BORDER = "rgba(255,255,255,0.035)";
+const PROFILE_AMBIENT_GRADIENT = [
+  "rgba(0,255,133,0.03)",
+  "rgba(0,255,133,0.008)",
+  "transparent",
+] as const;
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BG },
+  ambientGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 200,
+    zIndex: 0,
+  },
   container: { flex: 1, paddingHorizontal: 20 },
-  scrollContent: { paddingBottom: 20 },
+  scrollContent: { paddingBottom: 36 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyProfileText: {
     color: MUTED2,
@@ -1210,9 +1268,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
+    backgroundColor: PROFILE_SURFACE,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PROFILE_BORDER,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1221,21 +1279,22 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
+    backgroundColor: PROFILE_SURFACE,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PROFILE_BORDER,
     justifyContent: "center",
     alignItems: "center",
   },
 
   header: { alignItems: "center", marginTop: 4 },
   avatarGlowWrap: {
-    borderRadius: 84,
+    borderRadius: 80,
+    marginBottom: 16,
     shadowColor: ACCENT,
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.22,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 7,
+    elevation: 6,
   },
 
   avatar: {
@@ -1244,7 +1303,6 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     borderWidth: 2,
     borderColor: ACCENT,
-    marginBottom: 16,
   },
   avatarPreviewOverlay: {
     flex: 1,
@@ -1300,14 +1358,44 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  section: { marginTop: 18 },
+  section: {
+    marginTop: 0,
+    paddingTop: 0,
+  },
+
+  sectionAfterAction: {
+    marginTop: 20,
+  },
+
+  profileActionWrap: {
+    width: "100%",
+    marginTop: 22,
+    marginBottom: 4,
+    alignItems: "center",
+  },
+
+  profileSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginVertical: 22,
+  },
+
+  profileSectionLabel: {
+    color: TEXT,
+    fontSize: 18,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.05,
+    lineHeight: 24,
+    marginBottom: 12,
+    includeFontPadding: false,
+  },
 
   sectionTitle: {
-    color: TEXT,
-    fontSize: 17,
+    color: "rgba(255,255,255,0.94)",
+    fontSize: TYPE_SECTION,
     fontFamily: fonts.heavy,
     letterSpacing: 0.15,
-    lineHeight: 22,
+    lineHeight: 26,
     marginBottom: 10,
     includeFontPadding: false,
   },
@@ -1319,12 +1407,11 @@ const styles = StyleSheet.create({
   openPlansSubtitle: {
     color: MUTED2,
     fontSize: 13,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.book,
     lineHeight: 18,
     marginBottom: 14,
     paddingRight: 8,
   },
-  footerActions: { marginTop: 20, marginBottom: 24, alignItems: "center" },
 
   blockedHint: {
     color: MUTED2,
@@ -1336,17 +1423,17 @@ const styles = StyleSheet.create({
   optionsOverlay: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.78)",
   },
   optionsSheetGroup: {
-    paddingHorizontal: 12,
     paddingBottom: 34,
   },
   optionsSheet: {
-    backgroundColor: "#161616",
-    borderRadius: MODAL_RADIUS,
-    borderWidth: 1,
-    borderColor: BORDER,
+    backgroundColor: BG,
+    borderTopLeftRadius: MODAL_RADIUS,
+    borderTopRightRadius: MODAL_RADIUS,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.06)",
     overflow: "hidden",
   },
   optionsRow: {
@@ -1366,15 +1453,16 @@ const styles = StyleSheet.create({
   },
   optionsDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: BORDER,
+    backgroundColor: "rgba(255,255,255,0.06)",
     marginLeft: 54,
   },
   optionsCancel: {
     marginTop: 10,
-    backgroundColor: "#161616",
-    borderRadius: MODAL_RADIUS,
-    borderWidth: 1,
-    borderColor: BORDER,
+    marginHorizontal: 12,
+    backgroundColor: PROFILE_SURFACE,
+    borderRadius: RADIUS_MD,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PROFILE_BORDER,
     paddingVertical: 16,
     alignItems: "center",
   },
@@ -1395,19 +1483,21 @@ const styles = StyleSheet.create({
   },
 
   imageCircle: {
-    width: 55,
-    height: 55,
-    borderRadius: 50,
-    borderWidth: 2,
-    borderColor: BORDER,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.1)",
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
+    backgroundColor: PROFILE_SURFACE,
   },
 
   connImg: {
-    width: 55,
-    height: 55,
-    borderRadius: 50,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
 
   connName: {
@@ -1422,21 +1512,20 @@ const styles = StyleSheet.create({
   interestsWrapper: {
     flexDirection: "row",
     flexWrap: "wrap",
+    gap: 8,
   },
 
   pill: {
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
+    backgroundColor: PROFILE_SURFACE,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.06)",
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginRight: 8,
-    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
   pillText: {
-    color: TEXT,
-    fontSize: 13,
+    color: "rgba(255,255,255,0.88)",
+    fontSize: 14,
     fontFamily: fonts.book,
   },
   emptyText: {
@@ -1446,14 +1535,15 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   removeFriendBtn: {
-    borderWidth: 1,
-    borderColor: "#ff453a",
+    alignSelf: "center",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,69,58,0.45)",
     borderRadius: BUTTON_RADIUS,
-    paddingVertical: 14,
-    paddingHorizontal: 42,
+    paddingVertical: 13,
+    paddingHorizontal: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,69,58,0.08)",
+    backgroundColor: "transparent",
   },
 
   removeFriendText: {
@@ -1461,29 +1551,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     fontSize: 15,
   },
-  addFriendBtn: {
-    borderWidth: 1,
-    borderColor: ACCENT,
-    borderRadius: BUTTON_RADIUS,
-    paddingVertical: 14,
-    paddingHorizontal: 42,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(125,255,166,0.08)",
-  },
-  addFriendBtnDisabled: {
-    opacity: 0.55,
-  },
-  addFriendText: {
-    color: ACCENT,
-    fontFamily: fonts.heavy,
-    fontSize: 15,
-  },
   memoCard: {
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: MODAL_RADIUS - 4,
+    backgroundColor: PROFILE_SURFACE_RAISED,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PROFILE_BORDER,
+    borderRadius: RADIUS_MD,
     padding: 16,
   },
 
