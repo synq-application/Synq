@@ -48,6 +48,8 @@ import {
 import {
   friendProfileCacheByUser,
   friendRelationCacheByUser,
+  friendsListCacheByUser,
+  mutualFriendsCacheByUser,
   warmFriendsAndConnectionsCache,
 } from "../src/lib/socialCache";
 import AlertModal from "./alert-modal";
@@ -59,16 +61,24 @@ import { formatLastSynq, resolveAvatar } from "./helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
 
 export default function FriendProfile() {
-  const { friendId } = useLocalSearchParams<{
+  const { friendId, from } = useLocalSearchParams<{
     friendId?: string;
+    from?: string;
   }>();
   const router = useRouter();
 
   const goBackOrHome = () => {
+    if (from === "add-friends") {
+      router.replace({
+        pathname: "/(tabs)/friends",
+        params: { openAddFriends: "1" },
+      });
+      return;
+    }
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)/friends");
     }
   };
 
@@ -86,13 +96,23 @@ export default function FriendProfile() {
     viewerId && friendKey
       ? friendRelationCacheByUser[viewerId]?.[friendKey]?.lastSynqAt?.toDate?.() ?? null
       : null;
+  const cachedIsFriend =
+    !!viewerId &&
+    !!friendKey &&
+    ((friendsListCacheByUser[viewerId]?.some((f) => f.id === friendKey) ?? false) ||
+      friendRelationCacheByUser[viewerId]?.[friendKey] != null);
+  const cachedMutualFriends =
+    viewerId && friendKey
+      ? mutualFriendsCacheByUser[viewerId]?.[friendKey] ?? []
+      : [];
 
   const [friend, setFriend] = useState<any>(cachedFriend);
-  const [mutualFriends, setMutualFriends] = useState<any[]>([]);
+  const [mutualFriends, setMutualFriends] = useState<any[]>(cachedMutualFriends);
   const [lastSynq, setLastSynq] = useState<Date | null>(cachedLastSynq);
   const [loading, setLoading] = useState(!cachedFriend);
-  const [isFriend, setIsFriend] = useState(false);
+  const [isFriend, setIsFriend] = useState(cachedIsFriend);
   const [requestSent, setRequestSent] = useState(false);
+  const [relationshipResolved, setRelationshipResolved] = useState(cachedIsFriend);
   const [actionLoading, setActionLoading] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [joinedPlanKeys, setJoinedPlanKeys] = useState<Record<string, boolean>>({});
@@ -197,6 +217,10 @@ export default function FriendProfile() {
           setFriend(warmed);
           setLoading(false);
         }
+        const warmedMutuals = mutualFriendsCacheByUser[viewerId]?.[friendKey];
+        if (warmedMutuals?.length) {
+          setMutualFriends(warmedMutuals);
+        }
       });
     }
 
@@ -261,37 +285,81 @@ export default function FriendProfile() {
   }, [friendKey, friend?.events, friend?.displayName]);
 
   useEffect(() => {
+    if (!viewerId || !friendKey) return;
+    setMutualFriends(mutualFriendsCacheByUser[viewerId]?.[friendKey] ?? []);
+  }, [viewerId, friendKey]);
+
+  useEffect(() => {
     const user = auth.currentUser;
     if (!friendId || !user) return;
 
+    const myId = user.uid;
+    const targetId = friendId as string;
+    const mutualCache = mutualFriendsCacheByUser[myId];
+    if (mutualCache && Object.prototype.hasOwnProperty.call(mutualCache, targetId)) {
+      setMutualFriends(mutualCache[targetId]);
+      return;
+    }
+
     const fetchMutuals = async () => {
-      const myId = user.uid;
+      try {
+        const profileCache = friendProfileCacheByUser[myId] ?? {};
+        const myFriendIds = (
+          friendsListCacheByUser[myId]?.map((f) => f.id) ??
+          (
+            await getDocs(collection(db, "users", myId, "friends"))
+          ).docs.map((d) => d.id)
+        ).filter((id) => id !== targetId);
 
-      const myFriendsSnap = await getDocs(
-        collection(db, "users", myId, "friends")
-      );
-      const myFriendIds = myFriendsSnap.docs.map((d) => d.id);
+        const mutualIds = (
+          await Promise.all(
+            myFriendIds.map(async (fid) => {
+              try {
+                const snap = await getDoc(
+                  doc(db, "users", fid, "friends", targetId)
+                );
+                return snap.exists() ? fid : null;
+              } catch {
+                return null;
+              }
+            })
+          )
+        ).filter(Boolean) as string[];
 
-      const theirFriendsSnap = await getDocs(
-        collection(db, "users", friendId as string, "friends")
-      );
-      const theirFriendIds = theirFriendsSnap.docs.map((d) => d.id);
+        const mutualData = mutualIds
+          .map((id) => {
+            const cachedProfile = profileCache[id];
+            if (cachedProfile) return cachedProfile;
+            return null;
+          })
+          .filter(Boolean) as any[];
 
-      const mutualIds = theirFriendIds.filter((id) =>
-        myFriendIds.includes(id)
-      );
+        const missingIds = mutualIds.filter((id) => !profileCache[id]);
+        if (missingIds.length > 0) {
+          const fetched = await Promise.all(
+            missingIds.map(async (id) => {
+              const snap = await getDoc(doc(db, "users", id));
+              return snap.exists() ? { id, ...snap.data() } : null;
+            })
+          );
+          mutualData.push(...fetched.filter(Boolean));
+        }
 
-      const mutualData = await Promise.all(
-        mutualIds.map(async (id) => {
-          const snap = await getDoc(doc(db, "users", id));
-          return snap.exists() ? { id, ...snap.data() } : null;
-        })
-      );
-
-      setMutualFriends(mutualData.filter(Boolean));
+        const sorted = [...mutualData].sort((a, b) =>
+          (a.displayName || "").localeCompare(b.displayName || "")
+        );
+        if (!mutualFriendsCacheByUser[myId]) {
+          mutualFriendsCacheByUser[myId] = {};
+        }
+        mutualFriendsCacheByUser[myId][targetId] = sorted;
+        setMutualFriends(sorted);
+      } catch (e) {
+        console.error("[FriendProfile] fetchMutuals failed:", e);
+        setMutualFriends([]);
+      }
     };
 
-    fetchMutuals();
+    void fetchMutuals();
   }, [friendId]);
 
   useEffect(() => {
@@ -338,9 +406,11 @@ export default function FriendProfile() {
         }
       } catch {
         setIsFriend(false);
+      } finally {
+        setRelationshipResolved(true);
       }
     };
-    checkRelationship();
+    void checkRelationship();
   }, [friendKey]);
 
   if (loading) {
@@ -853,7 +923,10 @@ export default function FriendProfile() {
                       onPress={() =>
                         router.push({
                           pathname: "/friend-profile",
-                          params: { friendId: item.id },
+                          params: {
+                            friendId: item.id,
+                            ...(from ? { from } : {}),
+                          },
                         })
                       }
                     >
@@ -921,7 +994,9 @@ export default function FriendProfile() {
         ) : null}
 
         <View style={styles.footerActions}>
-          {userIsBlocked ? (
+          {!relationshipResolved ? (
+            <ActivityIndicator color={ACCENT} size="small" />
+          ) : userIsBlocked ? (
             <Text style={styles.blockedHint}>You’ve blocked this user.</Text>
           ) : isFriend ? (
             <TouchableOpacity
@@ -929,7 +1004,7 @@ export default function FriendProfile() {
               style={styles.removeFriendBtn}
               onPress={() => setShowRemoveModal(true)}
             >
-              <Text style={styles.removeFriendText}>Remove Friend</Text>
+              <Text style={styles.removeFriendText}>Remove friend</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity

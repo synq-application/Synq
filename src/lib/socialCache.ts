@@ -18,6 +18,8 @@ export const friendRelationCacheByUser: Record<string, Record<string, { synqCoun
 export const connectionsCacheByUser: Record<string, Connection[]> = {};
 export const connectionProfileCacheByUser: Record<string, Record<string, Omit<Connection, "synqCount">>> = {};
 export const suggestedCacheByUser: Record<string, any[]> = {};
+/** viewerId -> profileId -> mutual friend profiles (for instant Mutual Friends UI). */
+export const mutualFriendsCacheByUser: Record<string, Record<string, Friend[]>> = {};
 
 const warmFriendsInFlight: Record<string, Promise<void> | undefined> = {};
 const warmSuggestedInFlight: Record<string, Promise<void> | undefined> = {};
@@ -43,6 +45,7 @@ type PersistedSocialCache = {
   connections: Connection[];
   connectionProfiles: Record<string, Omit<Connection, "synqCount">>;
   suggested: any[];
+  mutualFriends: Record<string, Friend[]>;
 };
 
 export function pruneSocialCachesToFriendIds(userId: string, friendIds: Set<string>) {
@@ -69,7 +72,52 @@ export function pruneSocialCachesToFriendIds(userId: string, friendIds: Set<stri
     connectionsCacheByUser[userId] = conns.filter((c) => friendIds.has(c.id));
   }
 
+  const mutuals = mutualFriendsCacheByUser[userId];
+  if (mutuals) {
+    Object.keys(mutuals).forEach((targetId) => {
+      if (!friendIds.has(targetId)) delete mutuals[targetId];
+    });
+  }
+
   void persistSocialCache(userId);
+}
+
+async function buildMutualFriendsIndex(
+  myFriendIds: string[],
+  profileCache: Record<string, Friend>
+): Promise<Record<string, Friend[]>> {
+  const myFriendSet = new Set(myFriendIds);
+  const byTarget = new Map<string, Map<string, Friend>>();
+
+  await Promise.all(
+    myFriendIds.map(async (fid) => {
+      const mutualProfile = profileCache[fid];
+      if (!mutualProfile) return;
+      try {
+        const theirFriendsSnap = await getDocs(
+          collection(db, "users", fid, "friends")
+        );
+        theirFriendsSnap.docs.forEach((d) => {
+          const targetId = d.id;
+          if (targetId === fid || !myFriendSet.has(targetId)) return;
+          let bucket = byTarget.get(targetId);
+          if (!bucket) {
+            bucket = new Map();
+            byTarget.set(targetId, bucket);
+          }
+          bucket.set(fid, mutualProfile);
+        });
+      } catch {
+        /* skip unreadable list */
+      }
+    })
+  );
+
+  const index: Record<string, Friend[]> = {};
+  byTarget.forEach((bucket, targetId) => {
+    index[targetId] = sortFriendsByName([...bucket.values()]);
+  });
+  return index;
 }
 
 async function persistSocialCache(userId: string) {
@@ -80,6 +128,7 @@ async function persistSocialCache(userId: string) {
     connections: connectionsCacheByUser[userId] ?? [],
     connectionProfiles: connectionProfileCacheByUser[userId] ?? {},
     suggested: suggestedCacheByUser[userId] ?? [],
+    mutualFriends: mutualFriendsCacheByUser[userId] ?? {},
   };
   try {
     await AsyncStorage.setItem(socialCacheKey(userId), JSON.stringify(payload));
@@ -104,6 +153,7 @@ export async function hydrateSocialCachesFromDisk(userId: string): Promise<void>
       connectionsCacheByUser[userId] = parsed.connections ?? [];
       connectionProfileCacheByUser[userId] = parsed.connectionProfiles ?? {};
       suggestedCacheByUser[userId] = parsed.suggested ?? [];
+      mutualFriendsCacheByUser[userId] = parsed.mutualFriends ?? {};
 
       Object.values(friendProfileCacheByUser[userId]).forEach((friend: any) => {
         prefetchImage(friend?.imageurl);
@@ -207,6 +257,10 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
 
     friendsListCacheByUser[userId] = sortedFriends;
     connectionsCacheByUser[userId] = connections;
+    mutualFriendsCacheByUser[userId] = await buildMutualFriendsIndex(
+      sortedFriends.map((f) => f.id),
+      profileCache
+    );
     await persistSocialCache(userId);
   })();
 
