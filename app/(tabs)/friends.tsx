@@ -36,9 +36,7 @@ import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   useLocalSearchParams,
-  usePathname,
   useRouter,
-  useSegments,
 } from "expo-router";
 import {
   collection,
@@ -54,12 +52,14 @@ import {
   where,
   writeBatch
 } from "firebase/firestore";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   DeviceEventEmitter,
   Dimensions,
   FlatList,
+  Platform,
   Keyboard,
   Modal,
   Pressable,
@@ -71,6 +71,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  type LayoutChangeEvent,
   type ViewStyle,
 } from "react-native";
 import Animated, {
@@ -78,11 +79,13 @@ import Animated, {
   Easing,
   FadeIn,
   FadeInDown,
+  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withRepeat,
   withSequence,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -318,8 +321,6 @@ function FriendsListEmpty({
 
 export default function FriendsScreen() {
   const router = useRouter();
-  const pathname = usePathname();
-  const segments = useSegments();
   const isFriendsTabFocused = useIsFocused();
   const { openAddFriends } = useLocalSearchParams<{ openAddFriends?: string }>();
   const myId = auth.currentUser?.uid ?? "";
@@ -329,9 +330,6 @@ export default function FriendsScreen() {
   const [topSynqs, setTopSynqs] = useState<Connection[]>(cachedTopSynqs);
   const [hasLoadedTopSynqs, setHasLoadedTopSynqs] = useState(cachedTopSynqs.length > 0);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
-  const [addFriendsModalAnimation, setAddFriendsModalAnimation] = useState<
-    "slide" | "none"
-  >("slide");
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [searchText, setSearchText] = useState("");
   const [sortMode, setSortMode] = useState<FriendsSortMode>("alphabetical");
@@ -341,22 +339,20 @@ export default function FriendsScreen() {
   const [friendDistancesKm, setFriendDistancesKm] = useState<Record<string, number>>({});
   const [distanceSortReady, setDistanceSortReady] = useState(sortMode !== "distance");
 
-  const routeShowsFriendProfile =
-    (pathname ?? "").includes("friend-profile") ||
-    segments.some((s) => typeof s === "string" && s.includes("friend-profile"));
-  const showAddFriendsModal =
-    searchModalVisible && isFriendsTabFocused && !routeShowsFriendProfile;
+  const showAddFriendsModal = searchModalVisible;
+
+  const closeAddFriendsModal = useCallback(() => {
+    setSearchModalVisible(false);
+  }, []);
 
   useEffect(() => {
     if (openAddFriends !== "1") return;
-    setAddFriendsModalAnimation("none");
     setSearchModalVisible(true);
   }, [openAddFriends]);
 
   const openFriendProfileFromAddFriends = useCallback(
     (friendId: string) => {
-      setAddFriendsModalAnimation("none");
-      setSearchModalVisible(true);
+      Keyboard.dismiss();
       router.push({
         pathname: "/friend-profile",
         params: { friendId, from: "add-friends" },
@@ -366,7 +362,6 @@ export default function FriendsScreen() {
   );
 
   const openAddFriendsModal = useCallback(() => {
-    setAddFriendsModalAnimation("slide");
     setSearchModalVisible(true);
   }, []);
 
@@ -728,6 +723,7 @@ export default function FriendsScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={styles.screenRoot}>
       <View style={styles.container}>
         <LinearGradient
           pointerEvents="none"
@@ -789,18 +785,19 @@ export default function FriendsScreen() {
           }
         />
       )}
-        <SearchModal
-          visible={showAddFriendsModal}
-          animationType={addFriendsModalAnimation}
-          onClose={() => setSearchModalVisible(false)}
-          onOpenProfile={openFriendProfileFromAddFriends}
-          currentFriends={friends.map((f) => f.id)}
-        />
         <FriendsSortMenu
           visible={sortMenuVisible}
           sortMode={sortMode}
           onSelect={setSortMode}
           onClose={() => setSortMenuVisible(false)}
+        />
+      </View>
+        <SearchModal
+          visible={showAddFriendsModal}
+          hardwareBackEnabled={isFriendsTabFocused}
+          onClose={closeAddFriendsModal}
+          onOpenProfile={openFriendProfileFromAddFriends}
+          currentFriends={friends.map((f) => f.id)}
         />
       </View>
     </TouchableWithoutFeedback>
@@ -825,7 +822,7 @@ function AddFriendsSectionHeader({
         isFirst && styles.addFriendsSectionHeaderFirst,
       ]}
     >
-      <Text style={styles.listSectionLabel}>{title}</Text>
+      <Text style={styles.addFriendsSectionLabel}>{title}</Text>
       {showCount && count > 0 ? (
         <View style={styles.friendCountPill}>
           <Text style={styles.friendCountPillText}>{count}</Text>
@@ -885,20 +882,85 @@ function AddFriendsUserRow({
   );
 }
 
+const ADD_FRIENDS_SHEET_SPRING = { damping: 30, stiffness: 300, mass: 0.95 };
+const ADD_FRIENDS_SHEET_CLOSE_MS = 380;
+
 function SearchModal({
   visible,
+  hardwareBackEnabled,
   onClose,
   onOpenProfile,
-  animationType = "slide",
   currentFriends,
 }: {
   visible: boolean;
+  hardwareBackEnabled: boolean;
   onClose: () => void;
   onOpenProfile: (friendId: string) => void;
-  animationType?: "slide" | "none";
   currentFriends: string[];
 }) {
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
+  const translateY = useSharedValue(9999);
+  const sheetHeightRef = useRef(0);
+  const [mounted, setMounted] = useState(visible);
+  const sheetAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+  const listBottomInset = insets.bottom + (Platform.OS === "ios" ? 12 : 20);
+
+  const openSheet = useCallback(() => {
+    cancelAnimation(translateY);
+    if (reducedMotion) {
+      translateY.value = 0;
+    } else {
+      translateY.value = withSpring(0, ADD_FRIENDS_SHEET_SPRING);
+    }
+  }, [reducedMotion, translateY]);
+
+  const onSheetLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const h = e.nativeEvent.layout.height;
+      if (h <= 0) return;
+      const prev = sheetHeightRef.current;
+      sheetHeightRef.current = h;
+      if (!visible) {
+        translateY.value = h;
+        return;
+      }
+      if (prev <= 0) {
+        translateY.value = h;
+        openSheet();
+      }
+    },
+    [visible, openSheet, translateY]
+  );
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      if (sheetHeightRef.current > 0) openSheet();
+      return;
+    }
+    if (!mounted) return;
+    const h = sheetHeightRef.current;
+    if (h <= 0) {
+      setMounted(false);
+      return;
+    }
+    cancelAnimation(translateY);
+    if (reducedMotion) {
+      translateY.value = h;
+      setMounted(false);
+      return;
+    }
+    translateY.value = withTiming(
+      h,
+      { duration: ADD_FRIENDS_SHEET_CLOSE_MS, easing: Easing.inOut(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(setMounted)(false);
+      }
+    );
+  }, [visible, mounted, reducedMotion, openSheet, translateY]);
   const [queryText, setQueryText] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [suggested, setSuggested] = useState<any[]>([]);
@@ -922,6 +984,15 @@ function SearchModal({
         : 0;
     return `${mutualCount} mutual ${mutualCount === 1 ? "friend" : "friends"}`;
   };
+
+  useEffect(() => {
+    if (!visible || !mounted || !hardwareBackEnabled) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, mounted, hardwareBackEnabled, onClose]);
 
   useEffect(() => {
     if (!visible) {
@@ -1494,9 +1565,28 @@ function SearchModal({
     }
   };
 
-  const openProfile = (friendId: string) => {
+  const seedProfileCache = (user: { id: string; [key: string]: unknown }) => {
+    const myId = auth.currentUser?.uid;
+    if (!myId || !user?.id) return;
+    if (!friendProfileCacheByUser[myId]) {
+      friendProfileCacheByUser[myId] = {};
+    }
+    friendProfileCacheByUser[myId][user.id] = {
+      id: user.id,
+      displayName: user.displayName,
+      imageurl: user.imageurl,
+      city: user.city,
+      state: user.state,
+      interests: user.interests,
+      events: user.events,
+      location: user.location,
+    } as any;
+  };
+
+  const openProfile = (user: { id: string; [key: string]: unknown }) => {
     Keyboard.dismiss();
-    onOpenProfile(friendId);
+    seedProfileCache(user);
+    onOpenProfile(user.id);
   };
 
   const renderAddActionButton = (
@@ -1582,7 +1672,7 @@ function SearchModal({
           item={item}
           subtitle="Sent you a request"
           subtitleAccent
-          onPressProfile={() => openProfile(item.id)}
+          onPressProfile={() => openProfile(item)}
           cardStyle={styles.addFriendCardIncoming}
           trailing={
             <View style={styles.addFriendRequestActions}>
@@ -1607,7 +1697,7 @@ function SearchModal({
         <AddFriendsUserRow
           item={item}
           subtitle="Request sent"
-          onPressProfile={() => openProfile(item.id)}
+          onPressProfile={() => openProfile(item)}
           trailing={renderAddActionButton(item, "Pending", {
             disabled: true,
             onLongPress: () => handlePendingLongPress(item),
@@ -1623,7 +1713,7 @@ function SearchModal({
       <AddFriendsUserRow
         item={item}
         subtitle={`${mutualCount} mutual ${mutualCount === 1 ? "friend" : "friends"}`}
-        onPressProfile={() => openProfile(item.id)}
+        onPressProfile={() => openProfile(item)}
         trailing={renderSuggestedActions(item)}
       />
     );
@@ -1631,12 +1721,19 @@ function SearchModal({
 
   const addFriendsListEmpty = !queryText && addFriendsSections.length === 0;
 
+  if (!mounted) return null;
+
   return (
-    <Modal
-      visible={visible}
-      animationType={animationType}
-      presentationStyle="pageSheet"
-    >
+    <>
+      <View
+        style={styles.addFriendsOverlay}
+        pointerEvents={visible ? "auto" : "none"}
+        accessibilityViewIsModal
+      >
+        <Animated.View
+          onLayout={onSheetLayout}
+          style={[styles.addFriendsSheet, sheetAnimatedStyle]}
+        >
       <View style={styles.modalBody}>
         <LinearGradient
           pointerEvents="none"
@@ -1646,12 +1743,7 @@ function SearchModal({
         />
         <StatusBar barStyle="light-content" />
 
-        <View
-          style={[
-            styles.addFriendsHeader,
-            { paddingTop: Math.max(insets.top, 12) + 8 },
-          ]}
-        >
+        <View style={styles.addFriendsHeader}>
           <Text style={styles.addFriendsTitle}>Add friends</Text>
           <TouchableOpacity
             onPress={onClose}
@@ -1707,8 +1799,11 @@ function SearchModal({
                 keyboardDismissMode="on-drag"
                 onScrollBeginDrag={Keyboard.dismiss}
                 stickySectionHeadersEnabled={false}
-                contentContainerStyle={styles.addFriendsListContent}
-                ListFooterComponent={<View style={{ height: 24 }} />}
+                contentContainerStyle={[
+                  styles.addFriendsListContent,
+                  { paddingBottom: listBottomInset },
+                ]}
+                ListFooterComponent={<View style={{ height: 8 }} />}
                 SectionSeparatorComponent={() => <View style={styles.addFriendsSectionGap} />}
                 renderSectionHeader={({ section }) => (
                   <AddFriendsSectionHeader
@@ -1734,9 +1829,10 @@ function SearchModal({
               keyboardDismissMode="on-drag"
               contentContainerStyle={[
                 styles.addFriendsListContent,
+                { paddingBottom: listBottomInset },
                 results.length === 0 && styles.addFriendsListContentEmpty,
               ]}
-              ListFooterComponent={<View style={{ height: 24 }} />}
+              ListFooterComponent={<View style={{ height: 8 }} />}
               ItemSeparatorComponent={() => <View style={styles.addFriendsItemGap} />}
               ListEmptyComponent={
                 isSearching ? (
@@ -1756,13 +1852,15 @@ function SearchModal({
                 <AddFriendsUserRow
                   item={item}
                   subtitle={getResultSubtitle(item)}
-                  onPressProfile={() => openProfile(item.id)}
+                  onPressProfile={() => openProfile(item)}
                   trailing={renderSearchResultActions(item)}
                 />
               )}
             />
           </View>
         )}
+      </View>
+        </Animated.View>
       </View>
       <ConfirmModal
         visible={pendingCancelTarget != null}
@@ -1786,11 +1884,35 @@ function SearchModal({
         message={alertConfig?.message || ""}
         onClose={() => setAlertVisible(false)}
       />
-    </Modal>
+    </>
   );
 }
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
+  screenRoot: { flex: 1, backgroundColor: BG },
+  container: {
+    flex: 1,
+    backgroundColor: BG,
+    paddingHorizontal: 20,
+  },
+  addFriendsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "flex-end",
+    zIndex: 100,
+    elevation: 100,
+  },
+  addFriendsSheet: {
+    width: "100%",
+    height: "94%",
+    backgroundColor: BG,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -6 },
+    elevation: 24,
+  },
   ambientGlow: {
     position: "absolute",
     top: 0,
@@ -2248,7 +2370,12 @@ const styles = StyleSheet.create({
   },
   removeBtn: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12 },
   removeBtnText: { color: "#ff453a", fontFamily: fonts.heavy, fontSize: 14 },
-  modalBody: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
+  modalBody: {
+    flex: 1,
+    backgroundColor: BG,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
   modalAmbientGlow: {
     position: "absolute",
     top: 0,
@@ -2261,6 +2388,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     minHeight: 44,
+    paddingTop: 40,
     marginBottom: 4,
   },
   addFriendsTitle: {
@@ -2285,13 +2413,21 @@ const styles = StyleSheet.create({
   addFriendsListWrap: { flex: 1 },
   addFriendsListContent: { paddingBottom: 32 },
   addFriendsListContentEmpty: { flexGrow: 1 },
+  addFriendsSectionLabel: {
+    color: MUTED2,
+    fontSize: 15,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.2,
+    lineHeight: 20,
+    includeFontPadding: false,
+  },
   addFriendsSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 20,
     marginBottom: 12,
-    minHeight: 28,
+    minHeight: 24,
   },
   addFriendsSectionHeaderFirst: {
     marginTop: 4,

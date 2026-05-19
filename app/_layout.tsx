@@ -654,6 +654,13 @@ export default function RootLayout() {
                 <Stack.Screen name="(auth)" />
                 <Stack.Screen name="location" />
                 <Stack.Screen name="(tabs)" />
+                <Stack.Screen
+                  name="friend-profile"
+                  options={{
+                    animation: "slide_from_right",
+                    gestureEnabled: true,
+                  }}
+                />
               </Stack>
             )}
             {locationModals}

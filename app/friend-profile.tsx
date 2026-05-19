@@ -68,18 +68,11 @@ export default function FriendProfile() {
   const router = useRouter();
 
   const goBackOrHome = () => {
-    if (from === "add-friends") {
-      router.replace({
-        pathname: "/(tabs)/friends",
-        params: { openAddFriends: "1" },
-      });
-      return;
-    }
     if (router.canGoBack()) {
       router.back();
-    } else {
-      router.replace("/(tabs)/friends");
+      return;
     }
+    router.replace("/(tabs)/friends");
   };
 
   const handleBack = () => {
@@ -423,7 +416,18 @@ export default function FriendProfile() {
     );
   }
 
-  if (!friend) return null;
+  if (!friend) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.center}>
+          <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
+            <Icon name="chevron-back" size={22} color={TEXT} />
+          </TouchableOpacity>
+          <Text style={styles.emptyProfileText}>Could not load this profile.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const city = friend.city?.trim();
   const state = friend.state?.trim();
@@ -1185,6 +1189,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20 },
   scrollContent: { paddingBottom: 20 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  emptyProfileText: {
+    color: MUTED2,
+    fontFamily: fonts.book,
+    fontSize: 15,
+    marginTop: 24,
+    textAlign: "center",
+    paddingHorizontal: 24,
+  },
 
   topBar: {
     marginTop: 4,
@@ -1261,8 +1273,10 @@ const styles = StyleSheet.create({
 
   name: {
     color: TEXT,
-    fontSize: 26,
+    fontSize: 24,
+    lineHeight: 30,
     fontFamily: fonts.heavy,
+    includeFontPadding: false,
   },
 
   locationRow: {
@@ -1275,7 +1289,8 @@ const styles = StyleSheet.create({
     color: MUTED2,
     marginLeft: 4,
     fontFamily: fonts.book,
-    fontSize: 16,
+    fontSize: 15,
+    lineHeight: 20,
   },
 
   lastSynqText: {
@@ -1289,9 +1304,12 @@ const styles = StyleSheet.create({
 
   sectionTitle: {
     color: TEXT,
-    fontSize: 20,
+    fontSize: 17,
     fontFamily: fonts.heavy,
+    letterSpacing: 0.15,
+    lineHeight: 22,
     marginBottom: 10,
+    includeFontPadding: false,
   },
 
   openPlansTitle: {
@@ -1340,7 +1358,7 @@ const styles = StyleSheet.create({
   },
   optionsRowText: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: fonts.medium,
   },
   optionsDestructive: {
@@ -1362,7 +1380,7 @@ const styles = StyleSheet.create({
   },
   optionsCancelText: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: fonts.heavy,
   },
 
@@ -1395,9 +1413,10 @@ const styles = StyleSheet.create({
   connName: {
     color: TEXT,
     fontSize: 14,
-    marginTop: 10,
+    marginTop: 8,
     textAlign: "center",
-    fontFamily: fonts.heavy,
+    fontFamily: fonts.medium,
+    lineHeight: 18,
   },
 
   interestsWrapper: {
@@ -1422,6 +1441,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: MUTED2,
+    fontSize: 13,
+    fontFamily: fonts.book,
     fontStyle: "italic",
   },
   removeFriendBtn: {
