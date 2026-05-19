@@ -19,7 +19,7 @@ import {
   where
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import React, { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   Animated,
   DeviceEventEmitter,
@@ -66,6 +66,10 @@ import {
   synqStatusStorageKey,
 } from "../../src/lib/synqSession";
 import ConfirmModal from '../confirm-modal';
+import AlertModal from '../alert-modal';
+import { filterOrReject } from '@/src/lib/contentFilter';
+import { useBlockedUsers } from '@/src/lib/blockedUsers';
+import ReportModal from '../report-modal';
 import ExploreModal from '../explore-modal';
 import {
   resolveAvatar,
@@ -256,7 +260,59 @@ export default function SynqScreen() {
   const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
   const [isStartingSynq, setIsStartingSynq] = useState(false);
+  const [contentAlertVisible, setContentAlertVisible] = useState(false);
+  const [contentAlertMessage, setContentAlertMessage] = useState("");
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    reportedUserId: string;
+    messageId: string;
+    chatId: string;
+  } | null>(null);
+  const { isBlocked } = useBlockedUsers();
   const activePulseOpacity = useRef(new Animated.Value(1)).current;
+
+  const visibleChats = useMemo(() => {
+    const myId = auth.currentUser?.uid;
+    if (!myId) return allChats;
+    return allChats.filter(
+      (c) =>
+        !(c.participants || []).some(
+          (p: string) => p && p !== myId && isBlocked(p)
+        )
+    );
+  }, [allChats, isBlocked]);
+
+  const visibleAvailableFriends = useMemo(
+    () => availableFriends.filter((f) => !isBlocked(f.id)),
+    [availableFriends, isBlocked]
+  );
+
+  useEffect(() => {
+    if (!activeChatId || !auth.currentUser?.uid) return;
+    const chat = allChats.find((c) => c.id === activeChatId);
+    const myId = auth.currentUser.uid;
+    if (
+      chat &&
+      (chat.participants || []).some(
+        (p: string) => p && p !== myId && isBlocked(p)
+      )
+    ) {
+      setActiveChatId(null);
+      setMessages([]);
+      setMessagesPane("inbox");
+      setPendingNewChat(null);
+    }
+  }, [activeChatId, allChats, isBlocked]);
+
+  const rejectIfObjectionable = (text: string): boolean => {
+    const result = filterOrReject(text);
+    if (!result.ok) {
+      setContentAlertMessage(result.reason);
+      setContentAlertVisible(true);
+      return true;
+    }
+    return false;
+  };
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
@@ -696,7 +752,7 @@ export default function SynqScreen() {
       const getSuggestions = httpsCallable(functions, 'getSynqSuggestions');
       const currentChat = pendingNewChat
         ? { participants: pendingNewChat.participants }
-        : allChats.find((c) => c.id === activeChatId);
+        : visibleChats.find((c) => c.id === activeChatId);
       if (!currentChat) return;
       const city = userProfile?.city + ' ' + userProfile?.state;
       const friendId = currentChat.participants.find((id: string) => id !== auth.currentUser?.uid);
@@ -736,6 +792,8 @@ export default function SynqScreen() {
     const textToSend = selectedOption
       ? `${selectedOption.name}\n${selectedOption.location}`
       : `✨ Synq AI Suggestion:\n\n${aiResponse}`;
+
+    if (rejectIfObjectionable(textToSend)) return;
 
     try {
       let chatId = activeChatId;
@@ -777,6 +835,7 @@ export default function SynqScreen() {
 
   const startSynq = async () => {
     if (!auth.currentUser || isStartingSynq) return;
+    if (memo.trim() && rejectIfObjectionable(memo)) return;
     Vibration.vibrate(200);
     setIsStartingSynq(true);
     try {
@@ -955,7 +1014,7 @@ export default function SynqScreen() {
         participantNames: pendingNewChat.participantNames,
         participantImages: pendingNewChat.participantImages,
       }
-    : allChats.find((c) => c.id === activeChatId);
+    : visibleChats.find((c) => c.id === activeChatId);
 
   const renderAvatarStack = (images: any) => {
     if (!images) {
@@ -1025,7 +1084,7 @@ export default function SynqScreen() {
             memo={memo}
             hasUnread={hasUnread}
             activePulseOpacity={activePulseOpacity}
-            availableFriends={availableFriends}
+            availableFriends={visibleAvailableFriends}
             selectedFriends={selectedFriends}
             setSelectedFriends={setSelectedFriends}
             handleConnect={handleConnect}
@@ -1070,7 +1129,7 @@ export default function SynqScreen() {
           {messagesPane === "inbox" ? (
             <MessagesInboxPane
               styles={styles}
-              allChats={allChats}
+              allChats={visibleChats}
               currentUserId={auth.currentUser?.uid}
               getChatTitle={getChatTitle}
               renderAvatarStack={renderAvatarStack}
@@ -1143,6 +1202,15 @@ export default function SynqScreen() {
               sendMessage={sendMessage}
               sendAISuggestionToChat={sendAISuggestionToChat}
               onMessageBubblePress={onMessageBubblePress}
+              onMessageLongPress={(item) => {
+                if (item.senderId === auth.currentUser?.uid) return;
+                setReportTarget({
+                  reportedUserId: item.senderId,
+                  messageId: item.id,
+                  chatId: activeChatId || "",
+                });
+                setReportModalVisible(true);
+              }}
               onIdeaBubblePress={onIdeaBubblePress}
               ChatMessageBubble={ChatMessageBubble}
               iMessageBubbleColumnMaxWidth={iMessageBubbleColumnMaxWidth}
@@ -1187,9 +1255,27 @@ export default function SynqScreen() {
           setMemo={setMemo}
           styles={styles}
           onSaveMemo={async () => {
+            if (memo.trim() && rejectIfObjectionable(memo)) return;
             await updateDoc(doc(db, "users", auth.currentUser!.uid), { memo });
             setIsEditModalVisible(false);
           }}
+        />
+        <ReportModal
+          visible={reportModalVisible && !!reportTarget}
+          reportedUserId={reportTarget?.reportedUserId || ""}
+          contentType="message"
+          chatId={reportTarget?.chatId}
+          messageId={reportTarget?.messageId}
+          onClose={() => {
+            setReportModalVisible(false);
+            setReportTarget(null);
+          }}
+        />
+        <AlertModal
+          visible={contentAlertVisible}
+          title="Content not allowed"
+          message={contentAlertMessage}
+          onClose={() => setContentAlertVisible(false)}
         />
         <ConfirmModal
           visible={showEndSynqModal}

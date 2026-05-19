@@ -28,6 +28,7 @@ import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { filterOrReject } from "@/src/lib/contentFilter";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -263,6 +264,15 @@ export default function ProfileScreen() {
     if (!eventToSave.title) {
       showAlert("Missing info", "Add a title");
       return;
+    }
+
+    for (const field of [eventToSave.title, eventToSave.location]) {
+      if (!field) continue;
+      const check = filterOrReject(String(field));
+      if (!check.ok) {
+        showAlert("Content not allowed", check.reason);
+        return;
+      }
     }
 
     const newItem = {
