@@ -7,21 +7,33 @@ import {
   Friend,
   MUTED,
   MUTED2,
+  MUTED3,
+  profileScreenSectionTitle,
+  RADIUS_LG,
+  RADIUS_MD,
   SPACE_3,
   SPACE_4,
   SPACE_5,
   SPACE_6,
-  profileScreenSectionTitle,
   SURFACE,
-  TEXT,
   tabScreenMainHeaderTitle,
+  TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
+  TYPE_SECTION,
 } from "@/constants/Variables";
+import { useBlockedUsers } from "@/src/lib/blockedUsers";
+import {
+  buildFriendDistanceMap,
+  resolveOriginCoords,
+  sortFriendsByDistanceKm,
+  sortFriendsByNameWithNoLocationLast,
+} from "@/src/lib/friendDistance";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   useLocalSearchParams,
   usePathname,
@@ -49,6 +61,7 @@ import {
   FlatList,
   Keyboard,
   Modal,
+  Pressable,
   SectionList,
   StatusBar,
   StyleSheet,
@@ -84,12 +97,20 @@ import {
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
 import { friendLocationLine, resolveAvatar } from "../helpers";
-import { useBlockedUsers } from "@/src/lib/blockedUsers";
 
 const { width } = Dimensions.get("window");
 
+type FriendsSortMode = "alphabetical" | "distance";
+
 const sortFriendsByName = (list: Friend[]) =>
   [...list].sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
+
+function formatMyCityLabel(city: string, state: string): string {
+  if (!city.trim()) return "";
+  const c = city.trim();
+  const s = state.trim();
+  return s ? `${c}, ${s}` : c;
+}
 
 function splitDisplayName(displayName?: string | null) {
   const raw = (displayName || "").trim();
@@ -150,10 +171,62 @@ function FriendsHeaderAddButton({
       accessibilityLabel="Add friends"
       activeOpacity={0.75}
     >
-      <Animated.View style={animatedStyle}>
-        <Icon name="add-circle-outline" size={30} color={TEXT} />
+      <Animated.View style={[animatedStyle, styles.headerAddBtn]}>
+        <Ionicons name="person-add-outline" size={20} color={ACCENT} />
       </Animated.View>
     </TouchableOpacity>
+  );
+}
+
+function FriendsSortMenu({
+  visible,
+  sortMode,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  sortMode: FriendsSortMode;
+  onSelect: (mode: FriendsSortMode) => void;
+  onClose: () => void;
+}) {
+  const options: { mode: FriendsSortMode; label: string; hint: string }[] = [
+    { mode: "alphabetical", label: "Alphabetical", hint: "A → Z by name" },
+    { mode: "distance", label: "Distance", hint: "Nearest first (uses city when needed)" },
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.sortMenuOverlay} onPress={onClose}>
+        <Pressable style={styles.sortMenuCard} onPress={(e) => e.stopPropagation()}>
+          <Text style={styles.sortMenuTitle}>Sort friends</Text>
+          {options.map((option) => {
+            const selected = sortMode === option.mode;
+            return (
+              <TouchableOpacity
+                key={option.mode}
+                style={[styles.sortMenuOption, selected && styles.sortMenuOptionSelected]}
+                onPress={() => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onSelect(option.mode);
+                  onClose();
+                }}
+                activeOpacity={0.75}
+              >
+                <View style={styles.sortMenuOptionText}>
+                  <Text style={styles.sortMenuOptionLabel}>{option.label}</Text>
+                  <Text style={styles.sortMenuOptionHint}>{option.hint}</Text>
+                </View>
+                {selected ? (
+                  <Ionicons name="checkmark" size={18} color={ACCENT} />
+                ) : (
+                  <View style={styles.sortMenuOptionSpacer} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -255,6 +328,12 @@ export default function FriendsScreen() {
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [isFriendsRefreshing, setIsFriendsRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [sortMode, setSortMode] = useState<FriendsSortMode>("alphabetical");
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
+  const [myCoords, setMyCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [myCityLabel, setMyCityLabel] = useState("");
+  const [friendDistancesKm, setFriendDistancesKm] = useState<Record<string, number>>({});
+  const [distanceSortReady, setDistanceSortReady] = useState(sortMode !== "distance");
 
   const routeShowsFriendProfile =
     (pathname ?? "").includes("friend-profile") ||
@@ -275,6 +354,38 @@ export default function FriendsScreen() {
       return () => clearTimeout(t);
     }, [])
   );
+
+  useEffect(() => {
+    if (!myId) return;
+    let cancelled = false;
+    getDoc(doc(db, "users", myId))
+      .then((snap) => {
+        if (cancelled || !snap.exists()) return;
+        const data = snap.data() as {
+          lat?: unknown;
+          lng?: unknown;
+          city?: unknown;
+          state?: unknown;
+          locationDisplay?: unknown;
+        };
+        const lat = typeof data.lat === "number" ? data.lat : null;
+        const lng = typeof data.lng === "number" ? data.lng : null;
+        if (lat != null && lng != null) {
+          setMyCoords({ lat, lng });
+        }
+        const city = typeof data.city === "string" ? data.city : "";
+        const state = typeof data.state === "string" ? data.state : "";
+        const label =
+          typeof data.locationDisplay === "string" && data.locationDisplay.trim()
+            ? data.locationDisplay.trim()
+            : formatMyCityLabel(city, state);
+        if (label) setMyCityLabel(label);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [myId]);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -340,21 +451,58 @@ export default function FriendsScreen() {
 
   const { isBlocked } = useBlockedUsers();
 
-  const filteredFriends = friends.filter((f) => {
-    if (isBlocked(f.id)) return false;
-    return (f.displayName || "")
-      .toLowerCase()
-      .includes(searchText.toLowerCase());
-  });
+  useEffect(() => {
+    if (sortMode !== "distance") {
+      setDistanceSortReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    setDistanceSortReady(false);
+
+    (async () => {
+      const origin = await resolveOriginCoords(myCoords, myCityLabel);
+      if (cancelled) return;
+
+      if (!origin || friends.length === 0) {
+        setFriendDistancesKm({});
+        setDistanceSortReady(true);
+        return;
+      }
+
+      const map = await buildFriendDistanceMap(friends, origin);
+      if (!cancelled) {
+        setFriendDistancesKm(map);
+        setDistanceSortReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sortMode, friends, myCoords, myCityLabel]);
+
+  const displayFriends = useMemo(() => {
+    const filtered = friends.filter((f) => {
+      if (isBlocked(f.id)) return false;
+      return (f.displayName || "")
+        .toLowerCase()
+        .includes(searchText.toLowerCase());
+    });
+    if (sortMode === "distance" && distanceSortReady) {
+      return sortFriendsByDistanceKm(filtered, friendDistancesKm);
+    }
+    return sortFriendsByNameWithNoLocationLast(filtered);
+  }, [friends, searchText, sortMode, distanceSortReady, friendDistancesKm, isBlocked]);
 
   const showFriendSearch = friends.length > 0 && !isFriendsInitialLoading;
-  const listIsEmpty = filteredFriends.length === 0;
+  const listIsEmpty = displayFriends.length === 0;
 
   const hasTopSynqActivity = topSynqs.some((t) => (t.synqCount ?? 0) > 0);
 
   const renderSkeletonRow = (key: string) => (
-    <View key={key} style={styles.friendRow}>
-      <View style={[styles.avatar, styles.skeletonBlock]} />
+    <View key={key} style={styles.friendCard}>
+      <View style={[styles.avatarRing, styles.skeletonBlock]} />
       <View style={{ flex: 1 }}>
         <View style={[styles.skeletonBlock, { height: 14, width: "55%", marginBottom: 8 }]} />
         <View style={[styles.skeletonBlock, { height: 12, width: "38%" }]} />
@@ -362,85 +510,135 @@ export default function FriendsScreen() {
     </View>
   );
 
-  const renderTopSynqsSection = () => {
-    if (hasLoadedTopSynqs && !hasTopSynqActivity) {
-      return null;
-    }
-    if (!hasLoadedTopSynqs && friends.length === 0) {
-      return null;
-    }
+  const renderPodiumSlot = (
+    item: Connection | undefined,
+    rank: number,
+    avatarSize: number,
+    key: string
+  ) => {
+    if (!item) return <View key={key} style={styles.podiumSlotEmpty} />;
 
-    if (!hasLoadedTopSynqs) {
-      return (
-        <View style={styles.topSynqsSection}>
-          <Text style={styles.sectionTitle}>Top Synqs</Text>
-          <View style={styles.synqsContainer}>
-            {[0, 1, 2].map((i) => (
-              <View key={i} style={styles.connItem}>
-                <View style={[styles.imageCircle, styles.skeletonBlock]} />
-                <View style={[styles.skeletonBlock, styles.skeletonConnLabel]} />
-              </View>
-            ))}
+    const isFirst = rank === 1;
+    return (
+      <View key={key} style={[styles.podiumSlot, isFirst && styles.podiumSlotFirst]}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push({
+              pathname: "/friend-profile",
+              params: { friendId: item.id },
+            });
+          }}
+          style={styles.podiumAvatarPress}
+        >
+          <View
+            style={[
+              styles.podiumAvatarRing,
+              isFirst && styles.podiumAvatarRingFirst,
+              { width: avatarSize + 6, height: avatarSize + 6, borderRadius: (avatarSize + 6) / 2 },
+            ]}
+          >
+            <ExpoImage
+              source={{ uri: resolveAvatar(item.imageUrl) }}
+              style={{
+                width: avatarSize,
+                height: avatarSize,
+                borderRadius: avatarSize / 2,
+              }}
+              cachePolicy="memory-disk"
+              transition={120}
+            />
           </View>
+        </TouchableOpacity>
+        <Text style={[styles.connName, isFirst && styles.connNameFirst]} numberOfLines={1}>
+          {item.name.split(" ")[0]}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderTopSynqsPodium = () => (
+    <View style={styles.topSynqsCard}>
+      <LinearGradient
+        pointerEvents="none"
+        colors={["rgba(0,255,133,0.1)", "rgba(0,255,133,0.03)", "rgba(255,255,255,0.02)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.topSynqsCardInner}>
+        <Text style={[styles.listSectionLabel, styles.listSectionLabelCard]}>Top Synqs</Text>
+        <View style={styles.podiumRow}>
+          {(() => {
+            const topThree = topSynqs.slice(0, 3);
+            const slots: { item: Connection | undefined; rank: number; size: number }[] = [
+              { item: topThree[1], rank: 2, size: 52 },
+              { item: topThree[0], rank: 1, size: 68 },
+              { item: topThree[2], rank: 3, size: 52 },
+            ];
+            return slots.map((slot) =>
+              renderPodiumSlot(slot.item, slot.rank, slot.size, `podium-${slot.rank}`)
+            );
+          })()}
         </View>
-      );
+      </View>
+    </View>
+  );
+
+  const renderTopSynqsSection = () => {
+    if (!hasLoadedTopSynqs || !hasTopSynqActivity) {
+      return null;
     }
 
     return (
       <View style={styles.topSynqsSection}>
-        <Text style={styles.sectionTitle}>Top Synqs</Text>
-
-        <View style={styles.synqsContainer}>
-          {topSynqs.slice(0, 3).map((item, i) => (
-            <View key={item.id || i} style={styles.connItem}>
-              <TouchableOpacity
-                activeOpacity={0.75}
-                onPress={() =>
-                  router.push({
-                    pathname: "/friend-profile",
-                    params: { friendId: item.id },
-                  })
-                }
-              >
-                <View style={styles.imageCircle}>
-                  <ExpoImage
-                    source={{ uri: resolveAvatar(item.imageUrl) }}
-                    style={styles.connImg}
-                    cachePolicy="memory-disk"
-                    transition={120}
-                  />
-                  {i === 0 && (
-                    <View style={styles.crown}>
-                      <Ionicons name="star" size={8} color="#061006" />
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-
-              <Text style={styles.connName} numberOfLines={1}>
-                {item.name.split(" ")[0]}
-              </Text>
-            </View>
-          ))}
-        </View>
+        {renderTopSynqsPodium()}
       </View>
     );
   };
 
   const renderFriendsListHeader = () => {
     const topSynqsBlock = renderTopSynqsSection();
-    const showAllFriendsHeader = topSynqsBlock != null && friends.length > 0;
+    const showAllFriendsHeader = friends.length > 0;
 
     return (
       <>
         {topSynqsBlock}
         {showAllFriendsHeader ? (
-          <View style={styles.allFriendsSection}>
-            <View style={styles.allFriendsDivider} />
-            <Text style={styles.sectionTitle}>All friends</Text>
+          <View
+            style={[
+              styles.allFriendsSection,
+              topSynqsBlock != null && styles.allFriendsSectionInset,
+            ]}
+          >
+            <View style={styles.allFriendsSectionHeader}>
+              <Text style={[styles.listSectionLabel, styles.listSectionLabelRow]}>
+                All friends
+              </Text>
+              <View style={styles.allFriendsTrailing}>
+                <View style={styles.friendCountPill}>
+                  <Text style={styles.friendCountPillText}>{friends.length}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.sortBtn}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSortMenuVisible(true);
+                  }}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sort friends"
+                >
+                  <Ionicons
+                    name="swap-vertical-outline"
+                    size={18}
+                    color={sortMode === "distance" ? ACCENT : MUTED2}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        ) : topSynqsBlock != null ? (
-          <View style={styles.friendsListAfterTopSynqsSpacer} />
         ) : (
           <View style={styles.friendsListHeaderSpacerNoTopSynqs} />
         )}
@@ -459,8 +657,8 @@ export default function FriendsScreen() {
 
     return (
     <TouchableOpacity
-      style={styles.friendRow}
-      activeOpacity={0.65}
+      style={styles.friendCard}
+      activeOpacity={0.72}
       onPress={() => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
@@ -469,7 +667,7 @@ export default function FriendsScreen() {
         });
       }}
     >
-      <View style={styles.avatar}>
+      <View style={styles.avatarRing}>
         <ExpoImage
           source={{ uri: resolveAvatar((item as any)?.imageurl) }}
           style={styles.img}
@@ -500,7 +698,9 @@ export default function FriendsScreen() {
         )}
       </View>
 
-      <Icon name="chevron-forward" size={17} color="rgba(255,255,255,0.18)" />
+      <View style={styles.friendChevronWrap}>
+        <Icon name="chevron-forward" size={16} color={MUTED3} />
+      </View>
     </TouchableOpacity>
     );
   };
@@ -508,24 +708,28 @@ export default function FriendsScreen() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.container}>
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(0,255,133,0.09)", "rgba(0,255,133,0.02)", "transparent"]}
+          locations={[0, 0.45, 1]}
+          style={styles.ambientGlow}
+        />
         <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
-        <View style={styles.headerTitleBlock}>
-          <Text style={styles.headerTitle}>Friends</Text>
-        </View>
+        <Text style={styles.headerTitle}>Friends</Text>
         <FriendsHeaderAddButton
           pulse={!isFriendsInitialLoading && friends.length === 0}
           onPress={() => setSearchModalVisible(true)}
         />
       </View>
       {showFriendSearch && (
-        <View style={styles.searchBarSubtle}>
-          <Ionicons name="search-outline" size={14} color="rgba(255,255,255,0.22)" />
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={16} color={MUTED3} />
           <TextInput
             placeholder="Search"
-            placeholderTextColor="rgba(255,255,255,0.22)"
-            style={styles.searchBarSubtleInput}
+            placeholderTextColor={MUTED3}
+            style={styles.searchBarInput}
             value={searchText}
             onChangeText={setSearchText}
           />
@@ -545,13 +749,12 @@ export default function FriendsScreen() {
       ) : (
         <FlatList
           style={styles.friendsList}
-          data={filteredFriends}
+          data={displayFriends}
           keyExtractor={(item) => item.id}
           renderItem={renderFriendRow}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           onScrollBeginDrag={Keyboard.dismiss}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListFooterComponent={<View style={{ height: 40 }} />}
           contentContainerStyle={listIsEmpty ? styles.friendsListContentEmpty : styles.friendsListContent}
           ListHeaderComponent={renderFriendsListHeader()}
@@ -573,6 +776,12 @@ export default function FriendsScreen() {
           visible={showAddFriendsModal}
           onClose={() => setSearchModalVisible(false)}
           currentFriends={friends.map((f) => f.id)}
+        />
+        <FriendsSortMenu
+          visible={sortMenuVisible}
+          sortMode={sortMode}
+          onSelect={setSortMode}
+          onClose={() => setSortMenuVisible(false)}
         />
       </View>
     </TouchableWithoutFeedback>
@@ -1277,27 +1486,51 @@ function SearchModal({
 }
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
+  ambientGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 280,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 88,
-    marginBottom: 6,
     alignItems: "center",
+    marginTop: 88,
+    marginBottom: 10,
+    minHeight: 44,
   },
-  headerTitleBlock: { flex: 1, paddingRight: 12 },
-  headerTitle: tabScreenMainHeaderTitle,
+  headerTitle: {
+    ...tabScreenMainHeaderTitle,
+    flex: 1,
+    lineHeight: 34,
+    includeFontPadding: false,
+  },
+  headerAddBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerAction: { paddingLeft: 12, paddingVertical: 6 },
-  searchBarSubtle: {
+  searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.06)",
-    gap: 6,
+    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: RADIUS_MD,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    gap: 8,
   },
-  searchBarSubtleInput: {
+  searchBarInput: {
     flex: 1,
     color: TEXT,
     fontFamily: fonts.book,
@@ -1305,32 +1538,83 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     minHeight: 20,
   },
-  topSynqsSection: { marginTop: 12, marginBottom: 4 },
-  sectionTitle: profileScreenSectionTitle,
-  synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 14 },
-  connItem: { alignItems: "center", width: 72 },
-  imageCircle: {
-    width: 55,
-    height: 55,
-    borderRadius: 50,
+  topSynqsSection: { marginTop: 6, marginBottom: 4 },
+  topSynqsCard: {
+    borderRadius: RADIUS_LG,
+    borderWidth: 1,
+    borderColor: "rgba(0,255,133,0.14)",
+    overflow: "hidden",
+    backgroundColor: SURFACE,
+  },
+  topSynqsCardInner: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 18,
+  },
+  listSectionLabel: {
+    color: TEXT,
+    fontSize: TYPE_SECTION,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
+  },
+  listSectionLabelCard: {
+    marginBottom: 14,
+  },
+  listSectionLabelRow: {
+    flex: 1,
+    paddingRight: 8,
+    lineHeight: 26,
+    includeFontPadding: false,
+  },
+  podiumRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
     justifyContent: "center",
+    gap: 12,
+    paddingTop: 4,
+  },
+  podiumSlot: {
+    flex: 1,
+    alignItems: "center",
+    maxWidth: 96,
+  },
+  podiumSlotFirst: {
+    marginBottom: 6,
+  },
+  podiumSlotEmpty: {
+    flex: 1,
+    maxWidth: 96,
+  },
+  podiumAvatarPress: {
     alignItems: "center",
     position: "relative",
+  },
+  podiumAvatarRing: {
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
     overflow: "hidden",
   },
-  connImg: { width: 55, height: 55, borderRadius: 50 },
-  crown: {
-    position: "absolute",
-    bottom: -1,
-    right: -1,
-    backgroundColor: ACCENT,
-    padding: 2,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "black",
-    zIndex: 10,
+  podiumAvatarRingFirst: {
+    borderColor: ACCENT,
+    shadowColor: ACCENT,
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
   },
-  connName: { color: TEXT, fontSize: 13, marginTop: 8, textAlign: "center", fontFamily: fonts.medium },
+  connName: {
+    color: TEXT,
+    fontSize: 13,
+    marginTop: 10,
+    textAlign: "center",
+    fontFamily: fonts.medium,
+  },
+  connNameFirst: {
+    fontSize: 14,
+    fontFamily: fonts.heavy,
+  },
   skeletonBlock: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 8,
@@ -1338,21 +1622,121 @@ const styles = StyleSheet.create({
   skeletonConnLabel: {
     height: 9,
     width: 48,
-    marginTop: 8,
+    marginTop: 10,
     borderRadius: 6,
   },
   allFriendsSection: {
-    marginTop: 8,
-    paddingTop: 14,
+    marginTop: 12,
+    marginBottom: 10,
   },
-  allFriendsDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: BORDER,
-    marginBottom: 14,
+  allFriendsSectionInset: {
+    paddingLeft: 16,
   },
-  friendsListAfterTopSynqsSpacer: { height: 22 },
+  allFriendsSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 32,
+  },
+  allFriendsTrailing: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 0,
+  },
+  sortBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sortMenuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "flex-end",
+    paddingHorizontal: 20,
+    paddingBottom: 48,
+  },
+  sortMenuCard: {
+    backgroundColor: "#141414",
+    borderRadius: RADIUS_LG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingVertical: 8,
+    overflow: "hidden",
+  },
+  sortMenuTitle: {
+    color: MUTED2,
+    fontSize: 12,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 8,
+  },
+  sortMenuOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+  },
+  sortMenuOptionSelected: {
+    backgroundColor: "rgba(0,255,133,0.06)",
+  },
+  sortMenuOptionText: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  sortMenuOptionLabel: {
+    color: TEXT,
+    fontSize: 16,
+    fontFamily: fonts.heavy,
+  },
+  sortMenuOptionHint: {
+    color: MUTED3,
+    fontSize: 12,
+    fontFamily: fonts.book,
+    marginTop: 2,
+  },
+  sortMenuOptionSpacer: {
+    width: 18,
+  },
+  friendCountPill: {
+    minWidth: 28,
+    height: 28,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  friendCountPillText: {
+    color: MUTED2,
+    fontSize: 13,
+    fontFamily: fonts.heavy,
+    lineHeight: 16,
+    includeFontPadding: false,
+  },
   friendsListHeaderSpacerNoTopSynqs: { height: 18 },
-  friendRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
+  friendCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    borderRadius: RADIUS_MD,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
   friendRowContent: { flex: 1, justifyContent: "center", paddingRight: 8 },
   friendRowName: {
     marginBottom: 3,
@@ -1385,10 +1769,28 @@ const styles = StyleSheet.create({
     marginRight: 14,
     overflow: "hidden",
   },
+  friendChevronWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarRing: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    marginRight: 14,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.1)",
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
   img: {
-    width: 55,
-    height: 55,
-    borderRadius: 50,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
   friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
   mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
