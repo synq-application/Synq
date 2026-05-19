@@ -26,7 +26,6 @@ import {
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
-  TYPE_SECTION,
 } from "@/constants/Variables";
 import { useBlockedUsers } from "@/src/lib/blockedUsers";
 import {
@@ -78,6 +77,8 @@ import {
   TouchableWithoutFeedback,
   View,
   type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type ViewStyle,
 } from "react-native";
 import Animated, {
@@ -114,6 +115,11 @@ import { friendLocationLine, resolveAvatar } from "../helpers";
 const { width } = Dimensions.get("window");
 
 type FriendsSortMode = "alphabetical" | "distance";
+
+const FRIENDS_SORT_LABELS: Record<FriendsSortMode, string> = {
+  alphabetical: "Alphabetical",
+  distance: "Distance",
+};
 
 const sortFriendsByName = (list: Friend[]) =>
   [...list].sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
@@ -192,6 +198,31 @@ function FriendsHeaderAddButton({
 }
 
 const SORT_MENU_FADE_MS = 280;
+
+function FriendsSortTrigger({
+  sortMode,
+  onPress,
+}: {
+  sortMode: FriendsSortMode;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.sortBarBtn}
+      onPress={() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      activeOpacity={0.82}
+      accessibilityRole="button"
+      accessibilityLabel={`Sort by, ${FRIENDS_SORT_LABELS[sortMode]}`}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+    >
+      <Text style={styles.sortBarLabel}>Sort by</Text>
+      <Ionicons name="chevron-down" size={12} color={MUTED2} style={styles.sortBarChevron} />
+    </TouchableOpacity>
+  );
+}
 
 function FriendsSortMenu({
   visible,
@@ -386,8 +417,20 @@ export default function FriendsScreen() {
   const [myCityLabel, setMyCityLabel] = useState("");
   const [friendDistancesKm, setFriendDistancesKm] = useState<Record<string, number>>({});
   const [distanceSortReady, setDistanceSortReady] = useState(sortMode !== "distance");
+  const [headerFadeTop, setHeaderFadeTop] = useState(0);
+  const [listScrollY, setListScrollY] = useState(0);
 
   const showAddFriendsModal = searchModalVisible;
+  const headerFadeOpacity = Math.min(1, listScrollY / 28);
+
+  const onFriendsHeaderLayout = useCallback((e: LayoutChangeEvent) => {
+    const { y, height } = e.nativeEvent.layout;
+    setHeaderFadeTop(y + height);
+  }, []);
+
+  const onFriendsListScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    setListScrollY(e.nativeEvent.contentOffset.y);
+  }, []);
 
   const closeAddFriendsModal = useCallback(() => {
     setSearchModalVisible(false);
@@ -573,37 +616,6 @@ export default function FriendsScreen() {
     </View>
   );
 
-  const renderFriendsListHeader = () => {
-    if (friends.length === 0) return null;
-
-    return (
-      <View style={styles.allFriendsSection}>
-        <View style={styles.allFriendsSectionHeader}>
-          <Text style={[styles.listSectionLabel, styles.listSectionLabelRow]}>
-            All friends
-          </Text>
-          <TouchableOpacity
-            style={styles.sortBtn}
-            onPress={() => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setSortMenuVisible(true);
-            }}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Sort friends"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons
-              name="swap-vertical-outline"
-              size={18}
-              color={sortMenuVisible || sortMode === "distance" ? ACCENT : MUTED2}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
   const renderFriendRow = ({ item }: { item: Friend }) => {
     const locationLine = friendLocationLine(item);
     const fallbackLoc =
@@ -671,36 +683,45 @@ export default function FriendsScreen() {
         />
         <StatusBar barStyle="light-content" />
 
-      <View style={[styles.headerBlock, styles.screenPadding]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Friends</Text>
-          <FriendsHeaderAddButton
-            pulse={!isFriendsInitialLoading && friends.length === 0}
-            onPress={openAddFriendsModal}
-          />
-        </View>
-        {showFriendSearch && (
-          <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={17} color={MUTED2} />
-            <TextInput
-              placeholder="Search friends"
-              placeholderTextColor="rgba(255,255,255,0.38)"
-              style={styles.searchBarInput}
-              value={searchText}
-              onChangeText={setSearchText}
+      <View onLayout={onFriendsHeaderLayout}>
+        <View style={[styles.headerBlock, styles.screenPadding]}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Friends</Text>
+            <FriendsHeaderAddButton
+              pulse={!isFriendsInitialLoading && friends.length === 0}
+              onPress={openAddFriendsModal}
             />
-            {searchText.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchText("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={14} color={MUTED2} />
-              </TouchableOpacity>
-            )}
           </View>
-        )}
+          {showFriendSearch && (
+            <>
+              <View style={styles.searchBar}>
+                <Ionicons name="search-outline" size={17} color={MUTED2} />
+                <TextInput
+                  placeholder="Search"
+                  placeholderTextColor="rgba(255,255,255,0.38)"
+                  style={styles.searchBarInput}
+                  value={searchText}
+                  onChangeText={setSearchText}
+                />
+                {searchText.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchText("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close-circle" size={14} color={MUTED2} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.sortBar}>
+                <FriendsSortTrigger
+                  sortMode={sortMode}
+                  onPress={() => setSortMenuVisible(true)}
+                />
+              </View>
+            </>
+          )}
+        </View>
       </View>
 
       {isFriendsInitialLoading ? (
         <View style={styles.friendsList}>
-          <View style={styles.screenPadding}>{renderFriendsListHeader()}</View>
           {["1", "2", "3"].map((k, i) => (
             <View key={k}>
               {i > 0 ? renderFriendRowSeparator() : null}
@@ -718,10 +739,11 @@ export default function FriendsScreen() {
           ItemSeparatorComponent={renderFriendRowSeparator}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          onScroll={onFriendsListScroll}
+          scrollEventThrottle={16}
           onScrollBeginDrag={Keyboard.dismiss}
           ListFooterComponent={<View style={{ height: 40 }} />}
           contentContainerStyle={listIsEmpty ? styles.friendsListContentEmpty : styles.friendsListContent}
-          ListHeaderComponent={renderFriendsListHeader()}
           ListEmptyComponent={
             <FriendsListEmpty
               hasFriends={friends.length > 0}
@@ -738,6 +760,17 @@ export default function FriendsScreen() {
           onSelect={setSortMode}
           onClose={() => setSortMenuVisible(false)}
         />
+        {showFriendSearch && headerFadeTop > 0 && headerFadeOpacity > 0 ? (
+          <LinearGradient
+            pointerEvents="none"
+            colors={FRIENDS_SEARCH_FADE_GRADIENT}
+            locations={[0, 0.42, 1]}
+            style={[
+              styles.headerScrollFade,
+              { top: headerFadeTop - 4, opacity: headerFadeOpacity },
+            ]}
+          />
+        ) : null}
       </View>
         <SearchModal
           visible={showAddFriendsModal}
@@ -1846,12 +1879,18 @@ const FRIENDS_AMBIENT_GRADIENT = [
   "rgba(0,255,133,0.008)",
   "transparent",
 ] as const;
+const FRIENDS_SEARCH_FADE_GRADIENT = [
+  BG,
+  "rgba(9,10,11,0.88)",
+  "rgba(9,10,11,0)",
+] as const;
 
 const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: BG },
   container: {
     flex: 1,
     backgroundColor: BG,
+    position: "relative",
   },
   screenPadding: {
     paddingHorizontal: 20,
@@ -1886,7 +1925,15 @@ const styles = StyleSheet.create({
   headerBlock: {
     marginTop: 88,
     marginBottom: 4,
-    zIndex: 1,
+    zIndex: 2,
+  },
+  headerScrollFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 56,
+    zIndex: 10,
+    elevation: 10,
   },
   friendRowSeparator: {
     height: StyleSheet.hairlineWidth,
@@ -1915,7 +1962,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 8,
     minHeight: 44,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -1933,44 +1980,38 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     minHeight: 22,
   },
-  listSectionLabel: {
-    color: "rgba(255,255,255,0.94)",
-    fontSize: TYPE_SECTION,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.15,
-  },
-  listSectionLabelRow: {
-    flex: 1,
-    paddingRight: 8,
-    lineHeight: 26,
-    includeFontPadding: false,
-    marginBottom: 10,
-  },
   skeletonBlock: {
     backgroundColor: FRIENDS_SURFACE_RAISED,
     borderRadius: 8,
   },
-  allFriendsSection: {
-    marginTop: 0,
-    marginBottom: 12,
-    paddingHorizontal: 20,
-  },
-  allFriendsSectionHeader: {
+  sortBar: {
     flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    marginTop: 2,
+    marginBottom: 14,
   },
-  sortBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  sortBarBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minHeight: 32,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: BUTTON_RADIUS,
     backgroundColor: FRIENDS_SURFACE,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: FRIENDS_BORDER,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    marginBottom: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  sortBarLabel: {
+    color: "rgba(255,255,255,0.52)",
+    fontSize: TYPE_CAPTION,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.22,
+  },
+  sortBarChevron: {
+    marginTop: 1,
+    opacity: 0.9,
   },
   sortMenuOverlay: {
     flex: 1,
