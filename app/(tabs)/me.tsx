@@ -73,6 +73,7 @@ const allActivities = Object.values(presetActivities).flat();
 
 type ProfilePressableProps = {
   onPress: () => void;
+  onLongPress?: () => void;
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
@@ -85,6 +86,7 @@ type ProfilePressableProps = {
 
 function ProfilePressable({
   onPress,
+  onLongPress,
   children,
   style,
   contentStyle,
@@ -112,6 +114,16 @@ function ProfilePressable({
         }
         onPress();
       }}
+      onLongPress={
+        onLongPress
+          ? () => {
+              if (haptic && !disabled) {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
+              onLongPress();
+            }
+          : undefined
+      }
       onPressIn={() => {
         if (!disabled && animatePress) {
           scale.value = withSpring(0.96, { damping: 16, stiffness: 380 });
@@ -149,6 +161,7 @@ export default function ProfileScreen() {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [avatarRenderVersion, setAvatarRenderVersion] = useState(0);
   const [isQRExpanded, setQRExpanded] = useState(false);
+  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
@@ -629,9 +642,10 @@ export default function ProfileScreen() {
               <View style={styles.avatarGlowWrap}>
                 <ProfilePressable
                   onPress={pickImage}
+                  onLongPress={() => setAvatarPreviewOpen(true)}
                   disabled={isUploading || isPickingImage}
                   contentStyle={styles.imageWrapper}
-                  accessibilityLabel="Change profile photo"
+                  accessibilityLabel="Profile photo. Tap to change, hold to expand."
                   animatePress={false}
                 >
                   <ExpoImage
@@ -833,6 +847,30 @@ export default function ProfileScreen() {
       </Modal>
 
       <Modal
+        visible={avatarPreviewOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAvatarPreviewOpen(false)}
+      >
+        <Pressable
+          style={styles.avatarPreviewOverlay}
+          onPress={() => setAvatarPreviewOpen(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close profile photo preview"
+        >
+          <View style={styles.avatarPreviewDim} pointerEvents="none" />
+          <ExpoImage
+            source={{ uri: resolvedProfileImage }}
+            style={styles.avatarPreviewImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={0}
+            recyclingKey={`${resolvedProfileImage}-${avatarRenderVersion}`}
+          />
+        </Pressable>
+      </Modal>
+
+      <Modal
         visible={showInputModal}
         animationType="slide"
         presentationStyle="fullScreen"
@@ -1004,6 +1042,24 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   profileImg: { width: "100%", height: "100%" },
+  avatarPreviewOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+    paddingHorizontal: 24,
+  },
+  avatarPreviewDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.88)",
+  },
+  avatarPreviewImage: {
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.22)",
+  },
   qrToggle: { position: "absolute", bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
   qrToggleInner: { alignItems: "center", justifyContent: "center" },
   nameAccent: {
