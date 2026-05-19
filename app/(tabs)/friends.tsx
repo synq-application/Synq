@@ -429,10 +429,17 @@ export default function FriendsScreen() {
 
   const renderFriendsListHeader = () => {
     const topSynqsBlock = renderTopSynqsSection();
+    const showAllFriendsHeader = topSynqsBlock != null && friends.length > 0;
+
     return (
       <>
         {topSynqsBlock}
-        {topSynqsBlock != null ? (
+        {showAllFriendsHeader ? (
+          <View style={styles.allFriendsSection}>
+            <View style={styles.allFriendsDivider} />
+            <Text style={styles.sectionTitle}>All friends</Text>
+          </View>
+        ) : topSynqsBlock != null ? (
           <View style={styles.friendsListAfterTopSynqsSpacer} />
         ) : (
           <View style={styles.friendsListHeaderSpacerNoTopSynqs} />
@@ -1333,6 +1340,15 @@ const styles = StyleSheet.create({
     width: 48,
     marginTop: 8,
     borderRadius: 6,
+  },
+  allFriendsSection: {
+    marginTop: 8,
+    paddingTop: 14,
+  },
+  allFriendsDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: BORDER,
+    marginBottom: 14,
   },
   friendsListAfterTopSynqsSpacer: { height: 22 },
   friendsListHeaderSpacerNoTopSynqs: { height: 18 },
