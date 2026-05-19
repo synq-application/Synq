@@ -1,3 +1,5 @@
+import type { TextStyle, ViewStyle } from "react-native";
+
 export const ACCENT = "#00FF85";
 export const DEFAULT_AVATAR =
   "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&s=256";
@@ -43,6 +45,25 @@ export const TYPE_TITLE = 26;
 export const TYPE_SECTION = 20;
 export const TYPE_BODY = 16;
 export const TYPE_CAPTION = 13;
+
+/** Shared pill style for low-emphasis destructive actions (End Synq, Sign Out). */
+export const destructiveActionBtn: ViewStyle = {
+  alignSelf: "center",
+  paddingVertical: 14,
+  paddingHorizontal: 60,
+  borderRadius: BUTTON_RADIUS + 8,
+  borderWidth: 1.5,
+  borderColor: "#222",
+  backgroundColor: "#0a0a0a",
+};
+
+export const destructiveActionBtnText: TextStyle = {
+  color: "#666",
+  fontFamily: fonts.heavy,
+  fontSize: 13,
+  letterSpacing: 2,
+  textTransform: "uppercase",
+};
 
 export interface Friend {
   id: string;

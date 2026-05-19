@@ -1346,8 +1346,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnText: { fontSize: 16, color: 'black', fontFamily: fonts.medium },
-  deactivateLink: { marginTop: 10, alignSelf: 'center', padding: 8 },
-  deactivateLinkText: { color: '#FF453A', fontSize: 15, fontFamily: fonts.medium, opacity: 0.9 },
   activatingContainer: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
   unifiedTitle: { color: 'white', fontSize: 28, fontFamily: fonts.medium, marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
   gifLarge: { width: 280, height: 280 },
@@ -1594,18 +1592,16 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   saveBtn: {
+    alignSelf: 'center',
+    width: PRIMARY_CTA_WIDTH,
+    height: PRIMARY_CTA_HEIGHT,
     backgroundColor: ACCENT,
-    width: '80%',
-    padding: 18,
-    borderRadius: 16,
+    borderRadius: BUTTON_RADIUS,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
-    alignSelf: 'center'
+    marginTop: 16,
   },
-  saveBtnText: { color: 'black', fontSize: 16, fontFamily: 'Avenir-Medium' },
-  endSynqBtn: { width: '100%', padding: 18, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FF453A' },
-  endSynqBtnText: { color: '#FF453A', fontSize: 16 },
+  saveBtnText: { color: 'black', fontSize: 16, fontFamily: fonts.medium },
   centeredIdeaContainer: {
     alignItems: 'center',
     marginVertical: 15,
@@ -1742,13 +1738,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
     fontFamily: "Avenir-Medium",
   },
-  panelSubtext: {
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 14,
-    marginTop: 6,
-    marginBottom: 12,
-  },
-
   suggestionSectionTitle: {
     color: "rgba(255,255,255,0.55)",
     fontSize: 15,
@@ -1775,18 +1764,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  lockRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 14,
-  },
-
-  lockText: {
-    color: "rgba(255,255,255,0.30)",
-    fontSize: 12,
-    marginLeft: 6,
-  },
   inboxEmptyWrap: {
     alignItems: "center",
     justifyContent: "center",

@@ -77,11 +77,7 @@ export default function EditSynqModal({
                 />
               </TouchableOpacity>
 
-              <Text style={styles.panelTitle}>Edit synq memo</Text>
-
-              <Text style={styles.panelSubtext}>
-                Share what you’re up to or what you’re down for
-              </Text>
+              <Text style={styles.panelTitle}>Edit memo</Text>
 
               <TextInput
                 style={styles.panelInput}
@@ -128,19 +124,10 @@ export default function EditSynqModal({
               <TouchableOpacity
                 style={styles.saveBtn}
                 onPress={onSaveMemo}
+                activeOpacity={0.85}
               >
-                <Text style={styles.saveBtnText}>Update memo</Text>
+                <Text style={styles.saveBtnText}>Update</Text>
               </TouchableOpacity>
-              <View style={styles.lockRow}>
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={14}
-                  color="rgba(255,255,255,0.35)"
-                />
-                <Text style={styles.lockText}>
-                  Only your friends can see this
-                </Text>
-              </View>
 
             </View>
           </TouchableWithoutFeedback>

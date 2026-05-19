@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import React from "react";
+import SynqOptionsSheet from "../../../app/synq-screens/SynqOptionsSheet";
+import React, { useState } from "react";
 import {
   Animated,
   FlatList,
@@ -9,8 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ACCENT, BG } from "../../../constants/Variables";
 import { friendLocationLine, resolveAvatar } from "../../../app/helpers";
+import { ACCENT, BG } from "../../../constants/Variables";
 
 type Props = {
   styles: any;
@@ -41,6 +42,8 @@ export default function ActiveSynqSection({
   openMessagesInbox,
   openEditModal,
 }: Props) {
+  const [optionsVisible, setOptionsVisible] = useState(false);
+
   return (
     <View style={styles.activeSynqRoot}>
       <View style={styles.activeHeaderBlock}>
@@ -64,12 +67,12 @@ export default function ActiveSynqSection({
             </View>
           </View>
           <TouchableOpacity
-            onPress={openEditModal}
+            onPress={() => setOptionsVisible(true)}
             style={styles.headerIconContainer}
             accessibilityRole="button"
-            accessibilityLabel="Edit Synq memo and settings"
+            accessibilityLabel="Synq options"
           >
-            <Ionicons name="create-outline" size={26} color="white" />
+            <Ionicons name="ellipsis-horizontal" size={26} color="white" />
           </TouchableOpacity>
         </View>
       </View>
@@ -167,13 +170,13 @@ export default function ActiveSynqSection({
         />
       </View>
 
-      <View
-        style={[
-          styles.activeFooterBlock,
-          { paddingBottom: Math.max(44, 24 + insetsBottom) },
-        ]}
-      >
-        {availableFriends.length > 0 ? (
+      {availableFriends.length > 0 ? (
+        <View
+          style={[
+            styles.activeFooterBlock,
+            { paddingBottom: Math.max(44, 24 + insetsBottom) },
+          ]}
+        >
           <TouchableOpacity
             style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
             onPress={handleConnect}
@@ -191,17 +194,17 @@ export default function ActiveSynqSection({
               {selectedFriends.length === 0 ? "Select friends" : "Start plan"}
             </Text>
           </TouchableOpacity>
-        ) : null}
+        </View>
+      ) : (
+        <View style={{ paddingBottom: Math.max(44, 24 + insetsBottom) }} />
+      )}
 
-        <TouchableOpacity
-          onPress={endSynq}
-          style={styles.deactivateLink}
-          accessibilityRole="button"
-          accessibilityLabel="End Synq"
-        >
-          <Text style={styles.deactivateLinkText}>End Synq</Text>
-        </TouchableOpacity>
-      </View>
+      <SynqOptionsSheet
+        visible={optionsVisible}
+        onClose={() => setOptionsVisible(false)}
+        onEditMemo={openEditModal}
+        onEndSynq={endSynq}
+      />
     </View>
   );
 }
