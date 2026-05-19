@@ -11,7 +11,7 @@ import {
   useSegments,
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, {
@@ -36,12 +36,18 @@ initSentry();
 import LocationUpdateModal from "../components/LocationUpdateModal";
 import { ACCENT, BG } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
+import {
+  getPreAuthTermsAccepted,
+  persistCommunityTermsAcceptance,
+  userHasAcceptedCommunityTerms,
+} from "../src/lib/communityTerms";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../src/lib/locationPromptEvents";
 import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
 } from "../src/lib/socialCache";
 import { SynqBootProvider } from "../src/lib/synqBootContext";
+import { BlockedUsersProvider } from "../src/lib/blockedUsers";
 import {
   computeSynqActiveFromUserData,
   readCachedSynqActive,
@@ -138,6 +144,7 @@ export default function RootLayout() {
   } | null>(null);
   const synqBootUidRef = useRef<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [communityTermsOk, setCommunityTermsOk] = useState<boolean | null>(null);
   const inviteProcessingRef = useRef(false);
   const inviteAttemptsRef = useRef<Set<string>>(new Set());
 
@@ -401,11 +408,47 @@ export default function RootLayout() {
   };
 
   useEffect(() => {
+    if (!user?.uid) {
+      setCommunityTermsOk(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const data = snap.data() as Record<string, unknown> | undefined;
+        if (data?.suspended === true) {
+          await signOut(auth);
+          if (!cancelled) setCommunityTermsOk(null);
+          return;
+        }
+        if (userHasAcceptedCommunityTerms(data)) {
+          if (!cancelled) setCommunityTermsOk(true);
+          return;
+        }
+        const preAuth = await getPreAuthTermsAccepted();
+        if (preAuth) {
+          await persistCommunityTermsAcceptance(user.uid);
+          if (!cancelled) setCommunityTermsOk(true);
+          return;
+        }
+        if (!cancelled) setCommunityTermsOk(false);
+      } catch {
+        if (!cancelled) setCommunityTermsOk(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
     if (!authReady || !navReady) return;
 
     const inAuthGroup = segments[0] === "(auth)";
     const onLocationPage = segments[0] === "location";
     const onDetailsPage = segments[1] === "details";
+    const onCommunityTermsPage = segments[1] === "community-terms";
     const hasName = !!user?.displayName;
 
     if (!user) {
@@ -418,10 +461,19 @@ export default function RootLayout() {
       return;
     }
 
+    if (communityTermsOk === false) {
+      if (!onCommunityTermsPage) {
+        router.replace("/(auth)/community-terms?postAuth=1");
+      }
+      return;
+    }
+
+    if (communityTermsOk !== true) return;
+
     if (onLocationPage) return;
 
-    if (inAuthGroup) router.replace("/(tabs)");
-  }, [authReady, navReady, user, segments]);
+    if (inAuthGroup && !onCommunityTermsPage) router.replace("/(tabs)");
+  }, [authReady, navReady, user, segments, communityTermsOk]);
 
   useEffect(() => {
     if (!authReady || !navReady || !user?.uid) return;
@@ -577,6 +629,7 @@ export default function RootLayout() {
           <SynqBootProvider
             value={synqBoot ?? { cachedSynqActive: false }}
           >
+            <BlockedUsersProvider>
             {showSplash ? (
               <View
                 style={{
@@ -604,6 +657,7 @@ export default function RootLayout() {
               </Stack>
             )}
             {locationModals}
+            </BlockedUsersProvider>
           </SynqBootProvider>
         </AuthContext.Provider>
       </ErrorBoundary>
