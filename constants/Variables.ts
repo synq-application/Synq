@@ -46,6 +46,15 @@ export const TYPE_SECTION = 20;
 export const TYPE_BODY = 16;
 export const TYPE_CAPTION = 13;
 
+/** Section headings on the Me profile screen (Recent Synqs, Open plans, Interests). */
+export const profileScreenSectionTitle: TextStyle = {
+  color: TEXT,
+  fontSize: 18,
+  fontFamily: fonts.heavy,
+  letterSpacing: 0.15,
+  marginBottom: 12,
+};
+
 /** Shared pill style for low-emphasis destructive actions (End Synq, Sign Out). */
 export const destructiveActionBtn: ViewStyle = {
   alignSelf: "center",

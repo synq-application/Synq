@@ -12,7 +12,9 @@ import {
   fonts,
   Friend,
   MODAL_RADIUS,
+  MUTED,
   MUTED2,
+  profileScreenSectionTitle,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   SURFACE,
@@ -557,6 +559,14 @@ export default function ProfileScreen() {
   const locationLower =
     city && state ? `${city}, ${state}` : null;
 
+  const profileNameParts = useMemo(() => {
+    const raw = auth.currentUser?.displayName?.trim() || "";
+    if (!raw) return { first: "Your", last: "profile" };
+    const parts = raw.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return { first: parts[0], last: "" };
+    return { first: parts[0], last: parts.slice(1).join(" ") };
+  }, [auth.currentUser?.displayName]);
+
   useEffect(() => {
     if (isFocused) return;
     scrollRef.current?.scrollTo({ y: 0, animated: false });
@@ -646,19 +656,26 @@ export default function ProfileScreen() {
               </ProfilePressable>
             </View>
 
-            <Text style={styles.nameText}>{auth.currentUser?.displayName}</Text>
+            <Text style={styles.nameText} numberOfLines={2}>
+              <Text style={styles.nameAccent}>{profileNameParts.first}</Text>
+              {profileNameParts.last.length > 0 ? (
+                <Text style={styles.nameAccent}> {profileNameParts.last}</Text>
+              ) : null}
+            </Text>
 
-            {locationLower && (
+            {locationLower ? (
               <View style={styles.locationRow}>
                 <Icon
                   name="location-outline"
-                  size={18}
-                  color="rgba(255,255,255,0.35)"
+                  size={14}
+                  color={MUTED2}
                   style={styles.locationIcon}
                 />
-                <Text style={styles.locationText}>{locationLower}</Text>
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {locationLower}
+                </Text>
               </View>
-            )}
+            ) : null}
 
             <View style={styles.profileActionsRow}>
               <ProfilePressable
@@ -666,7 +683,7 @@ export default function ProfileScreen() {
                 onPress={() => router.push("/edit-profile")}
                 accessibilityLabel="Edit profile"
               >
-                <Icon name="create-outline" size={13} color={ACCENT} />
+                <Icon name="create-outline" size={14} color={MUTED2} />
                 <Text style={styles.editProfileBtnText}>Edit profile</Text>
               </ProfilePressable>
               <ProfilePressable
@@ -674,7 +691,7 @@ export default function ProfileScreen() {
                 onPress={shareProfile}
                 accessibilityLabel="Share profile"
               >
-                <Icon name="share-social-outline" size={13} color={ACCENT} />
+                <Icon name="share-social-outline" size={14} color={MUTED2} />
                 <Text style={styles.editProfileBtnText}>Share profile</Text>
               </ProfilePressable>
             </View>
@@ -971,19 +988,19 @@ const styles = StyleSheet.create({
   avatarGlowWrap: {
     borderRadius: 84,
     shadowColor: ACCENT,
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 7,
+    elevation: 5,
   },
   imageWrapper: {
     width: 160,
     height: 160,
     borderRadius: 80,
     overflow: "hidden",
-    borderWidth: 2,
-    borderColor: ACCENT,
-    backgroundColor: "#1a1a1a",
+    borderWidth: 1.5,
+    borderColor: "rgba(0,255,133,0.55)",
+    backgroundColor: "#111",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1,
@@ -991,45 +1008,57 @@ const styles = StyleSheet.create({
   profileImg: { width: "100%", height: "100%" },
   qrToggle: { position: "absolute", bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
   qrToggleInner: { alignItems: "center", justifyContent: "center" },
-  nameText: { color: ACCENT, fontSize: 26, fontFamily: fonts.heavy, letterSpacing: 0.2, marginTop: 10 },
+  nameText: {
+    marginTop: 14,
+    textAlign: "center",
+    maxWidth: "92%",
+  },
+  nameAccent: {
+    color: ACCENT,
+    fontSize: 22,
+    lineHeight: 28,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.15,
+  },
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 6,
+    maxWidth: "88%",
   },
   locationIcon: {
-    marginRight: 5,
+    marginRight: 4,
   },
   locationText: {
-    color: MUTED2,
-    fontSize: 16,
-    marginTop: 2,
-    letterSpacing: 1,
-    fontFamily: fonts.medium,
+    color: MUTED,
+    fontSize: 14,
+    fontFamily: fonts.book,
+    flexShrink: 1,
   },
   editProfileBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 11,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: ACCENT,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: BORDER,
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
   profileActionsRow: {
-    marginTop: 12,
+    marginTop: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 10,
     flexWrap: "wrap",
   },
   editProfileBtnText: {
-    color: ACCENT,
-    fontFamily: fonts.heavy,
-    fontSize: 12,
-    letterSpacing: 0.2,
+    color: TEXT,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    letterSpacing: 0.1,
   },
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 14 },
   connItem: { alignItems: "center", width: 72 },
@@ -1043,11 +1072,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     position: "relative",
     overflow: "hidden",
-    backgroundColor: SURFACE,
-    borderWidth: 1,
-    borderColor: BORDER,
   },
-  connImg: { width: 55, height: 55, borderRadius: 50, backgroundColor: "#222" },
+  connImg: { width: 55, height: 55, borderRadius: 50 },
   crown: {
     position: "absolute",
     bottom: -1,
@@ -1064,7 +1090,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 8,
     textAlign: "center",
-    fontFamily: fonts.heavy,
+    fontFamily: fonts.medium,
   },
   profileHelperText: {
     color: MUTED2,
@@ -1083,13 +1109,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: BORDER,
   },
-  sectionTitle: {
-    color: TEXT,
-    fontSize: 20,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
-    marginBottom: 14,
-  },
+  sectionTitle: profileScreenSectionTitle,
   interestsAddPlanBtn: {
     flexDirection: "row",
     alignItems: "center",

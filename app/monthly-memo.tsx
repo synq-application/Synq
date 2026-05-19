@@ -1,4 +1,4 @@
-import { ACCENT, BORDER, fonts, TEXT } from "@/constants/Variables";
+import { ACCENT, BORDER, fonts, profileScreenSectionTitle, TEXT } from "@/constants/Variables";
 import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useEffect, useMemo, useState } from "react";
@@ -494,13 +494,7 @@ const DateBtn = ({
 
 const styles = StyleSheet.create({
   container: { width: "100%", alignSelf: "stretch" },
-  sectionTitle: {
-    color: TEXT,
-    fontSize: 20,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
-    marginBottom: 16,
-  },
+  sectionTitle: profileScreenSectionTitle,
   plansBox: {
     paddingVertical: 0,
     paddingHorizontal: 0,
