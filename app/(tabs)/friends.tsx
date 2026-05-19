@@ -398,7 +398,7 @@ export default function FriendsScreen() {
                   })
                 }
               >
-                <View style={[styles.imageCircle, i === 0 && styles.imageCircleLead]}>
+                <View style={styles.imageCircle}>
                   <ExpoImage
                     source={{ uri: resolveAvatar(item.imageUrl) }}
                     style={styles.connImg}
@@ -1306,10 +1306,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     position: "relative",
     overflow: "hidden",
-  },
-  imageCircleLead: {
-    borderWidth: 1.5,
-    borderColor: "rgba(0,255,133,0.45)",
   },
   connImg: { width: 55, height: 55, borderRadius: 50 },
   crown: {
