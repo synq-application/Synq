@@ -14,9 +14,9 @@ import {
   MODAL_RADIUS,
   MUTED,
   MUTED2,
-  profileScreenSectionTitle,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
+  profileScreenSectionTitle,
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
@@ -656,11 +656,9 @@ export default function ProfileScreen() {
               </ProfilePressable>
             </View>
 
-            <Text style={styles.nameText} numberOfLines={2}>
-              <Text style={styles.nameAccent}>{profileNameParts.first}</Text>
-              {profileNameParts.last.length > 0 ? (
-                <Text style={styles.nameAccent}> {profileNameParts.last}</Text>
-              ) : null}
+            <Text style={styles.nameAccent} numberOfLines={2}>
+              {profileNameParts.first}
+              {profileNameParts.last.length > 0 ? ` ${profileNameParts.last}` : ""}
             </Text>
 
             {locationLower ? (
@@ -1008,17 +1006,15 @@ const styles = StyleSheet.create({
   profileImg: { width: "100%", height: "100%" },
   qrToggle: { position: "absolute", bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
   qrToggleInner: { alignItems: "center", justifyContent: "center" },
-  nameText: {
+  nameAccent: {
+    color: ACCENT,
+    fontSize: 24,
+    lineHeight: 32,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
     marginTop: 14,
     textAlign: "center",
     maxWidth: "92%",
-  },
-  nameAccent: {
-    color: ACCENT,
-    fontSize: 22,
-    lineHeight: 28,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.15,
   },
   locationRow: {
     flexDirection: "row",
