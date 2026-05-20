@@ -676,12 +676,6 @@ export default function FriendsScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.screenRoot}>
       <View style={styles.container}>
-        <LinearGradient
-          pointerEvents="none"
-          colors={FRIENDS_AMBIENT_GRADIENT}
-          locations={[0, 0.5, 1]}
-          style={styles.ambientGlow}
-        />
         <StatusBar barStyle="light-content" />
 
       <View onLayout={onFriendsHeaderLayout}>
@@ -1716,12 +1710,6 @@ function SearchModal({
           style={[styles.addFriendsSheet, sheetAnimatedStyle]}
         >
       <View style={styles.modalBody}>
-        <LinearGradient
-          pointerEvents="none"
-          colors={FRIENDS_AMBIENT_GRADIENT}
-          locations={[0, 0.5, 1]}
-          style={styles.modalAmbientGlow}
-        />
         <StatusBar barStyle="light-content" />
 
         <View style={styles.addFriendsHeader}>
@@ -1875,11 +1863,6 @@ const FRIENDS_SURFACE_RAISED = "#0E1012";
 const FRIENDS_SEARCH_BG = "#0A0B0D";
 const FRIENDS_BORDER = "rgba(255,255,255,0.035)";
 const FRIENDS_SEARCH_BORDER = "rgba(255,255,255,0.05)";
-const FRIENDS_AMBIENT_GRADIENT = [
-  "rgba(0,255,133,0.03)",
-  "rgba(0,255,133,0.008)",
-  "transparent",
-] as const;
 const FRIENDS_SEARCH_FADE_GRADIENT = [
   BG,
   "rgba(9,10,11,0.88)",
@@ -1914,14 +1897,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: -6 },
     elevation: 24,
-  },
-  ambientGlow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-    zIndex: 0,
   },
   headerBlock: {
     marginTop: 88,
@@ -2287,14 +2262,6 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
     paddingHorizontal: 20,
     paddingTop: 12,
-  },
-  modalAmbientGlow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-    zIndex: 0,
   },
   addFriendsHeader: {
     flexDirection: "row",

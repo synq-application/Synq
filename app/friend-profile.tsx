@@ -15,7 +15,6 @@ import {
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
 import { Image as ExpoImage } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   collection,
@@ -419,19 +418,9 @@ export default function FriendProfile() {
     void checkRelationship();
   }, [friendKey]);
 
-  const ambientGlow = (
-    <LinearGradient
-      pointerEvents="none"
-      colors={PROFILE_AMBIENT_GRADIENT}
-      locations={[0, 0.5, 1]}
-      style={styles.ambientGlow}
-    />
-  );
-
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        {ambientGlow}
         <View style={styles.center}>
           <ActivityIndicator color={ACCENT} />
         </View>
@@ -442,7 +431,6 @@ export default function FriendProfile() {
   if (!friend) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        {ambientGlow}
         <View style={styles.center}>
           <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
             <Icon name="chevron-back" size={22} color={TEXT} />
@@ -865,7 +853,6 @@ export default function FriendProfile() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {ambientGlow}
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
@@ -1228,22 +1215,8 @@ export default function FriendProfile() {
 const PROFILE_SURFACE = "#0A0B0D";
 const PROFILE_SURFACE_RAISED = "#0E1012";
 const PROFILE_BORDER = "rgba(255,255,255,0.035)";
-const PROFILE_AMBIENT_GRADIENT = [
-  "rgba(0,255,133,0.03)",
-  "rgba(0,255,133,0.008)",
-  "transparent",
-] as const;
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BG },
-  ambientGlow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-    zIndex: 0,
-  },
   container: { flex: 1, paddingHorizontal: 20 },
   scrollContent: { paddingBottom: 36 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },

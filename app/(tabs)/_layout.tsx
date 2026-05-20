@@ -72,7 +72,7 @@ export default function TabsLayout() {
               <ExpoImage
                 source={SYNQ_ICON}
                 style={styles.synqIcon}
-                contentFit="contain"
+                contentFit="cover"
                 transition={0}
                 cachePolicy="memory-disk"
               />
@@ -123,18 +123,16 @@ const styles = StyleSheet.create({
     backgroundColor: TAB_BAR_BG,
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
     marginBottom: Platform.OS === "ios" ? 26 : 16,
     marginTop: TAB_BAR_ICON_NUDGE,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.85)",
-    shadowColor: "#FFF",
-    shadowOpacity: 0.32,
-    shadowRadius: 7,
+    borderWidth: 0,
     elevation: 6,
   },
 
   synqButtonActive: {
     transform: [{ scale: 1.05 }],
+    borderWidth: 2,
     borderColor: "rgba(0,255,133,0.85)",
     shadowColor: ACCENT,
     shadowOpacity: 0.28,
@@ -142,7 +140,7 @@ const styles = StyleSheet.create({
   },
 
   synqIcon: {
-    width: 92,
-    height: 74,
+    width: 86,
+    height: 86,
   },
 });
