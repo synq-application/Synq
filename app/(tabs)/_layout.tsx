@@ -119,20 +119,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE_4,
   },
   synqButton: {
-    width: 59,
-    height: 59,
-    borderRadius: 29.5,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: Platform.OS === "ios" ? 26 : 16,
+    marginBottom: Platform.OS === "ios" ? 24 : 14,
     marginTop: TAB_BAR_ICON_NUDGE,
     borderWidth: 0,
     elevation: 6,
   },
   synqButtonInner: {
-    width: 59,
-    height: 59,
-    borderRadius: 29.5,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     backgroundColor: TAB_BAR_BG,
     justifyContent: "center",
     alignItems: "center",
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   },
 
   synqIcon: {
-    width: 86,
-    height: 86,
+    width: 98,
+    height: 98,
   },
 });
