@@ -15,18 +15,27 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ACCENT, BG } from "../../constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BORDER,
+  BUTTON_RADIUS,
+  MUTED,
+  MUTED3,
+  RADIUS_MD,
+  SPACE_2,
+  SPACE_3,
+  SPACE_4,
+  SPACE_5,
+  SPACE_6,
+  SURFACE,
+  TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_TITLE,
+  fonts,
+} from "../../constants/Variables";
 
 import AlertModal from "../alert-modal";
-
-const BACKGROUND = BG;
-const SURFACE = "#161616";
-
-const fonts = {
-  heavy: "Avenir-Heavy",
-  medium: "Avenir-Medium",
-  black: "Avenir-Black",
-};
 
 const FEEDBACK_EMAIL = "synqapp@gmail.com";
 
@@ -84,9 +93,8 @@ export default function FeedbackScreen() {
       setMessage("");
       setEmail("");
       setType("Feedback");
-
     } catch {
-      showAlert("Something went wrong", "We couldn’t open your email app.");
+      showAlert("Something went wrong", "We couldn't open your email app.");
     }
   };
 
@@ -114,8 +122,10 @@ export default function FeedbackScreen() {
       <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
-        <BackButton onPress={() => router.back()} />
-        <Text style={styles.headerTitle}>Feedback</Text>
+        <BackButton onPress={() => router.back()} style={styles.backButton} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>Feedback</Text>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -151,8 +161,8 @@ export default function FeedbackScreen() {
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder=""
-                placeholderTextColor="#666"
+                placeholder="you@example.com"
+                placeholderTextColor={MUTED3}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -168,7 +178,7 @@ export default function FeedbackScreen() {
                 value={message}
                 onChangeText={setMessage}
                 placeholder="Tell us what you think…"
-                placeholderTextColor="#666"
+                placeholderTextColor={MUTED3}
                 multiline
                 textAlignVertical="top"
                 style={[styles.input, styles.textarea]}
@@ -198,81 +208,86 @@ export default function FeedbackScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BACKGROUND },
+  container: { flex: 1, backgroundColor: BG },
 
   header: {
-    height: 72,
-    backgroundColor: ACCENT,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACE_4 + SPACE_3,
+    paddingTop: SPACE_3,
+    paddingBottom: SPACE_3,
   },
+  backButton: { marginRight: SPACE_3 },
   headerTitle: {
-    fontSize: 22,
-    fontFamily: fonts.heavy,
-    color: "black",
-    marginLeft: 6,
-  },
-
-  scrollContent: { paddingBottom: 40 },
-
-  hero: {
-    margin: 20,
-    backgroundColor: SURFACE,
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#202020",
-  },
-  heroTitle: {
-    fontSize: 20,
+    fontSize: TYPE_TITLE,
     fontFamily: fonts.heavy,
     color: "white",
-    marginBottom: 6,
+  },
+
+  scrollContent: {
+    paddingBottom: SPACE_6 + SPACE_3,
+    paddingTop: SPACE_3,
+  },
+
+  hero: {
+    marginHorizontal: SPACE_4 + SPACE_3,
+    marginBottom: SPACE_3,
+    backgroundColor: SURFACE,
+    borderRadius: RADIUS_MD,
+    padding: SPACE_4 + 2,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  heroTitle: {
+    fontSize: TYPE_BODY + 4,
+    fontFamily: fonts.heavy,
+    color: "white",
+    marginBottom: SPACE_3 - 4,
   },
   heroSubtitle: {
-    fontSize: 14.5,
+    fontSize: TYPE_BODY - 1,
     fontFamily: fonts.medium,
-    color: "#BDBDBD",
-    lineHeight: 20,
+    color: MUTED,
+    lineHeight: 22,
   },
   bold: { fontFamily: fonts.heavy, color: "white" },
 
-  section: { marginTop: 6 },
+  section: { marginTop: 2 },
   sectionTitle: {
-    color: "#666",
-    fontSize: 14,
+    color: MUTED,
+    fontSize: TYPE_CAPTION + 1,
     fontFamily: fonts.medium,
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginLeft: 25,
-    marginBottom: 10,
-    marginTop: 10,
+    marginLeft: SPACE_5 + 1,
+    marginBottom: SPACE_3 - 2,
+    marginTop: SPACE_3 - 2,
   },
 
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginHorizontal: 20,
+    gap: SPACE_3 - 2,
+    marginHorizontal: SPACE_4 + SPACE_3,
   },
   chip: {
     borderRadius: 999,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    backgroundColor: "#101010",
+    paddingVertical: SPACE_3 - 3,
+    paddingHorizontal: SPACE_3,
+    backgroundColor: SURFACE,
     borderWidth: 1,
-    borderColor: "#242424",
+    borderColor: BORDER,
   },
   chipActive: {
     backgroundColor: ACCENT,
     borderColor: ACCENT,
   },
   chipText: {
-    color: "#DADADA",
+    color: "white",
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION + 1,
   },
   chipTextActive: {
     color: "black",
@@ -281,41 +296,34 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: SURFACE,
-    marginHorizontal: 20,
-    borderRadius: 16,
-    padding: 14,
+    marginHorizontal: SPACE_4 + SPACE_3,
+    borderRadius: RADIUS_MD,
+    padding: SPACE_4 + 2,
     borderWidth: 1,
-    borderColor: "#202020",
+    borderColor: BORDER,
   },
 
   input: {
     color: "white",
     fontFamily: fonts.medium,
-    fontSize: 15,
-    paddingVertical: 8,
+    fontSize: TYPE_BODY,
+    paddingVertical: SPACE_2,
   },
   textarea: {
     minHeight: 140,
   },
-  helperText: {
-    marginTop: 8,
-    color: "#8C8C8C",
-    fontFamily: fonts.medium,
-    fontSize: 12.5,
-    lineHeight: 18,
-  },
 
   submitBtn: {
-    marginTop: 18,
-    marginHorizontal: 20,
+    marginTop: SPACE_4 + 2,
+    marginHorizontal: SPACE_4 + SPACE_3,
     backgroundColor: ACCENT,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    borderRadius: BUTTON_RADIUS + 2,
+    paddingVertical: SPACE_4 - 2,
+    paddingHorizontal: SPACE_4,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: SPACE_3 - 2,
   },
   submitBtnDisabled: {
     opacity: 0.5,
@@ -323,8 +331,8 @@ const styles = StyleSheet.create({
   submitText: {
     color: "black",
     fontFamily: fonts.black,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
   },
 
-  footerSpace: { height: 24 },
+  footerSpace: { height: SPACE_5 },
 });

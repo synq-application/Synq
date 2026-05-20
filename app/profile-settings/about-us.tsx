@@ -7,19 +7,24 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
-import { ACCENT, BG } from "../../constants/Variables";
-
-const BACKGROUND = BG;
-const SURFACE = "#161616";
-
-const fonts = {
-  black: "Avenir-Black",
-  heavy: "Avenir-Heavy",
-  medium: "Avenir-Medium",
-};
+import {
+  ACCENT,
+  BG,
+  BORDER,
+  MUTED,
+  RADIUS_MD,
+  SPACE_3,
+  SPACE_4,
+  SPACE_5,
+  SPACE_6,
+  SURFACE,
+  TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_TITLE,
+  fonts,
+} from "../../constants/Variables";
 
 export default function AboutUsScreen() {
   const Section = ({
@@ -39,8 +44,10 @@ export default function AboutUsScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        <BackButton onPress={() => router.back()} />
-        <Text style={styles.headerTitle}>About Us</Text>
+        <BackButton onPress={() => router.back()} style={styles.backButton} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>About Us</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -52,24 +59,22 @@ export default function AboutUsScreen() {
         </View>
 
         <Section title="Our mission">
-          <View style={styles.copyBlock}>
-            <Text style={styles.copyText}>
-              Synq is built around one idea: connection over engagement.
-            </Text>
-            <Text style={[styles.copyText, { marginTop: 10 }]}>
-              In a fast-paced world with unpredictable schedules, we’re overwhelmed by content we
-              don’t care about—and no one wants to add yet another commitment to their calendar.
-            </Text>
-            <Text style={[styles.copyText, { marginTop: 10 }]}>
-              What if technology didn’t only connect us—but helped us feel connected? Synq isn’t
-              just another social app. It’s a tool for presence, spontaneity, and real-world
-              connection.
-            </Text>
-            <Text style={[styles.copyText, { marginTop: 10 }]}>
-              Synq reimagines how people come together—enabling serendipitous moments of authentic
-              social fulfillment. Let’s Synq.
-            </Text>
-          </View>
+          <Text style={styles.copyText}>
+            Synq is built around one idea: connection over engagement.
+          </Text>
+          <Text style={styles.copyText}>
+            In a fast-paced world with unpredictable schedules, we're overwhelmed by content we
+            don't care about—and no one wants to add yet another commitment to their calendar.
+          </Text>
+          <Text style={styles.copyText}>
+            What if technology didn't only connect us—but helped us feel connected? Synq isn't
+            just another social app. It's a tool for presence, spontaneity, and real-world
+            connection.
+          </Text>
+          <Text style={styles.copyText}>
+            Synq reimagines how people come together—enabling serendipitous moments of authentic
+            social fulfillment. Let's Synq.
+          </Text>
         </Section>
 
         <Section title="How Synq works">
@@ -77,7 +82,7 @@ export default function AboutUsScreen() {
             <View style={styles.bulletRow}>
               <Text style={styles.bulletDot}>•</Text>
               <Text style={styles.bulletText}>
-                Tap <Text style={styles.bold}>Synq</Text> when you’re open.
+                Tap <Text style={styles.bold}>Synq</Text> when you're open.
               </Text>
             </View>
             <View style={styles.bulletRow}>
@@ -102,82 +107,91 @@ export default function AboutUsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BACKGROUND },
+  container: { flex: 1, backgroundColor: BG },
+
   header: {
-    height: 72,
-    backgroundColor: ACCENT,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACE_4 + SPACE_3,
+    paddingTop: SPACE_3,
+    paddingBottom: SPACE_3,
   },
+  backButton: { marginRight: SPACE_3 },
   headerTitle: {
-    fontSize: 22,
+    fontSize: TYPE_TITLE,
     fontFamily: fonts.heavy,
-    color: "black",
-    marginLeft: 6,
+    color: "white",
   },
 
-  scrollContent: { paddingBottom: 40 },
+  scrollContent: {
+    paddingBottom: SPACE_6 + SPACE_3,
+    paddingTop: SPACE_3,
+  },
 
   hero: {
-    margin: 20,
+    marginHorizontal: SPACE_4 + SPACE_3,
+    marginBottom: SPACE_3,
     backgroundColor: SURFACE,
-    borderRadius: 18,
-    padding: 18,
+    borderRadius: RADIUS_MD,
+    padding: SPACE_4 + 2,
     borderWidth: 1,
-    borderColor: "#202020",
+    borderColor: BORDER,
   },
   heroTitle: {
-    fontSize: 28,
+    fontSize: TYPE_TITLE + 2,
     fontFamily: fonts.black,
     color: "white",
-    marginBottom: 6,
+    marginBottom: SPACE_3 - 4,
   },
   heroSubtitle: {
-    fontSize: 14.5,
+    fontSize: TYPE_BODY - 1,
     fontFamily: fonts.medium,
-    color: "#BDBDBD",
-    lineHeight: 20,
+    color: MUTED,
+    lineHeight: 22,
   },
 
-  section: { marginTop: 6 },
+  section: { marginTop: 2 },
   sectionTitle: {
-    color: "#666",
-    fontSize: 14,
+    color: MUTED,
+    fontSize: TYPE_CAPTION + 1,
     fontFamily: fonts.medium,
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginLeft: 25,
-    marginBottom: 10,
-    marginTop: 10,
+    marginLeft: SPACE_5 + 1,
+    marginBottom: SPACE_3 - 2,
+    marginTop: SPACE_3 - 2,
   },
   card: {
     backgroundColor: SURFACE,
-    marginHorizontal: 20,
-    borderRadius: 16,
+    marginHorizontal: SPACE_4 + SPACE_3,
+    borderRadius: RADIUS_MD,
+    padding: SPACE_4 + 2,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#202020",
+    borderColor: BORDER,
   },
 
-  copyBlock: { padding: 18 },
   copyText: {
-    color: "#EAEAEA",
+    color: "white",
     fontFamily: fonts.medium,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: TYPE_BODY,
+    lineHeight: 24,
+    marginBottom: 10,
   },
   bold: { fontFamily: fonts.heavy, color: "white" },
 
-  bullets: { padding: 18 },
-  bulletRow: { flexDirection: "row", marginBottom: 10 },
+  bullets: { marginTop: 2 },
+  bulletRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
   bulletDot: { color: ACCENT, marginRight: 10, fontSize: 18, lineHeight: 22 },
   bulletText: {
-    color: "#EAEAEA",
+    color: "white",
     fontFamily: fonts.medium,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: TYPE_BODY,
+    lineHeight: 24,
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
-  footerSpace: { height: 24 },
+
+  footerSpace: { height: SPACE_5 },
 });

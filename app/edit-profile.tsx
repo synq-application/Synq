@@ -7,6 +7,8 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
+  Platform,
+  StatusBar,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -16,17 +18,32 @@ import {
   TouchableWithoutFeedback,
   View
 } from 'react-native';
-import { ACCENT, BG, BUTTON_RADIUS, MUTED2 } from "../constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BORDER,
+  BUTTON_RADIUS,
+  MUTED,
+  MUTED2,
+  MUTED3,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
+  RADIUS_MD,
+  SPACE_3,
+  SPACE_4,
+  SPACE_5,
+  SPACE_6,
+  SURFACE,
+  TEXT,
+  TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_TITLE,
+  fonts,
+} from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import { filterOrReject } from "@/src/lib/contentFilter";
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
-
-const fonts = {
-  black: 'Avenir-Black',
-  heavy: 'Avenir-Heavy',
-  medium: 'Avenir-Medium',
-};
 
 const US_STATE_ABBREV: Record<string, string> = {
   Alabama: "AL",
@@ -318,106 +335,129 @@ export default function EditProfileScreen() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
         <View style={styles.header}>
-          <BackButton onPress={handleCancel} />
-          <View style={styles.headerTitleBlock}>
+          <BackButton onPress={handleCancel} style={styles.backButton} />
+          <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Edit profile</Text>
           </View>
-          <View style={styles.backButtonSpacer} />
         </View>
-        <View style={styles.headerDivider} />
 
         <ScrollView
-          contentContainerStyle={styles.form}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Display Name</Text>
-          <TextInput
-            style={styles.input}
-            value={displayName}
-            onChangeText={setDisplayName}
-            placeholder="Your name"
-            placeholderTextColor="#444"
-          />
-        </View>
-
-        <View style={styles.row}>
-          <View style={[styles.inputGroup, { flex: 2, marginRight: 15 }]}>
-            <Text style={styles.label}>City</Text>
-            <TextInput
-              style={styles.input}
-              value={city}
-              onChangeText={setCity}
-              placeholder="e.g. New York"
-              placeholderTextColor="#444"
-            />
-          </View>
-          <View style={[styles.inputGroup, { flex: 1 }]}>
-            <Text style={styles.label}>State</Text>
-            <TextInput
-              style={styles.input}
-              value={state}
-              onChangeText={setState}
-              placeholder="NY"
-              placeholderTextColor="#444"
-              maxLength={2}
-              autoCapitalize="characters"
-            />
-          </View>
-        </View>
-
-        {!locationUsed && (
-          <TouchableOpacity
-            onPress={fillFromCurrentLocation}
-            disabled={saving || locating || removingLocation}
-            activeOpacity={0.85}
-            style={[styles.locationRow, (saving || locating || removingLocation) && { opacity: 0.7 }]}
-          >
-            <View style={styles.locationLeft}>
-              <Text style={styles.locationIcon}>📍</Text>
-              <View style={{ flexShrink: 1 }}>
-                <Text style={styles.locationPrimary}>
-                  {locating ? "Using current location…" : "Update using current location"}
-                </Text>
-                <Text style={styles.locationSecondary}>
-                  {locating ? "Finding your city and state" : "Auto-fill city & state"}
-                </Text>
-              </View>
+          <Text style={styles.groupTitle}>Name</Text>
+          <View style={styles.group}>
+            <View style={styles.fieldRow}>
+              <TextInput
+                style={styles.fieldInput}
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder="Display name"
+                placeholderTextColor={MUTED3}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
             </View>
-          </TouchableOpacity>
-        )}
-        {hasSavedLocation && (
+          </View>
+
+          <Text style={styles.groupTitle}>Location</Text>
+          <View style={styles.group}>
+            <View style={styles.locationFieldsRow}>
+              <TextInput
+                style={[styles.fieldInput, styles.cityInput]}
+                value={city}
+                onChangeText={setCity}
+                placeholder="City"
+                placeholderTextColor={MUTED3}
+                autoCapitalize="words"
+              />
+              <View style={styles.colDivider} />
+              <TextInput
+                style={[styles.fieldInput, styles.stateInput]}
+                value={state}
+                onChangeText={setState}
+                placeholder="ST"
+                placeholderTextColor={MUTED3}
+                maxLength={2}
+                autoCapitalize="characters"
+              />
+            </View>
+          </View>
+
+          {!locationUsed && (
+            <View style={styles.group}>
+              <TouchableOpacity
+                onPress={fillFromCurrentLocation}
+                disabled={saving || locating || removingLocation}
+                activeOpacity={0.75}
+                style={[
+                  styles.actionRow,
+                  (saving || locating || removingLocation) && styles.disabledControl,
+                ]}
+              >
+                <View style={styles.actionIconWrap}>
+                  {locating ? (
+                    <ActivityIndicator size="small" color={ACCENT} />
+                  ) : (
+                    <Ionicons name="location-outline" size={20} color={ACCENT} />
+                  )}
+                </View>
+                <View style={styles.actionCopy}>
+                  <Text style={styles.actionTitle}>
+                    {locating ? "Using current location…" : "Use current location"}
+                  </Text>
+                  <Text style={styles.actionSubtitle}>
+                    {locating ? "Finding your city and state" : "Auto-fill city and state"}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#666" />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {hasSavedLocation && (
+            <TouchableOpacity
+              onPress={() => setShowRemoveLocationConfirm(true)}
+              disabled={saving || locating || removingLocation}
+              style={styles.removeLocationBtn}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.removeLocationText}>Remove location</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
-            onPress={() => setShowRemoveLocationConfirm(true)}
-            disabled={saving || locating || removingLocation}
-            style={styles.removeLocationBtn}
+            onPress={handleSave}
+            disabled={saving || removingLocation}
+            style={[
+              styles.saveButton,
+              (saving || removingLocation) && styles.disabledControl,
+            ]}
+            activeOpacity={0.9}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="black" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save changes</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleCancel}
+            disabled={saving || removingLocation}
+            style={[
+              styles.cancelButton,
+              (saving || removingLocation) && styles.disabledControl,
+            ]}
             activeOpacity={0.8}
           >
-            <Text style={styles.removeLocationText}>Remove location</Text>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
-        )}
-        <TouchableOpacity
-          onPress={handleSave}
-          disabled={saving || removingLocation}
-          style={[styles.saveButton, (saving || removingLocation) && { opacity: 0.7 }]}
-          activeOpacity={0.85}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="black" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleCancel}
-          disabled={saving || removingLocation}
-          style={[styles.cancelButton, (saving || removingLocation) && { opacity: 0.45 }]}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
+
+          <View style={styles.footerSpace} />
         </ScrollView>
         <AlertModal
           visible={alertVisible}
@@ -459,111 +499,164 @@ export default function EditProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  darkFill: { flex: 1, backgroundColor: BG, justifyContent: 'center', alignItems: 'center' },
+  darkFill: {
+    flex: 1,
+    backgroundColor: BG,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    marginTop: 20,
+    paddingHorizontal: SPACE_4 + SPACE_3,
+    paddingTop: SPACE_3,
+    paddingBottom: SPACE_3,
   },
-  headerTitleBlock: {
-    flex: 1,
-    paddingHorizontal: 10,
-  },
+  backButton: { marginRight: SPACE_3 + 2 },
   headerTitle: {
-    color: "white",
-    fontSize: 22,
+    fontSize: TYPE_TITLE,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
-    lineHeight: 28,
+    color: "white",
   },
-  backButtonSpacer: {
+
+  scrollContent: {
+    paddingBottom: SPACE_6,
+    paddingTop: SPACE_3,
+  },
+
+  groupTitle: {
+    color: MUTED,
+    fontSize: TYPE_CAPTION + 1,
+    fontFamily: fonts.medium,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginLeft: SPACE_5,
+    marginBottom: SPACE_3 - 2,
+    marginTop: SPACE_3,
+  },
+  group: {
+    backgroundColor: SURFACE,
+    marginHorizontal: SPACE_4 + SPACE_3,
+    borderRadius: RADIUS_MD,
+    overflow: "hidden",
+    marginBottom: SPACE_3,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  fieldRow: {
+    paddingHorizontal: SPACE_4 + 2,
+    paddingVertical: 10,
+    justifyContent: "center",
+  },
+  locationFieldsRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    paddingHorizontal: SPACE_4 + 2,
+    paddingVertical: 10,
+    minHeight: 44,
+  },
+  colDivider: {
+    width: 1,
+    alignSelf: "stretch",
+    backgroundColor: "rgba(255,255,255,0.16)",
+    marginHorizontal: SPACE_3 - 2,
+    marginVertical: 6,
+  },
+  fieldInput: {
+    color: TEXT,
+    fontSize: TYPE_BODY,
+    fontFamily: fonts.medium,
+    paddingVertical: Platform.OS === "ios" ? 6 : 4,
+    paddingHorizontal: 0,
+    includeFontPadding: false,
+  },
+  cityInput: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: "center",
+  },
+  stateInput: {
+    width: 56,
+    alignSelf: "center",
+    textAlign: "center",
+    letterSpacing: 1.2,
+  },
+
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: SPACE_4,
+    paddingHorizontal: SPACE_4 + 2,
+    gap: SPACE_3 + 2,
+  },
+  actionIconWrap: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,255,133,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(0,255,133,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  headerDivider: { marginTop: 16, height: 1, backgroundColor: "#222" },
-
-  form: { padding: 25, paddingTop: 18, paddingBottom: 12 },
-
-  inputGroup: { marginBottom: 25 },
-  label: {
-    color: '#666',
-    fontSize: 12,
-    fontFamily: fonts.heavy,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-    letterSpacing: 1
-  },
-  input: {
-    backgroundColor: '#111',
-    color: 'white',
-    padding: 15,
-    borderRadius: BUTTON_RADIUS,
-    fontSize: 16,
+  actionCopy: { flex: 1, minWidth: 0 },
+  actionTitle: {
+    color: TEXT,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
-    borderWidth: 1,
-    borderColor: '#222'
+    lineHeight: 22,
   },
-  row: { flexDirection: 'row' },
-  locationRow: {
-    marginTop: 6,
-    borderRadius: BUTTON_RADIUS,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  actionSubtitle: {
+    marginTop: 2,
+    color: MUTED,
+    fontSize: TYPE_CAPTION + 1,
+    fontFamily: fonts.book,
+    lineHeight: 18,
   },
-  locationLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-    paddingRight: 10,
-  },
-  locationIcon: { fontSize: 16 },
-  locationPrimary: { color: "white", fontSize: 14, fontWeight: "800" },
-  locationSecondary: { marginTop: 2, color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: "600" },
+
   removeLocationBtn: {
     alignSelf: "flex-start",
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 2,
+    marginTop: SPACE_3 - 4,
+    marginLeft: SPACE_5,
+    marginBottom: SPACE_3,
+    paddingVertical: SPACE_3 - 4,
   },
   removeLocationText: {
     color: MUTED2,
-    fontSize: 14,
+    fontSize: TYPE_CAPTION + 2,
     fontFamily: fonts.medium,
   },
+
   saveButton: {
-    marginTop: 24,
+    marginTop: SPACE_5 + 8,
     alignSelf: "center",
-    height: 52,
-    width: "62%",
-    borderRadius: BUTTON_RADIUS,
+    width: PRIMARY_CTA_WIDTH,
+    height: PRIMARY_CTA_HEIGHT,
     backgroundColor: ACCENT,
+    borderRadius: BUTTON_RADIUS,
     alignItems: "center",
     justifyContent: "center",
   },
   saveButtonText: {
     color: "black",
-    fontSize: 16,
+    fontSize: TYPE_BODY + 2,
     fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
   },
   cancelButton: {
-    marginTop: 28,
+    marginTop: SPACE_4,
     alignSelf: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: SPACE_3,
+    paddingHorizontal: SPACE_4,
   },
   cancelButtonText: {
-    color: "#ff453a",
-    fontSize: 15,
-    fontFamily: fonts.heavy,
+    color: MUTED2,
+    fontSize: TYPE_BODY,
+    fontFamily: fonts.medium,
   },
+
+  disabledControl: { opacity: 0.5 },
+  footerSpace: { height: SPACE_5 },
 });
