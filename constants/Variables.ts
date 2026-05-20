@@ -14,7 +14,29 @@ export const synqSvg = `
 `;
 
 export const BG = "#090A0B";
-export const TAB_BAR_BG = "#0F1812";
+/** Solid black behind tab icons and labels. */
+export const TAB_BAR_BG = "#000000";
+/** Tab bar fade: transparent (content) → black (icons). */
+export const TAB_BAR_FADE_GRADIENT = [
+  "rgba(9,10,11,0)",
+  "rgba(0,0,0,0.72)",
+  TAB_BAR_BG,
+] as const;
+/** Profile header fade: black (icons) → page background. */
+export const PROFILE_HEADER_FADE_GRADIENT = [
+  TAB_BAR_BG,
+  "rgba(0,0,0,0.94)",
+  "rgba(0,0,0,0.68)",
+  "rgba(0,0,0,0.32)",
+  "rgba(9,10,11,0)",
+] as const;
+export const PROFILE_HEADER_FADE_LOCATIONS = [0, 0.22, 0.48, 0.72, 1] as const;
+/** Fade strip height directly under the notifications/settings row. */
+export const PROFILE_HEADER_FADE_BELOW_ICONS = 8;
+/** Clear space between the fade and the QR / profile photo. */
+export const PROFILE_HEADER_CONTENT_GAP = 22;
+/** Extra list/scroll bottom padding when the tab bar is position:absolute. */
+export const TAB_BAR_SCROLL_INSET = 96;
 export const PRIMARY_CTA_WIDTH = "68%";
 export const PRIMARY_CTA_HEIGHT = 56;
 export const BUTTON_RADIUS = 14;

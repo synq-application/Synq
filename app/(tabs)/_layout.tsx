@@ -1,9 +1,37 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { Tabs } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
-import { ACCENT, SPACE_2, SPACE_3, SPACE_4, SPACE_5, TAB_BAR_BG, TYPE_CAPTION, fonts } from "../../constants/Variables";
+import {
+  ACCENT,
+  SPACE_2,
+  SPACE_3,
+  SPACE_4,
+  SPACE_5,
+  TAB_BAR_BG,
+  TAB_BAR_FADE_GRADIENT,
+  TYPE_CAPTION,
+  fonts,
+} from "../../constants/Variables";
+
+const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 92 : 74;
+/** Gradient extends above the tab bar so content fades smoothly. */
+const TAB_BAR_FADE_EXTENSION = Platform.OS === "ios" ? 36 : 30;
+const TAB_BAR_ICON_NUDGE = Platform.OS === "ios" ? 4 : 3;
+
+function TabBarBackground() {
+  return (
+    <LinearGradient
+      colors={[...TAB_BAR_FADE_GRADIENT]}
+      locations={[0, 0.24, 0.44]}
+      start={{ x: 0.5, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
+      style={styles.tabBarGradient}
+    />
+  );
+}
 
 const SYNQ_ICON = require("../../assets/SYNQ-2.png");
 
@@ -13,10 +41,12 @@ export default function TabsLayout() {
       initialRouteName="index"
       screenOptions={{
         headerShown: false,
+        tabBarBackground: () => <TabBarBackground />,
         tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: ACCENT,
         tabBarInactiveTintColor: "rgba(255,255,255,0.4)",
         tabBarShowLabel: true,
+        tabBarIconStyle: { marginTop: TAB_BAR_ICON_NUDGE },
         tabBarLabelStyle: { fontSize: TYPE_CAPTION, marginBottom: -SPACE_2, fontFamily: fonts.medium, letterSpacing: 0.2 },
       }}
     >
@@ -66,11 +96,23 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
+  tabBarGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: TAB_BAR_HEIGHT + TAB_BAR_FADE_EXTENSION,
+  },
   tabBar: {
-    backgroundColor: TAB_BAR_BG,
-    borderTopColor: "rgba(0, 255, 133, 0.18)",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    height: Platform.OS === "ios" ? 92 : 74,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "transparent",
+    borderTopWidth: 0,
+    elevation: 0,
+    overflow: "visible",
+    height: TAB_BAR_HEIGHT,
     paddingBottom: Platform.OS === "ios" ? SPACE_5 : SPACE_3,
     paddingHorizontal: SPACE_4,
   },
@@ -81,7 +123,8 @@ const styles = StyleSheet.create({
     backgroundColor: TAB_BAR_BG,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: Platform.OS === "ios" ? 30 : 20,
+    marginBottom: Platform.OS === "ios" ? 26 : 16,
+    marginTop: TAB_BAR_ICON_NUDGE,
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.85)",
     shadowColor: "#FFF",

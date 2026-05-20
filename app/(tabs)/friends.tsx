@@ -23,6 +23,7 @@ import {
   synqOutlineAddBtnTextCompact,
   synqOutlineAddBtnTextDisabled,
   tabScreenMainHeaderTitle,
+  TAB_BAR_SCROLL_INSET,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
@@ -2146,8 +2147,8 @@ const styles = StyleSheet.create({
   friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
   mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
   friendsList: { flex: 1, width: "100%" },
-  friendsListContent: { paddingBottom: 40 },
-  friendsListContentEmpty: { flexGrow: 1, paddingBottom: 40 },
+  friendsListContent: { paddingBottom: TAB_BAR_SCROLL_INSET },
+  friendsListContentEmpty: { flexGrow: 1, paddingBottom: TAB_BAR_SCROLL_INSET },
   emptyStateCenter: {
     flex: 1,
     paddingTop: SPACE_5,

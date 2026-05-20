@@ -17,13 +17,19 @@ import {
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   profileScreenSectionTitle,
+  PROFILE_HEADER_CONTENT_GAP,
+  PROFILE_HEADER_FADE_BELOW_ICONS,
+  PROFILE_HEADER_FADE_GRADIENT,
+  PROFILE_HEADER_FADE_LOCATIONS,
   SURFACE,
+  TAB_BAR_SCROLL_INSET,
   TEXT,
 } from "@/constants/Variables";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { signOut as firebaseSignOut } from "firebase/auth";
@@ -53,7 +59,11 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
@@ -144,7 +154,14 @@ function ProfilePressable({
 
 export default function ProfileScreen() {
   const isFocused = useIsFocused();
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  const profileHeaderTop = insets.top + 12;
+  const profileIconRowBottom = profileHeaderTop + 48;
+  const profileHeaderGradientHeight =
+    profileIconRowBottom + PROFILE_HEADER_FADE_BELOW_ICONS;
+  const profileScrollPaddingTop =
+    profileIconRowBottom + PROFILE_HEADER_CONTENT_GAP;
   const params = useLocalSearchParams<{ focusEventId?: string | string[] }>();
   const focusEventIdRaw = params.focusEventId;
   const focusEventId =
@@ -599,35 +616,15 @@ export default function ProfileScreen() {
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" />
 
-      <View style={styles.header}>
-        <ProfilePressable
-          style={styles.headerIconContainer}
-          contentStyle={styles.headerIconInner}
-          onPress={() => router.push("/notifications")}
-          accessibilityLabel="Notifications"
-        >
-          <Icon name="notifications-outline" size={26} color="white" />
-          {requestCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{requestCount}</Text>
-            </View>
-          )}
-        </ProfilePressable>
-
-        <ProfilePressable
-          style={styles.headerIconContainer}
-          contentStyle={styles.headerIconInner}
-          onPress={() => router.push("/settings")}
-          accessibilityLabel="Settings"
-        >
-          <Icon name="settings-outline" size={26} color="white" />
-        </ProfilePressable>
-      </View>
-
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: profileScrollPaddingTop },
+        ]}
+        showsVerticalScrollIndicator={false}
+        scrollIndicatorInsets={{ right: 0 }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         onScrollBeginDrag={Keyboard.dismiss}
@@ -979,28 +976,77 @@ export default function ProfileScreen() {
           await firebaseSignOut(auth);
         }}
       />
+
+      <LinearGradient
+        pointerEvents="none"
+        colors={[...PROFILE_HEADER_FADE_GRADIENT]}
+        locations={[...PROFILE_HEADER_FADE_LOCATIONS]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={[styles.headerGradient, { height: profileHeaderGradientHeight }]}
+      />
+
+      <View
+        style={[styles.header, { top: profileHeaderTop }]}
+        pointerEvents="box-none"
+      >
+        <ProfilePressable
+          style={styles.headerIconContainer}
+          contentStyle={styles.headerIconInner}
+          onPress={() => router.push("/notifications")}
+          accessibilityLabel="Notifications"
+        >
+          <Icon name="notifications-outline" size={26} color="white" />
+          {requestCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{requestCount}</Text>
+            </View>
+          )}
+        </ProfilePressable>
+
+        <ProfilePressable
+          style={styles.headerIconContainer}
+          contentStyle={styles.headerIconInner}
+          onPress={() => router.push("/settings")}
+          accessibilityLabel="Settings"
+        >
+          <Icon name="settings-outline" size={26} color="white" />
+        </ProfilePressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  /** Matches `friends` tab: padded screen, header outside scroll so icon row aligns with other tabs. */
-  screen: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
+  /** Full-width scroll (no gutter scrollbar); sections pad themselves. */
+  screen: { flex: 1, backgroundColor: BG },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 70 },
-  heroOuter: { marginHorizontal: -20, marginTop: 0 },
+  scrollContent: {
+    paddingBottom: TAB_BAR_SCROLL_INSET,
+    paddingHorizontal: 20,
+  },
+  heroOuter: { marginTop: 0 },
   heroGradient: {
     backgroundColor: BG,
-    paddingHorizontal: 20,
     paddingBottom: 8,
     position: "relative",
   },
+  headerGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+  },
   header: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 88,
     alignItems: "flex-start",
-    zIndex: 2,
+    zIndex: 3,
   },
   headerIconContainer: {
     width: 40,
@@ -1028,7 +1074,7 @@ const styles = StyleSheet.create({
     borderColor: "black",
   },
   badgeText: { color: "white", fontSize: 10, fontFamily: fonts.black },
-  profileSection: { alignItems: "center", marginTop: 4, zIndex: 3 },
+  profileSection: { alignItems: "center", marginTop: 0 },
   qrContainer: { width: 200, height: 200, justifyContent: "center", alignItems: "center" },
   qrBg: { position: "absolute", opacity: 0.4, backgroundColor: "white", borderRadius: 25, padding: 10 },
   avatarGlowWrap: {
