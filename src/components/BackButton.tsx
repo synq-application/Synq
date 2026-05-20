@@ -25,6 +25,7 @@ export default function BackButton({
       onPress={onPress}
       style={[navigationBackBtn, style]}
       activeOpacity={activeOpacity}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
     >
