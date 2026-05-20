@@ -4,6 +4,8 @@ import { Image as ExpoImage } from "expo-image";
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { doc, onSnapshot } from "firebase/firestore";
+import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
+import { useAuthRefresh } from "./_layout";
 import React, { useEffect, useState } from "react";
 import {
   Linking,
@@ -57,16 +59,26 @@ export default function SettingsScreen() {
     setAlertVisible(true);
   };
 
-  useEffect(() => {
-    if (!auth.currentUser?.uid) return;
+  const { user } = useAuthRefresh();
 
-    const userDocRef = doc(db, "users", auth.currentUser.uid);
-    const unsubscribe = onSnapshot(userDocRef, (snap) => {
-      if (snap.exists()) setUserData(snap.data());
-    });
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) {
+      setUserData(undefined);
+      return;
+    }
+
+    const userDocRef = doc(db, "users", uid);
+    const unsubscribe = onSnapshot(
+      userDocRef,
+      (snap) => {
+        if (snap.exists()) setUserData(snap.data());
+      },
+      ignoreSnapshotPermissionDenied
+    );
 
     return () => unsubscribe();
-  }, []);
+  }, [user?.uid]);
 
   useEffect(() => {
     prefetchResolvedAvatar(userData?.imageurl);
@@ -92,8 +104,8 @@ export default function SettingsScreen() {
 
   const signOut = async () => {
     try {
+      router.replace("/(auth)/welcome");
       await auth.signOut();
-      router.replace("/"); 
     } catch {
       showAlert("Sign out failed", "Please try again.");
     }

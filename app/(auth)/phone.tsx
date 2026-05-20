@@ -25,7 +25,7 @@ import {
 import BackButton from "@/src/components/BackButton";
 import { Ionicons } from "@expo/vector-icons";
 import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { signInWithPhoneNumber } from "firebase/auth";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -50,7 +50,9 @@ import { usePreAuthTermsGate } from "../../src/lib/usePreAuthTermsGate";
 const { width } = Dimensions.get("window");
 
 export default function Phone() {
-  const termsReady = usePreAuthTermsGate("phone");
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isSignIn = mode === "signin";
+  const termsReady = usePreAuthTermsGate("phone", { enabled: !isSignIn });
   const [phoneNumber, setPhoneNumber] = useState("");
   const [countryCode, setCountryCode] = useState("+1");
   const [confirm, setConfirm] = useState<any>(null);
@@ -187,8 +189,13 @@ export default function Phone() {
           >
           {!isCodeSent ? (
             <View style={[styles.innerContent, { marginTop: onboardingAuthInnerMarginTop() }]}>
-              <Text style={styles.title}>What’s your{"\n"}number?</Text>
+              <Text style={styles.title}>
+                {isSignIn ? "Welcome back" : "What’s your\nnumber?"}
+              </Text>
               <View style={styles.divider} />
+              {isSignIn ? (
+                <Text style={styles.subtitle}>Sign in with your phone number</Text>
+              ) : null}
 
               <View style={styles.inputRow}>
                 <View style={styles.countryWrapper}>
@@ -216,7 +223,9 @@ export default function Phone() {
               </View>
 
               <Text style={styles.helper}>
-                We’ll text you a code to verify your account.
+                {isSignIn
+                  ? "We’ll text you a code to sign in."
+                  : "We’ll text you a code to verify your account."}
               </Text>
 
               <TouchableOpacity
@@ -235,8 +244,17 @@ export default function Phone() {
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => router.push("/(auth)/email")} style={styles.linkBtn}>
-                <Text style={styles.linkText}>Sign up with email instead</Text>
+              <TouchableOpacity
+                onPress={() =>
+                  router.push(isSignIn ? "/(auth)/login" : "/(auth)/email")
+                }
+                style={styles.linkBtn}
+              >
+                <Text style={styles.linkText}>
+                  {isSignIn
+                    ? "Sign in with email instead"
+                    : "Sign up with email instead"}
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (

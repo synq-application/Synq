@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "postinstall": "node scripts/ensure-content-filter.mjs",
+    "sync:content-filter": "node scripts/ensure-content-filter.mjs",
     "eas-build-post-install": "node scripts/ensure-content-filter.mjs",
     "start": "expo start",
     "android": "expo start --android",

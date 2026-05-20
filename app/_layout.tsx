@@ -11,7 +11,7 @@ import {
   useSegments,
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { onAuthStateChanged, signOut, updateProfile, User } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, {
@@ -56,6 +56,12 @@ import {
   computeSynqActiveFromUserData,
   readCachedSynqActive,
 } from "../src/lib/synqSession";
+import {
+  displayNameFromUserDoc,
+  profileGateFromCache,
+  userHasDisplayName,
+  userHasLocation,
+} from "../src/lib/userProfile";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -109,7 +115,10 @@ async function registerForPushNotificationsAsync() {
   return token;
 }
 
-const AuthContext = createContext({ refreshAuth: () => {} });
+const AuthContext = createContext({
+  refreshAuth: () => {},
+  user: null as User | null,
+});
 export const useAuthRefresh = () => useContext(AuthContext);
 const PENDING_INVITE_FROM_UID_KEY = "synq:pendingInviteFromUid";
 const PENDING_INVITE_CODE_KEY = "synq:pendingInviteCode";
@@ -149,6 +158,10 @@ export default function RootLayout() {
   const synqBootUidRef = useRef<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [communityTermsOk, setCommunityTermsOk] = useState<boolean | null>(null);
+  const [userProfileGate, setUserProfileGate] = useState<{
+    hasDisplayName: boolean;
+    hasLocation: boolean;
+  } | null>(null);
   const inviteProcessingRef = useRef(false);
   const inviteAttemptsRef = useRef<Set<string>>(new Set());
 
@@ -343,6 +356,11 @@ export default function RootLayout() {
           hydrateOwnProfileFromDisk(u.uid),
         ]);
         prewarmMeTabScreen(u.uid);
+        const cachedGate = profileGateFromCache(u.uid);
+        if (cachedGate) setUserProfileGate(cachedGate);
+      } else {
+        setUserProfileGate(null);
+        setCommunityTermsOk(null);
       }
       setUser(u);
       setAuthReady(true);
@@ -418,22 +436,62 @@ export default function RootLayout() {
   useEffect(() => {
     if (!user?.uid) {
       setCommunityTermsOk(null);
+      setUserProfileGate(null);
       return;
     }
     let cancelled = false;
+    const cachedGate = profileGateFromCache(user.uid);
+    if (cachedGate) setUserProfileGate(cachedGate);
+
     (async () => {
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
         const data = snap.data() as Record<string, unknown> | undefined;
+        const hasDisplayName = userHasDisplayName(data);
+        const hasLocation = userHasLocation(data);
+
+        if (!cancelled) {
+          setUserProfileGate({ hasDisplayName, hasLocation });
+        }
+
         if (data?.suspended === true) {
           await signOut(auth);
-          if (!cancelled) setCommunityTermsOk(null);
+          if (!cancelled) {
+            setCommunityTermsOk(null);
+            setUserProfileGate(null);
+          }
           return;
         }
+
+        if (hasDisplayName && auth.currentUser && !auth.currentUser.displayName) {
+          const name = displayNameFromUserDoc(data);
+          if (name) {
+            try {
+              await updateProfile(auth.currentUser, {
+                displayName: name,
+                photoURL:
+                  typeof data?.imageurl === "string" ? data.imageurl : null,
+              });
+              await auth.currentUser.reload();
+              if (!cancelled) {
+                setUser(auth.currentUser);
+              }
+            } catch {}
+          }
+        }
+
         if (userHasAcceptedCommunityTerms(data)) {
           if (!cancelled) setCommunityTermsOk(true);
           return;
         }
+
+        // Returning accounts: terms were accepted at sign-up; do not re-prompt on login.
+        if (hasDisplayName) {
+          await persistCommunityTermsAcceptance(user.uid);
+          if (!cancelled) setCommunityTermsOk(true);
+          return;
+        }
+
         const preAuth = await getPreAuthTermsAccepted();
         if (preAuth) {
           await persistCommunityTermsAcceptance(user.uid);
@@ -442,7 +500,10 @@ export default function RootLayout() {
         }
         if (!cancelled) setCommunityTermsOk(false);
       } catch {
-        if (!cancelled) setCommunityTermsOk(false);
+        if (!cancelled) {
+          setCommunityTermsOk(false);
+          setUserProfileGate(null);
+        }
       }
     })();
     return () => {
@@ -454,15 +515,27 @@ export default function RootLayout() {
     if (!authReady || !navReady) return;
 
     const inAuthGroup = segments[0] === "(auth)";
-    const onLocationPage = segments[0] === "location";
+    const onLocationPage =
+      segments[0] === "location" ||
+      (segments[0] === "(auth)" && segments[1] === "location");
+    const onInterestsPage = segments[0] === "add-interests";
     const onDetailsPage = segments[1] === "details";
     const onCommunityTermsPage = segments[1] === "community-terms";
-    const hasName = !!user?.displayName;
+    const hasName =
+      !!user?.displayName || userProfileGate?.hasDisplayName === true;
 
     if (!user) {
       if (!inAuthGroup) router.replace("/(auth)/welcome");
       return;
     }
+
+    // Legacy persisted route from before location moved under (auth)
+    if (segments[0] === "location") {
+      router.replace("/(tabs)");
+      return;
+    }
+
+    if (userProfileGate === null) return;
 
     if (!hasName) {
       if (!onDetailsPage) router.replace("/(auth)/details");
@@ -478,14 +551,24 @@ export default function RootLayout() {
 
     if (communityTermsOk !== true) return;
 
-    if (onLocationPage) return;
+    if (
+      (onLocationPage && userProfileGate.hasLocation) ||
+      (onInterestsPage && userProfileGate.hasDisplayName)
+    ) {
+      router.replace("/(tabs)");
+      return;
+    }
+
+    if (onLocationPage || onInterestsPage) return;
 
     if (inAuthGroup && !onCommunityTermsPage) router.replace("/(tabs)");
-  }, [authReady, navReady, user, segments, communityTermsOk]);
+  }, [authReady, navReady, user, segments, communityTermsOk, userProfileGate]);
 
   useEffect(() => {
     if (!authReady || !navReady || !user?.uid) return;
-    if (!user.displayName) return;
+    const hasName =
+      !!user.displayName || userProfileGate?.hasDisplayName === true;
+    if (!hasName) return;
     if (inviteProcessingRef.current) return;
 
     const processPendingInvite = async () => {
@@ -536,7 +619,7 @@ export default function RootLayout() {
     };
 
     void processPendingInvite();
-  }, [authReady, navReady, user?.uid, user?.displayName]);
+  }, [authReady, navReady, user?.uid, user?.displayName, userProfileGate]);
 
   useEffect(() => {
     if (!authReady || !navReady || !assetsReady) return;
@@ -611,9 +694,24 @@ export default function RootLayout() {
   ]);
 
   const synqBootReady = user == null || synqBoot !== null;
+  const authGateReady =
+    !user || (userProfileGate !== null && communityTermsOk !== null);
+  const onOnboardingScreen =
+    segments[0] === "location" ||
+    (segments[0] === "(auth)" && segments[1] === "location") ||
+    segments[0] === "add-interests";
+  const holdSplashForStaleOnboarding =
+    !!user &&
+    onOnboardingScreen &&
+    userProfileGate !== null &&
+    (((segments[0] === "location" ||
+      (segments[0] === "(auth)" && segments[1] === "location")) &&
+      userProfileGate.hasLocation) ||
+      (segments[0] === "add-interests" && userProfileGate.hasDisplayName));
   const appReady =
-    authReady && navReady && assetsReady && synqBootReady;
-  const showSplash = !appReady || !minimumSplashElapsed;
+    authReady && navReady && assetsReady && synqBootReady && authGateReady;
+  const showSplash =
+    !appReady || !minimumSplashElapsed || holdSplashForStaleOnboarding;
 
   const locationModals =
     user && authReady ? (
@@ -633,7 +731,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>
-        <AuthContext.Provider value={{ refreshAuth }}>
+        <AuthContext.Provider value={{ refreshAuth, user }}>
           <SynqBootProvider
             value={synqBoot ?? { cachedSynqActive: false }}
           >
@@ -660,7 +758,6 @@ export default function RootLayout() {
             ) : (
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="(auth)" />
-                <Stack.Screen name="location" />
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen
                   name="friend-profile"

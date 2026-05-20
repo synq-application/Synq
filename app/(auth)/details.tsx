@@ -134,7 +134,7 @@ export default function Details() {
       );
 
       await auth.currentUser.reload();
-      router.push("/location");
+      router.push("/(auth)/location?onboarding=1");
     } catch (e: any) {
       console.error("[Details] saveDetails error:", e);
       showAlert(e?.message ?? "Something went wrong.", "Error");

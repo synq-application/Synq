@@ -1,7 +1,7 @@
 import * as Location from "expo-location";
-import { useRouter } from "expo-router";
-import { doc, setDoc } from "firebase/firestore";
-import React, { useMemo, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { stateAbbreviations } from "../assets/Mocks";
+import { stateAbbreviations } from "../../assets/Mocks";
 import {
   ONBOARDING_H_PADDING,
   ONBOARDING_SCROLL_BOTTOM,
@@ -32,10 +32,12 @@ import {
   PRIMARY_CTA_WIDTH,
   TEXT,
   fonts,
-} from "../constants/Variables";
-import { auth, db } from "../src/lib/firebase";
-import { useAuthRefresh } from "./_layout";
-import AlertModal from "./alert-modal";
+} from "../../constants/Variables";
+import { auth, db } from "../../src/lib/firebase";
+import { getCachedOwnProfile } from "../../src/lib/ownProfileCache";
+import { userHasLocation } from "../../src/lib/userProfile";
+import { useAuthRefresh } from "../_layout";
+import AlertModal from "../alert-modal";
 
 const US_STATE_ABBREV: Record<string, string> = stateAbbreviations;
 
@@ -47,8 +49,44 @@ function isValidStateAbbrev(abbrev: string): boolean {
 
 export default function LocationDetails() {
   const router = useRouter();
-  const { refreshAuth } = useAuthRefresh();
+  const { onboarding } = useLocalSearchParams<{ onboarding?: string }>();
+  const isSignupOnboarding = onboarding === "1";
+  const { refreshAuth, user } = useAuthRefresh();
   const insets = useSafeAreaInsets();
+  const [skipScreen, setSkipScreen] = useState(
+    () => !isSignupOnboarding
+  );
+
+  useEffect(() => {
+    if (!isSignupOnboarding) {
+      router.replace("/(tabs)");
+      return;
+    }
+
+    const uid = user?.uid;
+    if (!uid) return;
+
+    const cached = getCachedOwnProfile(uid);
+    if (cached?.city?.trim() && cached?.state?.trim()) {
+      setSkipScreen(true);
+      router.replace("/(tabs)");
+      return;
+    }
+
+    let cancelled = false;
+    getDoc(doc(db, "users", uid))
+      .then((snap) => {
+        if (cancelled || !snap.exists()) return;
+        if (userHasLocation(snap.data() as Record<string, unknown>)) {
+          setSkipScreen(true);
+          router.replace("/(tabs)");
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignupOnboarding, user?.uid, router]);
 
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -185,6 +223,10 @@ export default function LocationDetails() {
     refreshAuth();
     router.push("/add-interests");
   };
+
+  if (skipScreen) {
+    return <View style={styles.container} />;
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
