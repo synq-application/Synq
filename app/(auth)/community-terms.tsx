@@ -17,6 +17,7 @@ import {
   persistCommunityTermsAcceptance,
   setPreAuthTermsAccepted,
 } from "@/src/lib/communityTerms";
+import BackButton from "@/src/components/BackButton";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
@@ -99,13 +100,7 @@ export default function CommunityTermsScreen() {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" />
       {!isPostAuth ? (
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backBtn}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={20} color={ACCENT} />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} style={styles.backBtn} />
       ) : null}
 
       <ScrollView
@@ -196,12 +191,6 @@ const styles = StyleSheet.create({
     top: 52,
     left: 20,
     zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
   },
   scroll: {
     paddingHorizontal: ONBOARDING_H_PADDING,

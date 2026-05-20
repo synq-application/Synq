@@ -1,3 +1,4 @@
+import BackButton from "@/src/components/BackButton";
 import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
@@ -301,12 +302,7 @@ export default function NotificationsScreen() {
       <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Ionicons name="chevron-back" size={22} color="#888" />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} style={styles.backButton} />
 
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Notifications</Text>
@@ -365,15 +361,7 @@ const styles = StyleSheet.create({
     paddingTop: SPACE_3,
     paddingBottom: SPACE_3,
   },
-  backButton: {
-    marginRight: 12,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#1F1F1F",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  backButton: { marginRight: 12 },
   refreshBtn: {
     width: 36,
     height: 36,

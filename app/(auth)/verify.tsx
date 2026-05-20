@@ -1,3 +1,4 @@
+import BackButton from "@/src/components/BackButton";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { PhoneAuthProvider, signInWithCredential } from "firebase/auth";
@@ -77,9 +78,7 @@ export default function Verify() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color={ACCENT} />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} style={styles.backBtn} />
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={[
@@ -197,13 +196,5 @@ const styles = StyleSheet.create({
     top: ONBOARDING_BACK_TOP,
     left: ONBOARDING_BACK_LEFT,
     zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
   },
 });

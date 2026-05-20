@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import BackButton from "@/src/components/BackButton";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -39,9 +39,7 @@ export default function AboutUsScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={22} color="black" />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
         <Text style={styles.headerTitle}>About Us</Text>
       </View>
 
@@ -111,13 +109,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
   },
   headerTitle: {
     fontSize: 22,

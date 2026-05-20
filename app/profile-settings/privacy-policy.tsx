@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import BackButton from "@/src/components/BackButton";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -59,9 +59,7 @@ export default function PrivacyPolicyScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={22} color="black" />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} style={styles.backButton} />
         <Text style={styles.headerTitle}>Privacy Policy</Text>
       </View>
 
@@ -326,15 +324,7 @@ const styles = StyleSheet.create({
     paddingTop: SPACE_3,
     paddingBottom: SPACE_3,
   },
-  backButton: {
-    marginRight: 12,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#1F1F1F",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  backButton: { marginRight: 12 },
   headerTitle: {
     fontSize: TYPE_TITLE,
     fontFamily: fonts.heavy,

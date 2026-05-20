@@ -68,6 +68,19 @@ export const CLOSE_ICON_COLOR = MUTED2;
 export const CLOSE_ICON_SIZE = 26;
 /** Inline clear (search fields). */
 export const CLOSE_ICON_SIZE_INLINE = 16;
+/** Navigation back (“<”) — solid color so it reads the same on every surface. */
+export const BACK_ICON_NAME = "chevron-back" as const;
+export const BACK_ICON_COLOR = "#888888";
+export const BACK_ICON_SIZE = 22;
+/** Shared circular shell for header back controls. */
+export const navigationBackBtn: ViewStyle = {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: "#1F1F1F",
+  alignItems: "center",
+  justifyContent: "center",
+};
 export const TYPE_DISPLAY = 34;
 export const TYPE_TITLE = 26;
 export const TYPE_SECTION = 20;

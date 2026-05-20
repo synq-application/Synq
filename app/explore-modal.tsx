@@ -5,6 +5,7 @@ import {
     PRIMARY_CTA_WIDTH,
     fonts,
 } from "@/constants/Variables";
+import BackButton from "@/src/components/BackButton";
 import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
@@ -165,9 +166,7 @@ export default function ExploreModal({
                             ) : (
                                 <View style={styles.optionsView}>
                                     <View style={styles.header}>
-                                        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                                            <Ionicons name="chevron-back" size={22} color="#888" />
-                                        </TouchableOpacity>
+                                        <BackButton onPress={onBack} style={styles.backButton} />
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.title} numberOfLines={1}>
                                                 {currentCategory}
@@ -259,15 +258,7 @@ const styles = StyleSheet.create({
         padding: 20,
         alignItems: "center",
     },
-    backButton: {
-        marginRight: 12,
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: "#1F1F1F",
-        alignItems: "center",
-        justifyContent: "center",
-    },
+    backButton: { marginRight: 12 },
     title: {
         color: "white",
         fontSize: 22,

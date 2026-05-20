@@ -41,6 +41,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import BackButton from "@/src/components/BackButton";
 import Icon from "react-native-vector-icons/Ionicons";
 import {
   eventKey,
@@ -432,9 +433,7 @@ export default function FriendProfile() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.center}>
-          <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-            <Icon name="chevron-back" size={22} color={TEXT} />
-          </TouchableOpacity>
+          <BackButton onPress={handleBack} />
           <Text style={styles.emptyProfileText}>Could not load this profile.</Text>
         </View>
       </SafeAreaView>
@@ -859,9 +858,7 @@ export default function FriendProfile() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-            <Icon name="chevron-back" size={22} color={TEXT} />
-          </TouchableOpacity>
+          <BackButton onPress={handleBack} />
           <TouchableOpacity
             style={styles.optionsBtn}
             onPress={() => setShowOptionsSheet(true)}
@@ -1235,17 +1232,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: PROFILE_SURFACE,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: PROFILE_BORDER,
-    justifyContent: "center",
-    alignItems: "center",
   },
 
   optionsBtn: {

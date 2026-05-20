@@ -1,3 +1,4 @@
+import BackButton from '@/src/components/BackButton';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from "expo-location";
 import { router } from 'expo-router';
@@ -318,9 +319,7 @@ export default function EditProfileScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={22} color="#888" />
-          </TouchableOpacity>
+          <BackButton onPress={handleCancel} />
           <View style={styles.headerTitleBlock}>
             <Text style={styles.headerTitle}>Edit profile</Text>
           </View>
@@ -479,14 +478,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
     lineHeight: 28,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#1F1F1F",
-    alignItems: "center",
-    justifyContent: "center",
   },
   backButtonSpacer: {
     width: 40,

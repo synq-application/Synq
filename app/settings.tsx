@@ -1,3 +1,4 @@
+import BackButton from "@/src/components/BackButton";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import Constants from "expo-constants";
@@ -147,9 +148,7 @@ export default function SettingsScreen() {
       <StatusBar barStyle="light-content" />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={22} color="#888" />
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} style={styles.backButton} />
 
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Settings</Text>
@@ -261,15 +260,7 @@ const styles = StyleSheet.create({
     paddingTop: SPACE_3,
     paddingBottom: SPACE_3,
   },
-  backButton: {
-    marginRight: 12,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#1F1F1F",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  backButton: { marginRight: 12 },
   headerTitle: {
     fontSize: TYPE_TITLE,
     fontFamily: fonts.heavy,
