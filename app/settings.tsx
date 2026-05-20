@@ -1,4 +1,4 @@
-import BackButton from "@/src/components/BackButton";
+import StackScreenHeader from "@/src/components/StackScreenHeader";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import Constants from "expo-constants";
@@ -21,7 +21,9 @@ import {
   BORDER,
   BUTTON_RADIUS,
   MODAL_RADIUS,
+  fonts,
   MUTED,
+  MUTED2,
   RADIUS_MD,
   SPACE_1,
   SPACE_3,
@@ -31,7 +33,6 @@ import {
   SURFACE,
   TYPE_BODY,
   TYPE_CAPTION,
-  TYPE_TITLE,
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import { prefetchResolvedAvatar, resolveAvatar } from "./helpers";
@@ -40,12 +41,6 @@ import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
 
 const BACKGROUND = BG;
-
-const fonts = {
-  black: "Avenir-Black",
-  heavy: "Avenir-Heavy",
-  medium: "Avenir-Medium",
-};
 
 export default function SettingsScreen() {
   const [userData, setUserData] = useState<any>(null);
@@ -129,7 +124,7 @@ export default function SettingsScreen() {
       {value ? (
         <Text style={styles.itemValue}>{value}</Text>
       ) : (
-        <Ionicons name="chevron-forward" size={20} color="#666" />
+        <Ionicons name="chevron-forward" size={20} color={MUTED2} />
       )}
     </TouchableOpacity>
   );
@@ -147,13 +142,7 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <View style={styles.header}>
-        <BackButton onPress={() => router.back()} style={styles.backButton} />
-
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Settings</Text>
-        </View>
-      </View>
+      <StackScreenHeader title="Settings" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.userSection}>
@@ -179,7 +168,7 @@ export default function SettingsScreen() {
             onPress={() => router.push("/edit-profile")}
           />
           <SettingItem
-            label="Notifications"
+            label="Push notification settings"
             onPress={openSystemSettings}
           />
           <SettingItem label="Sign out" onPress={confirmSignOut} />
@@ -253,19 +242,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BACKGROUND },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACE_4 + SPACE_1,
-    paddingTop: SPACE_3,
-    paddingBottom: SPACE_3,
-  },
-  backButton: { marginRight: 12 },
-  headerTitle: {
-    fontSize: TYPE_TITLE,
-    fontFamily: fonts.heavy,
-    color: "white",
-  },
   scrollContent: {
     paddingBottom: SPACE_6 + SPACE_1,
     paddingTop: SPACE_3,

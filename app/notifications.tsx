@@ -1,5 +1,5 @@
-import BackButton from "@/src/components/BackButton";
 import CloseIcon from "@/src/components/CloseIcon";
+import StackScreenHeader from "@/src/components/StackScreenHeader";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { router } from "expo-router";
@@ -29,6 +29,8 @@ import {
   BG,
   BORDER,
   DEFAULT_AVATAR,
+  fonts,
+  MUTED2,
   RADIUS_MD,
   SPACE_3,
   SPACE_4,
@@ -36,7 +38,6 @@ import {
   TYPE_BODY,
   TYPE_CAPTION,
   TYPE_SECTION,
-  TYPE_TITLE
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 
@@ -54,15 +55,10 @@ function prefetchRequestRows(items: any[]) {
 const SURFACE = "rgba(255,255,255,0.06)";
 const BACKGROUND = BG;
 
-const fonts = {
-  black: "Avenir-Black",
-  heavy: "Avenir-Heavy",
-  medium: "Avenir-Medium",
-};
-
 export default function NotificationsScreen() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const [alertVisible, setAlertVisible] = useState(false);
@@ -148,10 +144,12 @@ export default function NotificationsScreen() {
         prefetchRequestRows(resolved);
         setRequests(resolved);
         setLoading(false);
+        setLoadError(false);
       },
       (error) => {
         console.error("Firestore Snapshot failed:", error);
         setLoading(false);
+        setLoadError(true);
       }
     );
 
@@ -301,17 +299,16 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <View style={styles.header}>
-        <BackButton onPress={() => router.back()} style={styles.backButton} />
-
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Notifications</Text>
-        </View>
-      </View>
+      <StackScreenHeader title="Friend requests" />
 
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color={ACCENT} />
+        </View>
+      ) : loadError ? (
+        <View style={styles.center}>
+          <Text style={styles.emptyTitle}>Could not load requests</Text>
+          <Text style={styles.emptySubtitle}>Pull down to refresh or try again later.</Text>
         </View>
       ) : (
         <FlatList
@@ -326,12 +323,12 @@ export default function NotificationsScreen() {
                 <Ionicons
                   name="notifications-off-outline"
                   size={34}
-                  color="#666"
+                  color={MUTED2}
                 />
               </View>
               <Text style={styles.emptyTitle}>All caught up</Text>
               <Text style={styles.emptySubtitle}>
-                No new notifications right now.
+                No pending friend requests right now.
               </Text>
             </View>
           }
@@ -354,28 +351,7 @@ export default function NotificationsScreen() {
 }
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BACKGROUND },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACE_4 + 4,
-    paddingTop: SPACE_3,
-    paddingBottom: SPACE_3,
-  },
-  backButton: { marginRight: 12 },
-  refreshBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#1F1F1F",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    fontSize: TYPE_TITLE,
-    fontFamily: fonts.heavy,
-    color: "white",
-  },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: SPACE_4 },
   listContent: {
     paddingBottom: SPACE_6 + 8,
     paddingTop: SPACE_3,

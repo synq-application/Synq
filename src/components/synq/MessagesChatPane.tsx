@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { MUTED } from "../../../constants/Variables";
+import { ACCENT, MUTED, MUTED2, MUTED3 } from "../../../constants/Variables";
 import { formatTime, parseIdeaText, resolveAvatar } from "../../../app/helpers";
 
 type Props = {
@@ -113,10 +113,20 @@ export default function MessagesChatPane({
               accessibilityRole="button"
               accessibilityLabel="Open Synq AI place suggestions"
             >
-              <Ionicons name="sparkles" size={14} color="#2BFF88" />
+              <Ionicons name="sparkles" size={14} color={ACCENT} />
               <Text style={styles.aiChipText}>{rotatingAIText}</Text>
-              <Ionicons name="chevron-forward" size={14} color="#666" />
+              <Ionicons name="chevron-forward" size={14} color={MUTED2} />
             </TouchableOpacity>
+            <Text
+              style={{
+                color: MUTED3,
+                fontSize: 11,
+                marginTop: 6,
+                fontFamily: "Avenir-Medium",
+              }}
+            >
+              Long-press a message to report
+            </Text>
           </View>
         </View>
         <CloseButton
@@ -324,7 +334,7 @@ export default function MessagesChatPane({
                   <Ionicons
                     name="sparkles"
                     size={16}
-                    color="#2BFF88"
+                    color={ACCENT}
                     style={{ marginRight: 8 }}
                   />
                   <Text style={styles.aiCardTitleSmall}>Synq Suggestion</Text>
@@ -363,7 +373,7 @@ export default function MessagesChatPane({
             accessibilityRole="button"
             accessibilityLabel="Send message"
           >
-            <Ionicons name="send" size={18} color="black" />
+            <Ionicons name="send" size={18} color={ACCENT} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

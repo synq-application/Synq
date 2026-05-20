@@ -1,4 +1,5 @@
 import CloseButton from "@/src/components/CloseButton";
+import { ACCENT } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { FlatList, Text, TouchableOpacity, View } from "react-native";
@@ -44,7 +45,7 @@ export default function MessagesInboxPane({
         ListEmptyComponent={
           <View style={styles.inboxEmptyWrap}>
             <View style={styles.inboxEmptyIconWrap}>
-              <Ionicons name="chatbubbles-outline" size={28} color="#2BFF88" />
+              <Ionicons name="chatbubbles-outline" size={28} color={ACCENT} />
             </View>
             <Text style={styles.inboxEmptyTitle}>No messages yet</Text>
             <Text style={styles.inboxEmptySub}>

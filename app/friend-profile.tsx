@@ -2,6 +2,7 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
+  DESTRUCTIVE,
   fonts,
   MODAL_RADIUS,
   MUTED2,
@@ -42,7 +43,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "@/src/components/BackButton";
-import Icon from "react-native-vector-icons/Ionicons";
+import { Ionicons } from "@expo/vector-icons";
 import {
   eventKey,
   eventKeyLoose,
@@ -458,6 +459,9 @@ export default function FriendProfile() {
       goBackOrHome();
     } catch (e) {
       console.error("Failed to remove friend", e);
+      setAlertTitle("Could not remove friend");
+      setAlertMessage("Please check your connection and try again.");
+      setAlertVisible(true);
     }
   };
 
@@ -490,6 +494,9 @@ export default function FriendProfile() {
       setCachedOutgoingFriendRequest(user.uid, friendKey, true);
     } catch (e) {
       console.error("Failed to send friend request", e);
+      setAlertTitle("Request failed");
+      setAlertMessage("Could not send friend request. Please try again.");
+      setAlertVisible(true);
     } finally {
       setActionLoading(false);
     }
@@ -866,7 +873,7 @@ export default function FriendProfile() {
             accessibilityRole="button"
             accessibilityLabel="More options"
           >
-            <Icon name="ellipsis-horizontal" size={22} color={TEXT} />
+            <Ionicons name="ellipsis-horizontal" size={22} color={TEXT} />
           </TouchableOpacity>
         </View>
         <View style={styles.header}>
@@ -894,7 +901,7 @@ export default function FriendProfile() {
 
           {locationText && (
             <View style={styles.locationRow}>
-              <Icon name="location-outline" size={14} color={MUTED2} />
+              <Ionicons name="location-outline" size={14} color={MUTED2} />
               <Text style={styles.locationText}>{locationText}</Text>
             </View>
           )}
@@ -1075,7 +1082,7 @@ export default function FriendProfile() {
                     }
                   }}
                 >
-                  <Icon name="person-add-outline" size={22} color={TEXT} />
+                  <Ionicons name="person-add-outline" size={22} color={TEXT} />
                   <Text style={styles.optionsRowText}>Unblock user</Text>
                 </TouchableOpacity>
               ) : (
@@ -1087,7 +1094,7 @@ export default function FriendProfile() {
                       setShowReportModal(true);
                     }}
                   >
-                    <Icon name="flag-outline" size={22} color={TEXT} />
+                    <Ionicons name="flag-outline" size={22} color={TEXT} />
                     <Text style={styles.optionsRowText}>Report user</Text>
                   </TouchableOpacity>
                   <View style={styles.optionsDivider} />
@@ -1098,7 +1105,7 @@ export default function FriendProfile() {
                       setShowBlockModal(true);
                     }}
                   >
-                    <Icon name="ban-outline" size={22} color="#FF453A" />
+                    <Ionicons name="ban-outline" size={22} color={DESTRUCTIVE} />
                     <Text style={[styles.optionsRowText, styles.optionsDestructive]}>
                       Block user
                     </Text>
@@ -1408,7 +1415,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
   },
   optionsDestructive: {
-    color: "#FF453A",
+    color: DESTRUCTIVE,
   },
   optionsDivider: {
     height: StyleSheet.hairlineWidth,
@@ -1506,7 +1513,7 @@ const styles = StyleSheet.create({
   },
 
   removeFriendText: {
-    color: "#ff453a",
+    color: DESTRUCTIVE,
     fontFamily: fonts.heavy,
     fontSize: 15,
   },

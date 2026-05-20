@@ -1,6 +1,14 @@
 import type { TextStyle, ViewStyle } from "react-native";
 
 export const ACCENT = "#00FF85";
+/** Text on accent-filled buttons and chips. */
+export const ON_ACCENT_TEXT = "#061006";
+/** Destructive actions: delete, block, end synq, swipe delete. */
+export const DESTRUCTIVE = "#FF453A";
+/** Solid black behind status bar in tab header overlays. */
+export const HEADER_BLACK = "#000000";
+/** Header icon glyph size (notifications, settings, messages, options). */
+export const HEADER_ICON_SIZE = 26;
 export const DEFAULT_AVATAR =
   "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&s=256";
 export const EXPIRATION_HOURS = 12;
@@ -24,17 +32,39 @@ export const TAB_BAR_FADE_GRADIENT = [
 ] as const;
 /** Profile header fade: black (icons) → page background. */
 export const PROFILE_HEADER_FADE_GRADIENT = [
-  TAB_BAR_BG,
-  "rgba(0,0,0,0.94)",
-  "rgba(0,0,0,0.68)",
-  "rgba(0,0,0,0.32)",
+  HEADER_BLACK,
+  HEADER_BLACK,
+  "rgba(0,0,0,0.96)",
+  "rgba(0,0,0,0.72)",
+  "rgba(0,0,0,0.38)",
   "rgba(9,10,11,0)",
 ] as const;
-export const PROFILE_HEADER_FADE_LOCATIONS = [0, 0.22, 0.48, 0.72, 1] as const;
-/** Fade strip height directly under the notifications/settings row. */
-export const PROFILE_HEADER_FADE_BELOW_ICONS = 8;
-/** Clear space between the fade and the QR / profile photo. */
+export const PROFILE_HEADER_FADE_LOCATIONS = [0, 0.1, 0.28, 0.5, 0.74, 1] as const;
+/** Fade strip height directly under the header icon row. */
+export const PROFILE_HEADER_FADE_BELOW_ICONS = 28;
+/** Offset from safe-area top to header icon row. */
+export const PROFILE_HEADER_TOP_OFFSET = 12;
+/** Height of the header icon touch row. */
+export const PROFILE_HEADER_ICON_ROW_HEIGHT = 48;
+/** Clear space between the fade and scroll content below. */
 export const PROFILE_HEADER_CONTENT_GAP = 22;
+
+/** Layout metrics for tab screens with floating header overlays. */
+export function getTabHeaderLayout(insetsTop: number) {
+  const top = insetsTop + PROFILE_HEADER_TOP_OFFSET;
+  const iconRowBottom = top + PROFILE_HEADER_ICON_ROW_HEIGHT;
+  const gradientHeight = iconRowBottom + PROFILE_HEADER_FADE_BELOW_ICONS;
+  const contentPaddingTop = iconRowBottom + PROFILE_HEADER_CONTENT_GAP;
+  /** Gradient height for title/icon rows (Friends, Synq active) — ends at icon row bottom. */
+  const titleGradientHeight = iconRowBottom + 16;
+  return {
+    top,
+    iconRowBottom,
+    gradientHeight,
+    contentPaddingTop,
+    titleGradientHeight,
+  };
+}
 /** Extra list/scroll bottom padding when the tab bar is position:absolute. */
 export const TAB_BAR_SCROLL_INSET = 96;
 export const PRIMARY_CTA_WIDTH = "68%";
@@ -112,6 +142,23 @@ export const tabScreenMainHeaderTitle: TextStyle = {
   letterSpacing: 0.2,
 };
 
+/** Stack screen titles (settings, notifications, profile settings). */
+export const stackScreenHeaderTitle: TextStyle = {
+  color: TEXT,
+  fontSize: 22,
+  fontFamily: fonts.heavy,
+  letterSpacing: 0.15,
+};
+
+/** Compact back control for stack headers (chevron sits closer to the left edge). */
+export const stackNavigationBackBtn: ViewStyle = {
+  width: 32,
+  height: 40,
+  alignItems: "flex-start",
+  justifyContent: "center",
+  backgroundColor: "transparent",
+};
+
 /** Shared pill style for low-emphasis destructive actions (End Synq, Sign Out). */
 export const destructiveActionBtn: ViewStyle = {
   alignSelf: "center",
@@ -124,7 +171,7 @@ export const destructiveActionBtn: ViewStyle = {
 };
 
 export const destructiveActionBtnText: TextStyle = {
-  color: "#666",
+  color: MUTED,
   fontFamily: fonts.heavy,
   fontSize: 13,
   letterSpacing: 2,

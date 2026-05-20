@@ -3,6 +3,7 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
+  DESTRUCTIVE,
   fonts,
   Friend,
   MUTED,
@@ -38,6 +39,10 @@ import {
 } from "@/src/lib/friendDistance";
 import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
+import ProfileTabHeaderOverlay, {
+  useTabHeaderLayout,
+} from "@/src/components/ProfileTabHeaderOverlay";
+import TabHeaderIconRow from "@/src/components/TabHeaderIconRow";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
@@ -408,6 +413,7 @@ function FriendsListEmpty({
 
 export default function FriendsScreen() {
   const router = useRouter();
+  const headerLayout = useTabHeaderLayout();
   const isFriendsTabFocused = useIsFocused();
   const { openAddFriends } = useLocalSearchParams<{ openAddFriends?: string }>();
   const myId = auth.currentUser?.uid ?? "";
@@ -415,6 +421,7 @@ export default function FriendsScreen() {
   const [friends, setFriends] = useState<Friend[]>(cachedFriends);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
+  const [friendsLoadError, setFriendsLoadError] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [sortMode, setSortMode] = useState<FriendsSortMode>("alphabetical");
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
@@ -548,8 +555,10 @@ export default function FriendsScreen() {
 
         friendsListCacheByUser[myId] = sortedFriends;
         setFriends(sortedFriends);
+        setFriendsLoadError(false);
       } catch (err) {
         console.error("[FriendsScreen] Error fetching friend data:", err);
+        setFriendsLoadError(true);
       } finally {
         setIsFriendsInitialLoading(false);
       }
@@ -682,15 +691,23 @@ export default function FriendsScreen() {
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
 
+      <ProfileTabHeaderOverlay variant="title" />
+      <TabHeaderIconRow>
+        <Text style={styles.headerTitle}>Friends</Text>
+        <FriendsHeaderAddButton
+          pulse={!isFriendsInitialLoading && friends.length === 0}
+          onPress={openAddFriendsModal}
+        />
+      </TabHeaderIconRow>
+
       <View onLayout={onFriendsHeaderLayout}>
-        <View style={[styles.headerBlock, styles.screenPadding]}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Friends</Text>
-            <FriendsHeaderAddButton
-              pulse={!isFriendsInitialLoading && friends.length === 0}
-              onPress={openAddFriendsModal}
-            />
-          </View>
+        <View
+          style={[
+            styles.headerBlock,
+            styles.screenPadding,
+            { paddingTop: headerLayout.iconRowBottom + 14 },
+          ]}
+        >
           {showFriendSearch && (
             <>
               <View style={styles.searchBar}>
@@ -718,6 +735,14 @@ export default function FriendsScreen() {
           )}
         </View>
       </View>
+
+      {friendsLoadError && !isFriendsInitialLoading ? (
+        <View style={styles.friendsLoadErrorWrap}>
+          <Text style={styles.friendsLoadErrorText}>
+            Could not load friends. Pull to refresh or try again later.
+          </Text>
+        </View>
+      ) : null}
 
       {isFriendsInitialLoading ? (
         <View style={styles.friendsList}>
@@ -1911,7 +1936,6 @@ const styles = StyleSheet.create({
     elevation: 24,
   },
   headerBlock: {
-    marginTop: 88,
     marginBottom: 4,
     zIndex: 2,
   },
@@ -1927,13 +1951,6 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: "rgba(255,255,255,0.08)",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
-    minHeight: 34,
-  },
   headerTitle: {
     ...tabScreenMainHeaderTitle,
     flex: 1,
@@ -1942,8 +1959,8 @@ const styles = StyleSheet.create({
     textAlignVertical: "center",
   },
   headerAddBtn: {
-    width: 34,
-    height: 34,
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2133,6 +2150,22 @@ const styles = StyleSheet.create({
   },
   friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
   mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
+  friendsLoadErrorWrap: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginHorizontal: 20,
+    marginTop: 8,
+    borderRadius: RADIUS_MD,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  friendsLoadErrorText: {
+    color: MUTED2,
+    fontFamily: fonts.medium,
+    fontSize: TYPE_BODY,
+    textAlign: "center",
+  },
   friendsList: { flex: 1, width: "100%" },
   friendsListContent: { paddingBottom: TAB_BAR_SCROLL_INSET },
   friendsListContentEmpty: { flexGrow: 1, paddingBottom: TAB_BAR_SCROLL_INSET },
@@ -2268,7 +2301,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   removeBtn: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12 },
-  removeBtnText: { color: "#ff453a", fontFamily: fonts.heavy, fontSize: 14 },
+  removeBtnText: { color: DESTRUCTIVE, fontFamily: fonts.heavy, fontSize: 14 },
   modalBody: {
     flex: 1,
     backgroundColor: BG,

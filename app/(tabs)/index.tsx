@@ -46,11 +46,13 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
+  DESTRUCTIVE,
   EXPIRATION_HOURS,
   fonts,
   MODAL_RADIUS,
   MUTED,
   MUTED2,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   SPACE_4,
@@ -78,6 +80,7 @@ import {
 } from '../helpers';
 import { openInMaps } from '../map-utils';
 import ActiveSynqSection from '../../src/components/synq/ActiveSynqSection';
+import ProfileTabHeaderOverlay from '@/src/components/ProfileTabHeaderOverlay';
 import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
 import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
 import EditSynqModal from '../synq-screens/EditSynqModal';
@@ -312,6 +315,11 @@ export default function SynqScreen() {
       return true;
     }
     return false;
+  };
+
+  const showActionError = (message: string) => {
+    setContentAlertMessage(message);
+    setContentAlertVisible(true);
   };
   const markChatRead = async (chatId: string) => {
     if (!auth.currentUser) return;
@@ -779,7 +787,9 @@ export default function SynqScreen() {
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {} finally {
+    } catch {
+      showActionError("Could not load suggestions. Please try again.");
+    } finally {
       setIsAILoading(false);
       setIsThinking(false)
     }
@@ -830,7 +840,9 @@ export default function SynqScreen() {
       setShowOptionsList(false);
       setSelectedOption(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+    } catch {
+      showActionError("Could not share suggestion. Please try again.");
+    }
   };
 
   const startSynq = async () => {
@@ -846,7 +858,9 @@ export default function SynqScreen() {
       });
       AsyncStorage.setItem(synqStatusStorageKey(auth.currentUser.uid), "active").catch(() => {});
       setSynqStatus(setSynq, 'activating');
-    } catch {} finally {
+    } catch {
+      showActionError("Could not start Synq. Check your connection and try again.");
+    } finally {
       setIsStartingSynq(false);
     }
   };
@@ -890,7 +904,9 @@ export default function SynqScreen() {
       setMessagesModalVisible(true);
       setMessagesPane("chat");
       setSelectedFriends([]);
-    } catch {}
+    } catch {
+      showActionError("Could not open chat. Please try again.");
+    }
   };
 
   const sendMessage = async () => {
@@ -898,6 +914,8 @@ export default function SynqScreen() {
     if (!pendingNewChat && (!activeChatId || !allChats.find((c) => c.id === activeChatId))) return;
 
     const text = inputText.trim();
+    if (rejectIfObjectionable(text)) return;
+
     const myId = auth.currentUser.uid;
     setInputText('');
 
@@ -949,7 +967,10 @@ export default function SynqScreen() {
           lastSynqAt: serverTimestamp(),
         }).catch(() => { });
       });
-    } catch {}
+    } catch {
+      setInputText(text);
+      showActionError("Message could not be sent. Please try again.");
+    }
   };
 
   const handleDeleteChat = async (chatId: string) => {
@@ -969,7 +990,9 @@ export default function SynqScreen() {
       await updateDoc(messageRef, {
         [`reactions.${userId}`]: hasReacted ? deleteField() : "heart",
       });
-    } catch {}
+    } catch {
+      showActionError("Could not update reaction. Please try again.");
+    }
   };
 
   const firstName = (fullName: string) =>
@@ -1079,6 +1102,8 @@ export default function SynqScreen() {
       <View style={[styles.container, tabletContentStyle]}>
         <StatusBar barStyle="light-content" />
         {status === 'active' && (
+          <>
+          <ProfileTabHeaderOverlay variant="title" />
           <ActiveSynqSection
             styles={styles}
             memo={memo}
@@ -1096,6 +1121,7 @@ export default function SynqScreen() {
             }}
             openEditModal={() => setIsEditModalVisible(true)}
           />
+          </>
         )}
         {(status === 'activating' || status === 'finding' || status === 'optimizing') && (
           <View style={styles.activatingContainer}>
@@ -1174,7 +1200,9 @@ export default function SynqScreen() {
                     try {
                       await deleteDoc(doc(db, "chats", chatId));
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    } catch {}
+                    } catch {
+                      showActionError("Could not delete chat. Please try again.");
+                    }
                   }}
                 />
               }
@@ -1344,9 +1372,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: SPACE_4,
   },
-  activeHeaderBlock: {
-    marginTop: 88,
-  },
+  activeBody: { flex: 1 },
   headerTitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1441,8 +1467,8 @@ const styles = StyleSheet.create({
   },
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
   whiteBold: { color: 'white', fontSize: 17, fontFamily: fonts.medium },
-  grayText: { color: '#666', fontSize: 13, marginTop: 2 },
-  locationText: { color: '#666', fontSize: 12, marginTop: 2 },
+  grayText: { color: MUTED2, fontSize: 13, marginTop: 2 },
+  locationText: { color: MUTED2, fontSize: 12, marginTop: 2 },
   activeFooterBlock: {
     backgroundColor: BG,
     paddingHorizontal: 20,
@@ -1457,7 +1483,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnText: { fontSize: 16, color: 'black', fontFamily: fonts.medium },
+  btnText: { fontSize: 16, color: ON_ACCENT_TEXT, fontFamily: fonts.heavy },
   activatingContainer: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
   unifiedTitle: { color: 'white', fontSize: 28, fontFamily: fonts.medium, marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
   gifLarge: { width: 280, height: 280 },
@@ -1557,7 +1583,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: { color: 'white', fontSize: 22, fontFamily: fonts.medium },
   messagesInboxTitle: tabScreenMainHeaderTitle,
-  deleteAction: { backgroundColor: '#FF453A', justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
+  deleteAction: { backgroundColor: DESTRUCTIVE, justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
   inboxItem: {
     paddingTop: 12,
     paddingBottom: 12,
@@ -1666,20 +1692,20 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   venueDesc: {
-    color: '#888',
+    color: MUTED2,
     fontSize: 13,
     lineHeight: 18,
   },
   sendIdeaBtn: { backgroundColor: '#8E8E93', margin: 20, padding: 18, borderRadius: 12, alignItems: 'center' },
   sendIdeaBtnEnabled: { backgroundColor: ACCENT, margin: 20, padding: 18, borderRadius: 12, alignItems: 'center' },
-  sendIdeaText: { color: 'black', fontFamily: 'Avenir-Black', fontSize: 16 },
+  sendIdeaText: { color: ON_ACCENT_TEXT, fontFamily: fonts.black, fontSize: 16 },
   inChatAICardContainer: { paddingHorizontal: 20, marginVertical: 10 },
   inChatAICard: { backgroundColor: '#1C1C1E', borderRadius: 20, padding: 20, borderLeftWidth: 4, borderLeftColor: ACCENT },
   aiCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   aiCardTitleSmall: { color: ACCENT, fontSize: 14, fontFamily: 'Avenir-Heavy', letterSpacing: 0.5 },
   aiCardBodySmall: { color: 'white', fontSize: 15, fontFamily: 'Avenir', lineHeight: 22, marginBottom: 15 },
   aiShareBtnSmall: { backgroundColor: ACCENT, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
-  aiShareBtnText: { color: 'black', fontSize: 14, fontFamily: 'Avenir-Heavy' },
+  aiShareBtnText: { color: ON_ACCENT_TEXT, fontSize: 14, fontFamily: fonts.heavy },
   editPanel: {
     width: '100%',
     backgroundColor: '#161616',
@@ -1713,7 +1739,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 16,
   },
-  saveBtnText: { color: 'black', fontSize: 16, fontFamily: fonts.medium },
+  saveBtnText: { color: ON_ACCENT_TEXT, fontSize: 16, fontFamily: fonts.heavy },
   centeredIdeaContainer: {
     alignItems: 'center',
     marginVertical: 15,
@@ -1766,7 +1792,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
   },
   timestampCentered: {
-    color: '#666',
+    color: MUTED2,
     fontSize: 10,
     marginTop: 4,
   },

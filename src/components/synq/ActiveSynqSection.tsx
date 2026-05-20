@@ -1,3 +1,7 @@
+import HeaderIconButton from "@/src/components/HeaderIconButton";
+import NotificationBadge from "@/src/components/NotificationBadge";
+import TabHeaderIconRow from "@/src/components/TabHeaderIconRow";
+import { useTabHeaderLayout } from "@/src/components/ProfileTabHeaderOverlay";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -43,39 +47,33 @@ export default function ActiveSynqSection({
   openEditModal,
 }: Props) {
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const headerLayout = useTabHeaderLayout();
 
   return (
     <View style={styles.activeSynqRoot}>
-      <View style={styles.activeHeaderBlock}>
-        <View style={styles.headerTitleRow}>
-          <TouchableOpacity
-            onPress={openMessagesInbox}
-            style={styles.headerIconContainer}
-            accessibilityRole="button"
-            accessibilityLabel="Open messages"
-          >
-            <Ionicons name="chatbubbles-outline" size={28} color="white" />
-            {hasUnread && <View style={styles.badge} />}
-          </TouchableOpacity>
-          <View style={styles.synqHeaderTitleCenter}>
-            <View style={styles.headerTitleWithIndicator}>
-              <Animated.View
-                style={[styles.activeStatusDot, { opacity: activePulseOpacity }]}
-                accessibilityLabel="Synq session live"
-              />
-              <Text style={styles.headerTitle}>Synq is active</Text>
-            </View>
+      <TabHeaderIconRow>
+        <HeaderIconButton
+          name="chatbubbles-outline"
+          onPress={openMessagesInbox}
+          accessibilityLabel="Open messages"
+          badge={hasUnread ? <NotificationBadge variant="dot" /> : undefined}
+        />
+        <View style={styles.synqHeaderTitleCenter}>
+          <View style={styles.headerTitleWithIndicator}>
+            <Animated.View
+              style={[styles.activeStatusDot, { opacity: activePulseOpacity }]}
+              accessibilityLabel="Synq session live"
+            />
+            <Text style={styles.headerTitle}>Synq is active</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => setOptionsVisible(true)}
-            style={styles.headerIconContainer}
-            accessibilityRole="button"
-            accessibilityLabel="Synq options"
-          >
-            <Ionicons name="ellipsis-horizontal" size={26} color="white" />
-          </TouchableOpacity>
         </View>
-      </View>
+        <HeaderIconButton
+          name="ellipsis-horizontal"
+          onPress={() => setOptionsVisible(true)}
+          accessibilityLabel="Synq options"
+        />
+      </TabHeaderIconRow>
+      <View style={[styles.activeBody, { paddingTop: headerLayout.iconRowBottom }]}>
       <View style={styles.headerDivider} />
 
       {memo.trim() !== "" ? (
@@ -196,6 +194,7 @@ export default function ActiveSynqSection({
       ) : (
         <View style={{ paddingBottom: Math.max(44, 24 + insetsBottom) }} />
       )}
+      </View>
 
       <SynqOptionsSheet
         visible={optionsVisible}
