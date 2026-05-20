@@ -177,7 +177,8 @@ export default function FriendOpenPlans({
 
 const styles = StyleSheet.create({
   container: {
-    width: "92%"
+    width: "92%",
+    alignItems: "flex-start",
   },
   header: {
     color: "white",
@@ -190,6 +191,9 @@ const styles = StyleSheet.create({
     marginBottom: 20
   },
   card: {
+    alignSelf: "flex-start",
+    width: "100%",
+    maxWidth: 340,
     backgroundColor: "#0d0d0d",
     borderRadius: 20,
     padding: 14,

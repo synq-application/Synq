@@ -1,8 +1,4 @@
 import {
-  ONBOARDING_DIVIDER_WIDTH,
-  ONBOARDING_H_PADDING,
-} from "@/constants/onboardingLayout";
-import {
   ACCENT,
   BG,
   BORDER,
@@ -17,6 +13,7 @@ import {
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   profileScreenSectionTitle,
+  tabScreenMainHeaderTitle,
   PROFILE_HEADER_CONTENT_GAP,
   PROFILE_HEADER_FADE_BELOW_ICONS,
   PROFILE_HEADER_FADE_GRADIENT,
@@ -74,10 +71,10 @@ import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOp
 import {
   computeRecentSynqRows,
   getCachedOwnProfile,
+  getMeTabInitialState,
   hydrateOwnProfileFromDisk,
   mergeCachedOwnProfile,
   recentSynqRowsEqual,
-  recentSynqRowsFromCache,
   recentSynqRowsToCache,
   setCachedOwnProfile,
   type RecentSynqRow,
@@ -188,27 +185,22 @@ export default function ProfileScreen() {
   const [planHighlightId, setPlanHighlightId] = useState<string | null>(null);
 
   const myId = auth.currentUser?.uid ?? "";
-  const cachedOwnProfile = myId ? getCachedOwnProfile(myId) : undefined;
-  const cachedFriendsForNames = myId ? friendsListCacheByUser[myId] ?? [] : [];
-  const cachedRecentFromProfile = recentSynqRowsFromCache(
-    cachedOwnProfile?.recentSynqs
+  const meBootstrap = useMemo(
+    () => (myId ? getMeTabInitialState(myId) : null),
+    [myId]
   );
-  const initialRecentSynqRows: RecentSynqRow[] =
-    cachedRecentFromProfile.length > 0
-      ? cachedRecentFromProfile
-      : myId
-        ? computeRecentSynqRows(myId, cachedFriendsForNames)
-        : [];
-  const [friendsForHostNames, setFriendsForHostNames] = useState<Friend[]>(cachedFriendsForNames);
+  const [friendsForHostNames, setFriendsForHostNames] = useState<Friend[]>(
+    () => meBootstrap?.friendsForHostNames ?? []
+  );
   const [friendsDataEpoch, setFriendsDataEpoch] = useState(0);
-  const [recentSynqRows, setRecentSynqRows] =
-    useState<RecentSynqRow[]>(initialRecentSynqRows);
+  const [recentSynqRows, setRecentSynqRows] = useState<RecentSynqRow[]>(
+    () => meBootstrap?.recentSynqRows ?? []
+  );
   const [recentSynqsReady, setRecentSynqsReady] = useState(
-    initialRecentSynqRows.length > 0 ||
-      Boolean(myId && friendRelationCacheByUser[myId])
+    () => meBootstrap?.recentSynqsReady ?? false
   );
   const [profileImage, setProfileImage] = useState<string | null>(
-    cachedOwnProfile?.imageurl ?? null
+    () => meBootstrap?.profileImage ?? null
   );
   const [avatarRenderVersion, setAvatarRenderVersion] = useState(0);
   const [isQRExpanded, setQRExpanded] = useState(false);
@@ -218,11 +210,11 @@ export default function ProfileScreen() {
   const [showInputModal, setShowInputModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string>("");
   const [selectedInterests, setSelectedInterests] = useState<string[]>(
-    cachedOwnProfile?.interests ?? []
+    () => meBootstrap?.selectedInterests ?? []
   );
-  const [interests, setInterests] = useState<string[]>(cachedOwnProfile?.interests ?? []);
-  const [city, setCity] = useState<string | null>(cachedOwnProfile?.city ?? null);
-  const [state, setState] = useState<string | null>(cachedOwnProfile?.state ?? null);
+  const [interests, setInterests] = useState<string[]>(() => meBootstrap?.interests ?? []);
+  const [city, setCity] = useState<string | null>(() => meBootstrap?.city ?? null);
+  const [state, setState] = useState<string | null>(() => meBootstrap?.state ?? null);
   const [requestCount, setRequestCount] = useState(0);
   type OpenPlanEvent = {
     id: string;
@@ -239,7 +231,7 @@ export default function ProfileScreen() {
   };
 
   const [events, setEvents] = useState<OpenPlanEvent[]>(
-    (cachedOwnProfile?.events as OpenPlanEvent[] | undefined) ?? []
+    () => (meBootstrap?.events as OpenPlanEvent[] | undefined) ?? []
   );
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
@@ -681,17 +673,20 @@ export default function ProfileScreen() {
     let cancelled = false;
     void hydrateOwnProfileFromDisk(myId).then(() => {
       if (cancelled) return;
-      const cached = getCachedOwnProfile(myId);
-      if (!cached) return;
-      setProfileImage((prev) => prev ?? cached.imageurl);
-      setInterests((prev) => (prev.length > 0 ? prev : cached.interests));
-      setSelectedInterests((prev) => (prev.length > 0 ? prev : cached.interests));
-      setCity((prev) => prev ?? cached.city);
-      setState((prev) => prev ?? cached.state);
-      setEvents((prev) => (prev.length > 0 ? prev : (cached.events as OpenPlanEvent[])));
-      const cachedRows = recentSynqRowsFromCache(cached.recentSynqs);
-      if (cachedRows.length > 0) {
-        setRecentSynqRows((prev) => (prev.length > 0 ? prev : cachedRows));
+      const next = getMeTabInitialState(myId);
+      setProfileImage((prev) => prev ?? next.profileImage);
+      setInterests((prev) => (prev.length > 0 ? prev : next.interests));
+      setSelectedInterests((prev) => (prev.length > 0 ? prev : next.selectedInterests));
+      setCity((prev) => prev ?? next.city);
+      setState((prev) => prev ?? next.state);
+      setEvents((prev) => (prev.length > 0 ? prev : (next.events as OpenPlanEvent[])));
+      setFriendsForHostNames((prev) =>
+        prev.length > 0 ? prev : next.friendsForHostNames
+      );
+      setRecentSynqRows((prev) =>
+        prev.length > 0 ? prev : next.recentSynqRows
+      );
+      if (next.recentSynqsReady) {
         setRecentSynqsReady(true);
       }
     });
@@ -1003,22 +998,21 @@ export default function ProfileScreen() {
           <SafeAreaView style={styles.interestModalFullscreen} edges={["top", "left", "right", "bottom"]}>
             <StatusBar barStyle="light-content" />
             <View style={styles.interestSheet}>
-            <View style={styles.interestSheetTop}>
-              <View style={styles.interestSheetHeaderRow}>
-                <View style={styles.interestSheetTitleWrap}>
-                  <Text style={styles.interestSheetTitle}>What are you into?</Text>
-                </View>
+              <View style={styles.interestHeader}>
+                <Text style={styles.interestTitle}>What are you into?</Text>
                 <TouchableOpacity
                   onPress={() => setShowInputModal(false)}
                   activeOpacity={0.7}
                   accessibilityLabel="Close interests"
                   accessibilityRole="button"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Icon name="close-circle" size={28} color="#444" />
+                  <Icon name="close-circle" size={26} color={MUTED2} />
                 </TouchableOpacity>
               </View>
-              <View style={styles.interestSheetDivider} />
-            </View>
+              <Text style={styles.interestSubtitle}>
+                Pick a few things you enjoy doing with friends.
+              </Text>
 
             <View style={styles.interestPillsSection}>
               <ScrollView
@@ -1042,7 +1036,9 @@ export default function ProfileScreen() {
                       activeOpacity={0.85}
                       style={[styles.interestPill, active && styles.interestPillOn]}
                     >
-                      <Text style={styles.interestText}>{item.name}</Text>
+                      <Text style={[styles.interestPillText, active && styles.interestPillTextOn]}>
+                        {item.name}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -1363,37 +1359,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
     width: "100%",
-    paddingHorizontal: ONBOARDING_H_PADDING,
-    paddingTop: 36,
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
-  interestSheetTop: {
-    marginBottom: 0,
-  },
-  interestSheetHeaderRow: {
+  interestHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    minHeight: 34,
+    paddingTop: 40,
+    marginBottom: 10,
   },
-  interestSheetTitleWrap: {
+  interestTitle: {
+    ...tabScreenMainHeaderTitle,
     flex: 1,
+    lineHeight: 32,
+    includeFontPadding: false,
     marginRight: 12,
   },
-  interestSheetTitle: {
-    color: TEXT,
-    fontSize: 22,
-    lineHeight: 28,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.1,
-  },
-  interestSheetDivider: {
-    marginTop: 8,
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    width: ONBOARDING_DIVIDER_WIDTH,
+  interestSubtitle: {
+    color: MUTED2,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: fonts.book,
+    marginBottom: 16,
   },
   interestPillsSection: {
     flex: 1,
-    marginTop: 16,
     marginBottom: 8,
     minHeight: 0,
   },
@@ -1406,18 +1398,27 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   interestPill: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    marginRight: 10,
-    marginBottom: 10,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: SURFACE,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: BORDER,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginRight: 8,
+    marginBottom: 8,
   },
   interestPillOn: {
-    backgroundColor: "rgba(125,255,166,0.18)",
-    borderColor: "rgba(125,255,166,0.6)",
+    backgroundColor: "rgba(0,255,133,0.12)",
+    borderColor: "rgba(0,255,133,0.55)",
+  },
+  interestPillText: {
+    color: TEXT,
+    fontFamily: fonts.book,
+    fontSize: 13,
+  },
+  interestPillTextOn: {
+    color: ACCENT,
+    fontFamily: fonts.medium,
   },
   interestSaveBtn: {
     marginTop: 20,

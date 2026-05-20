@@ -676,6 +676,8 @@ const styles = StyleSheet.create({
   plansBox: {
     paddingVertical: 0,
     paddingHorizontal: 0,
+    alignItems: "flex-start",
+    width: "100%",
   },
   empty: {
     color: "#666",
@@ -686,6 +688,9 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
   },
   card: {
+    alignSelf: "flex-start",
+    width: "86%",
+    maxWidth: 340,
     backgroundColor: "#0d0d0d",
     borderRadius: 14,
     borderWidth: 1,

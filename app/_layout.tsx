@@ -42,7 +42,10 @@ import {
   userHasAcceptedCommunityTerms,
 } from "../src/lib/communityTerms";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../src/lib/locationPromptEvents";
-import { hydrateOwnProfileFromDisk } from "../src/lib/ownProfileCache";
+import {
+  hydrateOwnProfileFromDisk,
+  prewarmMeTabScreen,
+} from "../src/lib/ownProfileCache";
 import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
@@ -339,6 +342,7 @@ export default function RootLayout() {
           hydrateSocialCachesFromDisk(u.uid),
           hydrateOwnProfileFromDisk(u.uid),
         ]);
+        prewarmMeTabScreen(u.uid);
       }
       setUser(u);
       setAuthReady(true);

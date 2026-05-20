@@ -87,6 +87,7 @@ export default function TabsLayout() {
         name="me"
         options={{
           title: "Me",
+          lazy: false,
           tabBarAccessibilityLabel: "Me, profile and settings",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-circle-outline" size={size} color={color} />
