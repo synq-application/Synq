@@ -1,13 +1,27 @@
-import { ACCENT, BORDER, fonts, profileScreenSectionTitle, TEXT } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  BORDER,
+  BUTTON_RADIUS,
+  fonts,
+  MODAL_RADIUS,
+  profileScreenSectionTitle,
+  TEXT,
+} from "@/constants/Variables";
+import PlanDateCalendar from "@/src/components/PlanDateCalendar";
+import PlanTimePicker from "@/src/components/PlanTimePicker";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import React, { useEffect, useMemo, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Dimensions,
   Keyboard,
+  type KeyboardEvent,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -119,8 +133,11 @@ export default function OpenPlans({
     return { primary, secondary };
   };
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
-  const [picker, setPicker] = useState<"date" | "time" | null>(null);
+  const [activePicker, setActivePicker] = useState<"date" | "time" | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<EventItem | null>(null);
+  const [keyboardInset, setKeyboardInset] = useState(0);
+  const planScrollRef = useRef<ScrollView>(null);
+  const locationInputRef = useRef<TextInput>(null);
 
   const minimumSelectableDate = useMemo(() => {
     const d = new Date();
@@ -131,13 +148,92 @@ export default function OpenPlans({
   useEffect(() => {
     if (showEventModal) {
       setSelectedDate(getInitialDate());
-      setPicker(null);
+      setActivePicker(null);
+      setNewEvent({ title: "", date: "", time: "", location: "" });
+      setKeyboardInset(0);
     }
+  }, [showEventModal, setNewEvent]);
+
+  useEffect(() => {
+    if (!showEventModal) return;
+
+    const onShow = (e: KeyboardEvent) => {
+      setKeyboardInset(e.endCoordinates.height);
+    };
+    const onHide = () => setKeyboardInset(0);
+
+    const showEvt =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvt, onShow);
+    const hideSub = Keyboard.addListener(hideEvt, onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, [showEventModal]);
 
   const visibleEvents = useMemo(() => filterOutPastOpenPlans(events), [events]);
 
-  const closePickers = () => setPicker(null);
+  const closeModal = () => {
+    Keyboard.dismiss();
+    setActivePicker(null);
+    setShowEventModal(false);
+  };
+
+  const handleBackdropPress = () => {
+    if (keyboardInset > 0) {
+      Keyboard.dismiss();
+      return;
+    }
+    if (activePicker) {
+      setActivePicker(null);
+      return;
+    }
+    closeModal();
+  };
+
+  const canPost = newEvent.title.trim().length > 0;
+
+  const dismissPickers = () => setActivePicker(null);
+
+  const locationScrollY = useRef(0);
+  const pendingLocationScroll = useRef(false);
+  const popupScrollMaxHeight = useMemo(
+    () => Math.min(420, Dimensions.get("window").height * 0.48),
+    []
+  );
+
+  const scrollToLocationField = () => {
+    requestAnimationFrame(() => {
+      planScrollRef.current?.scrollTo({
+        y: Math.max(0, locationScrollY.current - 20),
+        animated: true,
+      });
+    });
+  };
+
+  useEffect(() => {
+    if (keyboardInset <= 0 || !pendingLocationScroll.current) return;
+    pendingLocationScroll.current = false;
+    scrollToLocationField();
+  }, [keyboardInset]);
+
+  const collapseActivePicker = () => {
+    if (activePicker) setActivePicker(null);
+  };
+
+  const handleCalendarSelect = (d: Date) => {
+    setDate(d);
+    setActivePicker(null);
+  };
+
+  const handleTimeSelect = (d: Date) => {
+    setSelectedDate(d);
+    setActivePicker(null);
+  };
 
   const formatTime = (d: Date) =>
     d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -161,15 +257,22 @@ export default function OpenPlans({
 
   const todayRef = new Date();
   const tomorrowRef = new Date(Date.now() + 86400000);
-  const pickDateMode = picker === "date";
-  const pillarToday =
-    !pickDateMode && isSameCalendarDay(selectedDate, todayRef);
-  const pillarTomorrow =
-    !pickDateMode && isSameCalendarDay(selectedDate, tomorrowRef);
-  const pillarPickDate =
-    pickDateMode || (!pillarToday && !pillarTomorrow);
+  const isToday = isSameCalendarDay(selectedDate, todayRef);
+  const isTomorrow = isSameCalendarDay(selectedDate, tomorrowRef);
+  const isCustomDate = !isToday && !isTomorrow;
+
+  const formatPlanDateLabel = (d: Date) => {
+    if (isSameCalendarDay(d, todayRef)) return "Today";
+    if (isSameCalendarDay(d, tomorrowRef)) return "Tomorrow";
+    return d.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
 
   const handleSave = () => {
+    if (!canPost) return;
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
     const day = String(selectedDate.getDate()).padStart(2, "0");
@@ -290,139 +393,215 @@ export default function OpenPlans({
         />
       </View>
 
-      <Modal visible={showEventModal} transparent animationType="fade">
-        <TouchableWithoutFeedback
-          onPress={() => {
-            Keyboard.dismiss();
-            closePickers();
-          }}
-        >
-          <View style={styles.overlay}>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
-              keyboardVerticalOffset={30}
-              style={{ width: "100%", alignItems: "center" }}
+      <Modal
+        visible={showEventModal}
+        transparent
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <Pressable style={styles.popupOverlay} onPress={handleBackdropPress}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.popupAvoid}
+          >
+            <Pressable
+              style={styles.popupCard}
+              onPress={(e) => {
+                e.stopPropagation();
+                Keyboard.dismiss();
+                if (activePicker) setActivePicker(null);
+              }}
             >
-              <View style={styles.modal}>
-                <ScrollView
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
+              <View style={styles.popupTitleRow}>
+                <Text style={styles.popupTitle}>Add a plan</Text>
+                <TouchableOpacity
+                  onPress={closeModal}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityLabel="Close"
                 >
-                  <View style={styles.headerRow}>
-                    <Text
-                      onPress={() => setShowEventModal(false)}
-                      style={styles.cancel}
-                    >
-                      Cancel
-                    </Text>
-                    <Text style={styles.modalTitle}>Add a plan</Text>
-                    <Text
-                      onPress={handleSave}
-                      style={{ color: ACCENT, fontSize: 16 }}
-                    >
-                      Post
-                    </Text>
-                  </View>
-
-                  <TextInput
-                    placeholder="What's the plan?"
-                    placeholderTextColor="#555"
-                    style={styles.input}
-                    value={newEvent.title}
-                    onFocus={closePickers}
-                    onChangeText={(t) =>
-                      setNewEvent((p: any) => ({ ...p, title: t }))
-                    }
-                  />
-
-                  <View style={styles.row}>
-                    <DateBtn
-                      label="Today"
-                      selected={pillarToday}
-                      accentColor={ACCENT}
-                      onPress={() => {
-                        setPicker(null);
-                        setDate(new Date());
-                      }}
-                    />
-                    <DateBtn
-                      label="Tomorrow"
-                      selected={pillarTomorrow}
-                      accentColor={ACCENT}
-                      onPress={() => {
-                        setPicker(null);
-                        setDate(new Date(Date.now() + 86400000));
-                      }}
-                    />
-                    <DateBtn
-                      label="Pick a date"
-                      selected={pillarPickDate}
-                      accentColor={ACCENT}
-                      onPress={() => setPicker("date")}
-                    />
-                  </View>
-
-                  {picker === "date" && (
-                    <DateTimePicker
-                      value={selectedDate}
-                      mode="date"
-                      display="spinner"
-                      themeVariant="dark"
-                      textColor="white"
-                      minimumDate={minimumSelectableDate}
-                      onChange={(e, d) => {
-                        if (d) {
-                          setDate(d);
-                        }
-                      }}
-                    />
-                  )}
-
-                  <Text style={styles.label}>When?</Text>
-                  <TouchableOpacity
-                    style={styles.input}
-                    onPress={() => setPicker("time")}
-                  >
-                    <Text style={{ color: "white", fontSize: 16 }}>
-                      {selectedDate.toDateString()} ·{" "}
-                      {formatTime(selectedDate)}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {picker === "time" && (
-                    <DateTimePicker
-                      value={selectedDate}
-                      mode="time"
-                      display="spinner"
-                      themeVariant="dark"
-                      textColor="white"
-                      onChange={(e, t) => {
-                        if (t) {
-                          const updated = new Date(selectedDate);
-                          updated.setHours(t.getHours());
-                          updated.setMinutes(t.getMinutes());
-                          setSelectedDate(updated);
-                        }
-                      }}
-                    />
-                  )}
-
-                  <Text style={styles.label}>Where?</Text>
-                  <TextInput
-                    placeholder="Add location"
-                    placeholderTextColor="#555"
-                    style={styles.input}
-                    value={newEvent.location}
-                    onFocus={closePickers}
-                    onChangeText={(t) =>
-                      setNewEvent((p: any) => ({ ...p, location: t }))
-                    }
-                  />
-                </ScrollView>
+                  <Ionicons name="close" size={24} color={TEXT} />
+                </TouchableOpacity>
               </View>
-            </KeyboardAvoidingView>
-          </View>
-        </TouchableWithoutFeedback>
+
+              <TouchableWithoutFeedback
+                onPress={Keyboard.dismiss}
+                accessible={false}
+              >
+                <View>
+                  <Text style={styles.sheetSub}>
+                    Tell friends what you&apos;re doing, they can join.
+                  </Text>
+                </View>
+              </TouchableWithoutFeedback>
+
+              <ScrollView
+                ref={planScrollRef}
+                style={{ maxHeight: popupScrollMaxHeight }}
+                contentContainerStyle={[
+                  styles.popupScrollContent,
+                  keyboardInset > 0 ? { paddingBottom: 16 } : null,
+                ]}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="interactive"
+                onScrollBeginDrag={Keyboard.dismiss}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
+              <TouchableWithoutFeedback
+                onPress={Keyboard.dismiss}
+                accessible={false}
+              >
+                <View>
+              <TextInput
+                placeholder="What's the plan?"
+                placeholderTextColor="#555"
+                style={styles.planInput}
+                value={newEvent.title}
+                onFocus={dismissPickers}
+                onChangeText={(t) =>
+                  setNewEvent((p: any) => ({ ...p, title: t }))
+                }
+                returnKeyType="next"
+                blurOnSubmit={false}
+              />
+
+              <View style={styles.scheduleBlock}>
+                <TouchableWithoutFeedback onPress={collapseActivePicker}>
+                  <View>
+                    <View style={styles.quickDateRow}>
+                      <DateBtn
+                        label="Today"
+                        selected={isToday}
+                        accentColor={ACCENT}
+                        onPress={() => {
+                          setActivePicker(null);
+                          setDate(new Date());
+                        }}
+                      />
+                      <DateBtn
+                        label="Tomorrow"
+                        selected={isTomorrow}
+                        accentColor={ACCENT}
+                        onPress={() => {
+                          setActivePicker(null);
+                          setDate(new Date(Date.now() + 86400000));
+                        }}
+                      />
+                      <DateBtn
+                        label="Other"
+                        selected={isCustomDate}
+                        accentColor={ACCENT}
+                        onPress={() =>
+                          setActivePicker((p) => (p === "date" ? null : "date"))
+                        }
+                      />
+                    </View>
+
+                    <View style={styles.dateTimeRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.dateTimeField,
+                          activePicker === "date" && styles.dateTimeFieldActive,
+                        ]}
+                        onPress={() =>
+                          setActivePicker((p) => (p === "date" ? null : "date"))
+                        }
+                      >
+                        <Ionicons
+                          name="calendar-outline"
+                          size={18}
+                          color={activePicker === "date" ? ACCENT : "#888"}
+                        />
+                        <View style={styles.dateTimeTextWrap}>
+                          <Text style={styles.dateTimeValue}>
+                            {formatPlanDateLabel(selectedDate)}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.dateTimeField,
+                          activePicker === "time" && styles.dateTimeFieldActive,
+                        ]}
+                        onPress={() =>
+                          setActivePicker((p) => (p === "time" ? null : "time"))
+                        }
+                      >
+                        <Ionicons
+                          name="time-outline"
+                          size={18}
+                          color={activePicker === "time" ? ACCENT : "#888"}
+                        />
+                        <View style={styles.dateTimeTextWrap}>
+                          <Text style={styles.dateTimeValue}>
+                            {formatTime(selectedDate)}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </TouchableWithoutFeedback>
+
+                {activePicker === "date" ? (
+                  <View style={styles.calendarWrap}>
+                    <PlanDateCalendar
+                      value={selectedDate}
+                      minimumDate={minimumSelectableDate}
+                      accentColor={ACCENT}
+                      onChange={handleCalendarSelect}
+                    />
+                  </View>
+                ) : null}
+
+                {activePicker === "time" ? (
+                  <PlanTimePicker
+                    value={selectedDate}
+                    accentColor={ACCENT}
+                    onSelect={handleTimeSelect}
+                  />
+                ) : null}
+              </View>
+
+              <View
+                onLayout={(e) => {
+                  locationScrollY.current = e.nativeEvent.layout.y;
+                }}
+              >
+                <TextInput
+                  ref={locationInputRef}
+                  placeholder="Add location"
+                  placeholderTextColor="#555"
+                  style={styles.planInputSecondary}
+                  value={newEvent.location}
+                  onFocus={() => {
+                    dismissPickers();
+                    pendingLocationScroll.current = true;
+                    if (keyboardInset > 0) {
+                      pendingLocationScroll.current = false;
+                      scrollToLocationField();
+                    }
+                  }}
+                  onChangeText={(t) =>
+                    setNewEvent((p: any) => ({ ...p, location: t }))
+                  }
+                  returnKeyType="done"
+                />
+              </View>
+                </View>
+              </TouchableWithoutFeedback>
+              </ScrollView>
+
+              <TouchableOpacity
+                style={[styles.popupPostBtn, !canPost && styles.popupPostBtnDisabled]}
+                disabled={!canPost}
+                onPress={handleSave}
+              >
+                <Text style={styles.popupPostBtnText}>Post</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Pressable>
       </Modal>
       <ConfirmModal
         visible={!!pendingDeleteEvent}
@@ -567,15 +746,141 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   addBtnSpacing: { marginTop: 16, marginBottom: 8 },
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" },
-  modal: { width: "92%", backgroundColor: "#0a0a0a", padding: 18, borderRadius: 22 },
-  modalTitle: { color: "white", fontSize: 18, fontFamily: fonts.medium },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
-  row: { flexDirection: "row", justifyContent: "flex-start", gap: 6, marginBottom: 14 },
-  input: { backgroundColor: "#111", padding: 14, borderRadius: 12, color: "white", marginBottom: 12, fontSize: 16, fontFamily: fonts.medium },
-  label: { color: "#777", marginBottom: 5, fontSize: 14, fontFamily: fonts.medium },
-  dateBtn: { borderWidth: 1, borderColor: "#333", borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
-  cancel: { color: "#aaa", fontSize: 14 },
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.78)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  popupAvoid: {
+    width: "100%",
+    maxWidth: 400,
+  },
+  popupCard: {
+    width: "100%",
+    backgroundColor: BG,
+    borderRadius: MODAL_RADIUS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 18,
+  },
+  popupTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  popupTitle: {
+    flex: 1,
+    color: TEXT,
+    fontFamily: fonts.heavy,
+    fontSize: 22,
+    letterSpacing: -0.2,
+  },
+  popupScrollContent: {
+    paddingBottom: 4,
+  },
+  popupPostBtn: {
+    marginTop: 14,
+    height: 50,
+    borderRadius: BUTTON_RADIUS,
+    backgroundColor: ACCENT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  popupPostBtnDisabled: {
+    opacity: 0.4,
+  },
+  popupPostBtnText: {
+    color: "#061006",
+    fontFamily: fonts.heavy,
+    fontSize: 16,
+  },
+  calendarWrap: {
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  sheetSub: {
+    color: "rgba(255,255,255,0.62)",
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  planInput: {
+    backgroundColor: "#0c0c0c",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    padding: 14,
+    borderRadius: BUTTON_RADIUS,
+    color: TEXT,
+    fontSize: 16,
+    fontFamily: fonts.medium,
+    marginBottom: 10,
+  },
+  planInputSecondary: {
+    backgroundColor: "#0c0c0c",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    padding: 12,
+    borderRadius: BUTTON_RADIUS,
+    color: TEXT,
+    fontSize: 15,
+    fontFamily: fonts.medium,
+    marginBottom: 0,
+  },
+  scheduleBlock: {
+    backgroundColor: "#0c0c0c",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    borderRadius: BUTTON_RADIUS,
+    padding: 10,
+    marginBottom: 10,
+  },
+  quickDateRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 10,
+  },
+  dateTimeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 8,
+  },
+  dateTimeField: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#050505",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: BUTTON_RADIUS,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  dateTimeFieldActive: {
+    borderColor: ACCENT,
+    backgroundColor: "rgba(0,255,133,0.08)",
+  },
+  dateTimeTextWrap: { flex: 1 },
+  dateTimeValue: {
+    color: TEXT,
+    fontSize: 15,
+    fontFamily: fonts.heavy,
+  },
+  dateBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    borderRadius: BUTTON_RADIUS,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#050505",
+  },
   month: {
     color: "#888",
     fontSize: 11,
