@@ -150,6 +150,50 @@ export const synqOutlineAddBtnTextDisabled: TextStyle = {
   color: MUTED2,
 };
 
+/** Circular add icon shell (Friends header add control). */
+export const SYNQ_ADD_ICON_SIZE = 34;
+export const SYNQ_ADD_ICON_RADIUS = SYNQ_ADD_ICON_SIZE / 2;
+/** Glyph size inside {@link synqPlusAddBtn} icon area. */
+export const SYNQ_PLUS_ADD_GLYPH_SIZE = 17;
+
+export const synqAddIconBtn: ViewStyle = {
+  width: SYNQ_ADD_ICON_SIZE,
+  height: SYNQ_ADD_ICON_SIZE,
+  borderRadius: SYNQ_ADD_ICON_RADIUS,
+  borderWidth: 1.5,
+  borderColor: ACCENT,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "transparent",
+};
+
+/** Compact “+ Add” chip (Interests, Open plans, etc.). */
+export const synqPlusAddBtn: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  alignSelf: "flex-start",
+  borderWidth: 1.5,
+  borderColor: ACCENT,
+  borderRadius: SYNQ_ADD_ICON_RADIUS,
+  paddingRight: 12,
+  backgroundColor: "transparent",
+  minHeight: SYNQ_ADD_ICON_SIZE,
+};
+
+export const synqPlusAddBtnIcon: ViewStyle = {
+  width: SYNQ_ADD_ICON_SIZE,
+  height: SYNQ_ADD_ICON_SIZE,
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+export const synqPlusAddBtnText: TextStyle = {
+  color: ACCENT,
+  fontFamily: fonts.heavy,
+  fontSize: 13,
+  letterSpacing: 0.15,
+};
+
 export interface Friend {
   id: string;
   displayName?: string;

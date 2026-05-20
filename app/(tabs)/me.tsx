@@ -23,8 +23,10 @@ import {
   PROFILE_HEADER_FADE_LOCATIONS,
   SURFACE,
   TAB_BAR_SCROLL_INSET,
+  SPACE_6,
   TEXT,
 } from "@/constants/Variables";
+import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
@@ -69,6 +71,17 @@ import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
 import { filterOutPastOpenPlans, matchesPlanEvent } from "../../src/lib/planEvents";
 import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
+import {
+  computeRecentSynqRows,
+  getCachedOwnProfile,
+  hydrateOwnProfileFromDisk,
+  mergeCachedOwnProfile,
+  recentSynqRowsEqual,
+  recentSynqRowsFromCache,
+  recentSynqRowsToCache,
+  setCachedOwnProfile,
+  type RecentSynqRow,
+} from "../../src/lib/ownProfileCache";
 import {
   friendRelationCacheByUser,
   friendsListCacheByUser,
@@ -162,6 +175,7 @@ export default function ProfileScreen() {
     profileIconRowBottom + PROFILE_HEADER_FADE_BELOW_ICONS;
   const profileScrollPaddingTop =
     profileIconRowBottom + PROFILE_HEADER_CONTENT_GAP;
+  const profileScrollPaddingBottom = TAB_BAR_SCROLL_INSET + SPACE_6;
   const params = useLocalSearchParams<{ focusEventId?: string | string[] }>();
   const focusEventIdRaw = params.focusEventId;
   const focusEventId =
@@ -174,9 +188,28 @@ export default function ProfileScreen() {
   const [planHighlightId, setPlanHighlightId] = useState<string | null>(null);
 
   const myId = auth.currentUser?.uid ?? "";
+  const cachedOwnProfile = myId ? getCachedOwnProfile(myId) : undefined;
   const cachedFriendsForNames = myId ? friendsListCacheByUser[myId] ?? [] : [];
+  const cachedRecentFromProfile = recentSynqRowsFromCache(
+    cachedOwnProfile?.recentSynqs
+  );
+  const initialRecentSynqRows: RecentSynqRow[] =
+    cachedRecentFromProfile.length > 0
+      ? cachedRecentFromProfile
+      : myId
+        ? computeRecentSynqRows(myId, cachedFriendsForNames)
+        : [];
   const [friendsForHostNames, setFriendsForHostNames] = useState<Friend[]>(cachedFriendsForNames);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [friendsDataEpoch, setFriendsDataEpoch] = useState(0);
+  const [recentSynqRows, setRecentSynqRows] =
+    useState<RecentSynqRow[]>(initialRecentSynqRows);
+  const [recentSynqsReady, setRecentSynqsReady] = useState(
+    initialRecentSynqRows.length > 0 ||
+      Boolean(myId && friendRelationCacheByUser[myId])
+  );
+  const [profileImage, setProfileImage] = useState<string | null>(
+    cachedOwnProfile?.imageurl ?? null
+  );
   const [avatarRenderVersion, setAvatarRenderVersion] = useState(0);
   const [isQRExpanded, setQRExpanded] = useState(false);
   const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
@@ -184,10 +217,12 @@ export default function ProfileScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string>("");
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  const [interests, setInterests] = useState<string[]>([]);
-  const [city, setCity] = useState<string | null>(null);
-  const [state, setState] = useState<string | null>(null);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>(
+    cachedOwnProfile?.interests ?? []
+  );
+  const [interests, setInterests] = useState<string[]>(cachedOwnProfile?.interests ?? []);
+  const [city, setCity] = useState<string | null>(cachedOwnProfile?.city ?? null);
+  const [state, setState] = useState<string | null>(cachedOwnProfile?.state ?? null);
   const [requestCount, setRequestCount] = useState(0);
   type OpenPlanEvent = {
     id: string;
@@ -203,7 +238,9 @@ export default function ProfileScreen() {
     joinedFromFriendUid?: string;
   };
 
-  const [events, setEvents] = useState<OpenPlanEvent[]>([]);
+  const [events, setEvents] = useState<OpenPlanEvent[]>(
+    (cachedOwnProfile?.events as OpenPlanEvent[] | undefined) ?? []
+  );
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
@@ -241,31 +278,10 @@ export default function ProfileScreen() {
     return m;
   }, [myId, friendsForHostNames]);
 
-  const recentSynqRows = useMemo(() => {
-    if (!myId) return [];
-    const rel = friendRelationCacheByUser[myId];
-    if (!rel) return [];
-    const toDate = (raw: unknown): Date | null => {
-      if (raw == null) return null;
-      try {
-        const d =
-          typeof (raw as { toDate?: () => Date }).toDate === "function"
-            ? (raw as { toDate: () => Date }).toDate()
-            : new Date(raw as string | number);
-        return Number.isNaN(d.getTime()) ? null : d;
-      } catch {
-        return null;
-      }
-    };
-    const rows: { friend: Friend; at: Date }[] = [];
-    for (const f of friendsForHostNames) {
-      const d = toDate(rel[f.id]?.lastSynqAt);
-      if (!d) continue;
-      rows.push({ friend: f, at: d });
-    }
-    rows.sort((a, b) => b.at.getTime() - a.at.getTime());
-    return rows.slice(0, 3);
-  }, [myId, friendsForHostNames]);
+  const computedRecentSynqRows = useMemo(
+    () => computeRecentSynqRows(myId, friendsForHostNames),
+    [myId, friendsForHostNames, friendsDataEpoch]
+  );
 
   const showAlert = (title: string, message: string) => {
     setAlertTitle(title);
@@ -372,19 +388,34 @@ export default function ProfileScreen() {
     const unsubscribeProfile = onSnapshot(userDocRef, (userDocSnap) => {
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        setCity(userData.city || null);
-        const stateAbbr = stateAbbreviations[userData.state] || userData.state || null;
-        setState(stateAbbr);
+        const nextCity = userData.city || null;
+        const stateAbbr =
+          stateAbbreviations[userData.state] || userData.state || null;
         const rawEvents = (userData.events || []) as OpenPlanEvent[];
         const prunedEvents = filterOutPastOpenPlans(rawEvents);
         if (prunedEvents.length < rawEvents.length) {
           updateDoc(userDocRef, { events: prunedEvents }).catch(() => {});
         }
+        const nextInterests = userData.interests || [];
+        const nextImage = userData?.imageurl || null;
+
+        const prevOwn = getCachedOwnProfile(myId);
+        setCachedOwnProfile(myId, {
+          imageurl: nextImage,
+          interests: nextInterests,
+          events: prunedEvents,
+          city: nextCity,
+          state: stateAbbr,
+          recentSynqs: prevOwn?.recentSynqs ?? [],
+        });
+
+        setCity(nextCity);
+        setState(stateAbbr);
         setEvents(prunedEvents);
-        setInterests(userData.interests || []);
-        setSelectedInterests(userData.interests || []);
-        setProfileImage(userData?.imageurl || null);
-        prefetchResolvedAvatar(userData?.imageurl);
+        setInterests(nextInterests);
+        setSelectedInterests(nextInterests);
+        setProfileImage(nextImage);
+        prefetchResolvedAvatar(nextImage);
       }
     });
 
@@ -414,11 +445,49 @@ export default function ProfileScreen() {
       const friendIds = new Set(snapshot.docs.map((d) => d.id));
       pruneSocialCachesToFriendIds(myId, friendIds);
 
+      if (!friendRelationCacheByUser[myId]) {
+        friendRelationCacheByUser[myId] = {};
+      }
+      snapshot.docs.forEach((d) => {
+        const data = d.data();
+        friendRelationCacheByUser[myId][d.id] = {
+          synqCount: data.synqCount || 0,
+          lastSynqAt: data.lastSynqAt,
+        };
+      });
+
+      const cachedList = friendsListCacheByUser[myId] ?? [];
+      const friendsCacheMatches =
+        cachedList.length > 0 &&
+        cachedList.length === friendIds.size &&
+        cachedList.every((f) => friendIds.has(f.id));
+
+      if (friendsCacheMatches) {
+        setFriendsForHostNames((prev) =>
+          prev.length === cachedList.length &&
+          prev.every((f, i) => f.id === cachedList[i]?.id)
+            ? prev
+            : cachedList
+        );
+        setFriendsDataEpoch((n) => n + 1);
+        setRecentSynqsReady(true);
+        return;
+      }
+
       try {
         await warmFriendsAndConnectionsCache(myId);
-        setFriendsForHostNames(friendsListCacheByUser[myId] ?? []);
+        const nextFriends = friendsListCacheByUser[myId] ?? [];
+        setFriendsForHostNames((prev) =>
+          prev.length === nextFriends.length &&
+          prev.every((f, i) => f.id === nextFriends[i]?.id)
+            ? prev
+            : nextFriends
+        );
+        setFriendsDataEpoch((n) => n + 1);
       } catch (e) {
         console.error("[ProfileScreen] warmFriendsAndConnectionsCache:", e);
+      } finally {
+        setRecentSynqsReady(true);
       }
     });
 
@@ -608,6 +677,53 @@ export default function ProfileScreen() {
   }, [auth.currentUser?.displayName]);
 
   useEffect(() => {
+    if (!myId) return;
+    let cancelled = false;
+    void hydrateOwnProfileFromDisk(myId).then(() => {
+      if (cancelled) return;
+      const cached = getCachedOwnProfile(myId);
+      if (!cached) return;
+      setProfileImage((prev) => prev ?? cached.imageurl);
+      setInterests((prev) => (prev.length > 0 ? prev : cached.interests));
+      setSelectedInterests((prev) => (prev.length > 0 ? prev : cached.interests));
+      setCity((prev) => prev ?? cached.city);
+      setState((prev) => prev ?? cached.state);
+      setEvents((prev) => (prev.length > 0 ? prev : (cached.events as OpenPlanEvent[])));
+      const cachedRows = recentSynqRowsFromCache(cached.recentSynqs);
+      if (cachedRows.length > 0) {
+        setRecentSynqRows((prev) => (prev.length > 0 ? prev : cachedRows));
+        setRecentSynqsReady(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [myId]);
+
+  useEffect(() => {
+    if (computedRecentSynqRows.length > 0) {
+      setRecentSynqRows((prev) => {
+        if (recentSynqRowsEqual(computedRecentSynqRows, prev)) return prev;
+        if (myId) {
+          mergeCachedOwnProfile(myId, {
+            recentSynqs: recentSynqRowsToCache(computedRecentSynqRows),
+          });
+        }
+        return computedRecentSynqRows;
+      });
+      return;
+    }
+    if (!recentSynqsReady) return;
+    setRecentSynqRows((prev) => {
+      if (prev.length === 0) return prev;
+      if (myId) {
+        mergeCachedOwnProfile(myId, { recentSynqs: [] });
+      }
+      return [];
+    });
+  }, [computedRecentSynqRows, recentSynqsReady, myId]);
+
+  useEffect(() => {
     if (isFocused) return;
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   }, [isFocused]);
@@ -621,7 +737,10 @@ export default function ProfileScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: profileScrollPaddingTop },
+          {
+            paddingTop: profileScrollPaddingTop,
+            paddingBottom: profileScrollPaddingBottom,
+          },
         ]}
         showsVerticalScrollIndicator={false}
         scrollIndicatorInsets={{ right: 0 }}
@@ -745,7 +864,8 @@ export default function ProfileScreen() {
                         source={{ uri: resolveAvatar(friend.imageurl) }}
                         style={styles.connImg}
                         cachePolicy="memory-disk"
-                        transition={220}
+                        transition={0}
+                        recyclingKey={friend.id}
                       />
                       {i === 0 && (
                         <View style={styles.crown}>
@@ -761,12 +881,14 @@ export default function ProfileScreen() {
               );
             })}
           </View>
-        ) : (
+        ) : recentSynqsReady ? (
           <Text style={styles.profileHelperText}>
             {friendsForHostNames.length === 0
               ? "Add friends to see recent Synqs here."
               : "No Synqs yet. Start a Synq with a friend to see it here."}
           </Text>
+        ) : (
+          <View style={styles.recentSynqsPlaceholder} />
         )}
       </View>
 
@@ -792,38 +914,33 @@ export default function ProfileScreen() {
             <Text style={styles.profileHelperText}>
               Add a few interests so friends know what you are into.
             </Text>
-            <TouchableOpacity
-              style={styles.interestsAddPlanBtn}
+            <SynqPlusAddButton
               onPress={() => setShowInputModal(true)}
               accessibilityLabel="Add interests"
-              activeOpacity={0.85}
-            >
-              <Text style={styles.interestsAddPlanBtnText}>+ Add</Text>
-            </TouchableOpacity>
+              style={styles.interestsAddPlanBtnSpacing}
+            />
           </>
         ) : (
-          <View style={styles.interestsWrapper}>
-            {interests.map((interest, i) => (
-              <ProfilePressable
-                key={i}
-                style={styles.interestRectOuter}
-                contentStyle={styles.interestRect}
-                onPress={() => handleDeleteInterest(interest)}
-                accessibilityLabel={`Interest ${interest}, tap to remove`}
-              >
-                <Text style={styles.interestText}>{interest}</Text>
-              </ProfilePressable>
-            ))}
-
-            <ProfilePressable
-              style={styles.addRectOuter}
-              contentStyle={styles.addRect}
+          <>
+            <View style={styles.interestsWrapper}>
+              {interests.map((interest, i) => (
+                <ProfilePressable
+                  key={i}
+                  style={styles.interestRectOuter}
+                  contentStyle={styles.interestRect}
+                  onPress={() => handleDeleteInterest(interest)}
+                  accessibilityLabel={`Interest ${interest}, tap to remove`}
+                >
+                  <Text style={styles.interestText}>{interest}</Text>
+                </ProfilePressable>
+              ))}
+            </View>
+            <SynqPlusAddButton
               onPress={() => setShowInputModal(true)}
               accessibilityLabel="Add more interests"
-            >
-              <Text style={styles.addRectText}>+ Add</Text>
-            </ProfilePressable>
-          </View>
+              style={styles.interestsAddBelow}
+            />
+          </>
         )}
       </View>
 
@@ -1022,7 +1139,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
   scrollView: { flex: 1 },
   scrollContent: {
-    paddingBottom: TAB_BAR_SCROLL_INSET,
     paddingHorizontal: 20,
   },
   heroOuter: { marginTop: 0 },
@@ -1211,6 +1327,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingTop: 6,
   },
+  recentSynqsPlaceholder: {
+    minHeight: 88,
+  },
   section: {
     marginTop: 16,
     paddingTop: 14,
@@ -1218,24 +1337,10 @@ const styles = StyleSheet.create({
     borderTopColor: BORDER,
   },
   sectionTitle: profileScreenSectionTitle,
-  interestsAddPlanBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: ACCENT,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginTop: 16,
-    alignSelf: "flex-start",
-  },
-  interestsAddPlanBtnText: {
-    color: ACCENT,
-    fontFamily: fonts.heavy,
-    fontSize: 13,
-  },
+  interestsAddPlanBtnSpacing: { marginTop: 16 },
+  interestsAddBelow: { marginTop: 12 },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  interestsWrapper: { flexDirection: "row", flexWrap: "wrap", alignItems: "center" },
+  interestsWrapper: { flexDirection: "row", flexWrap: "wrap" },
   interestRectOuter: { marginRight: 8, marginBottom: 8 },
   interestRect: {
     backgroundColor: SURFACE,
@@ -1246,18 +1351,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   interestText: { color: TEXT, fontFamily: fonts.book, fontSize: 13 },
-  addRectOuter: { marginBottom: 8 },
-  addRect: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: ACCENT,
-    borderStyle: "solid",
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  addRectText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13 },
   signOutBtn: { ...destructiveActionBtn, marginTop: 40 },
   signOutText: destructiveActionBtnText,
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" },

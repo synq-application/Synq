@@ -1,4 +1,5 @@
 import { ACCENT, BORDER, fonts, profileScreenSectionTitle, TEXT } from "@/constants/Variables";
+import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useEffect, useMemo, useState } from "react";
@@ -282,13 +283,11 @@ export default function OpenPlans({
       </View>
 
       <View style={styles.addBtnRow}>
-        <TouchableOpacity
-          style={styles.addBtn}
+        <SynqPlusAddButton
           onPress={() => setShowEventModal(true)}
           accessibilityLabel="Add plan"
-        >
-          <Text style={styles.addBtnText}>+ Add</Text>
-        </TouchableOpacity>
+          style={styles.addBtnSpacing}
+        />
       </View>
 
       <Modal visible={showEventModal} transparent animationType="fade">
@@ -567,19 +566,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "flex-start",
   },
-  addBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: ACCENT,
-    borderStyle: "solid",
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  addBtnText: { color: ACCENT, fontFamily: fonts.heavy, fontSize: 13, marginLeft: 0 },
+  addBtnSpacing: { marginTop: 16, marginBottom: 8 },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", alignItems: "center" },
   modal: { width: "92%", backgroundColor: "#0a0a0a", padding: 18, borderRadius: 22 },
   modalTitle: { color: "white", fontSize: 18, fontFamily: fonts.medium },

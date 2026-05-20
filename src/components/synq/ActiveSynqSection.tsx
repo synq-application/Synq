@@ -99,6 +99,7 @@ export default function ActiveSynqSection({
           style={styles.activeFriendsList}
           data={availableFriends}
           keyExtractor={(item) => item.id}
+          ItemSeparatorComponent={() => <View style={styles.activeFriendRowSeparator} />}
           ListEmptyComponent={
             <View style={styles.activeEmptyWrap}>
               <Text style={styles.activeEmptyTitle}>No free friends right now.</Text>
@@ -119,10 +120,7 @@ export default function ActiveSynqSection({
                       : [...prev, item.id]
                   )
                 }
-                style={[
-                  styles.friendCard,
-                  selectedFriends.includes(item.id) && { borderColor: ACCENT },
-                ]}
+                style={styles.friendCard}
               >
                 <ExpoImage
                   source={{ uri: resolveAvatar(item.imageurl) }}
@@ -162,8 +160,8 @@ export default function ActiveSynqSection({
         />
         <LinearGradient
           pointerEvents="none"
-          colors={["rgba(9,10,11,0)", "rgba(9,10,11,0.38)", BG]}
-          locations={[0, 0.45, 1]}
+          colors={["rgba(9,10,11,0)", "rgba(9,10,11,0.85)", BG]}
+          locations={[0, 0.55, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={styles.activeListFade}

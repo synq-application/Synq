@@ -111,6 +111,7 @@ import {
 } from "../../src/lib/socialCache";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
+import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import { friendLocationLine, resolveAvatar } from "../helpers";
 
 const { width } = Dimensions.get("window");
@@ -881,7 +882,7 @@ function SearchModal({
   const sheetAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
   }));
-  const listBottomInset = insets.bottom + (Platform.OS === "ios" ? 12 : 20);
+  const listBottomInset = 84 + (Platform.OS === "android" ? insets.bottom : 0);
 
   const openSheet = useCallback(() => {
     cancelAnimation(translateY);
@@ -1581,25 +1582,37 @@ function SearchModal({
       onLongPress?: () => void;
       disabled?: boolean;
     }
-  ) => (
-    <TouchableOpacity
-      onPress={opts?.onPress}
-      onLongPress={opts?.onLongPress}
-      delayLongPress={opts?.onLongPress ? 400 : undefined}
-      style={[synqOutlineAddBtnCompact, opts?.disabled && synqOutlineAddBtnDisabled]}
-      activeOpacity={0.8}
-      disabled={opts?.disabled && !opts?.onLongPress}
-    >
-      <Text
-        style={[
-          synqOutlineAddBtnTextCompact,
-          opts?.disabled && synqOutlineAddBtnTextDisabled,
-        ]}
+  ) => {
+    if (label === "Add") {
+      return (
+        <SynqPlusAddButton
+          onPress={() => opts?.onPress?.()}
+          accessibilityLabel="Add friend"
+          disabled={opts?.disabled}
+          activeOpacity={0.8}
+        />
+      );
+    }
+    return (
+      <TouchableOpacity
+        onPress={opts?.onPress}
+        onLongPress={opts?.onLongPress}
+        delayLongPress={opts?.onLongPress ? 400 : undefined}
+        style={[synqOutlineAddBtnCompact, opts?.disabled && synqOutlineAddBtnDisabled]}
+        activeOpacity={0.8}
+        disabled={opts?.disabled && !opts?.onLongPress}
       >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+        <Text
+          style={[
+            synqOutlineAddBtnTextCompact,
+            opts?.disabled && synqOutlineAddBtnTextDisabled,
+          ]}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   const renderSuggestedActions = (item: any) => {
     if (acceptedIds[item.id]) {
@@ -1772,7 +1785,7 @@ function SearchModal({
                   styles.addFriendsListContent,
                   { paddingBottom: listBottomInset },
                 ]}
-                ListFooterComponent={<View style={{ height: 8 }} />}
+                ListFooterComponent={<View style={{ height: 16 }} />}
                 SectionSeparatorComponent={() => <View style={styles.addFriendsSectionGap} />}
                 renderSectionHeader={({ section }) => (
                   <AddFriendsSectionHeader
@@ -1801,7 +1814,7 @@ function SearchModal({
                 { paddingBottom: listBottomInset },
                 results.length === 0 && styles.addFriendsListContentEmpty,
               ]}
-              ListFooterComponent={<View style={{ height: 8 }} />}
+              ListFooterComponent={<View style={{ height: 16 }} />}
               ItemSeparatorComponent={() => <View style={styles.friendRowSeparator} />}
               ListEmptyComponent={
                 isSearching ? (
@@ -2282,7 +2295,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   addFriendsListWrap: { flex: 1 },
-  addFriendsListContent: { paddingBottom: 32 },
+  addFriendsListContent: {},
   addFriendsListContentEmpty: { flexGrow: 1 },
   addFriendsSectionLabel: {
     flex: 1,
