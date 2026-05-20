@@ -69,13 +69,15 @@ export default function TabsLayout() {
           tabBarAccessibilityLabel: "Synq home",
           tabBarIcon: ({ focused }) => (
             <View style={[styles.synqButton, focused && styles.synqButtonActive]}>
-              <ExpoImage
-                source={SYNQ_ICON}
-                style={styles.synqIcon}
-                contentFit="cover"
-                transition={0}
-                cachePolicy="memory-disk"
-              />
+              <View style={styles.synqButtonInner}>
+                <ExpoImage
+                  source={SYNQ_ICON}
+                  style={styles.synqIcon}
+                  contentFit="cover"
+                  transition={0}
+                  cachePolicy="memory-disk"
+                />
+              </View>
             </View>
           ),
         }}
@@ -120,23 +122,31 @@ const styles = StyleSheet.create({
     width: 59,
     height: 59,
     borderRadius: 29.5,
-    backgroundColor: TAB_BAR_BG,
     justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden",
     marginBottom: Platform.OS === "ios" ? 26 : 16,
     marginTop: TAB_BAR_ICON_NUDGE,
     borderWidth: 0,
     elevation: 6,
   },
+  synqButtonInner: {
+    width: 59,
+    height: 59,
+    borderRadius: 29.5,
+    backgroundColor: TAB_BAR_BG,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
 
   synqButtonActive: {
-    transform: [{ scale: 1.05 }],
-    borderWidth: 2,
-    borderColor: "rgba(0,255,133,0.85)",
+    transform: [{ scale: 1.03 }],
+    borderWidth: 0,
     shadowColor: ACCENT,
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.18,
     shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
   },
 
   synqIcon: {
