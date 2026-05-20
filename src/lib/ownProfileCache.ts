@@ -3,7 +3,10 @@ import { Friend } from "@/constants/Variables";
 import { Image as ExpoImage } from "expo-image";
 
 import { resolveAvatar } from "../../app/helpers";
-import { friendRelationCacheByUser } from "./socialCache";
+import {
+  friendRelationCacheByUser,
+  friendsListCacheByUser,
+} from "./socialCache";
 
 export type CachedRecentSynq = {
   friendId: string;
@@ -149,6 +152,52 @@ export function mergeCachedOwnProfile(
 ) {
   const prev = ownProfileCacheByUser[userId] ?? emptySnapshot();
   setCachedOwnProfile(userId, { ...prev, ...partial });
+}
+
+export type MeTabInitialState = {
+  profileImage: string | null;
+  interests: string[];
+  selectedInterests: string[];
+  city: string | null;
+  state: string | null;
+  events: unknown[];
+  friendsForHostNames: Friend[];
+  recentSynqRows: RecentSynqRow[];
+  recentSynqsReady: boolean;
+};
+
+/** Synchronous snapshot for Me tab first paint (after disk hydrate at app boot). */
+export function getMeTabInitialState(userId: string): MeTabInitialState {
+  const profile = getCachedOwnProfile(userId);
+  const friends = friendsListCacheByUser[userId] ?? [];
+  const cachedRecent = recentSynqRowsFromCache(profile?.recentSynqs);
+  const recentSynqRows =
+    cachedRecent.length > 0 ? cachedRecent : computeRecentSynqRows(userId, friends);
+  const socialCacheReady = friendsListCacheByUser[userId] !== undefined;
+
+  return {
+    profileImage: profile?.imageurl ?? null,
+    interests: profile?.interests ?? [],
+    selectedInterests: profile?.interests ?? [],
+    city: profile?.city ?? null,
+    state: profile?.state ?? null,
+    events: profile?.events ?? [],
+    friendsForHostNames: friends,
+    recentSynqRows,
+    recentSynqsReady: recentSynqRows.length > 0 || socialCacheReady,
+  };
+}
+
+/** Prefetch Me tab images after auth hydrate so first open does not flash. */
+export function prewarmMeTabScreen(userId: string): void {
+  if (!userId) return;
+  const profile = getCachedOwnProfile(userId);
+  if (profile) {
+    prefetchProfileImage(profile.imageurl);
+    prefetchRecentSynqAvatars(profile.recentSynqs);
+  }
+  const friends = friendsListCacheByUser[userId] ?? [];
+  friends.slice(0, 3).forEach((friend) => prefetchProfileImage(friend.imageurl));
 }
 
 export async function hydrateOwnProfileFromDisk(userId: string): Promise<void> {
