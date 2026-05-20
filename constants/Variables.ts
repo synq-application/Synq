@@ -14,12 +14,12 @@ export const synqSvg = `
 `;
 
 export const BG = "#090A0B";
-/** Solid black behind tab icons and labels. */
-export const TAB_BAR_BG = "#000000";
-/** Tab bar fade: transparent (content) → black (icons). */
+/** Charcoal behind tab icons and labels (slightly lifted off pure black). */
+export const TAB_BAR_BG = "#050607";
+/** Tab bar fade: transparent (content) → charcoal (icons). */
 export const TAB_BAR_FADE_GRADIENT = [
   "rgba(9,10,11,0)",
-  "rgba(0,0,0,0.72)",
+  "rgba(5,6,7,0.64)",
   TAB_BAR_BG,
 ] as const;
 /** Profile header fade: black (icons) → page background. */

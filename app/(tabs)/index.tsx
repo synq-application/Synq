@@ -1311,7 +1311,7 @@ const styles = StyleSheet.create({
   activeSynqRoot: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
   activeListWrap: { flex: 1, position: "relative" },
   activeFriendsList: { flex: 1 },
-  activeListContent: { paddingTop: 20, paddingBottom: 108, paddingHorizontal: 0 },
+  activeListContent: { paddingTop: 12, paddingBottom: 108, paddingHorizontal: 0 },
   activeListFade: {
     position: "absolute",
     left: 0,
@@ -1378,8 +1378,8 @@ const styles = StyleSheet.create({
   },
   headerDivider: {
     marginTop: 16,
-    height: 1,
-    backgroundColor: BORDER,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   activeMemoRow: {
     marginTop: 14,
@@ -1388,10 +1388,10 @@ const styles = StyleSheet.create({
   activeMemoCard: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: "#111",
+    backgroundColor: "#0A0B0D",
     borderRadius: BUTTON_RADIUS,
-    borderWidth: 1,
-    borderColor: "#222",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.05)",
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
@@ -1430,14 +1430,14 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   friendCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#111',
-    padding: 15,
-    borderRadius: BUTTON_RADIUS,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#222'
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 0,
+  },
+  activeFriendRowSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
   whiteBold: { color: 'white', fontSize: 17, fontFamily: fonts.medium },
