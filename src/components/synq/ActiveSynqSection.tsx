@@ -22,8 +22,8 @@ import {
   TAB_BAR_SCROLL_INSET,
 } from "../../../constants/Variables";
 
-/** Fade above the pinned footer so list rows dissolve before the CTA. */
-const ACTIVE_LIST_BOTTOM_FADE_HEIGHT = 80;
+/** Fade strip sitting just above the Select friends button. */
+const ACTIVE_LIST_BOTTOM_FADE_HEIGHT = 52;
 /** Extra lift for the Select friends CTA above the tab bar. */
 const ACTIVE_CTA_BOTTOM_NUDGE = 48;
 
@@ -64,13 +64,14 @@ export default function ActiveSynqSection({
     const ctaBottomPad = TAB_BAR_SCROLL_INSET + ACTIVE_CTA_BOTTOM_NUDGE;
     const ctaBlockHeight = ctaPadTop + PRIMARY_CTA_HEIGHT;
     const dockHeight = ctaBlockHeight + ctaBottomPad;
+    const fadeBottom = ctaBottomPad + PRIMARY_CTA_HEIGHT;
     return {
       ctaPadTop,
       ctaBottomPad,
       ctaBlockHeight,
       dockHeight,
-      listBottomPad: dockHeight + ACTIVE_LIST_BOTTOM_FADE_HEIGHT,
-      fadeBottom: dockHeight,
+      fadeBottom,
+      listBottomPad: fadeBottom + ACTIVE_LIST_BOTTOM_FADE_HEIGHT,
     };
   }, []);
 
@@ -200,7 +201,7 @@ export default function ActiveSynqSection({
         <LinearGradient
           pointerEvents="none"
           colors={["rgba(9,10,11,0)", BG]}
-          locations={[0, 0.55, 1]}
+          locations={[0, 0.7, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={[
