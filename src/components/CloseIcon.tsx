@@ -1,5 +1,6 @@
 import {
   CLOSE_ICON_COLOR,
+  CLOSE_ICON_COLOR_INLINE,
   CLOSE_ICON_NAME,
   CLOSE_ICON_SIZE,
   CLOSE_ICON_SIZE_INLINE,
@@ -9,19 +10,27 @@ import React from "react";
 
 type Props = {
   size?: number;
+  color?: string;
   /** `inline` — search / field clear; `default` — sheets and modals. */
   variant?: "default" | "inline";
 };
 
-export default function CloseIcon({ size, variant = "default" }: Props) {
+export default function CloseIcon({
+  size,
+  color,
+  variant = "default",
+}: Props) {
+  const isInline = variant === "inline";
   const resolvedSize =
-    size ?? (variant === "inline" ? CLOSE_ICON_SIZE_INLINE : CLOSE_ICON_SIZE);
+    size ?? (isInline ? CLOSE_ICON_SIZE_INLINE : CLOSE_ICON_SIZE);
+  const resolvedColor =
+    color ?? (isInline ? CLOSE_ICON_COLOR_INLINE : CLOSE_ICON_COLOR);
 
   return (
     <Ionicons
       name={CLOSE_ICON_NAME}
       size={resolvedSize}
-      color={CLOSE_ICON_COLOR}
+      color={resolvedColor}
     />
   );
 }

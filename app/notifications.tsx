@@ -290,7 +290,7 @@ export default function NotificationsScreen() {
             onPress={() => handleRequest(item, false)}
             style={styles.denyBtn}
           >
-            <CloseIcon />
+            <CloseIcon size={22} />
           </TouchableOpacity>
         </View>
       </View>

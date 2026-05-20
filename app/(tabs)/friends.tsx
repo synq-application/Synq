@@ -11,6 +11,7 @@ import {
   profileScreenSectionTitle,
   RADIUS_LG,
   RADIUS_MD,
+  SPACE_2,
   SPACE_3,
   SPACE_4,
   SPACE_5,
@@ -35,6 +36,7 @@ import {
   sortFriendsByDistanceKm,
   sortFriendsByNameWithNoLocationLast,
 } from "@/src/lib/friendDistance";
+import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
@@ -1728,15 +1730,11 @@ function SearchModal({
 
         <View style={styles.addFriendsHeader}>
           <Text style={styles.addFriendsTitle}>Add friends</Text>
-          <TouchableOpacity
+          <CloseButton
             onPress={onClose}
-            activeOpacity={0.7}
             accessibilityLabel="Close"
-            accessibilityRole="button"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <CloseIcon />
-          </TouchableOpacity>
+            style={styles.addFriendsCloseBtn}
+          />
         </View>
 
         <View style={[styles.searchBar, styles.addFriendsSearchSpacing]}>
@@ -1842,7 +1840,7 @@ function SearchModal({
             />
           </View>
         )}
-      </View>
+        </View>
         </Animated.View>
       </View>
       <ConfirmModal
@@ -2275,14 +2273,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 28,
   },
   addFriendsHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    minHeight: 34,
-    paddingTop: 40,
+    justifyContent: "space-between",
     marginBottom: 14,
   },
   addFriendsSearchSpacing: {
@@ -2292,8 +2288,11 @@ const styles = StyleSheet.create({
   addFriendsTitle: {
     ...tabScreenMainHeaderTitle,
     flex: 1,
-    lineHeight: 32,
-    includeFontPadding: false,
+    marginRight: SPACE_3,
+    lineHeight: 34,
+  },
+  addFriendsCloseBtn: {
+    marginTop: -3,
   },
   addFriendsListWrap: { flex: 1 },
   addFriendsListContent: {},

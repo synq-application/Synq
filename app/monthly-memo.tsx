@@ -12,7 +12,7 @@ import PlanDateCalendar from "@/src/components/PlanDateCalendar";
 import PlanTimePicker from "@/src/components/PlanTimePicker";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
-import CloseIcon from "@/src/components/CloseIcon";
+import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -415,13 +415,7 @@ export default function OpenPlans({
             >
               <View style={styles.popupTitleRow}>
                 <Text style={styles.popupTitle}>Add a plan</Text>
-                <TouchableOpacity
-                  onPress={closeModal}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityLabel="Close"
-                >
-                  <CloseIcon />
-                </TouchableOpacity>
+                <CloseButton onPress={closeModal} accessibilityLabel="Close" />
               </View>
 
               <TouchableWithoutFeedback

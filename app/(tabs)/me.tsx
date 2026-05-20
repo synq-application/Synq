@@ -63,7 +63,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import CloseIcon from "@/src/components/CloseIcon";
+import CloseButton from "@/src/components/CloseButton";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
@@ -1001,15 +1001,10 @@ export default function ProfileScreen() {
             <View style={styles.interestSheet}>
               <View style={styles.interestHeader}>
                 <Text style={styles.interestTitle}>What are you into?</Text>
-                <TouchableOpacity
+                <CloseButton
                   onPress={() => setShowInputModal(false)}
-                  activeOpacity={0.7}
                   accessibilityLabel="Close interests"
-                  accessibilityRole="button"
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <CloseIcon />
-                </TouchableOpacity>
+                />
               </View>
               <Text style={styles.interestSubtitle}>
                 Pick a few things you enjoy doing with friends.

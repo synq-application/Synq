@@ -1,3 +1,4 @@
+import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
@@ -118,7 +119,7 @@ export default function MessagesChatPane({
             </TouchableOpacity>
           </View>
         </View>
-        <TouchableOpacity
+        <CloseButton
           onPress={() => {
             Keyboard.dismiss();
             setMessagesPane("inbox");
@@ -126,11 +127,8 @@ export default function MessagesChatPane({
             setShowOptionsList(false);
             setPendingNewChat(null);
           }}
-          accessibilityRole="button"
           accessibilityLabel="Close chat"
-        >
-          <CloseIcon />
-        </TouchableOpacity>
+        />
       </View>
 
       <KeyboardAvoidingView
@@ -333,8 +331,9 @@ export default function MessagesChatPane({
                   <TouchableOpacity
                     style={{ marginLeft: "auto" }}
                     onPress={() => setShowAICard(false)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <CloseIcon />
+                    <CloseIcon variant="inline" />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.aiCardBodySmall}>{aiResponse}</Text>

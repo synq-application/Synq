@@ -1,4 +1,4 @@
-import CloseIcon from "@/src/components/CloseIcon";
+import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { FlatList, Text, TouchableOpacity, View } from "react-native";
@@ -31,13 +31,10 @@ export default function MessagesInboxPane({
     <View style={styles.modalBg}>
       <View style={styles.modalHeader}>
         <Text style={styles.messagesInboxTitle}>Messages</Text>
-        <TouchableOpacity
+        <CloseButton
           onPress={onCloseMessages}
-          accessibilityRole="button"
           accessibilityLabel="Close messages"
-        >
-          <CloseIcon />
-        </TouchableOpacity>
+        />
       </View>
       <View style={styles.messagesHeaderDivider} />
 

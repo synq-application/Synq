@@ -62,12 +62,21 @@ export const SURFACE = "rgba(255,255,255,0.06)";
 export const BORDER = "rgba(255,255,255,0.08)";
 export const MUTED2 = "rgba(255,255,255,0.45)";
 export const MUTED3 = "rgba(255,255,255,0.25)";
-/** Dismiss / clear “X” controls — same glyph, color, and default size app-wide. */
-export const CLOSE_ICON_NAME = "close-circle" as const;
-export const CLOSE_ICON_COLOR = MUTED2;
-export const CLOSE_ICON_SIZE = 26;
-/** Inline clear (search fields). */
-export const CLOSE_ICON_SIZE_INLINE = 16;
+/** Dismiss “X” — white glyph, no chrome (matches back). */
+export const CLOSE_ICON_NAME = "close" as const;
+export const CLOSE_ICON_COLOR = TEXT;
+export const CLOSE_ICON_SIZE = 24;
+/** Inline clear in search fields — smaller, muted. */
+export const CLOSE_ICON_COLOR_INLINE = MUTED2;
+export const CLOSE_ICON_SIZE_INLINE = 18;
+/** Touch target for header / sheet close; transparent background. */
+export const navigationCloseBtn: ViewStyle = {
+  width: 44,
+  height: 44,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "transparent",
+};
 /** Navigation back (“<”) — white glyph, no chrome. */
 export const BACK_ICON_NAME = "chevron-back" as const;
 export const BACK_ICON_COLOR = TEXT;

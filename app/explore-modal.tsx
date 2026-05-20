@@ -6,7 +6,7 @@ import {
     fonts,
 } from "@/constants/Variables";
 import BackButton from "@/src/components/BackButton";
-import CloseIcon from "@/src/components/CloseIcon";
+import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import React, { useState } from "react";
@@ -105,9 +105,7 @@ export default function ExploreModal({
                                 <>
                                     <View style={styles.header}>
                                         <Text style={styles.title}>What’s the vibe?</Text>
-                                        <TouchableOpacity onPress={onClose}>
-                                            <CloseIcon />
-                                        </TouchableOpacity>
+                                        <CloseButton onPress={onClose} />
                                     </View>
 
                                     <Text style={styles.subtitle}>
@@ -172,9 +170,7 @@ export default function ExploreModal({
                                                 {currentCategory}
                                             </Text>
                                         </View>
-                                        <TouchableOpacity onPress={onClose}>
-                                            <CloseIcon />
-                                        </TouchableOpacity>
+                                        <CloseButton onPress={onClose} />
                                     </View>
 
                                     <FlatList

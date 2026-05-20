@@ -1,4 +1,4 @@
-import CloseIcon from "@/src/components/CloseIcon";
+import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
@@ -66,13 +66,7 @@ export default function EditSynqModal({
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.editPanel}>
 
-              <TouchableOpacity
-                onPress={onClose}
-                style={styles.closeBtn}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <CloseIcon />
-              </TouchableOpacity>
+              <CloseButton onPress={onClose} style={styles.closeBtn} />
 
               <Text style={styles.panelTitle}>Edit memo</Text>
 
