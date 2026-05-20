@@ -5,15 +5,15 @@ import { Tabs } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import {
-  ACCENT,
-  SPACE_2,
-  SPACE_3,
-  SPACE_4,
-  SPACE_5,
-  TAB_BAR_BG,
-  TAB_BAR_FADE_GRADIENT,
-  TYPE_CAPTION,
-  fonts,
+    ACCENT,
+    SPACE_2,
+    SPACE_3,
+    SPACE_4,
+    SPACE_5,
+    TAB_BAR_BG,
+    TAB_BAR_FADE_GRADIENT,
+    TYPE_CAPTION,
+    fonts,
 } from "../../constants/Variables";
 
 const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 92 : 74;
