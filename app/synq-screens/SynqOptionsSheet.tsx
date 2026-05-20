@@ -12,6 +12,7 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
+  DESTRUCTIVE,
   TEXT,
   fonts,
 } from "../../constants/Variables";
@@ -59,7 +60,7 @@ export default function SynqOptionsSheet({
               accessibilityRole="button"
               accessibilityLabel="End Synq"
             >
-              <Ionicons name="stop-circle-outline" size={22} color="#FF453A" />
+              <Ionicons name="stop-circle-outline" size={22} color={DESTRUCTIVE} />
               <Text style={[styles.optionText, styles.destructiveText]}>End Synq</Text>
             </TouchableOpacity>
           </View>
@@ -111,7 +112,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
   },
   destructiveText: {
-    color: "#FF453A",
+    color: DESTRUCTIVE,
   },
   divider: {
     height: StyleSheet.hairlineWidth,

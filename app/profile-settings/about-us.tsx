@@ -1,5 +1,4 @@
-import BackButton from "@/src/components/BackButton";
-import { router } from "expo-router";
+import StackScreenHeader from "@/src/components/StackScreenHeader";
 import React from "react";
 import {
   SafeAreaView,
@@ -22,7 +21,7 @@ import {
   SURFACE,
   TYPE_BODY,
   TYPE_CAPTION,
-  TYPE_TITLE,
+  TYPE_SECTION,
   fonts,
 } from "../../constants/Variables";
 
@@ -43,12 +42,7 @@ export default function AboutUsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.header}>
-        <BackButton onPress={() => router.back()} style={styles.backButton} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>About Us</Text>
-        </View>
-      </View>
+      <StackScreenHeader title="About us" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.hero}>
@@ -109,20 +103,6 @@ export default function AboutUsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACE_4 + SPACE_3,
-    paddingTop: SPACE_3,
-    paddingBottom: SPACE_3,
-  },
-  backButton: { marginRight: SPACE_3 },
-  headerTitle: {
-    fontSize: TYPE_TITLE,
-    fontFamily: fonts.heavy,
-    color: "white",
-  },
-
   scrollContent: {
     paddingBottom: SPACE_6 + SPACE_3,
     paddingTop: SPACE_3,
@@ -138,7 +118,7 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
   },
   heroTitle: {
-    fontSize: TYPE_TITLE + 2,
+    fontSize: TYPE_SECTION,
     fontFamily: fonts.black,
     color: "white",
     marginBottom: SPACE_3 - 4,

@@ -1,5 +1,22 @@
-import { ACCENT, BG } from "@/constants/Variables";
-import BackButton from "@/src/components/BackButton";
+import StackScreenHeader from "@/src/components/StackScreenHeader";
+import {
+  BG,
+  BORDER,
+  BUTTON_RADIUS,
+  DESTRUCTIVE,
+  fonts,
+  MUTED,
+  MUTED2,
+  RADIUS_MD,
+  SPACE_3,
+  SPACE_4,
+  SPACE_5,
+  SPACE_6,
+  SURFACE,
+  TEXT,
+  TYPE_BODY,
+  TYPE_SECTION,
+} from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { signOut } from "firebase/auth";
@@ -13,21 +30,11 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { auth } from "../src/lib/firebase";
-
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
-
-const BACKGROUND = BG;
-const SURFACE = "#161616";
-
-const fonts = {
-  heavy: "Avenir-Heavy",
-  medium: "Avenir-Medium",
-  black: "Avenir-Black",
-};
 
 export default function DeleteAccountScreen() {
   const [busy, setBusy] = useState(false);
@@ -65,10 +72,10 @@ export default function DeleteAccountScreen() {
       showAlert("Account deleted", "Your account has been deleted.", () => {
         router.replace("/");
       });
-
-    } catch (e: any) {
-      const code = String(e?.code || "");
-      const msg = String(e?.message || e);
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      const code = String(err?.code || "");
+      const msg = String(err?.message || e);
 
       if (code.includes("unauthenticated")) {
         showAlert(
@@ -78,80 +85,71 @@ export default function DeleteAccountScreen() {
       } else if (code.includes("not-found")) {
         showAlert(
           "Delete not available yet",
-          "The deleteMyAccount function isn’t deployed. Deploy it and try again."
+          "The deleteMyAccount function isn't deployed. Deploy it and try again."
         );
       } else {
-        showAlert("Couldn’t delete account", msg);
+        showAlert("Couldn't delete account", msg);
       }
     } finally {
       setBusy(false);
     }
   };
 
-  const confirmDelete = () => {
-    setShowConfirm(true);
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-
-      <View style={styles.header}>
-        <BackButton onPress={() => router.back()} />
-        <Text style={styles.headerTitle}>Delete account</Text>
-      </View>
+      <StackScreenHeader title="Delete account" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.hero}>
           <Text style={styles.heroTitle}>This is permanent</Text>
           <Text style={styles.heroSubtitle}>
-            Deleting your account removes your profile, friends, chats, and messages from Synq.
-            This can’t be undone.
+            Deleting your account removes your profile, friends, chats, and
+            messages from Synq. This can't be undone.
           </Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>What will be deleted</Text>
-
+        <Text style={styles.groupTitle}>What will be deleted</Text>
+        <View style={styles.group}>
           <View style={styles.bulletRow}>
             <Text style={styles.bulletDot}>•</Text>
             <Text style={styles.bulletText}>Your profile</Text>
           </View>
-
           <View style={styles.bulletRow}>
             <Text style={styles.bulletDot}>•</Text>
             <Text style={styles.bulletText}>Friends (removed on both sides)</Text>
           </View>
-
-          <View style={styles.bulletRow}>
+          <View style={[styles.bulletRow, styles.bulletRowLast]}>
             <Text style={styles.bulletDot}>•</Text>
-            <Text style={styles.bulletText}>Chats and messages you’re part of</Text>
+            <Text style={styles.bulletText}>
+              Chats and messages you're part of
+            </Text>
           </View>
         </View>
 
         <TouchableOpacity
-          onPress={confirmDelete}
-          activeOpacity={0.9}
-          style={[styles.deleteBtn, busy && { opacity: 0.7 }]}
+          onPress={() => setShowConfirm(true)}
+          activeOpacity={0.85}
+          style={[styles.deleteBtn, busy && styles.deleteBtnDisabled]}
           disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel="Delete my account"
         >
           {busy ? (
-            <ActivityIndicator />
+            <ActivityIndicator color={TEXT} />
           ) : (
             <>
-              <Ionicons name="trash" size={18} color="white" />
-              <Text style={styles.deleteText}>Delete my account</Text>
+              <Ionicons name="trash-outline" size={18} color={TEXT} />
+              <Text style={styles.deleteBtnText}>Delete my account</Text>
             </>
           )}
         </TouchableOpacity>
-
-        <View style={styles.footerSpace} />
       </ScrollView>
 
       <ConfirmModal
         visible={showConfirm}
         title="Delete account?"
-        message="This permanently deletes your Synq account, friends, and chats. This can’t be undone."
+        message="This permanently deletes your Synq account, friends, and chats. This can't be undone."
         confirmText="Delete"
         destructive
         onCancel={() => setShowConfirm(false)}
@@ -175,83 +173,80 @@ export default function DeleteAccountScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BACKGROUND },
-
-  header: {
-    height: 72,
-    backgroundColor: ACCENT,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
+  container: { flex: 1, backgroundColor: BG },
+  scrollContent: {
+    paddingTop: SPACE_3,
+    paddingBottom: SPACE_6,
+    paddingHorizontal: SPACE_4 + SPACE_3,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontFamily: fonts.heavy,
-    color: "black",
-    marginLeft: 6,
-  },
-
-  scrollContent: { paddingBottom: 40 },
-
   hero: {
-    margin: 20,
-    backgroundColor: SURFACE,
-    borderRadius: 14,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#202020",
+    marginBottom: SPACE_5,
   },
   heroTitle: {
-    fontSize: 20,
+    color: TEXT,
+    fontSize: TYPE_SECTION,
     fontFamily: fonts.heavy,
-    color: "white",
-    marginBottom: 6,
+    marginBottom: SPACE_3,
   },
   heroSubtitle: {
-    fontSize: 14.5,
+    color: MUTED2,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
-    color: "#BDBDBD",
-    lineHeight: 20,
+    lineHeight: 22,
   },
-  card: {
+  groupTitle: {
+    color: MUTED,
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: SPACE_3,
+  },
+  group: {
     backgroundColor: SURFACE,
-    marginHorizontal: 20,
-    borderRadius: 14,
-    padding: 18,
+    borderRadius: RADIUS_MD,
     borderWidth: 1,
-    borderColor: "#202020",
+    borderColor: BORDER,
+    paddingVertical: SPACE_3,
+    paddingHorizontal: SPACE_4,
+    marginBottom: SPACE_5,
   },
-  cardTitle: {
-    color: "white",
-    fontFamily: fonts.heavy,
+  bulletRow: {
+    flexDirection: "row",
+    marginBottom: SPACE_3,
+  },
+  bulletRowLast: {
+    marginBottom: 0,
+  },
+  bulletDot: {
+    color: MUTED2,
+    marginRight: SPACE_3,
     fontSize: 16,
-    marginBottom: 12,
+    lineHeight: 22,
   },
-  bulletRow: { flexDirection: "row", marginBottom: 10 },
-  bulletDot: { color: ACCENT, marginRight: 10, fontSize: 18, lineHeight: 22 },
   bulletText: {
-    color: "#EAEAEA",
+    color: TEXT,
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BODY,
     lineHeight: 22,
     flex: 1,
   },
   deleteBtn: {
-    marginTop: 18,
-    marginHorizontal: 20,
-    backgroundColor: "#FF4D4F",
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: SPACE_3,
+    backgroundColor: DESTRUCTIVE,
+    borderRadius: BUTTON_RADIUS,
+    paddingVertical: 14,
+    paddingHorizontal: SPACE_4,
   },
-  deleteText: {
-    color: "white",
-    fontFamily: fonts.black,
-    fontSize: 16,
+  deleteBtnDisabled: {
+    opacity: 0.7,
   },
-  footerSpace: { height: 24 },
+  deleteBtnText: {
+    color: TEXT,
+    fontFamily: fonts.heavy,
+    fontSize: TYPE_BODY,
+  },
 });

@@ -1,4 +1,4 @@
-import BackButton from '@/src/components/BackButton';
+import StackScreenHeader from '@/src/components/StackScreenHeader';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from "expo-location";
 import { router } from 'expo-router';
@@ -37,7 +37,6 @@ import {
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
-  TYPE_TITLE,
   fonts,
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
@@ -336,12 +335,7 @@ export default function EditProfileScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
-        <View style={styles.header}>
-          <BackButton onPress={handleCancel} style={styles.backButton} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Edit profile</Text>
-          </View>
-        </View>
+        <StackScreenHeader title="Edit profile" onBack={handleCancel} />
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -413,7 +407,7 @@ export default function EditProfileScreen() {
                     {locating ? "Finding your city and state" : "Auto-fill city and state"}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#666" />
+                <Ionicons name="chevron-forward" size={18} color={MUTED2} />
               </TouchableOpacity>
             </View>
           )}
@@ -504,20 +498,6 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
     justifyContent: "center",
     alignItems: "center",
-  },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACE_4 + SPACE_3,
-    paddingTop: SPACE_3,
-    paddingBottom: SPACE_3,
-  },
-  backButton: { marginRight: SPACE_3 + 2 },
-  headerTitle: {
-    fontSize: TYPE_TITLE,
-    fontFamily: fonts.heavy,
-    color: "white",
   },
 
   scrollContent: {

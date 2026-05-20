@@ -3,7 +3,9 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
+  DESTRUCTIVE,
   MUTED2,
+  ON_ACCENT_TEXT,
   TEXT,
   fonts,
 } from "@/constants/Variables";
@@ -136,7 +138,7 @@ const styles = StyleSheet.create({
   },
 
   confirmText: {
-    color: "#061006",
+    color: ON_ACCENT_TEXT,
     fontFamily: fonts.heavy,
     fontSize: 14,
   },
@@ -144,10 +146,10 @@ const styles = StyleSheet.create({
   destructiveBtn: {
     backgroundColor: "rgba(255,69,58,0.12)",
     borderWidth: 1,
-    borderColor: "#ff453a",
+    borderColor: DESTRUCTIVE,
   },
 
   destructiveText: {
-    color: "#ff453a",
+    color: DESTRUCTIVE,
   },
 });

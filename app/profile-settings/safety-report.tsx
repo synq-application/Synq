@@ -1,5 +1,5 @@
-import BackButton from "@/src/components/BackButton";
-import { router } from "expo-router";
+import StackScreenHeader from "@/src/components/StackScreenHeader";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   SafeAreaView,
@@ -16,11 +16,11 @@ import {
   BG,
   BORDER,
   fonts,
+  ON_ACCENT_TEXT,
   RADIUS_MD,
   SPACE_4,
   SURFACE,
   TYPE_BODY,
-  TYPE_TITLE,
 } from "../../constants/Variables";
 import { auth } from "../../src/lib/firebase";
 import { submitReport, type ReportReason } from "../../src/lib/moderation";
@@ -35,7 +35,14 @@ const REASONS: { id: ReportReason; label: string }[] = [
 ];
 
 export default function SafetyReportScreen() {
-  const [reportedUserId, setReportedUserId] = useState("");
+  const params = useLocalSearchParams<{ reportedUserId?: string | string[] }>();
+  const reportedUserIdParam =
+    typeof params.reportedUserId === "string"
+      ? params.reportedUserId
+      : Array.isArray(params.reportedUserId)
+        ? params.reportedUserId[0]
+        : "";
+  const [reportedUserId] = useState(reportedUserIdParam);
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -48,23 +55,28 @@ export default function SafetyReportScreen() {
       setAlertVisible(true);
       return;
     }
-    const uid = reportedUserId.trim();
-    if (!uid || !reason) {
-      setAlertMessage("Enter the user ID and select a reason.");
+    if (!reportedUserId.trim()) {
+      setAlertMessage(
+        "To report someone, open their profile and tap Report user, or long-press a message in chat."
+      );
+      setAlertVisible(true);
+      return;
+    }
+    if (!reason) {
+      setAlertMessage("Select a reason for your report.");
       setAlertVisible(true);
       return;
     }
     setSubmitting(true);
     try {
       await submitReport({
-        reportedUserId: uid,
+        reportedUserId: reportedUserId.trim(),
         contentType: "user",
         reason,
         details: details.trim() || undefined,
       });
       setAlertMessage("Report submitted. We aim to review within 24 hours.");
       setAlertVisible(true);
-      setReportedUserId("");
       setReason(null);
       setDetails("");
     } catch {
@@ -78,26 +90,14 @@ export default function SafetyReportScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.header}>
-        <BackButton onPress={() => router.back()} style={styles.backButton} />
-        <Text style={styles.headerTitle}>Report a safety issue</Text>
-      </View>
+      <StackScreenHeader title="Report a safety issue" />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.lead}>
-          Report objectionable content or abusive behavior. You can also report
-          from a message (long-press) or a friend profile.
+          {reportedUserId.trim()
+            ? "Tell us what happened. We review reports within 24 hours."
+            : "To report a specific person, open their friend profile and tap Report user, or long-press a message in chat."}
         </Text>
-
-        <Text style={styles.label}>Reported user ID (optional if from profile)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Firebase user ID"
-          placeholderTextColor="rgba(255,255,255,0.35)"
-          value={reportedUserId}
-          onChangeText={setReportedUserId}
-          autoCapitalize="none"
-        />
 
         {REASONS.map((r) => (
           <TouchableOpacity
@@ -119,8 +119,11 @@ export default function SafetyReportScreen() {
         />
 
         <TouchableOpacity
-          style={[styles.submit, (submitting || !reason) && styles.submitDisabled]}
-          disabled={submitting || !reason}
+          style={[
+            styles.submit,
+            (submitting || !reason || !reportedUserId.trim()) && styles.submitDisabled,
+          ]}
+          disabled={submitting || !reason || !reportedUserId.trim()}
           onPress={handleSubmit}
         >
           <Text style={styles.submitText}>
@@ -143,18 +146,6 @@ export default function SafetyReportScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACE_4,
-    paddingVertical: 12,
-  },
-  backButton: { marginRight: 12 },
-  headerTitle: {
-    fontSize: TYPE_TITLE,
-    fontFamily: fonts.heavy,
-    color: "white",
-  },
   scroll: { padding: SPACE_4, paddingBottom: 40 },
   lead: {
     color: "rgba(255,255,255,0.75)",
@@ -198,5 +189,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   submitDisabled: { opacity: 0.45 },
-  submitText: { color: "#061006", fontFamily: fonts.heavy, fontSize: 16 },
+  submitText: { color: ON_ACCENT_TEXT, fontFamily: fonts.heavy, fontSize: 16 },
 });

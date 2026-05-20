@@ -1,5 +1,4 @@
-import BackButton from "@/src/components/BackButton";
-import { router } from "expo-router";
+import StackScreenHeader from "@/src/components/StackScreenHeader";
 import React from "react";
 import {
   SafeAreaView,
@@ -24,7 +23,6 @@ import {
   SURFACE,
   TYPE_BODY,
   TYPE_CAPTION,
-  TYPE_TITLE,
   fonts,
 } from "../../constants/Variables";
 
@@ -58,10 +56,7 @@ export default function PrivacyPolicyScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.header}>
-        <BackButton onPress={() => router.back()} style={styles.backButton} />
-        <Text style={styles.headerTitle}>Privacy Policy</Text>
-      </View>
+      <StackScreenHeader title="Privacy policy" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Section title="1. Scope and Contact">
@@ -316,20 +311,6 @@ export default function PrivacyPolicyScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BACKGROUND },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACE_4 + SPACE_1,
-    paddingTop: SPACE_3,
-    paddingBottom: SPACE_3,
-  },
-  backButton: { marginRight: 12 },
-  headerTitle: {
-    fontSize: TYPE_TITLE,
-    fontFamily: fonts.heavy,
-    color: "white",
-  },
 
   scrollContent: {
     paddingBottom: SPACE_6 + SPACE_1,

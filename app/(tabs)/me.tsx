@@ -3,35 +3,34 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
-  destructiveActionBtn,
-  destructiveActionBtnText,
   fonts,
   Friend,
   MODAL_RADIUS,
   MUTED,
   MUTED2,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   profileScreenSectionTitle,
   tabScreenMainHeaderTitle,
-  PROFILE_HEADER_CONTENT_GAP,
-  PROFILE_HEADER_FADE_BELOW_ICONS,
-  PROFILE_HEADER_FADE_GRADIENT,
-  PROFILE_HEADER_FADE_LOCATIONS,
   SURFACE,
   TAB_BAR_SCROLL_INSET,
   SPACE_6,
   TEXT,
 } from "@/constants/Variables";
+import HeaderIconButton from "@/src/components/HeaderIconButton";
+import NotificationBadge from "@/src/components/NotificationBadge";
+import ProfileTabHeaderOverlay, {
+  useTabHeaderLayout,
+} from "@/src/components/ProfileTabHeaderOverlay";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
+import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
-import { signOut as firebaseSignOut } from "firebase/auth";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { filterOrReject } from "@/src/lib/contentFilter";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -39,6 +38,7 @@ import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import {
+  ActivityIndicator,
   AppState,
   AppStateStatus,
   Keyboard,
@@ -58,13 +58,8 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
-import {
-  SafeAreaProvider,
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import CloseButton from "@/src/components/CloseButton";
-import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
 import { filterOutPastOpenPlans, matchesPlanEvent } from "../../src/lib/planEvents";
@@ -165,14 +160,8 @@ function ProfilePressable({
 
 export default function ProfileScreen() {
   const isFocused = useIsFocused();
-  const insets = useSafeAreaInsets();
+  const headerLayout = useTabHeaderLayout();
   const scrollRef = useRef<ScrollView>(null);
-  const profileHeaderTop = insets.top + 12;
-  const profileIconRowBottom = profileHeaderTop + 48;
-  const profileHeaderGradientHeight =
-    profileIconRowBottom + PROFILE_HEADER_FADE_BELOW_ICONS;
-  const profileScrollPaddingTop =
-    profileIconRowBottom + PROFILE_HEADER_CONTENT_GAP;
   const profileScrollPaddingBottom = TAB_BAR_SCROLL_INSET + SPACE_6;
   const params = useLocalSearchParams<{ focusEventId?: string | string[] }>();
   const focusEventIdRaw = params.focusEventId;
@@ -238,7 +227,6 @@ export default function ProfileScreen() {
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
   const [pendingInterestDelete, setPendingInterestDelete] = useState<string | null>(null);
-  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const resolvedProfileImage = useMemo(() => resolveAvatar(profileImage), [profileImage]);
 
   const [showEventModal, setShowEventModal] = useState(false);
@@ -534,7 +522,13 @@ export default function ProfileScreen() {
     setIsPickingImage(true);
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") return;
+      if (status !== "granted") {
+        showAlert(
+          "Photo access needed",
+          "Allow photo library access in Settings to update your profile picture."
+        );
+        return;
+      }
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -570,10 +564,6 @@ export default function ProfileScreen() {
     } finally {
       setIsUploading(false);
     }
-  };
-
-  const handleSignOut = () => {
-    setShowSignOutConfirm(true);
   };
 
   const saveInterests = async () => {
@@ -734,7 +724,7 @@ export default function ProfileScreen() {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: profileScrollPaddingTop,
+            paddingTop: headerLayout.contentPaddingTop,
             paddingBottom: profileScrollPaddingBottom,
           },
         ]}
@@ -788,7 +778,7 @@ export default function ProfileScreen() {
                 onPress={() => setQRExpanded(true)}
                 accessibilityLabel="Expand QR code"
               >
-                <Icon name="qr-code-outline" size={13} color="black" />
+                <Ionicons name="qr-code-outline" size={13} color={ON_ACCENT_TEXT} />
               </ProfilePressable>
             </View>
 
@@ -799,7 +789,7 @@ export default function ProfileScreen() {
 
             {locationLower ? (
               <View style={styles.locationRow}>
-                <Icon
+                <Ionicons
                   name="location-outline"
                   size={14}
                   color={MUTED2}
@@ -817,7 +807,7 @@ export default function ProfileScreen() {
                 onPress={() => router.push("/edit-profile")}
                 accessibilityLabel="Edit profile"
               >
-                <Icon name="create-outline" size={14} color={MUTED2} />
+                <Ionicons name="create-outline" size={14} color={MUTED2} />
                 <Text style={styles.editProfileBtnText}>Edit profile</Text>
               </ProfilePressable>
               <ProfilePressable
@@ -825,7 +815,7 @@ export default function ProfileScreen() {
                 onPress={shareProfile}
                 accessibilityLabel="Share profile"
               >
-                <Icon name="share-social-outline" size={14} color={MUTED2} />
+                <Ionicons name="share-social-outline" size={14} color={MUTED2} />
                 <Text style={styles.editProfileBtnText}>Share profile</Text>
               </ProfilePressable>
             </View>
@@ -865,7 +855,7 @@ export default function ProfileScreen() {
                       />
                       {i === 0 && (
                         <View style={styles.crown}>
-                          <Icon name="star" size={8} color="black" />
+                          <Ionicons name="star" size={8} color={ON_ACCENT_TEXT} />
                         </View>
                       )}
                     </View>
@@ -884,7 +874,7 @@ export default function ProfileScreen() {
               : "No Synqs yet. Start a Synq with a friend to see it here."}
           </Text>
         ) : (
-          <View style={styles.recentSynqsPlaceholder} />
+          <ActivityIndicator color={ACCENT} style={styles.recentSynqsLoading} />
         )}
       </View>
 
@@ -940,14 +930,6 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      <ProfilePressable
-        style={{ alignSelf: "center" }}
-        contentStyle={styles.signOutBtn}
-        onPress={handleSignOut}
-        accessibilityLabel="Sign out"
-      >
-        <Text style={styles.signOutText}>Sign Out</Text>
-      </ProfilePressable>
       </ScrollView>
 
       <Modal visible={isQRExpanded} transparent animationType="fade">
@@ -1068,60 +1050,35 @@ export default function ProfileScreen() {
         onConfirm={async () => {
           if (!pendingInterestDelete || !auth.currentUser) return;
           const updatedInterests = interests.filter((i) => i !== pendingInterestDelete);
-          await updateDoc(doc(db, "users", auth.currentUser.uid), {
-            interests: updatedInterests,
-          });
-          setPendingInterestDelete(null);
-        }}
-      />
-      <ConfirmModal
-        visible={showSignOutConfirm}
-        title="Sign Out"
-        message="Are you sure?"
-        confirmText="Sign Out"
-        onCancel={() => setShowSignOutConfirm(false)}
-        onConfirm={async () => {
-          setShowSignOutConfirm(false);
-          await firebaseSignOut(auth);
+          try {
+            await updateDoc(doc(db, "users", auth.currentUser.uid), {
+              interests: updatedInterests,
+            });
+            setPendingInterestDelete(null);
+          } catch {
+            showAlert("Error", "Could not remove interest. Please try again.");
+            setPendingInterestDelete(null);
+          }
         }}
       />
 
-      <LinearGradient
-        pointerEvents="none"
-        colors={[...PROFILE_HEADER_FADE_GRADIENT]}
-        locations={[...PROFILE_HEADER_FADE_LOCATIONS]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={[styles.headerGradient, { height: profileHeaderGradientHeight }]}
-      />
-
-      <View
-        style={[styles.header, { top: profileHeaderTop }]}
-        pointerEvents="box-none"
-      >
-        <ProfilePressable
-          style={styles.headerIconContainer}
-          contentStyle={styles.headerIconInner}
+      <ProfileTabHeaderOverlay>
+        <HeaderIconButton
+          name="notifications-outline"
           onPress={() => router.push("/notifications")}
-          accessibilityLabel="Notifications"
-        >
-          <Icon name="notifications-outline" size={26} color="white" />
-          {requestCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{requestCount}</Text>
-            </View>
-          )}
-        </ProfilePressable>
-
-        <ProfilePressable
-          style={styles.headerIconContainer}
-          contentStyle={styles.headerIconInner}
+          accessibilityLabel="Friend requests"
+          badge={
+            requestCount > 0 ? (
+              <NotificationBadge variant="count" count={requestCount} />
+            ) : undefined
+          }
+        />
+        <HeaderIconButton
+          name="settings-outline"
           onPress={() => router.push("/settings")}
           accessibilityLabel="Settings"
-        >
-          <Icon name="settings-outline" size={26} color="white" />
-        </ProfilePressable>
-      </View>
+        />
+      </ProfileTabHeaderOverlay>
     </View>
   );
 }
@@ -1139,49 +1096,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     position: "relative",
   },
-  headerGradient: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 2,
-  },
-  header: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    zIndex: 3,
-  },
-  headerIconContainer: {
-    width: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerIconInner: {
-    position: "relative",
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badge: {
-    position: "absolute",
-    right: -4,
-    top: -4,
-    backgroundColor: "red",
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "black",
-  },
-  badgeText: { color: "white", fontSize: 10, fontFamily: fonts.black },
+  recentSynqsLoading: { alignSelf: "center", marginVertical: 16 },
   profileSection: { alignItems: "center", marginTop: 0 },
   qrContainer: { width: 200, height: 200, justifyContent: "center", alignItems: "center" },
   qrBg: { position: "absolute", opacity: 0.4, backgroundColor: "white", borderRadius: 25, padding: 10 },
@@ -1319,9 +1234,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingTop: 6,
   },
-  recentSynqsPlaceholder: {
-    minHeight: 88,
-  },
   section: {
     marginTop: 16,
     paddingTop: 14,
@@ -1343,8 +1255,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   interestText: { color: TEXT, fontFamily: fonts.book, fontSize: 13 },
-  signOutBtn: { ...destructiveActionBtn, marginTop: 40 },
-  signOutText: destructiveActionBtnText,
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" },
   qrModalBox: { backgroundColor: "white", padding: 25, borderRadius: MODAL_RADIUS + 18 },
   interestModalFullscreen: {

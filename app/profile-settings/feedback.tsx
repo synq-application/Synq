@@ -1,6 +1,5 @@
-import BackButton from "@/src/components/BackButton";
+import StackScreenHeader from "@/src/components/StackScreenHeader";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -31,7 +30,6 @@ import {
   SURFACE,
   TYPE_BODY,
   TYPE_CAPTION,
-  TYPE_TITLE,
   fonts,
 } from "../../constants/Variables";
 
@@ -121,12 +119,7 @@ export default function FeedbackScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <View style={styles.header}>
-        <BackButton onPress={() => router.back()} style={styles.backButton} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Feedback</Text>
-        </View>
-      </View>
+      <StackScreenHeader title="Feedback" />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -211,20 +204,6 @@ export default function FeedbackScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACE_4 + SPACE_3,
-    paddingTop: SPACE_3,
-    paddingBottom: SPACE_3,
-  },
-  backButton: { marginRight: SPACE_3 },
-  headerTitle: {
-    fontSize: TYPE_TITLE,
-    fontFamily: fonts.heavy,
-    color: "white",
-  },
 
   scrollContent: {
     paddingBottom: SPACE_6 + SPACE_3,
