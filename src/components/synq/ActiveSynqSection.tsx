@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import SynqOptionsSheet from "../../../app/synq-screens/SynqOptionsSheet";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Animated,
   FlatList,
@@ -15,7 +15,17 @@ import {
   View,
 } from "react-native";
 import { friendLocationLine, resolveAvatar } from "../../../app/helpers";
-import { ACCENT, BG } from "../../../constants/Variables";
+import {
+  ACCENT,
+  BG,
+  PRIMARY_CTA_HEIGHT,
+  TAB_BAR_SCROLL_INSET,
+} from "../../../constants/Variables";
+
+/** Fade above the pinned footer so list rows dissolve before the CTA. */
+const ACTIVE_LIST_BOTTOM_FADE_HEIGHT = 80;
+/** Extra lift for the Select friends CTA above the tab bar. */
+const ACTIVE_CTA_BOTTOM_NUDGE = 48;
 
 type Props = {
   styles: any;
@@ -48,6 +58,21 @@ export default function ActiveSynqSection({
 }: Props) {
   const [optionsVisible, setOptionsVisible] = useState(false);
   const headerLayout = useTabHeaderLayout();
+
+  const footerLayout = useMemo(() => {
+    const ctaPadTop = 12;
+    const ctaBottomPad = TAB_BAR_SCROLL_INSET + ACTIVE_CTA_BOTTOM_NUDGE;
+    const ctaBlockHeight = ctaPadTop + PRIMARY_CTA_HEIGHT;
+    const dockHeight = ctaBlockHeight + ctaBottomPad;
+    return {
+      ctaPadTop,
+      ctaBottomPad,
+      ctaBlockHeight,
+      dockHeight,
+      listBottomPad: dockHeight + ACTIVE_LIST_BOTTOM_FADE_HEIGHT,
+      fadeBottom: dockHeight,
+    };
+  }, []);
 
   return (
     <View style={styles.activeSynqRoot}>
@@ -92,12 +117,13 @@ export default function ActiveSynqSection({
         </View>
       ) : null}
 
-      <View style={styles.activeListWrap}>
+      <View style={styles.activeListFooterDock}>
         <FlatList
           style={styles.activeFriendsList}
           data={availableFriends}
           keyExtractor={(item) => item.id}
-          ItemSeparatorComponent={() => <View style={styles.activeFriendRowSeparator} />}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={null}
           ListEmptyComponent={
             <View style={styles.activeEmptyWrap}>
               <Text style={styles.activeEmptyTitle}>No free friends right now.</Text>
@@ -109,6 +135,7 @@ export default function ActiveSynqSection({
           renderItem={({ item }) => {
             const friendMemo = item.memo?.trim();
             const locationLine = friendLocationLine(item);
+            const selected = selectedFriends.includes(item.id);
             return (
               <TouchableOpacity
                 onPress={() =>
@@ -118,7 +145,10 @@ export default function ActiveSynqSection({
                       : [...prev, item.id]
                   )
                 }
-                style={styles.friendCard}
+                style={[
+                  styles.friendCard,
+                  selected ? styles.friendCardSelected : styles.friendCardUnselected,
+                ]}
               >
                 <ExpoImage
                   source={{ uri: resolveAvatar(item.imageurl) }}
@@ -148,52 +178,70 @@ export default function ActiveSynqSection({
                   ) : null}
                 </View>
 
-                {selectedFriends.includes(item.id) && (
+                {selected ? (
                   <Ionicons name="checkmark-circle" size={24} color={ACCENT} />
-                )}
+                ) : null}
               </TouchableOpacity>
             );
           }}
-          contentContainerStyle={styles.activeListContent}
+          contentContainerStyle={[
+            styles.activeListContent,
+            {
+              paddingBottom:
+                availableFriends.length > 0
+                  ? footerLayout.listBottomPad
+                  : TAB_BAR_SCROLL_INSET,
+            },
+          ]}
         />
+
+        {availableFriends.length > 0 ? (
+          <>
         <LinearGradient
           pointerEvents="none"
-          colors={["rgba(9,10,11,0)", "rgba(9,10,11,0.85)", BG]}
+          colors={["rgba(9,10,11,0)", BG]}
           locations={[0, 0.55, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
-          style={styles.activeListFade}
-        />
-      </View>
-
-      {availableFriends.length > 0 ? (
-        <View
           style={[
-            styles.activeFooterBlock,
-            { paddingBottom: Math.max(44, 24 + insetsBottom) },
+            styles.activeListBottomFade,
+            {
+              height: ACTIVE_LIST_BOTTOM_FADE_HEIGHT,
+              bottom: footerLayout.fadeBottom,
+            },
           ]}
-        >
-          <TouchableOpacity
-            style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
-            onPress={handleConnect}
-            disabled={!selectedFriends.length}
-            accessibilityRole="button"
-            accessibilityLabel={
-              selectedFriends.length === 0
-                ? "Select friends who are free to start planning"
-                : `Start plan with ${selectedFriends.length} friend${
-                    selectedFriends.length === 1 ? "" : "s"
-                  }`
-            }
+        />
+          <View
+            style={[
+              styles.activeFooterDock,
+              {
+                height: footerLayout.dockHeight,
+                paddingTop: footerLayout.ctaPadTop,
+                paddingBottom: footerLayout.ctaBottomPad,
+              },
+            ]}
           >
-            <Text style={styles.btnText}>
-              {selectedFriends.length === 0 ? "Select friends" : "Start plan"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={{ paddingBottom: Math.max(44, 24 + insetsBottom) }} />
-      )}
+            <TouchableOpacity
+              style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
+              onPress={handleConnect}
+              disabled={!selectedFriends.length}
+              accessibilityRole="button"
+              accessibilityLabel={
+                selectedFriends.length === 0
+                  ? "Select friends who are free to start planning"
+                  : `Start plan with ${selectedFriends.length} friend${
+                      selectedFriends.length === 1 ? "" : "s"
+                    }`
+              }
+            >
+              <Text style={styles.btnText}>
+                {selectedFriends.length === 0 ? "Select friends" : "Start plan"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          </>
+        ) : null}
+      </View>
       </View>
 
       <SynqOptionsSheet

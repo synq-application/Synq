@@ -1,4 +1,5 @@
 import { auth, db } from "@/src/lib/firebase";
+import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
@@ -40,7 +41,8 @@ export function BlockedUsersProvider({ children }: { children: React.ReactNode }
         setBlockedSet(next);
         setReady(true);
       },
-      () => {
+      (err) => {
+        ignoreSnapshotPermissionDenied(err);
         setBlockedSet(new Set());
         setReady(true);
       }

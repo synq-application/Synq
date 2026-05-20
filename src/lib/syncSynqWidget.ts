@@ -4,6 +4,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import type { DocumentData } from "firebase/firestore";
 import { auth, db } from "./firebase";
+import { ignoreSnapshotPermissionDenied } from "./firestoreListeners";
 import { computeSynqActiveFromUserData } from "./synqSession";
 
 const isExpoGo =
@@ -80,10 +81,14 @@ export function startSynqGlanceWidgetSync(): () => void {
     lastProps = null;
     if (!user) return;
 
-    unsubDoc = onSnapshot(doc(db, "users", user.uid), (snap) => {
-      lastProps = mapUserDocToWidgetProps(snap.data());
-      push();
-    });
+    unsubDoc = onSnapshot(
+      doc(db, "users", user.uid),
+      (snap) => {
+        lastProps = mapUserDocToWidgetProps(snap.data());
+        push();
+      },
+      ignoreSnapshotPermissionDenied
+    );
   });
 
   const sub = AppState.addEventListener("change", (next: AppStateStatus) => {

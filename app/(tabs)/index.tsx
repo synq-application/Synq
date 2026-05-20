@@ -61,7 +61,9 @@ import {
   tabScreenMainHeaderTitle,
   TYPE_BODY
 } from '../../constants/Variables';
+import { ignoreSnapshotPermissionDenied } from '@/src/lib/firestoreListeners';
 import { auth, db } from '../../src/lib/firebase';
+import { useAuthRefresh } from '../_layout';
 import { useSynqBoot } from "../../src/lib/synqBootContext";
 import {
   computeSynqActiveFromUserData,
@@ -214,6 +216,7 @@ function ChatMessageBubble({
 }
 
 export default function SynqScreen() {
+  const { user } = useAuthRefresh();
   const synqBoot = useSynqBoot();
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -515,12 +518,12 @@ export default function SynqScreen() {
   }, [isExploreVisible]);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    const uid = user?.uid;
+    if (!uid) return;
     let cancelled = false;
     const init = async () => {
       let nextStatus: SynqStatus = "idle";
       try {
-        const uid = auth.currentUser!.uid;
         const userRef = doc(db, 'users', uid);
 
         const userSnap = await getDoc(userRef);
@@ -558,11 +561,13 @@ export default function SynqScreen() {
 
     const q = query(
       collection(db, "chats"),
-      where("participants", "array-contains", auth.currentUser!.uid),
+      where("participants", "array-contains", uid),
       orderBy("createdAt", "desc")
     );
 
-    const unsubChats = onSnapshot(q, (snap) => {
+    const unsubChats = onSnapshot(
+      q,
+      (snap) => {
       const chats = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
 
       chats.sort((a, b) => {
@@ -581,30 +586,30 @@ export default function SynqScreen() {
           }
         });
       });
-      const myId = auth.currentUser!.uid;
       const anyUnread = chats.some((c: any) => {
         const updatedAtMs = c.updatedAt?.toMillis?.() ?? 0;
-        const lastReadMs = c.lastReadBy?.[myId]?.toMillis?.() ?? 0;
+        const lastReadMs = c.lastReadBy?.[uid]?.toMillis?.() ?? 0;
         const lastSender = c.lastMessageSenderId;
-        return !!lastSender && lastSender !== myId && updatedAtMs > lastReadMs;
+        return !!lastSender && lastSender !== uid && updatedAtMs > lastReadMs;
       });
 
       setHasUnread(anyUnread);
-    });
+    },
+      ignoreSnapshotPermissionDenied
+    );
 
     return () => {
       cancelled = true;
       unsubChats();
     };
-  }, []);
+  }, [user?.uid]);
 
   useEffect(() => {
-    if (!auth.currentUser || status !== 'active') {
+    const myId = user?.uid;
+    if (!myId || status !== 'active') {
       setAvailableFriends([]);
       return;
     }
-
-    const myId = auth.currentUser.uid;
     const friendsRef = collection(db, 'users', myId, 'friends');
     const friendUnsubs = new Map<string, () => void>();
     const friendState = new Map<string, any>();
@@ -613,7 +618,9 @@ export default function SynqScreen() {
       setAvailableFriends(Array.from(friendState.values()));
     };
 
-    const friendsUnsub = onSnapshot(friendsRef, (friendsSnap) => {
+    const friendsUnsub = onSnapshot(
+      friendsRef,
+      (friendsSnap) => {
       const friendIds = new Set(friendsSnap.docs.map((d) => d.id));
 
       for (const [fid, unsub] of friendUnsubs.entries()) {
@@ -629,32 +636,38 @@ export default function SynqScreen() {
         if (friendUnsubs.has(fid)) return;
 
         const uRef = doc(db, 'users', fid);
-        const uUnsub = onSnapshot(uRef, (uSnap) => {
-          if (!uSnap.exists()) {
-            friendState.delete(fid);
-            emit();
-            return;
-          }
-
-          const data = uSnap.data();
-
-          if (computeSynqActiveFromUserData(data)) {
-            friendState.set(fid, { id: fid, ...data });
-            const uri = resolveAvatar(data?.imageurl);
-            if (uri) {
-              ExpoImage.prefetch(uri).catch(() => {});
+        const uUnsub = onSnapshot(
+          uRef,
+          (uSnap) => {
+            if (!uSnap.exists()) {
+              friendState.delete(fid);
+              emit();
+              return;
             }
-          } else {
-            friendState.delete(fid);
-          }
 
-          emit();
-        });
+            const data = uSnap.data();
+
+            if (computeSynqActiveFromUserData(data)) {
+              friendState.set(fid, { id: fid, ...data });
+              const uri = resolveAvatar(data?.imageurl);
+              if (uri) {
+                ExpoImage.prefetch(uri).catch(() => {});
+              }
+            } else {
+              friendState.delete(fid);
+            }
+
+            emit();
+          },
+          ignoreSnapshotPermissionDenied
+        );
 
         friendUnsubs.set(fid, uUnsub);
       });
       emit();
-    });
+    },
+      ignoreSnapshotPermissionDenied
+    );
 
     return () => {
       friendsUnsub();
@@ -662,7 +675,7 @@ export default function SynqScreen() {
       friendUnsubs.clear();
       friendState.clear();
     };
-  }, [status]);
+  }, [status, user?.uid]);
 
   useEffect(() => {
     if (!activeChatId || !isChatPaneOpen) return;
@@ -678,7 +691,8 @@ export default function SynqScreen() {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
       },
-      () => {
+      (error) => {
+        ignoreSnapshotPermissionDenied(error);
         setMessages([]);
         setActiveChatId(null);
         setMessagesPane("inbox");
@@ -1337,17 +1351,27 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   darkFill: { flex: 1, backgroundColor: BG, justifyContent: 'center' },
   activeSynqRoot: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
-  activeListWrap: { flex: 1, position: "relative" },
+  activeListFooterDock: {
+    flex: 1,
+    minHeight: 0,
+    position: "relative",
+  },
   activeFriendsList: { flex: 1 },
-  activeListContent: { paddingTop: 12, paddingBottom: 108, paddingHorizontal: 0 },
-  activeListFade: {
+  activeListContent: { paddingTop: 12, paddingHorizontal: 0 },
+  activeListBottomFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 2,
+  },
+  activeFooterDock: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: 72,
-    zIndex: 1,
-    elevation: 2,
+    zIndex: 3,
+    backgroundColor: BG,
+    justifyContent: "flex-start",
   },
   activeEmptyWrap: {
     alignItems: "center",
@@ -1372,7 +1396,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: SPACE_4,
   },
-  activeBody: { flex: 1 },
+  activeBody: { flex: 1, minHeight: 0 },
   headerTitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1459,7 +1483,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 14,
-    paddingHorizontal: 0,
+    paddingHorizontal: 14,
+    borderRadius: BUTTON_RADIUS,
+    borderWidth: 1.5,
+    marginBottom: 10,
+  },
+  friendCardSelected: {
+    borderColor: ACCENT,
+  },
+  friendCardUnselected: {
+    borderColor: "rgba(255,255,255,0.22)",
   },
   activeFriendRowSeparator: {
     height: StyleSheet.hairlineWidth,
@@ -1469,11 +1502,6 @@ const styles = StyleSheet.create({
   whiteBold: { color: 'white', fontSize: 17, fontFamily: fonts.medium },
   grayText: { color: MUTED2, fontSize: 13, marginTop: 2 },
   locationText: { color: MUTED2, fontSize: 12, marginTop: 2 },
-  activeFooterBlock: {
-    backgroundColor: BG,
-    paddingHorizontal: 20,
-    paddingTop: 6,
-  },
   btn: {
     alignSelf: 'center',
     width: PRIMARY_CTA_WIDTH,

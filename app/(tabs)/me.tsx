@@ -81,7 +81,9 @@ import {
   pruneSocialCachesToFriendIds,
   warmFriendsAndConnectionsCache,
 } from "../../src/lib/socialCache";
+import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
 import AlertModal from "../alert-modal";
+import { useAuthRefresh } from "../_layout";
 import ConfirmModal from "../confirm-modal";
 import { formatLastSynq, prefetchResolvedAvatar, resolveAvatar } from "../helpers";
 import MonthlyMemo from "../monthly-memo";
@@ -174,7 +176,8 @@ export default function ProfileScreen() {
 
   const [planHighlightId, setPlanHighlightId] = useState<string | null>(null);
 
-  const myId = auth.currentUser?.uid ?? "";
+  const { user } = useAuthRefresh();
+  const myId = user?.uid ?? "";
   const meBootstrap = useMemo(
     () => (myId ? getMeTabInitialState(myId) : null),
     [myId]
@@ -361,123 +364,134 @@ export default function ProfileScreen() {
   };
 
   useEffect(() => {
-    if (!auth.currentUser?.uid) return;
-    const myId = auth.currentUser.uid;
+    if (!myId) return;
 
     const userDocRef = doc(db, "users", myId);
 
-    const unsubscribeProfile = onSnapshot(userDocRef, (userDocSnap) => {
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        const nextCity = userData.city || null;
-        const stateAbbr =
-          stateAbbreviations[userData.state] || userData.state || null;
-        const rawEvents = (userData.events || []) as OpenPlanEvent[];
-        const prunedEvents = filterOutPastOpenPlans(rawEvents);
-        if (prunedEvents.length < rawEvents.length) {
-          updateDoc(userDocRef, { events: prunedEvents }).catch(() => {});
+    const unsubscribeProfile = onSnapshot(
+      userDocRef,
+      (userDocSnap) => {
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          const nextCity = userData.city || null;
+          const stateAbbr =
+            stateAbbreviations[userData.state] || userData.state || null;
+          const rawEvents = (userData.events || []) as OpenPlanEvent[];
+          const prunedEvents = filterOutPastOpenPlans(rawEvents);
+          if (prunedEvents.length < rawEvents.length) {
+            updateDoc(userDocRef, { events: prunedEvents }).catch(() => {});
+          }
+          const nextInterests = userData.interests || [];
+          const nextImage = userData?.imageurl || null;
+
+          const prevOwn = getCachedOwnProfile(myId);
+          setCachedOwnProfile(myId, {
+            imageurl: nextImage,
+            interests: nextInterests,
+            events: prunedEvents,
+            city: nextCity,
+            state: stateAbbr,
+            recentSynqs: prevOwn?.recentSynqs ?? [],
+          });
+
+          setCity(nextCity);
+          setState(stateAbbr);
+          setEvents(prunedEvents);
+          setInterests(nextInterests);
+          setSelectedInterests(nextInterests);
+          setProfileImage(nextImage);
+          prefetchResolvedAvatar(nextImage);
         }
-        const nextInterests = userData.interests || [];
-        const nextImage = userData?.imageurl || null;
-
-        const prevOwn = getCachedOwnProfile(myId);
-        setCachedOwnProfile(myId, {
-          imageurl: nextImage,
-          interests: nextInterests,
-          events: prunedEvents,
-          city: nextCity,
-          state: stateAbbr,
-          recentSynqs: prevOwn?.recentSynqs ?? [],
-        });
-
-        setCity(nextCity);
-        setState(stateAbbr);
-        setEvents(prunedEvents);
-        setInterests(nextInterests);
-        setSelectedInterests(nextInterests);
-        setProfileImage(nextImage);
-        prefetchResolvedAvatar(nextImage);
-      }
-    });
+      },
+      ignoreSnapshotPermissionDenied
+    );
 
     const reqRef = collection(db, "users", myId, "friendRequests");
-    const unsubscribeRequests = onSnapshot(reqRef, (snap) => {
-      setRequestCount(snap.docs.length);
-      snap.docs.forEach((d) => {
-        const data = d.data() as any;
-        const senderId = data.from || data.fromId || d.id;
-        const inline =
-          data.senderImageUrl || data.fromImageUrl || data.fromImageurl || data.imageurl;
-        prefetchResolvedAvatar(inline);
-        const hasHttp =
-          typeof inline === "string" && inline.trim().startsWith("http");
-        if (!hasHttp && senderId) {
-          getDoc(doc(db, "users", senderId))
-            .then((u) => {
-              if (u.exists()) prefetchResolvedAvatar((u.data() as any)?.imageurl);
-            })
-            .catch(() => {});
-        }
-      });
-    });
+    const unsubscribeRequests = onSnapshot(
+      reqRef,
+      (snap) => {
+        setRequestCount(snap.docs.length);
+        snap.docs.forEach((d) => {
+          const data = d.data() as any;
+          const senderId = data.from || data.fromId || d.id;
+          const inline =
+            data.senderImageUrl || data.fromImageUrl || data.fromImageurl || data.imageurl;
+          prefetchResolvedAvatar(inline);
+          const hasHttp =
+            typeof inline === "string" && inline.trim().startsWith("http");
+          if (!hasHttp && senderId) {
+            getDoc(doc(db, "users", senderId))
+              .then((u) => {
+                if (u.exists()) prefetchResolvedAvatar((u.data() as any)?.imageurl);
+              })
+              .catch(() => {});
+          }
+        });
+      },
+      ignoreSnapshotPermissionDenied
+    );
 
     const friendsCol = collection(db, "users", myId, "friends");
-    const unsubscribeFriends = onSnapshot(friendsCol, async (snapshot) => {
-      const friendIds = new Set(snapshot.docs.map((d) => d.id));
-      pruneSocialCachesToFriendIds(myId, friendIds);
+    const unsubscribeFriends = onSnapshot(
+      friendsCol,
+      async (snapshot) => {
+        const friendIds = new Set(snapshot.docs.map((d) => d.id));
+        pruneSocialCachesToFriendIds(myId, friendIds);
 
-      if (!friendRelationCacheByUser[myId]) {
-        friendRelationCacheByUser[myId] = {};
-      }
-      snapshot.docs.forEach((d) => {
-        const data = d.data();
-        friendRelationCacheByUser[myId][d.id] = {
-          synqCount: data.synqCount || 0,
-          lastSynqAt: data.lastSynqAt,
-        };
-      });
+        if (!friendRelationCacheByUser[myId]) {
+          friendRelationCacheByUser[myId] = {};
+        }
+        snapshot.docs.forEach((d) => {
+          const data = d.data();
+          friendRelationCacheByUser[myId][d.id] = {
+            synqCount: data.synqCount || 0,
+            lastSynqAt: data.lastSynqAt,
+          };
+        });
 
-      const cachedList = friendsListCacheByUser[myId] ?? [];
-      const friendsCacheMatches =
-        cachedList.length > 0 &&
-        cachedList.length === friendIds.size &&
-        cachedList.every((f) => friendIds.has(f.id));
+        const cachedList = friendsListCacheByUser[myId] ?? [];
+        const friendsCacheMatches =
+          cachedList.length > 0 &&
+          cachedList.length === friendIds.size &&
+          cachedList.every((f) => friendIds.has(f.id));
 
-      if (friendsCacheMatches) {
-        setFriendsForHostNames((prev) =>
-          prev.length === cachedList.length &&
-          prev.every((f, i) => f.id === cachedList[i]?.id)
-            ? prev
-            : cachedList
-        );
-        setFriendsDataEpoch((n) => n + 1);
-        setRecentSynqsReady(true);
-        return;
-      }
+        if (friendsCacheMatches) {
+          setFriendsForHostNames((prev) =>
+            prev.length === cachedList.length &&
+            prev.every((f, i) => f.id === cachedList[i]?.id)
+              ? prev
+              : cachedList
+          );
+          setFriendsDataEpoch((n) => n + 1);
+          setRecentSynqsReady(true);
+          return;
+        }
 
-      try {
-        await warmFriendsAndConnectionsCache(myId);
-        const nextFriends = friendsListCacheByUser[myId] ?? [];
-        setFriendsForHostNames((prev) =>
-          prev.length === nextFriends.length &&
-          prev.every((f, i) => f.id === nextFriends[i]?.id)
-            ? prev
-            : nextFriends
-        );
-        setFriendsDataEpoch((n) => n + 1);
-      } catch (e) {
-        console.error("[ProfileScreen] warmFriendsAndConnectionsCache:", e);
-      } finally {
-        setRecentSynqsReady(true);
-      }
-    });
+        try {
+          await warmFriendsAndConnectionsCache(myId);
+          const nextFriends = friendsListCacheByUser[myId] ?? [];
+          setFriendsForHostNames((prev) =>
+            prev.length === nextFriends.length &&
+            prev.every((f, i) => f.id === nextFriends[i]?.id)
+              ? prev
+              : nextFriends
+          );
+          setFriendsDataEpoch((n) => n + 1);
+        } catch (e) {
+          console.error("[ProfileScreen] warmFriendsAndConnectionsCache:", e);
+        } finally {
+          setRecentSynqsReady(true);
+        }
+      },
+      ignoreSnapshotPermissionDenied
+    );
 
     return () => {
       unsubscribeProfile();
       unsubscribeRequests();
       unsubscribeFriends();
     };
-  }, []);
+  }, [myId]);
 
   const prunePastEventsToFirestore = useCallback(() => {
     const uid = auth.currentUser?.uid;

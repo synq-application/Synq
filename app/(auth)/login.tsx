@@ -44,10 +44,8 @@ import { SvgXml } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AlertModal from "../alert-modal";
 import { auth } from "../../src/lib/firebase";
-import { usePreAuthTermsGate } from "../../src/lib/usePreAuthTermsGate";
 
 export default function Login() {
-  const termsReady = usePreAuthTermsGate("login");
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -103,10 +101,6 @@ export default function Login() {
       showAlert("Could not send reset email.", "Error");
     }
   };
-
-  if (!termsReady) {
-    return <View style={styles.root} />;
-  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>

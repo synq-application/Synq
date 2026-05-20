@@ -105,7 +105,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
 import { auth, db } from "../../src/lib/firebase";
+import { useAuthRefresh } from "../_layout";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
 import {
   friendProfileCacheByUser,
@@ -413,10 +415,11 @@ function FriendsListEmpty({
 
 export default function FriendsScreen() {
   const router = useRouter();
+  const { user } = useAuthRefresh();
   const headerLayout = useTabHeaderLayout();
   const isFriendsTabFocused = useIsFocused();
   const { openAddFriends } = useLocalSearchParams<{ openAddFriends?: string }>();
-  const myId = auth.currentUser?.uid ?? "";
+  const myId = user?.uid ?? "";
   const cachedFriends = myId ? friendsListCacheByUser[myId] ?? [] : [];
   const [friends, setFriends] = useState<Friend[]>(cachedFriends);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
@@ -510,15 +513,16 @@ export default function FriendsScreen() {
   }, [myId]);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!myId) return;
 
-    const myId = auth.currentUser.uid;
     if (!friendProfileCacheByUser[myId]) {
       friendProfileCacheByUser[myId] = {};
     }
     const friendsRef = collection(db, "users", myId, "friends");
 
-    const unsubFriends = onSnapshot(friendsRef, async (snapshot) => {
+    const unsubFriends = onSnapshot(
+      friendsRef,
+      async (snapshot) => {
       const friendIds = snapshot.docs.map((d) => d.id);
       const profileCache = friendProfileCacheByUser[myId];
 
@@ -562,12 +566,14 @@ export default function FriendsScreen() {
       } finally {
         setIsFriendsInitialLoading(false);
       }
-    });
+    },
+      ignoreSnapshotPermissionDenied
+    );
 
     return () => {
       unsubFriends();
     };
-  }, []);
+  }, [myId]);
 
   const { isBlocked } = useBlockedUsers();
 
