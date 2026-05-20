@@ -63,6 +63,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import CloseIcon from "@/src/components/CloseIcon";
 import Icon from "react-native-vector-icons/Ionicons";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db, storage } from "../../src/lib/firebase";
@@ -1007,7 +1008,7 @@ export default function ProfileScreen() {
                   accessibilityRole="button"
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Icon name="close-circle" size={26} color={MUTED2} />
+                  <CloseIcon />
                 </TouchableOpacity>
               </View>
               <Text style={styles.interestSubtitle}>

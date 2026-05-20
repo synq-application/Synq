@@ -1,3 +1,4 @@
+import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import * as Haptics from "expo-haptics";
@@ -128,7 +129,7 @@ export default function MessagesChatPane({
           accessibilityRole="button"
           accessibilityLabel="Close chat"
         >
-          <Ionicons name="close-circle" size={28} color="#444" />
+          <CloseIcon />
         </TouchableOpacity>
       </View>
 
@@ -333,7 +334,7 @@ export default function MessagesChatPane({
                     style={{ marginLeft: "auto" }}
                     onPress={() => setShowAICard(false)}
                   >
-                    <Ionicons name="close-circle" size={28} color="#444" />
+                    <CloseIcon />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.aiCardBodySmall}>{aiResponse}</Text>

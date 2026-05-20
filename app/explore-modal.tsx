@@ -5,6 +5,7 @@ import {
     PRIMARY_CTA_WIDTH,
     fonts,
 } from "@/constants/Variables";
+import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import React, { useState } from "react";
@@ -104,7 +105,7 @@ export default function ExploreModal({
                                     <View style={styles.header}>
                                         <Text style={styles.title}>What’s the vibe?</Text>
                                         <TouchableOpacity onPress={onClose}>
-                                            <Ionicons name="close" size={26} color="#666" />
+                                            <CloseIcon />
                                         </TouchableOpacity>
                                     </View>
 
@@ -173,7 +174,7 @@ export default function ExploreModal({
                                             </Text>
                                         </View>
                                         <TouchableOpacity onPress={onClose}>
-                                            <Ionicons name="close" size={26} color="#666" />
+                                            <CloseIcon />
                                         </TouchableOpacity>
                                     </View>
 

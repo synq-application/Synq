@@ -62,6 +62,12 @@ export const SURFACE = "rgba(255,255,255,0.06)";
 export const BORDER = "rgba(255,255,255,0.08)";
 export const MUTED2 = "rgba(255,255,255,0.45)";
 export const MUTED3 = "rgba(255,255,255,0.25)";
+/** Dismiss / clear “X” controls — same glyph, color, and default size app-wide. */
+export const CLOSE_ICON_NAME = "close-circle" as const;
+export const CLOSE_ICON_COLOR = MUTED2;
+export const CLOSE_ICON_SIZE = 26;
+/** Inline clear (search fields). */
+export const CLOSE_ICON_SIZE_INLINE = 16;
 export const TYPE_DISPLAY = 34;
 export const TYPE_TITLE = 26;
 export const TYPE_SECTION = 20;

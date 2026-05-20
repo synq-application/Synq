@@ -1,3 +1,4 @@
+import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { router } from "expo-router";
@@ -288,7 +289,7 @@ export default function NotificationsScreen() {
             onPress={() => handleRequest(item, false)}
             style={styles.denyBtn}
           >
-            <Ionicons name="close" size={22} color="#888" />
+            <CloseIcon />
           </TouchableOpacity>
         </View>
       </View>

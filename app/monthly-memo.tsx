@@ -12,6 +12,7 @@ import PlanDateCalendar from "@/src/components/PlanDateCalendar";
 import PlanTimePicker from "@/src/components/PlanTimePicker";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
+import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -419,7 +420,7 @@ export default function OpenPlans({
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   accessibilityLabel="Close"
                 >
-                  <Ionicons name="close" size={24} color={TEXT} />
+                  <CloseIcon />
                 </TouchableOpacity>
               </View>
 

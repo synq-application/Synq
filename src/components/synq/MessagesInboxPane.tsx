@@ -1,3 +1,4 @@
+import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { FlatList, Text, TouchableOpacity, View } from "react-native";
@@ -35,7 +36,7 @@ export default function MessagesInboxPane({
           accessibilityRole="button"
           accessibilityLabel="Close messages"
         >
-          <Ionicons name="close-circle" size={28} color="#444" />
+          <CloseIcon />
         </TouchableOpacity>
       </View>
       <View style={styles.messagesHeaderDivider} />

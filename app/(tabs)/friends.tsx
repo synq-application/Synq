@@ -35,6 +35,7 @@ import {
   sortFriendsByDistanceKm,
   sortFriendsByNameWithNoLocationLast,
 } from "@/src/lib/friendDistance";
+import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
@@ -701,7 +702,7 @@ export default function FriendsScreen() {
                 />
                 {searchText.length > 0 && (
                   <TouchableOpacity onPress={() => setSearchText("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close-circle" size={14} color={MUTED2} />
+                    <CloseIcon variant="inline" />
                   </TouchableOpacity>
                 )}
               </View>
@@ -1734,7 +1735,7 @@ function SearchModal({
             accessibilityRole="button"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="close-circle" size={26} color={MUTED2} />
+            <CloseIcon />
           </TouchableOpacity>
         </View>
 
@@ -1754,7 +1755,7 @@ function SearchModal({
               onPress={() => searchUsers("")}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="close-circle" size={16} color={MUTED2} />
+              <CloseIcon variant="inline" />
             </TouchableOpacity>
           ) : null}
         </View>

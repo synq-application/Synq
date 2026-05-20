@@ -1,3 +1,4 @@
+import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
@@ -70,11 +71,7 @@ export default function EditSynqModal({
                 style={styles.closeBtn}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons
-                  name="close"
-                  size={22}
-                  color="rgba(255,255,255,0.4)"
-                />
+                <CloseIcon />
               </TouchableOpacity>
 
               <Text style={styles.panelTitle}>Edit memo</Text>
