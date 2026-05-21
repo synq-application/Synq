@@ -1,7 +1,8 @@
 import StackScreenHeader from "@/src/components/StackScreenHeader";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
+  Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -26,6 +27,9 @@ import { auth } from "../../src/lib/firebase";
 import { submitReport, type ReportReason } from "../../src/lib/moderation";
 import AlertModal from "../alert-modal";
 
+/** Firestore queue when the report is not tied to a specific profile. */
+const GENERAL_SAFETY_REPORT_USER_ID = "_general_safety";
+
 const REASONS: { id: ReportReason; label: string }[] = [
   { id: "harassment", label: "Harassment or bullying" },
   { id: "hate", label: "Hate or discrimination" },
@@ -48,17 +52,22 @@ export default function SafetyReportScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
+  const scrollRef = useRef<ScrollView>(null);
+  const detailsScrollY = useRef(0);
+
+  const nudgeDetailsAboveKeyboard = () => {
+    const delay = Platform.OS === "ios" ? 100 : 0;
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, detailsScrollY.current - 140),
+        animated: true,
+      });
+    }, delay);
+  };
 
   const handleSubmit = async () => {
     if (!auth.currentUser) {
       setAlertMessage("Sign in to submit a safety report.");
-      setAlertVisible(true);
-      return;
-    }
-    if (!reportedUserId.trim()) {
-      setAlertMessage(
-        "To report someone, open their profile and tap Report user, or long-press a message in chat."
-      );
       setAlertVisible(true);
       return;
     }
@@ -69,16 +78,28 @@ export default function SafetyReportScreen() {
     }
     setSubmitting(true);
     try {
-      await submitReport({
-        reportedUserId: reportedUserId.trim(),
+      const result = await submitReport({
+        reportedUserId: reportedUserId.trim() || GENERAL_SAFETY_REPORT_USER_ID,
         contentType: "user",
         reason,
         details: details.trim() || undefined,
       });
-      setAlertMessage("Report submitted. We aim to review within 24 hours.");
+      if (result.duplicate) {
+        setAlertMessage(
+          "You already have an open report for this issue. Change the reason or details, or wait until it is reviewed."
+        );
+      } else if (result.emailSent === false) {
+        setAlertMessage(
+          "Report saved, but the alert email could not be sent. Check Firebase function logs (moderation_email_failed)."
+        );
+      } else {
+        setAlertMessage("Report submitted. We aim to review within 24 hours.");
+      }
       setAlertVisible(true);
-      setReason(null);
-      setDetails("");
+      if (!result.duplicate) {
+        setReason(null);
+        setDetails("");
+      }
     } catch {
       setAlertMessage("Could not submit report. Please try again.");
       setAlertVisible(true);
@@ -92,11 +113,18 @@ export default function SafetyReportScreen() {
       <StatusBar barStyle="light-content" />
       <StackScreenHeader title="Report a safety issue" />
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets
+      >
         <Text style={styles.lead}>
           {reportedUserId.trim()
             ? "Tell us what happened. We review reports within 24 hours."
-            : "To report a specific person, open their friend profile and tap Report user, or long-press a message in chat."}
+            : "Describe the safety issue below. We review reports within 24 hours."}
         </Text>
 
         {REASONS.map((r) => (
@@ -109,21 +137,29 @@ export default function SafetyReportScreen() {
           </TouchableOpacity>
         ))}
 
-        <TextInput
-          style={[styles.input, styles.details]}
-          placeholder="What happened? (optional)"
-          placeholderTextColor="rgba(255,255,255,0.35)"
-          value={details}
-          onChangeText={setDetails}
-          multiline
-        />
+        <View
+          onLayout={(e) => {
+            detailsScrollY.current = e.nativeEvent.layout.y;
+          }}
+        >
+          <TextInput
+            style={[styles.input, styles.details]}
+            placeholder="What happened? (optional)"
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            value={details}
+            onChangeText={setDetails}
+            multiline
+            textAlignVertical="top"
+            onFocus={nudgeDetailsAboveKeyboard}
+          />
+        </View>
 
         <TouchableOpacity
           style={[
             styles.submit,
-            (submitting || !reason || !reportedUserId.trim()) && styles.submitDisabled,
+            (submitting || !reason) && styles.submitDisabled,
           ]}
-          disabled={submitting || !reason || !reportedUserId.trim()}
+          disabled={submitting || !reason}
           onPress={handleSubmit}
         >
           <Text style={styles.submitText}>
@@ -146,7 +182,8 @@ export default function SafetyReportScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  scroll: { padding: SPACE_4, paddingBottom: 40 },
+  scrollView: { flex: 1 },
+  scroll: { padding: SPACE_4, paddingBottom: 32 },
   lead: {
     color: "rgba(255,255,255,0.75)",
     fontFamily: fonts.medium,

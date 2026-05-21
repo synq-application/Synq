@@ -7,19 +7,23 @@ const { containsObjectionableContent } = require("./contentFilter");
 const { logError, logInfo, logWarn } = require("./serverLog");
 
 const MODERATION_EMAIL_TO = "synqapp@gmail.com";
-const MODERATION_FROM = process.env.MODERATION_EMAIL_FROM || "Synq Moderation <onboarding@resend.dev>";
+const MODERATION_SECRETS = ["MODERATION_EMAIL_API_KEY"];
+
+function moderationFromAddress() {
+  return process.env.MODERATION_EMAIL_FROM || "Synq Moderation <onboarding@resend.dev>";
+}
 
 async function sendModerationEmail(subject, body) {
   const apiKey = process.env.MODERATION_EMAIL_API_KEY;
   if (!apiKey) {
     logWarn("moderation_email_skipped_no_api_key", { subject });
-    return;
+    return false;
   }
   try {
-    await axios.post(
+    const res = await axios.post(
       "https://api.resend.com/emails",
       {
-        from: MODERATION_FROM,
+        from: moderationFromAddress(),
         to: [MODERATION_EMAIL_TO],
         subject,
         text: body,
@@ -32,8 +36,19 @@ async function sendModerationEmail(subject, body) {
         timeout: 15000,
       }
     );
+    logInfo("moderation_email_sent", { subject, id: res.data?.id });
+    return true;
   } catch (e) {
-    logError("moderation_email_failed", e, { subject });
+    const resendMessage =
+      e?.response?.data?.message || e?.response?.data?.error || e?.message;
+    logError("moderation_email_failed", e, {
+      subject,
+      to: MODERATION_EMAIL_TO,
+      from: moderationFromAddress(),
+      resendMessage,
+      status: e?.response?.status,
+    });
+    return false;
   }
 }
 
@@ -44,6 +59,16 @@ async function enqueueModerationItem(db, item) {
     ...item,
   });
   return ref.id;
+}
+
+function buildDedupeSuffix(reportedUserId, contentType, reason, details, messageId, contentId) {
+  if (messageId || contentId) return messageId || contentId;
+  // General safety reports (no profile): allow a new open report per reason + details snippet.
+  if (String(reportedUserId).startsWith("_general")) {
+    const snippet = String(details || "").trim().slice(0, 80);
+    return `${reason}:${snippet}`;
+  }
+  return "";
 }
 
 async function notifyModerationQueueItem(queueId, item) {
@@ -58,7 +83,7 @@ async function notifyModerationQueueItem(queueId, item) {
     `Message: ${item.messageId || "—"}`,
     `Details: ${item.details || "—"}`,
   ];
-  await sendModerationEmail(
+  return sendModerationEmail(
     `[Synq] Moderation: ${item.kind || item.contentType || "report"}`,
     lines.join("\n")
   );
@@ -82,6 +107,7 @@ function registerModerationExports() {
     {
       document: "chats/{chatId}/messages/{messageId}",
       region: "us-central1",
+      secrets: MODERATION_SECRETS,
     },
     async (event) => {
       const snap = event.data;
@@ -116,7 +142,9 @@ function registerModerationExports() {
     }
   );
 
-  const submitReport = onCall({ region: "us-central1" }, async (request) => {
+  const submitReport = onCall(
+    { region: "us-central1", secrets: MODERATION_SECRETS },
+    async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
     const reporterId = request.auth.uid;
     const {
@@ -133,7 +161,14 @@ function registerModerationExports() {
       throw new HttpsError("invalid-argument", "Missing required report fields.");
     }
 
-    const dedupeKey = `${reporterId}:${reportedUserId}:${contentType}:${messageId || contentId || ""}`;
+    const dedupeKey = `${reporterId}:${reportedUserId}:${contentType}:${buildDedupeSuffix(
+      reportedUserId,
+      contentType,
+      reason,
+      details,
+      messageId,
+      contentId
+    )}`;
     const recent = await db
       .collection("moderationQueue")
       .where("dedupeKey", "==", dedupeKey)
@@ -141,7 +176,11 @@ function registerModerationExports() {
       .limit(1)
       .get();
     if (!recent.empty) {
-      return { ok: true, duplicate: true, queueId: recent.docs[0].id };
+      logInfo("submitReport_duplicate", {
+        queueId: recent.docs[0].id,
+        dedupeKey,
+      });
+      return { ok: true, duplicate: true, queueId: recent.docs[0].id, emailSent: false };
     }
 
     const queueId = await enqueueModerationItem(db, {
@@ -156,7 +195,7 @@ function registerModerationExports() {
       contentId: contentId || null,
       dedupeKey,
     });
-    await notifyModerationQueueItem(queueId, {
+    const emailSent = await notifyModerationQueueItem(queueId, {
       kind: "user_report",
       reporterId,
       reportedUserId,
@@ -166,11 +205,13 @@ function registerModerationExports() {
       chatId,
       messageId,
     });
-    return { ok: true, queueId };
-  }
+    return { ok: true, queueId, emailSent };
+    }
   );
 
-  const blockUser = onCall({ region: "us-central1" }, async (request) => {
+  const blockUser = onCall(
+    { region: "us-central1", secrets: MODERATION_SECRETS },
+    async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
     const blockerId = request.auth.uid;
     const blockedUserId = String(request.data?.blockedUserId || "").trim();
@@ -205,7 +246,7 @@ function registerModerationExports() {
     });
 
     return { ok: true, queueId };
-  }
+    }
   );
 
   const unblockUser = onCall({ region: "us-central1" }, async (request) => {
@@ -264,6 +305,7 @@ function registerModerationExports() {
     {
       schedule: "every day 09:00",
       region: "us-central1",
+      secrets: MODERATION_SECRETS,
     },
     async () => {
       const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);

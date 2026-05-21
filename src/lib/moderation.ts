@@ -1,4 +1,5 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "./firebase";
 
 export type ReportReason =
   | "harassment"
@@ -19,12 +20,17 @@ export type SubmitReportParams = {
   contentId?: string;
 };
 
-const functions = getFunctions(undefined, "us-central1");
+const functions = getFunctions(app, "us-central1");
 
 export async function submitReport(params: SubmitReportParams) {
   const fn = httpsCallable(functions, "submitReport");
   const res = await fn(params);
-  return res.data as { ok: boolean; queueId?: string; duplicate?: boolean };
+  return res.data as {
+    ok: boolean;
+    queueId?: string;
+    duplicate?: boolean;
+    emailSent?: boolean;
+  };
 }
 
 export async function blockUser(blockedUserId: string, details?: string) {
