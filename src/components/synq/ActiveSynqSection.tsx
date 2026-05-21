@@ -200,7 +200,7 @@ export default function ActiveSynqSection({
           <>
         <LinearGradient
           pointerEvents="none"
-          colors={["rgba(9,10,11,0)", BG]}
+          colors={["rgba(9,10,11,0)", "rgba(9,10,11,0.55)", BG]}
           locations={[0, 0.7, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
