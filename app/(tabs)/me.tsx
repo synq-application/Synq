@@ -28,11 +28,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { filterOrReject } from "@/src/lib/contentFilter";
+import {
+  launchProfilePhotoPicker,
+  requestPhotoLibraryAccess,
+} from "@/src/lib/profilePhotoPicker";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -545,8 +548,8 @@ export default function ProfileScreen() {
   const pickImage = async () => {
     setIsPickingImage(true);
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
+      const granted = await requestPhotoLibraryAccess();
+      if (!granted) {
         showAlert(
           "Photo access needed",
           "Allow photo library access in Settings to update your profile picture."
@@ -554,15 +557,9 @@ export default function ProfileScreen() {
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
-      });
-
-      if (!result.canceled && result.assets[0]?.uri) {
-        await uploadImage(result.assets[0].uri);
+      const result = await launchProfilePhotoPicker();
+      if (result.ok) {
+        await uploadImage(result.uri);
       }
     } finally {
       setAvatarRenderVersion((prev) => prev + 1);

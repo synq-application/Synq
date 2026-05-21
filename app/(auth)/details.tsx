@@ -6,7 +6,6 @@ import {
   onboardingContentTopPadding,
 } from "@/constants/onboardingLayout";
 import { Image as ExpoImage } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
@@ -27,6 +26,12 @@ import {
 import Icon from "react-native-vector-icons/Ionicons";
 import { filterOrReject } from "@/src/lib/contentFilter";
 import {
+  getPhotoLibraryPermission,
+  launchProfilePhotoPicker,
+  photoLibraryAccessGranted,
+  requestPhotoLibraryAccess,
+} from "@/src/lib/profilePhotoPicker";
+import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
@@ -38,6 +43,7 @@ import {
 } from "../../constants/Variables";
 import { auth, db, storage } from "../../src/lib/firebase";
 import AlertModal from "../alert-modal";
+import ConfirmModal from "../confirm-modal";
 
 export default function Details() {
   const router = useRouter();
@@ -50,6 +56,10 @@ export default function Details() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
+  const [photoPermissionPromptVisible, setPhotoPermissionPromptVisible] =
+    useState(false);
+  const [photoPermissionRequesting, setPhotoPermissionRequesting] =
+    useState(false);
 
   const showAlert = (message: string, title?: string) => {
     setAlertTitle(title);
@@ -59,23 +69,52 @@ export default function Details() {
 
   const canContinue = firstName.trim() && lastName.trim() && !loading && !isUploading;
 
+  const openPhotoPickerAfterAccess = async () => {
+    const result = await launchProfilePhotoPicker();
+    if (result.ok) {
+      uploadImage(result.uri);
+      return;
+    }
+    if (result.reason === "denied") {
+      showAlert(
+        "Allow photo library access in Settings to choose a profile photo.",
+        "Photo access needed"
+      );
+    }
+  };
+
+  const requestPhotoAccessAndPick = async () => {
+    setPhotoPermissionRequesting(true);
+    try {
+      const granted = await requestPhotoLibraryAccess();
+      if (!granted) {
+        showAlert(
+          "Allow photo library access in Settings to choose a profile photo.",
+          "Photo access needed"
+        );
+        return;
+      }
+      await openPhotoPickerAfterAccess();
+    } finally {
+      setPhotoPermissionRequesting(false);
+    }
+  };
+
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      showAlert("We need access to your photos.", "Permission Denied");
+    if (isUploading || photoPermissionRequesting) return;
+
+    const permission = await getPhotoLibraryPermission();
+    if (photoLibraryAccessGranted(permission)) {
+      await openPhotoPickerAfterAccess();
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-
-    if (!result.canceled && result.assets[0].uri) {
-      uploadImage(result.assets[0].uri);
+    if (permission.status === "undetermined") {
+      setPhotoPermissionPromptVisible(true);
+      return;
     }
+
+    await requestPhotoAccessAndPick();
   };
 
   const uploadImage = async (uri: string) => {
@@ -165,7 +204,11 @@ export default function Details() {
           </View>
 
           <View style={styles.avatarContainer}>
-            <TouchableOpacity onPress={pickImage} style={styles.avatarCircle} disabled={isUploading}>
+            <TouchableOpacity
+              onPress={pickImage}
+              style={styles.avatarCircle}
+              disabled={isUploading || photoPermissionRequesting}
+            >
               {image ? (
                 <ExpoImage
                   source={{ uri: image }}
@@ -233,6 +276,18 @@ export default function Details() {
             title={alertTitle}
             message={alertMessage}
             onClose={() => setAlertVisible(false)}
+          />
+          <ConfirmModal
+            visible={photoPermissionPromptVisible}
+            title="Photo library access"
+            message="Synq needs access to your photo library so you can choose an optional profile photo. You can decline and continue without a photo."
+            confirmText="Continue"
+            cancelText="Not now"
+            onCancel={() => setPhotoPermissionPromptVisible(false)}
+            onConfirm={() => {
+              setPhotoPermissionPromptVisible(false);
+              void requestPhotoAccessAndPick();
+            }}
           />
         </View>
         </ScrollView>

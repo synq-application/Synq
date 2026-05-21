@@ -61,6 +61,15 @@ async function enqueueModerationItem(db, item) {
   return ref.id;
 }
 
+function labelFromProfileFields({ displayName, email, phone, uid }) {
+  const parts = [];
+  if (displayName) parts.push(displayName);
+  if (email) parts.push(email);
+  if (phone) parts.push(phone);
+  const summary = parts.length ? parts.join(" · ") : "Unknown user";
+  return `${summary} (uid: ${uid})`;
+}
+
 async function formatUserLabel(db, uid) {
   const id = String(uid || "").trim();
   if (!id) return "—";
@@ -75,19 +84,34 @@ async function formatUserLabel(db, uid) {
         .catch(() => null),
     ]);
     const data = docSnap.exists ? docSnap.data() || {} : {};
-    const displayName = String(data.displayName || "").trim();
-    const email = String(data.email || authUser?.email || "").trim();
-    const phone = String(authUser?.phoneNumber || data.phone || "").trim();
-    const parts = [];
-    if (displayName) parts.push(displayName);
-    if (email) parts.push(email);
-    if (phone) parts.push(phone);
-    const summary = parts.length ? parts.join(" · ") : "Unknown user";
-    return `${summary} (uid: ${id})`;
+    return labelFromProfileFields({
+      displayName: String(data.displayName || authUser?.displayName || "").trim(),
+      email: String(data.email || authUser?.email || "").trim(),
+      phone: String(authUser?.phoneNumber || data.phone || "").trim(),
+      uid: id,
+    });
   } catch (e) {
     logWarn("moderation_user_lookup_failed", { uid: id, err: String(e?.message || e) });
     return `uid: ${id}`;
   }
+}
+
+async function resolveReporterLabel(db, item) {
+  const id = String(item.reporterId || "").trim();
+  if (!id || id === "system") return formatUserLabel(db, id);
+
+  const name = String(item.reporterName || "").trim();
+  const email = String(item.reporterEmail || "").trim();
+  const phone = String(item.reporterPhone || "").trim();
+  if (name || email || phone) {
+    return labelFromProfileFields({
+      displayName: name,
+      email,
+      phone,
+      uid: id,
+    });
+  }
+  return formatUserLabel(db, id);
 }
 
 function formatReportedUserLabel(reportedUserId) {
@@ -110,11 +134,13 @@ function buildDedupeSuffix(reportedUserId, contentType, reason, details, message
 }
 
 async function notifyModerationQueueItem(db, queueId, item) {
-  const reporterLabel = await formatUserLabel(db, item.reporterId);
+  const reporterLabel = await resolveReporterLabel(db, item);
   const reportedId = item.reportedUserId || "—";
   const reportedLabel = String(reportedId).startsWith("_general")
     ? formatReportedUserLabel(reportedId)
     : await formatUserLabel(db, reportedId);
+
+  logInfo("moderation_notify", { queueId, reporterLabel, reportedLabel });
 
   const lines = [
     `Queue ID: ${queueId}`,
@@ -125,6 +151,9 @@ async function notifyModerationQueueItem(db, queueId, item) {
     `Content type: ${item.contentType || "—"}`,
     `Chat: ${item.chatId || "—"}`,
     `Message: ${item.messageId || "—"}`,
+    ...(item.preview
+      ? [`Flagged content: ${item.preview}`]
+      : []),
     `Details: ${item.details || "—"}`,
   ];
   return sendModerationEmail(
@@ -179,6 +208,8 @@ function registerModerationExports() {
           reportedUserId: data.senderId,
           chatId,
           messageId,
+          reason: "auto_filter",
+          preview: text.slice(0, 200),
         });
       } catch (e) {
         logError("onMessageContentFilter", e, { chatId, messageId });
@@ -191,6 +222,26 @@ function registerModerationExports() {
     async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
     const reporterId = request.auth.uid;
+    const authToken = request.auth.token || {};
+    let reporterName = String(authToken.name || "").trim();
+    let reporterEmail = String(authToken.email || "").trim();
+    let reporterPhone = String(authToken.phone_number || "").trim();
+    if (!reporterName || !reporterEmail) {
+      try {
+        const reporterSnap = await db.collection("users").doc(reporterId).get();
+        if (reporterSnap.exists) {
+          const profile = reporterSnap.data() || {};
+          if (!reporterName) reporterName = String(profile.displayName || "").trim();
+          if (!reporterEmail) reporterEmail = String(profile.email || "").trim();
+          if (!reporterPhone) reporterPhone = String(profile.phone || "").trim();
+        }
+      } catch (e) {
+        logWarn("submitReport_reporter_profile_lookup", {
+          reporterId,
+          err: String(e?.message || e),
+        });
+      }
+    }
     const {
       reportedUserId,
       contentType,
@@ -230,6 +281,9 @@ function registerModerationExports() {
     const queueId = await enqueueModerationItem(db, {
       kind: "user_report",
       reporterId,
+      reporterName: reporterName || null,
+      reporterEmail: reporterEmail || null,
+      reporterPhone: reporterPhone || null,
       reportedUserId,
       contentType,
       reason,
@@ -242,6 +296,9 @@ function registerModerationExports() {
     const emailSent = await notifyModerationQueueItem(db, queueId, {
       kind: "user_report",
       reporterId,
+      reporterName,
+      reporterEmail,
+      reporterPhone,
       reportedUserId,
       contentType,
       reason,

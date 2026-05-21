@@ -1,4 +1,3 @@
-import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import React, { useEffect, useMemo, useState } from "react";
@@ -35,9 +34,16 @@ import {
 } from "../../constants/Variables";
 import { auth, db } from "../../src/lib/firebase";
 import { getCachedOwnProfile } from "../../src/lib/ownProfileCache";
+import {
+  fetchCurrentCityState,
+  getForegroundLocationPermission,
+  foregroundLocationAccessGranted,
+  requestForegroundLocationAccess,
+} from "../../src/lib/locationAccess";
 import { userHasLocation } from "../../src/lib/userProfile";
 import { useAuthRefresh } from "../_layout";
 import AlertModal from "../alert-modal";
+import ConfirmModal from "../confirm-modal";
 
 const US_STATE_ABBREV: Record<string, string> = stateAbbreviations;
 
@@ -99,6 +105,10 @@ export default function LocationDetails() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
+  const [locationPermissionPromptVisible, setLocationPermissionPromptVisible] =
+    useState(false);
+  const [locationPermissionRequesting, setLocationPermissionRequesting] =
+    useState(false);
 
   const showAlert = (message: string, title?: string) => {
     setAlertTitle(title);
@@ -117,67 +127,75 @@ export default function LocationDetails() {
     );
   }, [city, state, loading, locating]);
 
-  const fillFromCurrentLocation = async () => {
+  const applyResolvedLocation = (data: {
+    lat: number;
+    lng: number;
+    city: string;
+    stateAbbrev: string;
+  }) => {
+    setCoords({ lat: data.lat, lng: data.lng });
+    setCity(data.city);
+    setState(data.stateAbbrev);
+    setLocationUsed(true);
+  };
+
+  const readLocationAfterAccess = async () => {
+    setLocating(true);
     try {
-      setLocationUsed(true); 
-      setLocating(true);
-
-      const { status } =
-        await Location.requestForegroundPermissionsAsync();
-
-      if (status !== "granted") {
+      const result = await fetchCurrentCityState(US_STATE_ABBREV);
+      if (result.ok) {
+        applyResolvedLocation(result.data);
+        return;
+      }
+      if (result.reason === "denied") {
         showAlert(
-          "Enable location access to auto-fill your city and state.",
+          "Allow location access in Settings to auto-fill your city and state.",
           "Location permission needed"
         );
-        setLocationUsed(false);
-        setLocating(false);
         return;
       }
-
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      setCoords({ lat, lng });
-
-      const results = await Location.reverseGeocodeAsync({
-        latitude: lat,
-        longitude: lng,
-      });
-
-      const best = results?.[0];
-
-      const detectedCity =
-        (best?.city ||
-          best?.subregion ||
-          best?.district ||
-          "").trim();
-
-      const detectedRegion = (best?.region || "").trim();
-
-      if (!detectedCity || !detectedRegion) {
+      if (result.reason === "undetected") {
         showAlert("Please enter it manually.", "Couldn’t detect city/state");
-        setLocationUsed(false);
-        setLocating(false);
         return;
       }
-
-      const abbrev =
-        US_STATE_ABBREV[detectedRegion] ??
-        detectedRegion.toUpperCase().slice(0, 2);
-
-      setCity(detectedCity);
-      setState(abbrev);
-      setLocating(false);
-    } catch (e: any) {
-      console.error(e);
-      setLocationUsed(false);
-      setLocating(false);
       showAlert("Could not get your current location.", "Error");
+    } finally {
+      setLocating(false);
     }
+  };
+
+  const requestLocationAccessAndFill = async () => {
+    setLocationPermissionRequesting(true);
+    try {
+      const granted = await requestForegroundLocationAccess();
+      if (!granted) {
+        showAlert(
+          "Allow location access in Settings to auto-fill your city and state.",
+          "Location permission needed"
+        );
+        return;
+      }
+      await readLocationAfterAccess();
+    } finally {
+      setLocationPermissionRequesting(false);
+    }
+  };
+
+  const fillFromCurrentLocation = async () => {
+    if (loading || locating || locationPermissionRequesting) return;
+
+    const permission = await getForegroundLocationPermission();
+    if (foregroundLocationAccessGranted(permission)) {
+      await readLocationAfterAccess();
+      return;
+    }
+
+    if (permission.status === "undetermined") {
+      setLocationPermissionPromptVisible(true);
+      return;
+    }
+
+    await requestLocationAccessAndFill();
   };
 
   const saveLocation = async () => {
@@ -279,7 +297,7 @@ export default function LocationDetails() {
           {!locationUsed && (
             <TouchableOpacity
               onPress={fillFromCurrentLocation}
-              disabled={loading || locating}
+              disabled={loading || locating || locationPermissionRequesting}
               activeOpacity={0.85}
               style={styles.locationRow}
             >
@@ -320,6 +338,18 @@ export default function LocationDetails() {
           title={alertTitle}
           message={alertMessage}
           onClose={() => setAlertVisible(false)}
+        />
+        <ConfirmModal
+          visible={locationPermissionPromptVisible}
+          title="Location access"
+          message="Synq uses your location once to auto-fill your city and state. You can decline and enter your location manually instead."
+          confirmText="Continue"
+          cancelText="Not now"
+          onCancel={() => setLocationPermissionPromptVisible(false)}
+          onConfirm={() => {
+            setLocationPermissionPromptVisible(false);
+            void requestLocationAccessAndFill();
+          }}
         />
         </View>
         </ScrollView>

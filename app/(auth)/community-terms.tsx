@@ -18,6 +18,9 @@ import {
   setPreAuthTermsAccepted,
 } from "@/src/lib/communityTerms";
 import BackButton from "@/src/components/BackButton";
+import LegalDocumentModal from "@/src/components/legal/LegalDocumentModal";
+import PrivacyPolicyContent from "@/src/components/legal/PrivacyPolicyContent";
+import TermsContent from "@/src/components/legal/TermsContent";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
@@ -47,6 +50,9 @@ export default function CommunityTermsScreen() {
 
   const [checked, setChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [legalModal, setLegalModal] = useState<"terms" | "privacy" | null>(
+    null
+  );
 
   useEffect(() => {
     if (!isPostAuth || !auth.currentUser) return;
@@ -135,15 +141,11 @@ export default function CommunityTermsScreen() {
         </View>
 
         <View style={styles.links}>
-          <TouchableOpacity
-            onPress={() => router.push("/profile-settings/terms-conditions")}
-          >
+          <TouchableOpacity onPress={() => setLegalModal("terms")}>
             <Text style={styles.link}>Terms & Conditions</Text>
           </TouchableOpacity>
           <Text style={styles.linkSep}> · </Text>
-          <TouchableOpacity
-            onPress={() => router.push("/profile-settings/privacy-policy")}
-          >
+          <TouchableOpacity onPress={() => setLegalModal("privacy")}>
             <Text style={styles.link}>Privacy Policy</Text>
           </TouchableOpacity>
         </View>
@@ -180,6 +182,21 @@ export default function CommunityTermsScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <LegalDocumentModal
+        visible={legalModal === "terms"}
+        title="Terms & conditions"
+        onClose={() => setLegalModal(null)}
+      >
+        <TermsContent />
+      </LegalDocumentModal>
+      <LegalDocumentModal
+        visible={legalModal === "privacy"}
+        title="Privacy policy"
+        onClose={() => setLegalModal(null)}
+      >
+        <PrivacyPolicyContent />
+      </LegalDocumentModal>
     </SafeAreaView>
   );
 }
