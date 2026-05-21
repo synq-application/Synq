@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ACCENT, MUTED, MUTED2, MUTED3 } from "../../../constants/Variables";
+import { ACCENT, MUTED, MUTED2, ON_ACCENT_TEXT } from "../../../constants/Variables";
 import { formatTime, parseIdeaText, resolveAvatar } from "../../../app/helpers";
 
 type Props = {
@@ -93,7 +93,7 @@ export default function MessagesChatPane({
       <View
         style={[
           styles.modalHeader,
-          { paddingTop: Math.max(4, insetsTop - 26) },
+          { paddingTop: Math.max(4, insetsTop - 26), alignItems: "flex-start" },
         ]}
       >
         <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -117,16 +117,6 @@ export default function MessagesChatPane({
               <Text style={styles.aiChipText}>{rotatingAIText}</Text>
               <Ionicons name="chevron-forward" size={14} color={MUTED2} />
             </TouchableOpacity>
-            <Text
-              style={{
-                color: MUTED3,
-                fontSize: 11,
-                marginTop: 6,
-                fontFamily: "Avenir-Medium",
-              }}
-            >
-              Long-press a message to report
-            </Text>
           </View>
         </View>
         <CloseButton
@@ -137,6 +127,7 @@ export default function MessagesChatPane({
             setShowOptionsList(false);
             setPendingNewChat(null);
           }}
+          style={{ marginTop: -4 }}
           accessibilityLabel="Close chat"
         />
       </View>
@@ -370,10 +361,18 @@ export default function MessagesChatPane({
           <TouchableOpacity
             onPress={sendMessage}
             style={styles.sendBtn}
+            activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel="Send message"
           >
-            <Ionicons name="send" size={18} color={ACCENT} />
+            <View style={styles.sendIconWrap}>
+              <Ionicons
+                name="send"
+                size={20}
+                color={ON_ACCENT_TEXT}
+                style={styles.sendIcon}
+              />
+            </View>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
