@@ -10,6 +10,7 @@ const axios = require("axios");
 const admin = require("firebase-admin");
 const { logError, logWarn, logInfo } = require("./serverLog");
 const { registerModerationExports } = require("./moderation");
+const { handleUserEventsChange } = require("./openPlanSync");
 
 if (admin.apps.length === 0) {
     admin.initializeApp();
@@ -811,6 +812,30 @@ exports.expireStaleSynq = onSchedule(
       }
     } catch (e) {
       logError("expireStaleSynq", e, {});
+    }
+  }
+);
+
+/**
+ * Propagate open-plan interest to hosts and cascade plan deletions to interested friends.
+ * Clients cannot write other users' calendars (firestore.rules); this runs with admin access.
+ */
+exports.syncOpenPlanEvents = onDocumentUpdated(
+  {
+    document: "users/{userId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const userId = event.params.userId;
+    const before = event.data.before.data() || {};
+    const after = event.data.after.data() || {};
+    const beforeEvents = Array.isArray(before.events) ? before.events : [];
+    const afterEvents = Array.isArray(after.events) ? after.events : [];
+
+    try {
+      await handleUserEventsChange(admin.firestore(), userId, beforeEvents, afterEvents);
+    } catch (e) {
+      logError("syncOpenPlanEvents", e, { userId });
     }
   }
 );

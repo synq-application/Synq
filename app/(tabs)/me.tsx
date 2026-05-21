@@ -230,6 +230,7 @@ export default function ProfileScreen() {
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
   const [pendingInterestDelete, setPendingInterestDelete] = useState<string | null>(null);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
   const resolvedProfileImage = useMemo(() => resolveAvatar(profileImage), [profileImage]);
 
   const [showEventModal, setShowEventModal] = useState(false);
@@ -271,6 +272,15 @@ export default function ProfileScreen() {
     setAlertTitle(title);
     setAlertMessage(message);
     setAlertVisible(true);
+  };
+
+  const signOut = async () => {
+    try {
+      router.replace("/(auth)/welcome");
+      await auth.signOut();
+    } catch {
+      showAlert("Sign out failed", "Please try again.");
+    }
   };
 
   const saveEvent = async (eventOverride?: any) => {
@@ -944,6 +954,18 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      <View style={[styles.section, styles.signOutSection]}>
+        <TouchableOpacity
+          onPress={() => setShowSignOutModal(true)}
+          style={styles.signOutBtn}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+        >
+          <Text style={styles.signOutBtnText}>Sign out</Text>
+        </TouchableOpacity>
+      </View>
+
       </ScrollView>
 
       <Modal visible={isQRExpanded} transparent animationType="fade">
@@ -1050,6 +1072,19 @@ export default function ProfileScreen() {
   message={alertMessage}
   onClose={() => setAlertVisible(false)}
 />
+      <ConfirmModal
+        visible={showSignOutModal}
+        title="Sign out?"
+        message="You can sign back in anytime."
+        confirmText="Sign out"
+        destructive
+        onCancel={() => setShowSignOutModal(false)}
+        onConfirm={async () => {
+          setShowSignOutModal(false);
+          await signOut();
+        }}
+      />
+
       <ConfirmModal
         visible={!!pendingInterestDelete}
         title="Remove Interest"
@@ -1355,5 +1390,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
+  },
+  signOutSection: {
+    paddingBottom: 20,
+  },
+  signOutBtn: {
+    marginTop: 4,
+    alignSelf: "center",
+    paddingVertical: 11,
+    paddingHorizontal: 32,
+    borderRadius: BUTTON_RADIUS,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  signOutBtnText: {
+    color: MUTED,
+    fontSize: 15,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.1,
   },
 });
