@@ -1,9 +1,10 @@
 import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
+import { ACCENT, MUTED, MUTED2, ON_ACCENT_TEXT } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import * as Haptics from "expo-haptics";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   FlatList,
   Keyboard,
@@ -15,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ACCENT, MUTED, MUTED2, ON_ACCENT_TEXT } from "../../../constants/Variables";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatTime, parseIdeaText, resolveAvatar } from "../../../app/helpers";
 
 type Props = {
@@ -60,6 +61,15 @@ type Props = {
   currentUserId?: string;
 };
 
+function getHeaderAvatarUri(
+  chat: { participantImages?: Record<string, string> } | null | undefined,
+  currentUserId?: string
+) {
+  if (!chat?.participantImages || !currentUserId) return null;
+  const other = Object.entries(chat.participantImages).find(([uid]) => uid !== currentUserId);
+  return other ? resolveAvatar(other[1]) : null;
+}
+
 export default function MessagesChatPane({
   styles,
   insetsTop,
@@ -88,34 +98,61 @@ export default function MessagesChatPane({
   windowWidth,
   currentUserId,
 }: Props) {
+  const insets = useSafeAreaInsets();
+  const canSend = inputText.trim().length > 0;
+  const headerAvatarUri = useMemo(
+    () => getHeaderAvatarUri(activeChat, currentUserId),
+    [activeChat, currentUserId]
+  );
+
+  const handleSend = () => {
+    if (!canSend) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    sendMessage();
+  };
+
   return (
     <View style={styles.modalBg}>
       <View
         style={[
-          styles.modalHeader,
-          { paddingTop: Math.max(4, insetsTop - 26), alignItems: "flex-start" },
+          styles.chatHeader,
+          { paddingTop: Math.max(8, insetsTop - 22) },
         ]}
       >
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View>
-            <Text style={styles.modalTitle}>
+        <View style={styles.chatHeaderMain}>
+          {headerAvatarUri ? (
+            <ExpoImage
+              source={{ uri: headerAvatarUri }}
+              style={styles.chatHeaderAvatar}
+              cachePolicy="memory-disk"
+              transition={120}
+              recyclingKey={headerAvatarUri}
+            />
+          ) : (
+            <View style={styles.chatHeaderAvatar}>
+              <Ionicons name="people" size={20} color={MUTED2} />
+            </View>
+          )}
+          <View style={styles.chatHeaderTextCol}>
+            <Text style={styles.chatTitle} numberOfLines={1}>
               {activeChat ? getChatTitle(activeChat) : "Synq Chat"}
             </Text>
-
             <TouchableOpacity
               onPress={() => {
                 Keyboard.dismiss();
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setIsExploreVisible(true);
               }}
-              style={styles.aiChip}
-              activeOpacity={0.8}
+              style={styles.aiChipPremium}
+              activeOpacity={0.82}
               accessibilityRole="button"
               accessibilityLabel="Open Synq AI place suggestions"
             >
-              <Ionicons name="sparkles" size={14} color={ACCENT} />
-              <Text style={styles.aiChipText}>{rotatingAIText}</Text>
-              <Ionicons name="chevron-forward" size={14} color={MUTED2} />
+              <Ionicons name="sparkles" size={13} color={ACCENT} />
+              <Text style={styles.aiChipTextPremium} numberOfLines={1}>
+                {rotatingAIText}
+              </Text>
+              <Ionicons name="chevron-forward" size={13} color={MUTED2} />
             </TouchableOpacity>
           </View>
         </View>
@@ -127,24 +164,30 @@ export default function MessagesChatPane({
             setShowOptionsList(false);
             setPendingNewChat(null);
           }}
-          style={{ marginTop: -4 }}
+          style={{ marginTop: 2 }}
           accessibilityLabel="Close chat"
         />
       </View>
+      <View style={styles.chatHeaderDivider} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
         keyboardVerticalOffset={60}
       >
-        <View style={{ flex: 1 }}>
+        <View style={styles.chatBody}>
           <FlatList
             ref={flatListRef}
+            style={styles.chatList}
             data={messages}
             keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.chatEmptyWrap}>
-                <Ionicons name="sparkles-outline" size={24} color={MUTED} />
+                <View style={styles.chatEmptyIconWrap}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={26} color={ACCENT} />
+                </View>
+                <Text style={styles.chatEmptyTitle}>Start the conversation</Text>
                 <Text style={styles.chatEmptyText}>
                   Say hi to kick this Synq off.
                 </Text>
@@ -299,23 +342,20 @@ export default function MessagesChatPane({
                     </View>
                   </View>
                   <Text
-                    style={{
-                      color: "#444",
-                      fontSize: 11,
-                      marginTop: 4,
-                      marginLeft: isMe ? 0 : 44,
-                      alignSelf: isMe ? "flex-end" : "flex-start",
-                    }}
+                    style={[
+                      styles.chatTimestamp,
+                      {
+                        marginLeft: isMe ? 0 : 44,
+                        alignSelf: isMe ? "flex-end" : "flex-start",
+                      },
+                    ]}
                   >
                     {formatTime(item.createdAt)}
                   </Text>
                 </View>
               );
             }}
-            contentContainerStyle={{
-              flexGrow: 1,
-              padding: 20,
-            }}
+            contentContainerStyle={styles.chatListContent}
           />
 
           {showAICard && (
@@ -346,34 +386,46 @@ export default function MessagesChatPane({
           )}
         </View>
 
-        <View style={styles.inputRow}>
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Message..."
-            placeholderTextColor="#666"
-            multiline
-            textAlignVertical="top"
-            scrollEnabled
-            returnKeyType="default"
-          />
-          <TouchableOpacity
-            onPress={sendMessage}
-            style={styles.sendBtn}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
-          >
-            <View style={styles.sendIconWrap}>
-              <Ionicons
-                name="send"
-                size={20}
-                color={ON_ACCENT_TEXT}
-                style={styles.sendIcon}
-              />
-            </View>
-          </TouchableOpacity>
+        <View
+          style={[
+            styles.composerDock,
+            { paddingBottom: Math.max(insets.bottom, 10) + 6 },
+          ]}
+        >
+          <View style={styles.composerShell}>
+            <TextInput
+              style={styles.composerInput}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Message"
+              placeholderTextColor="rgba(255,255,255,0.32)"
+              multiline
+              textAlignVertical="center"
+              scrollEnabled
+              returnKeyType="default"
+            />
+            <TouchableOpacity
+              onPress={handleSend}
+              style={[
+                styles.sendBtnInset,
+                !canSend && styles.sendBtnInsetDisabled,
+              ]}
+              activeOpacity={canSend ? 0.85 : 1}
+              disabled={!canSend}
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
+              accessibilityState={{ disabled: !canSend }}
+            >
+              <View style={styles.sendIconWrap}>
+                <Ionicons
+                  name="send"
+                  size={18}
+                  color={canSend ? ON_ACCENT_TEXT : MUTED2}
+                  style={canSend ? styles.sendIcon : styles.sendIconDisabled}
+                />
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </View>
