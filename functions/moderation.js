@@ -61,6 +61,44 @@ async function enqueueModerationItem(db, item) {
   return ref.id;
 }
 
+async function formatUserLabel(db, uid) {
+  const id = String(uid || "").trim();
+  if (!id) return "—";
+  if (id === "system") return "system (automated)";
+
+  try {
+    const [docSnap, authUser] = await Promise.all([
+      db.collection("users").doc(id).get(),
+      admin
+        .auth()
+        .getUser(id)
+        .catch(() => null),
+    ]);
+    const data = docSnap.exists ? docSnap.data() || {} : {};
+    const displayName = String(data.displayName || "").trim();
+    const email = String(data.email || authUser?.email || "").trim();
+    const phone = String(authUser?.phoneNumber || data.phone || "").trim();
+    const parts = [];
+    if (displayName) parts.push(displayName);
+    if (email) parts.push(email);
+    if (phone) parts.push(phone);
+    const summary = parts.length ? parts.join(" · ") : "Unknown user";
+    return `${summary} (uid: ${id})`;
+  } catch (e) {
+    logWarn("moderation_user_lookup_failed", { uid: id, err: String(e?.message || e) });
+    return `uid: ${id}`;
+  }
+}
+
+function formatReportedUserLabel(reportedUserId) {
+  const id = String(reportedUserId || "").trim();
+  if (!id) return "—";
+  if (id.startsWith("_general")) {
+    return "General safety report (no specific profile)";
+  }
+  return id;
+}
+
 function buildDedupeSuffix(reportedUserId, contentType, reason, details, messageId, contentId) {
   if (messageId || contentId) return messageId || contentId;
   // General safety reports (no profile): allow a new open report per reason + details snippet.
@@ -71,12 +109,18 @@ function buildDedupeSuffix(reportedUserId, contentType, reason, details, message
   return "";
 }
 
-async function notifyModerationQueueItem(queueId, item) {
+async function notifyModerationQueueItem(db, queueId, item) {
+  const reporterLabel = await formatUserLabel(db, item.reporterId);
+  const reportedId = item.reportedUserId || "—";
+  const reportedLabel = String(reportedId).startsWith("_general")
+    ? formatReportedUserLabel(reportedId)
+    : await formatUserLabel(db, reportedId);
+
   const lines = [
     `Queue ID: ${queueId}`,
     `Type: ${item.kind || item.contentType || "unknown"}`,
-    `Reporter: ${item.reporterId || "—"}`,
-    `Reported user: ${item.reportedUserId || "—"}`,
+    `Reporter: ${reporterLabel}`,
+    `Reported user: ${reportedLabel}`,
     `Reason: ${item.reason || "—"}`,
     `Content type: ${item.contentType || "—"}`,
     `Chat: ${item.chatId || "—"}`,
@@ -129,7 +173,7 @@ function registerModerationExports() {
           reason: "auto_filter",
           preview: text.slice(0, 200),
         });
-        await notifyModerationQueueItem(queueId, {
+        await notifyModerationQueueItem(db, queueId, {
           kind: "auto_filtered",
           contentType: "message",
           reportedUserId: data.senderId,
@@ -195,7 +239,7 @@ function registerModerationExports() {
       contentId: contentId || null,
       dedupeKey,
     });
-    const emailSent = await notifyModerationQueueItem(queueId, {
+    const emailSent = await notifyModerationQueueItem(db, queueId, {
       kind: "user_report",
       reporterId,
       reportedUserId,
@@ -238,7 +282,7 @@ function registerModerationExports() {
       reason: "block",
       details: request.data?.details || null,
     });
-    await notifyModerationQueueItem(queueId, {
+    await notifyModerationQueueItem(db, queueId, {
       kind: "block",
       reporterId: blockerId,
       reportedUserId: blockedUserId,
