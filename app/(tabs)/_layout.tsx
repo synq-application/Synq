@@ -72,7 +72,7 @@ export default function TabsLayout() {
               <View style={styles.synqButtonInner}>
                 <ExpoImage
                   source={SYNQ_ICON}
-                  style={styles.synqIcon}
+                  style={[styles.synqIcon, focused && styles.synqIconActive]}
                   contentFit="cover"
                   transition={0}
                   cachePolicy="memory-disk"
@@ -141,17 +141,21 @@ const styles = StyleSheet.create({
   },
 
   synqButtonActive: {
-    transform: [{ scale: 1.03 }],
+    transform: [{ scale: 1.05 }],
     borderWidth: 0,
     shadowColor: ACCENT,
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
+    shadowOpacity: 0.42,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
+    elevation: 12,
   },
 
   synqIcon: {
-    width: 98,
-    height: 98,
+    width: 100,
+    height: 100,
+  },
+  synqIconActive: {
+    width: 106,
+    height: 106,
   },
 });
