@@ -1540,7 +1540,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     textAlign: "center",
     lineHeight: 34,
-    marginTop: 120,
+    marginTop: 96,
     maxWidth: 352,
   },
   inlineMetaRow: {
