@@ -1,7 +1,6 @@
 import {
   ONBOARDING_H_PADDING,
   ONBOARDING_SCROLL_BOTTOM,
-  ONBOARDING_SUBTITLE_SIZE,
   ONBOARDING_TITLE_SIZE,
   onboardingContentTopPadding,
 } from "@/constants/onboardingLayout";
@@ -35,7 +34,6 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  MUTED,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   TEXT,
@@ -217,37 +215,39 @@ export default function Details() {
         <View style={styles.innerContent}>
           <View style={styles.headerSection}>
             <Text style={styles.title}>What’s your name?</Text>
-            <Text style={styles.subtitle}>Help friends recognize you on Synq.</Text>
           </View>
 
           <View style={styles.avatarContainer}>
             <TouchableOpacity
               onPress={pickImage}
-              style={styles.avatarCircle}
+              style={styles.avatarTouchable}
               disabled={isUploading || photoPermissionRequesting}
             >
-              {image ? (
-                <ExpoImage
-                  source={{ uri: image }}
-                  style={styles.avatarImage}
-                  cachePolicy="memory-disk"
-                  transition={0}
-                  recyclingKey={image}
-                />
-              ) : (
-                <View style={styles.placeholderIcon}>
-                  <Icon name="camera-outline" size={28} color="rgba(255,255,255,0.5)" />
-                  <Text style={styles.addPhotoText}>
-                    {isUploading ? "Uploading..." : "Add Photo"}
-                  </Text>
-                </View>
-              )}
+              <View style={styles.avatarCircle}>
+                {image ? (
+                  <ExpoImage
+                    source={{ uri: image }}
+                    style={styles.avatarImage}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={0}
+                    recyclingKey={image}
+                  />
+                ) : (
+                  <View style={styles.placeholderIcon}>
+                    <Icon name="camera-outline" size={28} color="rgba(255,255,255,0.5)" />
+                    <Text style={styles.addPhotoText}>
+                      {isUploading ? "Uploading..." : "Add Photo"}
+                    </Text>
+                  </View>
+                )}
+              </View>
 
               <View style={styles.plusBadge}>
                 {isUploading ? (
                   <ActivityIndicator color="black" />
                 ) : (
-                  <Icon name="add" size={15} color="black" />
+                  <Icon name="add" size={16} color="black" style={styles.plusIcon} />
                 )}
               </View>
             </TouchableOpacity>
@@ -337,18 +337,14 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },
-  subtitle: {
-    color: MUTED,
-    fontSize: ONBOARDING_SUBTITLE_SIZE,
-    marginTop: 9,
-    marginBottom: 10,
-    fontFamily: fonts.book,
-    lineHeight: 22,
-  },
   avatarContainer: {
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 22,
     marginBottom: 12,
+  },
+  avatarTouchable: {
+    width: 132,
+    height: 132,
   },
   avatarCircle: {
     width: 132,
@@ -359,8 +355,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
+    overflow: "hidden",
   },
-  avatarImage: { width: 86, height: 86, borderRadius: 43 },
+  avatarImage: {
+    width: 132,
+    height: 132,
+  },
   placeholderIcon: { alignItems: "center" },
   addPhotoText: {
     color: "rgba(255,255,255,0.4)",
@@ -370,16 +370,21 @@ const styles = StyleSheet.create({
   },
   plusBadge: {
     position: "absolute",
-    bottom: 2,
-    right: 2,
+    bottom: 4,
+    right: 4,
+    zIndex: 2,
     backgroundColor: ACCENT,
     width: 26,
     height: 26,
-    borderRadius: BUTTON_RADIUS,
+    borderRadius: 13,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 3,
     borderColor: "black",
+  },
+  plusIcon: {
+    marginTop: 1,
+    marginLeft: 0.5,
   },
   optionalText: {
     color: "rgba(255,255,255,0.3)",

@@ -7,11 +7,11 @@ import {
   fonts,
 } from "@/constants/Variables";
 import { cropProfilePhoto } from "@/src/lib/cropProfilePhoto";
+import { Image as ExpoImage } from "expo-image";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -36,6 +36,8 @@ const MAX_USER_SCALE = 4;
 
 type Props = {
   imageUri: string;
+  imageWidth?: number;
+  imageHeight?: number;
   processing?: boolean;
   onCancel: () => void;
   onChoose: (croppedUri: string) => void;
@@ -66,6 +68,8 @@ function clampTranslation(
 
 export default function ProfilePhotoCropView({
   imageUri,
+  imageWidth: initialImageWidth,
+  imageHeight: initialImageHeight,
   processing = false,
   onCancel,
   onChoose,
@@ -107,16 +111,25 @@ export default function ProfilePhotoCropView({
 
   useEffect(() => {
     resetTransforms();
-    Image.getSize(
-      imageUri,
-      (width, height) => {
-        setImageSize({ width, height });
-        imageWidth.value = width;
-        imageHeight.value = height;
-      },
-      () => setImageSize(null)
-    );
-  }, [imageUri, imageHeight, imageWidth, resetTransforms]);
+
+    if (initialImageWidth && initialImageHeight) {
+      setImageSize({ width: initialImageWidth, height: initialImageHeight });
+      imageWidth.value = initialImageWidth;
+      imageHeight.value = initialImageHeight;
+      return;
+    }
+
+    setImageSize(null);
+    imageWidth.value = 0;
+    imageHeight.value = 0;
+  }, [
+    imageUri,
+    imageHeight,
+    imageWidth,
+    initialImageHeight,
+    initialImageWidth,
+    resetTransforms,
+  ]);
 
   const composedGesture = useMemo(() => {
     const pinch = Gesture.Pinch()
@@ -187,9 +200,9 @@ export default function ProfilePhotoCropView({
 
   const imageAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
+      { scale: userScale.value },
       { translateX: translateX.value },
       { translateY: translateY.value },
-      { scale: userScale.value },
     ],
   }));
 
@@ -294,10 +307,17 @@ export default function ProfilePhotoCropView({
                     imageAnimatedStyle,
                   ]}
                 >
-                  <Image
+                  <ExpoImage
                     source={{ uri: imageUri }}
                     style={styles.image}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    onLoad={(event) => {
+                      const { width, height } = event.source;
+                      if (!width || !height || imageSize) return;
+                      setImageSize({ width, height });
+                      imageWidth.value = width;
+                      imageHeight.value = height;
+                    }}
                   />
                 </Animated.View>
               ) : (
@@ -368,7 +388,7 @@ const styles = StyleSheet.create({
     height: PROFILE_PHOTO_CROP_SIZE,
     borderRadius: PROFILE_PHOTO_CROP_SIZE / 2,
     overflow: "hidden",
-    backgroundColor: "#111",
+    backgroundColor: "transparent",
     borderWidth: 2,
     borderColor: ACCENT,
     zIndex: 1,

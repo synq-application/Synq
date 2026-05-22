@@ -1,4 +1,5 @@
 import * as ImageManipulator from "expo-image-manipulator";
+import { Image } from "react-native";
 
 export type ProfilePhotoCropParams = {
   imageWidth: number;
@@ -31,6 +32,28 @@ export function computeProfilePhotoCropRect({
   const size = Math.min(width, height);
 
   return { originX, originY, width: size, height: size };
+}
+
+/** Bake EXIF orientation into pixels so preview and crop math use the same dimensions. */
+export async function prepareProfilePhotoForCrop(
+  uri: string
+): Promise<{ uri: string; width: number; height: number }> {
+  const normalized = await ImageManipulator.manipulateAsync(uri, [], {
+    compress: 1,
+    format: ImageManipulator.SaveFormat.JPEG,
+  });
+
+  const { width, height } = await new Promise<{ width: number; height: number }>(
+    (resolve, reject) => {
+      Image.getSize(
+        normalized.uri,
+        (w, h) => resolve({ width: w, height: h }),
+        reject
+      );
+    }
+  );
+
+  return { uri: normalized.uri, width, height };
 }
 
 export async function cropProfilePhoto(

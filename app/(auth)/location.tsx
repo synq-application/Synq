@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import React, { useEffect, useMemo, useState } from "react";
@@ -27,6 +28,7 @@ import {
   BG,
   BUTTON_RADIUS,
   MUTED,
+  MUTED2,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   TEXT,
@@ -298,20 +300,35 @@ export default function LocationDetails() {
             <TouchableOpacity
               onPress={fillFromCurrentLocation}
               disabled={loading || locating || locationPermissionRequesting}
-              activeOpacity={0.85}
-              style={styles.locationRow}
+              activeOpacity={0.75}
+              style={[
+                styles.locationRow,
+                (loading || locating || locationPermissionRequesting) &&
+                  styles.locationRowDisabled,
+              ]}
             >
-              <View style={styles.locationLeft}>
-                <Text style={styles.locationIcon}>📍</Text>
-                <View>
-                  <Text style={styles.locationPrimary}>
-                    Use current location
-                  </Text>
-                  <Text style={styles.locationSecondary}>
-                    Auto-fill your city & state
-                  </Text>
-                </View>
+              <View style={styles.locationIconWrap}>
+                {locating ? (
+                  <ActivityIndicator size="small" color={ACCENT} />
+                ) : (
+                  <Ionicons name="location-outline" size={18} color={ACCENT} />
+                )}
               </View>
+              <View style={styles.locationCopy}>
+                <Text style={styles.locationPrimary}>
+                  {locating
+                    ? "Using current location…"
+                    : "Use current location"}
+                </Text>
+                <Text style={styles.locationSecondary}>
+                  {locating
+                    ? "Finding your city and state"
+                    : "Auto-fill your city and state"}
+                </Text>
+              </View>
+              {!locating && (
+                <Ionicons name="chevron-forward" size={18} color={MUTED2} />
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -408,35 +425,44 @@ const styles = StyleSheet.create({
   locationRow: {
     marginTop: 12,
     borderRadius: BUTTON_RADIUS,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.15)",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 12,
   },
-  locationLeft: {
-    flexDirection: "row",
+  locationRowDisabled: {
+    opacity: 0.55,
+  },
+  locationIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,255,133,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(0,255,133,0.22)",
     alignItems: "center",
-    gap: 10,
+    justifyContent: "center",
   },
-  locationIcon: { fontSize: 16 },
+  locationCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   locationPrimary: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "800",
+    color: TEXT,
+    fontSize: 16,
+    fontFamily: fonts.medium,
+    lineHeight: 22,
   },
   locationSecondary: {
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  locationChevron: {
-    color: ACCENT,
-    fontSize: 22,
-    fontWeight: "900",
+    marginTop: 2,
+    color: MUTED,
+    fontSize: 13,
+    fontFamily: fonts.book,
+    lineHeight: 18,
   },
 
   button: {
@@ -459,6 +485,6 @@ const styles = StyleSheet.create({
   skipText: {
     color: "rgba(255,255,255,0.5)",
     fontSize: 14,
-    fontWeight: "600",
+    fontFamily: fonts.medium,
   },
 });

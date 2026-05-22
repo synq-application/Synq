@@ -520,6 +520,7 @@ export default function RootLayout() {
       (segments[0] === "(auth)" && segments[1] === "location");
     const onInterestsPage = segments[0] === "add-interests";
     const onDetailsPage = segments[1] === "details";
+    const onProfilePhotoCropPage = segments[0] === "profile-photo-crop";
     const onCommunityTermsPage = segments[1] === "community-terms";
     const hasName =
       !!user?.displayName || userProfileGate?.hasDisplayName === true;
@@ -538,7 +539,9 @@ export default function RootLayout() {
     if (userProfileGate === null) return;
 
     if (!hasName) {
-      if (!onDetailsPage) router.replace("/(auth)/details");
+      if (!onDetailsPage && !onProfilePhotoCropPage) {
+        router.replace("/(auth)/details");
+      }
       return;
     }
 
