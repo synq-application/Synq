@@ -290,7 +290,7 @@ export default function RootLayout() {
     let cancelled = false;
     if (synqBootUidRef.current !== user.uid) {
       synqBootUidRef.current = user.uid;
-      setSynqBoot(null);
+      setSynqBoot({ cachedSynqActive: false });
     }
     (async () => {
       let cachedSynqActive = false;
@@ -357,7 +357,14 @@ export default function RootLayout() {
         ]);
         prewarmMeTabScreen(u.uid);
         const cachedGate = profileGateFromCache(u.uid);
-        if (cachedGate) setUserProfileGate(cachedGate);
+        if (cachedGate) {
+          setUserProfileGate(cachedGate);
+        } else {
+          setUserProfileGate({ hasDisplayName: false, hasLocation: false });
+        }
+        void getPreAuthTermsAccepted().then((accepted) => {
+          if (accepted) setCommunityTermsOk(true);
+        });
       } else {
         setUserProfileGate(null);
         setCommunityTermsOk(null);
@@ -711,10 +718,17 @@ export default function RootLayout() {
       (segments[0] === "(auth)" && segments[1] === "location")) &&
       userProfileGate.hasLocation) ||
       (segments[0] === "add-interests" && userProfileGate.hasDisplayName));
+  const inAuthGroup = segments[0] === "(auth)";
+  const inOnboardingAuxRoute =
+    segments[0] === "profile-photo-crop" || segments[0] === "add-interests";
+  const hideBootSplashDuringSignup =
+    !!user && (inAuthGroup || inOnboardingAuxRoute);
+
   const appReady =
     authReady && navReady && assetsReady && synqBootReady && authGateReady;
   const showSplash =
-    !appReady || !minimumSplashElapsed || holdSplashForStaleOnboarding;
+    (!appReady || !minimumSplashElapsed || holdSplashForStaleOnboarding) &&
+    !hideBootSplashDuringSignup;
 
   const locationModals =
     user && authReady ? (
