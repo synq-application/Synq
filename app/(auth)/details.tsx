@@ -6,11 +6,11 @@ import {
   onboardingContentTopPadding,
 } from "@/constants/onboardingLayout";
 import { Image as ExpoImage } from "expo-image";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -42,6 +42,10 @@ import {
   fonts,
 } from "../../constants/Variables";
 import { auth, db, storage } from "../../src/lib/firebase";
+import {
+  consumePendingProfilePhoto,
+  setPendingProfilePhotoSource,
+} from "@/src/lib/pendingProfilePhoto";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
 
@@ -72,7 +76,11 @@ export default function Details() {
   const openPhotoPickerAfterAccess = async () => {
     const result = await launchProfilePhotoPicker();
     if (result.ok) {
-      uploadImage(result.uri);
+      setPendingProfilePhotoSource(result.uri);
+      router.push({
+        pathname: "/profile-photo-crop",
+        params: { onboarding: "1" },
+      });
       return;
     }
     if (result.reason === "denied") {
@@ -117,7 +125,7 @@ export default function Details() {
     await requestPhotoAccessAndPick();
   };
 
-  const uploadImage = async (uri: string) => {
+  const uploadImage = useCallback(async (uri: string) => {
     if (!auth.currentUser) return;
 
     setIsUploading(true);
@@ -140,7 +148,16 @@ export default function Details() {
     } finally {
       setIsUploading(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const cropped = consumePendingProfilePhoto();
+      if (cropped) {
+        void uploadImage(cropped);
+      }
+    }, [uploadImage])
+  );
 
   const saveDetails = async () => {
     if (!auth.currentUser) return;

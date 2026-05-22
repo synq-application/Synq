@@ -50,9 +50,8 @@ export async function launchProfilePhotoPicker(): Promise<ProfilePhotoPickResult
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
-    allowsEditing: true,
-    aspect: [1, 1],
-    quality: 0.7,
+    allowsEditing: false,
+    quality: 1,
   });
 
   if (result.canceled || !result.assets[0]?.uri) {

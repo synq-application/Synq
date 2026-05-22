@@ -33,11 +33,14 @@ import { router, useLocalSearchParams } from "expo-router";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { filterOrReject } from "@/src/lib/contentFilter";
 import {
+  getPhotoLibraryPermission,
   launchProfilePhotoPicker,
+  photoLibraryAccessGranted,
   requestPhotoLibraryAccess,
 } from "@/src/lib/profilePhotoPicker";
+import { setPendingProfilePhotoSource } from "@/src/lib/pendingProfilePhoto";
+import { removeProfilePhoto } from "@/src/lib/uploadProfilePhoto";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import {
@@ -63,8 +66,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import CloseButton from "@/src/components/CloseButton";
+import ProfilePhotoActionSheet from "@/src/components/ProfilePhotoActionSheet";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
-import { auth, db, storage } from "../../src/lib/firebase";
+import { auth, db } from "../../src/lib/firebase";
 import { filterOutPastOpenPlans, matchesPlanEvent } from "../../src/lib/planEvents";
 import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
@@ -202,6 +206,13 @@ export default function ProfileScreen() {
   const [isQRExpanded, setQRExpanded] = useState(false);
   const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
   const [isPickingImage, setIsPickingImage] = useState(false);
+  const [photoMenuVisible, setPhotoMenuVisible] = useState(false);
+  const [photoPermissionPromptVisible, setPhotoPermissionPromptVisible] =
+    useState(false);
+  const photoPermissionRef = useRef<{
+    granted: boolean;
+    status: string;
+  } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string>("");
@@ -545,43 +556,109 @@ export default function ProfileScreen() {
     setPendingInterestDelete(interestName);
   };
 
-  const pickImage = async () => {
+  const openPhotoMenu = useCallback(async () => {
+    const permission = await getPhotoLibraryPermission();
+    photoPermissionRef.current = {
+      granted: photoLibraryAccessGranted(permission),
+      status: permission.status,
+    };
+    setPhotoMenuVisible(true);
+  }, []);
+
+  const navigateToCropWithPhoto = (pickedUri: string) => {
+    setPendingProfilePhotoSource(pickedUri);
+    router.push("/profile-photo-crop");
+  };
+
+  const openPhotoPickerAfterAccess = async () => {
+    const result = await launchProfilePhotoPicker();
+    if (result.ok) {
+      navigateToCropWithPhoto(result.uri);
+      return;
+    }
+    if (result.reason === "denied") {
+      showAlert(
+        "Photo access needed",
+        "Allow photo library access in Settings to update your profile picture."
+      );
+    }
+  };
+
+  const handleUploadPhoto = async () => {
+    const cached = photoPermissionRef.current;
+    if (!cached?.granted) {
+      setPhotoMenuVisible(false);
+      if (cached?.status === "undetermined") {
+        setPhotoPermissionPromptVisible(true);
+        return;
+      }
+      setIsPickingImage(true);
+      try {
+        const granted = await requestPhotoLibraryAccess();
+        photoPermissionRef.current = {
+          granted,
+          status: granted ? "granted" : "denied",
+        };
+        if (!granted) {
+          showAlert(
+            "Photo access needed",
+            "Allow photo library access in Settings to update your profile picture."
+          );
+          return;
+        }
+        const result = await launchProfilePhotoPicker();
+        if (result.ok) {
+          navigateToCropWithPhoto(result.uri);
+        } else if (result.reason === "denied") {
+          showAlert(
+            "Photo access needed",
+            "Allow photo library access in Settings to update your profile picture."
+          );
+        }
+      } catch {
+        showAlert("Error", "Could not open your photo library.");
+      } finally {
+        setAvatarRenderVersion((prev) => prev + 1);
+        setIsPickingImage(false);
+      }
+      return;
+    }
+
     setIsPickingImage(true);
     try {
-      const granted = await requestPhotoLibraryAccess();
-      if (!granted) {
+      const result = await launchProfilePhotoPicker();
+      setPhotoMenuVisible(false);
+
+      if (result.ok) {
+        navigateToCropWithPhoto(result.uri);
+        return;
+      }
+      if (result.reason === "denied") {
         showAlert(
           "Photo access needed",
           "Allow photo library access in Settings to update your profile picture."
         );
-        return;
       }
-
-      const result = await launchProfilePhotoPicker();
-      if (result.ok) {
-        await uploadImage(result.uri);
-      }
+    } catch {
+      setPhotoMenuVisible(false);
+      showAlert("Error", "Could not open your photo library.");
     } finally {
       setAvatarRenderVersion((prev) => prev + 1);
       setIsPickingImage(false);
     }
   };
 
-  const uploadImage = async (uri: string) => {
+  const handleRemovePhoto = async () => {
+    setPhotoMenuVisible(false);
     if (!auth.currentUser) return;
 
     setIsUploading(true);
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const storageRef = ref(storage, `profiles/${auth.currentUser.uid}`);
-      const uploadTask = await uploadBytesResumable(storageRef, blob);
-      const url = await getDownloadURL(uploadTask.ref);
-
-      await updateDoc(doc(db, "users", auth.currentUser.uid), { imageurl: url });
-      setProfileImage(url);
-    } catch (e) {
-      showAlert("Error", "Could not upload image.");
+      await removeProfilePhoto();
+      setProfileImage(null);
+      setAvatarRenderVersion((prev) => prev + 1);
+    } catch {
+      showAlert("Error", "Could not remove profile photo.");
     } finally {
       setIsUploading(false);
     }
@@ -774,7 +851,7 @@ export default function ProfileScreen() {
 
               <View style={styles.avatarGlowWrap}>
                 <ProfilePressable
-                  onPress={pickImage}
+                  onPress={() => void openPhotoMenu()}
                   onLongPress={() => setAvatarPreviewOpen(true)}
                   disabled={isUploading || isPickingImage}
                   contentStyle={styles.imageWrapper}
@@ -1063,6 +1140,40 @@ export default function ProfileScreen() {
           </SafeAreaView>
         </SafeAreaProvider>
       </Modal>
+      <ConfirmModal
+        visible={photoPermissionPromptVisible}
+        title="Photo library access"
+        message="Synq needs access to your photo library so you can choose a profile photo."
+        confirmText="Continue"
+        cancelText="Not now"
+        onCancel={() => setPhotoPermissionPromptVisible(false)}
+        onConfirm={() => {
+          setPhotoPermissionPromptVisible(false);
+          void (async () => {
+            setIsPickingImage(true);
+            try {
+              const granted = await requestPhotoLibraryAccess();
+              photoPermissionRef.current = {
+                granted,
+                status: granted ? "granted" : "denied",
+              };
+              if (!granted) {
+                showAlert(
+                  "Photo access needed",
+                  "Allow photo library access in Settings to update your profile picture."
+                );
+                return;
+              }
+              await openPhotoPickerAfterAccess();
+            } catch {
+              showAlert("Error", "Could not open your photo library.");
+            } finally {
+              setAvatarRenderVersion((prev) => prev + 1);
+              setIsPickingImage(false);
+            }
+          })();
+        }}
+      />
       <AlertModal
   visible={alertVisible}
   title={alertTitle}
@@ -1125,13 +1236,21 @@ export default function ProfileScreen() {
           accessibilityLabel="Settings"
         />
       </ProfileTabHeaderOverlay>
+
+      <ProfilePhotoActionSheet
+        visible={photoMenuVisible}
+        showRemove={Boolean(profileImage)}
+        onClose={() => setPhotoMenuVisible(false)}
+        onUpload={handleUploadPhoto}
+        onRemove={handleRemovePhoto}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   /** Full-width scroll (no gutter scrollbar); sections pad themselves. */
-  screen: { flex: 1, backgroundColor: BG },
+  screen: { flex: 1, backgroundColor: BG, position: "relative" },
   scrollView: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 20,

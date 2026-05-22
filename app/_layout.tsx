@@ -766,6 +766,14 @@ export default function RootLayout() {
                     gestureEnabled: true,
                   }}
                 />
+                <Stack.Screen
+                  name="profile-photo-crop"
+                  options={{
+                    animation: "slide_from_bottom",
+                    presentation: "fullScreenModal",
+                    gestureEnabled: false,
+                  }}
+                />
               </Stack>
             )}
             {locationModals}
