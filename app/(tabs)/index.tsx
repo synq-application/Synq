@@ -138,34 +138,43 @@ function ChatMessageBubble({
   onPress: () => void;
   heartCount: number;
 }) {
-  const [bubbleWidth, setBubbleWidth] = useState<number | undefined>(undefined);
-  const [lineCount, setLineCount] = useState<number | null>(null);
+  const [lineCount, setLineCount] = useState(1);
+  const [multiLineWidth, setMultiLineWidth] = useState<number | undefined>(
+    undefined
+  );
   const fontScale = PixelRatio.getFontScale();
   const padH = Math.round(IMESSAGE_BUBBLE_PADDING_H * fontScale);
   const padV = Math.round(IMESSAGE_BUBBLE_PADDING_V * fontScale);
   const horizontalPad = 2 * padH;
-  const maxText = Math.max(24, bubbleCap - horizontalPad);
+  const innerMax = bubbleCap - horizontalPad;
 
   useEffect(() => {
-    setBubbleWidth(undefined);
-    setLineCount(null);
+    setLineCount(1);
+    setMultiLineWidth(undefined);
   }, [bubbleCap, text]);
 
   const onTextLayout = useCallback(
     (e: NativeSyntheticEvent<TextLayoutEventData>) => {
       const lines = e.nativeEvent.lines;
       if (!lines.length) return;
-      setLineCount(lines.length);
+      const count = lines.length;
+      setLineCount(count);
+      if (count <= 1) {
+        setMultiLineWidth(undefined);
+        return;
+      }
       const longest = Math.max(...lines.map((l) => l.width), 0);
-      const raw = longest > 0 ? longest + horizontalPad : Math.min(text.length * (IMESSAGE_BUBBLE_FONT_SIZE * 0.55), bubbleCap);
-      const next = Math.min(Math.max(raw, horizontalPad + 8), bubbleCap);
-      setBubbleWidth((prev) => (prev === next ? prev : next));
+      if (longest <= 0) return;
+      setMultiLineWidth(
+        Math.min(Math.max(longest + horizontalPad, horizontalPad + 8), bubbleCap)
+      );
     },
-    [bubbleCap, horizontalPad, text]
+    [bubbleCap, horizontalPad]
   );
 
-  const textAlign =
-    lineCount === null ? "left" : lineCount <= 1 ? "center" : "left";
+  const textAlign = isMe && lineCount === 1 ? "center" : "left";
+  const textMaxWidth =
+    multiLineWidth !== undefined ? multiLineWidth - horizontalPad : innerMax;
 
   return (
     <Pressable onPress={onPress}>
@@ -174,9 +183,10 @@ function ChatMessageBubble({
           styles.bubble,
           isMe ? styles.myBubble : styles.theirBubble,
           { paddingHorizontal: padH, paddingVertical: padV },
-          bubbleWidth !== undefined
-            ? { width: bubbleWidth }
-            : { maxWidth: bubbleCap },
+          { maxWidth: bubbleCap, alignSelf: "flex-start" },
+          multiLineWidth !== undefined
+            ? { width: multiLineWidth, flexShrink: 0 }
+            : null,
           { position: "relative", overflow: "visible" },
         ]}
       >
@@ -186,8 +196,7 @@ function ChatMessageBubble({
             styles.bubbleText,
             {
               color: isMe ? "black" : "white",
-              maxWidth:
-                bubbleWidth !== undefined ? bubbleWidth - horizontalPad : maxText,
+              maxWidth: textMaxWidth,
               textAlign,
             },
           ]}
@@ -1662,7 +1671,7 @@ const styles = StyleSheet.create({
   },
   messageBubbleColumn: {
     flexGrow: 0,
-    flexShrink: 1,
+    flexShrink: 0,
   },
   bubble: {
     minHeight: MESSAGE_BUBBLE_MIN_HEIGHT,
