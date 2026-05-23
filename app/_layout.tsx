@@ -1,7 +1,6 @@
 import { Asset } from "expo-asset";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
-import { Image as ExpoImage } from "expo-image";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
 import {
@@ -23,8 +22,10 @@ import React, {
 } from "react";
 import {
   DeviceEventEmitter,
+  Image,
   InteractionManager,
   Platform,
+  StyleSheet,
   View,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -152,6 +153,8 @@ export default function RootLayout() {
   const [authReady, setAuthReady] = useState(false);
   const [assetsReady, setAssetsReady] = useState(false);
   const [minimumSplashElapsed, setMinimumSplashElapsed] = useState(false);
+  const [bootSplashDismissed, setBootSplashDismissed] = useState(false);
+  const nativeSplashHiddenRef = useRef(false);
   const [synqBoot, setSynqBoot] = useState<{
     cachedSynqActive: boolean;
   } | null>(null);
@@ -325,10 +328,11 @@ export default function RootLayout() {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  useEffect(() => {
-    if (!assetsReady) return;
+  const hideNativeSplash = () => {
+    if (nativeSplashHiddenRef.current || !assetsReady) return;
+    nativeSplashHiddenRef.current = true;
     void SplashScreen.hideAsync();
-  }, [assetsReady]);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -718,17 +722,38 @@ export default function RootLayout() {
       (segments[0] === "(auth)" && segments[1] === "location")) &&
       userProfileGate.hasLocation) ||
       (segments[0] === "add-interests" && userProfileGate.hasDisplayName));
-  const inAuthGroup = segments[0] === "(auth)";
-  const inOnboardingAuxRoute =
-    segments[0] === "profile-photo-crop" || segments[0] === "add-interests";
-  const hideBootSplashDuringSignup =
-    !!user && (inAuthGroup || inOnboardingAuxRoute);
-
   const appReady =
     authReady && navReady && assetsReady && synqBootReady && authGateReady;
-  const showSplash =
-    (!appReady || !minimumSplashElapsed || holdSplashForStaleOnboarding) &&
-    !hideBootSplashDuringSignup;
+  const onSignupFlowScreen =
+    segments[1] === "details" ||
+    segments[1] === "community-terms" ||
+    segments[0] === "location" ||
+    (segments[0] === "(auth)" && segments[1] === "location") ||
+    segments[0] === "profile-photo-crop" ||
+    segments[0] === "add-interests";
+  const hideBootSplashDuringSignup =
+    appReady && !!user && onSignupFlowScreen;
+  const shouldDismissBootSplash =
+    !bootSplashDismissed &&
+    !holdSplashForStaleOnboarding &&
+    !hideBootSplashDuringSignup &&
+    appReady &&
+    minimumSplashElapsed;
+
+  useEffect(() => {
+    if (!shouldDismissBootSplash) return;
+    setBootSplashDismissed(true);
+  }, [shouldDismissBootSplash]);
+
+  const showBootSplashOverlay =
+    !hideBootSplashDuringSignup &&
+    (holdSplashForStaleOnboarding ||
+      !bootSplashDismissed);
+
+  useEffect(() => {
+    if (showBootSplashOverlay) return;
+    hideNativeSplash();
+  }, [showBootSplashOverlay, assetsReady]);
 
   const locationModals =
     user && authReady ? (
@@ -753,46 +778,45 @@ export default function RootLayout() {
             value={synqBoot ?? { cachedSynqActive: false }}
           >
             <BlockedUsersProvider>
-            {showSplash ? (
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: BG,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <ExpoImage
-                  source={SPLASH_LOGO}
-                  style={{ width: 300, height: 220 }}
-                  contentFit="contain"
-                  transition={0}
-                  cachePolicy="memory-disk"
-                  accessibilityRole="image"
-                  accessibilityLabel="Synq"
-                />
-              </View>
-            ) : (
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen
-                  name="friend-profile"
-                  options={{
-                    animation: "slide_from_right",
-                    gestureEnabled: true,
-                  }}
-                />
-                <Stack.Screen
-                  name="profile-photo-crop"
-                  options={{
-                    animation: "slide_from_bottom",
-                    presentation: "fullScreenModal",
-                    gestureEnabled: false,
-                  }}
-                />
-              </Stack>
-            )}
+            <View style={styles.root}>
+              {navReady ? (
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen
+                    name="friend-profile"
+                    options={{
+                      animation: "slide_from_right",
+                      gestureEnabled: true,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="profile-photo-crop"
+                    options={{
+                      animation: "slide_from_bottom",
+                      presentation: "fullScreenModal",
+                      gestureEnabled: false,
+                    }}
+                  />
+                </Stack>
+              ) : null}
+              {showBootSplashOverlay ? (
+                <View
+                  style={styles.bootSplashOverlay}
+                  onLayout={hideNativeSplash}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  <Image
+                    source={SPLASH_LOGO}
+                    style={styles.bootSplashLogo}
+                    resizeMode="contain"
+                    accessibilityRole="image"
+                    accessibilityLabel="Synq"
+                  />
+                </View>
+              ) : null}
+            </View>
             {locationModals}
             </BlockedUsersProvider>
           </SynqBootProvider>
@@ -801,3 +825,18 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  bootSplashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: BG,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 999,
+  },
+  bootSplashLogo: {
+    width: 300,
+    height: 220,
+  },
+});
