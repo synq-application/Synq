@@ -126,6 +126,7 @@ export function pruneSocialCachesToFriendIds(userId: string, friendIds: Set<stri
 }
 
 async function buildMutualFriendsIndex(
+  viewerId: string,
   myFriendIds: string[],
   profileCache: Record<string, Friend>
 ): Promise<Record<string, Friend[]>> {
@@ -142,7 +143,7 @@ async function buildMutualFriendsIndex(
         );
         theirFriendsSnap.docs.forEach((d) => {
           const targetId = d.id;
-          if (targetId === fid || !myFriendSet.has(targetId)) return;
+          if (targetId === fid || targetId === viewerId || myFriendSet.has(targetId)) return;
           let bucket = byTarget.get(targetId);
           if (!bucket) {
             bucket = new Map();
@@ -307,6 +308,7 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
     friendsListCacheByUser[userId] = sortedFriends;
     connectionsCacheByUser[userId] = connections;
     mutualFriendsCacheByUser[userId] = await buildMutualFriendsIndex(
+      userId,
       sortedFriends.map((f) => f.id),
       profileCache
     );
@@ -412,6 +414,76 @@ export async function warmSuggestedCache(userId: string): Promise<void> {
   } finally {
     warmSuggestedInFlight[userId] = undefined;
   }
+}
+
+export function resolveMutualFriendCount(
+  viewerId: string,
+  targetId: string,
+  fallback?: unknown
+): number {
+  const cached = mutualFriendsCacheByUser[viewerId]?.[targetId];
+  if (cached) return cached.length;
+  if (typeof fallback === "number" && Number.isFinite(fallback)) return fallback;
+  return 0;
+}
+
+export async function countMutualFriendsForTarget(
+  viewerId: string,
+  targetId: string
+): Promise<number> {
+  if (!viewerId || !targetId || viewerId === targetId) return 0;
+
+  const cached = mutualFriendsCacheByUser[viewerId]?.[targetId];
+  if (cached) return cached.length;
+
+  const myFriendIds = (
+    friendsListCacheByUser[viewerId]?.map((f) => f.id) ??
+    (await getDocs(collection(db, "users", viewerId, "friends"))).docs.map((d) => d.id)
+  ).filter((id) => id !== targetId);
+
+  const profileCache = friendProfileCacheByUser[viewerId] ?? {};
+  const mutualProfiles: Friend[] = [];
+
+  await Promise.all(
+    myFriendIds.map(async (fid) => {
+      try {
+        const snap = await getDoc(doc(db, "users", fid, "friends", targetId));
+        if (!snap.exists()) return;
+        const cachedProfile = profileCache[fid];
+        if (cachedProfile) {
+          mutualProfiles.push(cachedProfile);
+          return;
+        }
+        const userSnap = await getDoc(doc(db, "users", fid));
+        if (userSnap.exists()) {
+          mutualProfiles.push({ id: fid, ...(userSnap.data() as object) } as Friend);
+        }
+      } catch {
+        /* skip unreadable edge */
+      }
+    })
+  );
+
+  const sorted = sortFriendsByName(mutualProfiles);
+  if (!mutualFriendsCacheByUser[viewerId]) {
+    mutualFriendsCacheByUser[viewerId] = {};
+  }
+  mutualFriendsCacheByUser[viewerId][targetId] = sorted;
+  return sorted.length;
+}
+
+export async function hydrateMutualCountsForUsers(
+  viewerId: string,
+  targetIds: string[]
+): Promise<Record<string, number>> {
+  const uniqueIds = [...new Set(targetIds.filter(Boolean))];
+  const counts: Record<string, number> = {};
+  await Promise.all(
+    uniqueIds.map(async (targetId) => {
+      counts[targetId] = await countMutualFriendsForTarget(viewerId, targetId);
+    })
+  );
+  return counts;
 }
 
 export function warmSocialCachesInBackground(userId: string) {

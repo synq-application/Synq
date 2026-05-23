@@ -112,6 +112,8 @@ import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvent
 import {
   friendProfileCacheByUser,
   friendsListCacheByUser,
+  hydrateMutualCountsForUsers,
+  resolveMutualFriendCount,
   setCachedOutgoingFriendRequest,
   suggestedCacheByUser,
   syncOutgoingFriendRequestsCache,
@@ -986,12 +988,15 @@ function SearchModal({
     message: string;
   } | null>(null);
   const [pendingCancelTarget, setPendingCancelTarget] = useState<any | null>(null);
+  const [mutualCountsByUserId, setMutualCountsByUserId] = useState<
+    Record<string, number>
+  >({});
 
-  const getResultSubtitle = (user: any) => {
+  const formatMutualFriendsSubtitle = (user: any) => {
+    const myId = auth.currentUser?.uid ?? "";
     const mutualCount =
-      typeof user?.mutualCount === "number" && Number.isFinite(user.mutualCount)
-        ? user.mutualCount
-        : 0;
+      mutualCountsByUserId[user.id] ??
+      resolveMutualFriendCount(myId, user.id, user?.mutualCount);
     return `${mutualCount} mutual ${mutualCount === 1 ? "friend" : "friends"}`;
   };
 
@@ -1007,6 +1012,7 @@ function SearchModal({
   useEffect(() => {
     if (!visible) {
       setPendingCancelTarget(null);
+      setMutualCountsByUserId({});
       return;
     }
     setQueryText("");
@@ -1317,6 +1323,22 @@ function SearchModal({
       suggested.filter((u) => !incomingIds.has(u.id) && !outgoingIds.has(u.id)),
     [suggested, incomingIds, outgoingIds]
   );
+
+  useEffect(() => {
+    if (!visible || !auth.currentUser) return;
+    const myId = auth.currentUser.uid;
+    const targetIds = [...pymkSuggested, ...results].map((user) => user.id);
+    if (targetIds.length === 0) return;
+
+    let cancelled = false;
+    void hydrateMutualCountsForUsers(myId, targetIds).then((counts) => {
+      if (cancelled) return;
+      setMutualCountsByUserId((prev) => ({ ...prev, ...counts }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, pymkSuggested, results]);
 
   const addFriendsSections = useMemo(() => {
     const sections: {
@@ -1727,14 +1749,10 @@ function SearchModal({
         />
       );
     }
-    const mutualCount =
-      typeof item?.mutualCount === "number" && Number.isFinite(item.mutualCount)
-        ? item.mutualCount
-        : 0;
     return (
       <AddFriendsUserRow
         item={item}
-        subtitle={`${mutualCount} mutual ${mutualCount === 1 ? "friend" : "friends"}`}
+        subtitle={formatMutualFriendsSubtitle(item)}
         onPressProfile={() => openProfile(item)}
         trailing={renderSuggestedActions(item)}
       />
@@ -1863,7 +1881,7 @@ function SearchModal({
               renderItem={({ item }) => (
                 <AddFriendsUserRow
                   item={item}
-                  subtitle={getResultSubtitle(item)}
+                  subtitle={formatMutualFriendsSubtitle(item)}
                   onPressProfile={() => openProfile(item)}
                   trailing={renderSearchResultActions(item)}
                 />
