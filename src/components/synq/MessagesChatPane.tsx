@@ -1,12 +1,13 @@
 import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
-import { ACCENT, MUTED, MUTED2, ON_ACCENT_TEXT } from "@/constants/Variables";
+import { ACCENT, MUTED2, ON_ACCENT_TEXT } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import * as Haptics from "expo-haptics";
-import React, { useMemo } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import {
   FlatList,
+  InteractionManager,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -16,8 +17,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatTime, parseIdeaText, resolveAvatar } from "../../../app/helpers";
+
+const MESSAGE_ENTER = FadeInUp.duration(200);
 
 type Props = {
   styles: any;
@@ -26,8 +30,10 @@ type Props = {
   getChatTitle: (chat: any) => string;
   rotatingAIText: string;
   pendingScrollToMessageId: string | null;
+  setPendingScrollToMessageId: (value: string | null) => void;
   flatListRef: React.RefObject<FlatList<any> | null>;
   messages: any[];
+  messagesReady: boolean;
   showAICard: boolean;
   aiResponse: string;
   inputText: string;
@@ -77,8 +83,10 @@ export default function MessagesChatPane({
   getChatTitle,
   rotatingAIText,
   pendingScrollToMessageId,
+  setPendingScrollToMessageId,
   flatListRef,
   messages,
+  messagesReady,
   showAICard,
   aiResponse,
   inputText,
@@ -100,16 +108,277 @@ export default function MessagesChatPane({
 }: Props) {
   const insets = useSafeAreaInsets();
   const canSend = inputText.trim().length > 0;
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  const chatSeededRef = useRef(false);
+  const initialScrollDoneRef = useRef(false);
+  const lastMessageCountRef = useRef(0);
   const headerAvatarUri = useMemo(
     () => getHeaderAvatarUri(activeChat, currentUserId),
     [activeChat, currentUserId]
   );
+
+  useEffect(() => {
+    knownMessageIdsRef.current = new Set();
+    chatSeededRef.current = false;
+    initialScrollDoneRef.current = false;
+    lastMessageCountRef.current = 0;
+  }, [activeChat?.id]);
+
+  useLayoutEffect(() => {
+    if (!messagesReady || messages.length === 0) {
+      if (messagesReady && messages.length === 0) {
+        chatSeededRef.current = true;
+      }
+      return;
+    }
+
+    if (!chatSeededRef.current) {
+      messages.forEach((message) => knownMessageIdsRef.current.add(message.id));
+      chatSeededRef.current = true;
+    }
+  }, [messages, messagesReady]);
+
+  useEffect(() => {
+    if (!messagesReady || messages.length === 0) return;
+
+    if (!initialScrollDoneRef.current) {
+      initialScrollDoneRef.current = true;
+      lastMessageCountRef.current = messages.length;
+      const task = InteractionManager.runAfterInteractions(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      });
+      return () => task.cancel();
+    }
+
+    if (
+      messages.length > lastMessageCountRef.current &&
+      !pendingScrollToMessageId
+    ) {
+      lastMessageCountRef.current = messages.length;
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      });
+    }
+  }, [
+    messagesReady,
+    messages.length,
+    pendingScrollToMessageId,
+    flatListRef,
+  ]);
+
+  useEffect(() => {
+    if (!pendingScrollToMessageId || !messagesReady || !messages.length) return;
+
+    const targetIndex = messages.findIndex(
+      (message) => message.id === pendingScrollToMessageId
+    );
+    if (targetIndex < 0) return;
+
+    const timer = setTimeout(() => {
+      try {
+        flatListRef.current?.scrollToIndex({
+          index: targetIndex,
+          animated: true,
+          viewPosition: 0.4,
+        });
+      } catch {
+        try {
+          flatListRef.current?.scrollToIndex({
+            index: targetIndex,
+            animated: true,
+          });
+        } catch {}
+      }
+      setPendingScrollToMessageId(null);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [
+    pendingScrollToMessageId,
+    messagesReady,
+    messages,
+    flatListRef,
+    setPendingScrollToMessageId,
+  ]);
+
+  const shouldAnimateMessage = useCallback((messageId: string) => {
+    if (!chatSeededRef.current || knownMessageIdsRef.current.has(messageId)) {
+      return false;
+    }
+    knownMessageIdsRef.current.add(messageId);
+    return true;
+  }, []);
 
   const handleSend = () => {
     if (!canSend) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sendMessage();
   };
+
+  const renderMessage = useCallback(
+    ({ item }: { item: any }) => {
+      const animateEntry = shouldAnimateMessage(item.id);
+      const isMe = item.senderId === currentUserId;
+      const isSystemIdea =
+        item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
+      const senderAvatar = resolveAvatar(
+        activeChat?.participantImages?.[item.senderId] || item.imageurl
+      );
+      const RowWrapper = animateEntry ? Animated.View : View;
+      const rowWrapperProps = animateEntry ? { entering: MESSAGE_ENTER } : {};
+
+      if (isSystemIdea) {
+        const { name, address } = parseIdeaText(item.text);
+        const ideaHeartCount =
+          item.reactions &&
+          Object.values(item.reactions).filter((v) => v === "heart").length;
+
+        return (
+          <RowWrapper {...rowWrapperProps}>
+            <View style={styles.centeredIdeaContainer}>
+              <View style={{ width: "85%", alignSelf: "center" }}>
+                <Pressable
+                  onPress={() =>
+                    onIdeaBubblePress(
+                      { id: item.id, reactions: item.reactions },
+                      { name, address }
+                    )
+                  }
+                >
+                  <View
+                    style={[
+                      styles.ideaBubble,
+                      { width: "100%", position: "relative", overflow: "visible" },
+                    ]}
+                  >
+                    {item.venueImage ? (
+                      <ExpoImage
+                        source={{ uri: item.venueImage }}
+                        style={styles.ideaImage}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={0}
+                        recyclingKey={item.venueImage}
+                      />
+                    ) : null}
+                    <Text style={styles.ideaText}>{item.text}</Text>
+                    {ideaHeartCount ? (
+                      <View style={styles.heartReaction}>
+                        {Array.from({ length: ideaHeartCount }, (_, i) => (
+                          <Ionicons
+                            key={i}
+                            name="heart"
+                            size={14}
+                            color="#FF2D55"
+                            style={{ marginLeft: i > 0 ? 3 : 0 }}
+                          />
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                </Pressable>
+              </View>
+
+              <Text style={styles.timestampCentered}>{formatTime(item.createdAt)}</Text>
+            </View>
+          </RowWrapper>
+        );
+      }
+
+      const bubbleCap = iMessageBubbleColumnMaxWidth(windowWidth, isMe);
+      const heartCount =
+        item.reactions &&
+        Object.values(item.reactions).filter((v) => v === "heart").length;
+
+      return (
+        <RowWrapper {...rowWrapperProps}>
+          <View
+            style={[
+              styles.msgContainer,
+              {
+                alignItems: isMe ? "flex-end" : "flex-start",
+              },
+            ]}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-end",
+              }}
+            >
+              {!isMe && (
+                <ExpoImage
+                  source={{ uri: senderAvatar }}
+                  style={styles.chatAvatar}
+                  cachePolicy="memory-disk"
+                  transition={0}
+                  recyclingKey={senderAvatar}
+                />
+              )}
+
+              <View
+                style={[
+                  styles.messageBubbleColumn,
+                  {
+                    maxWidth: bubbleCap,
+                    alignSelf: isMe ? "flex-end" : "flex-start",
+                    alignItems: isMe ? "flex-end" : "flex-start",
+                  },
+                ]}
+              >
+                <Pressable
+                  onLongPress={() =>
+                    onMessageLongPress?.({
+                      id: item.id,
+                      senderId: item.senderId,
+                      text: item.text,
+                    })
+                  }
+                  delayLongPress={400}
+                >
+                  <ChatMessageBubble
+                    text={item.text}
+                    bubbleCap={bubbleCap}
+                    isMe={isMe}
+                    heartCount={heartCount || 0}
+                    onPress={() =>
+                      onMessageBubblePress({
+                        id: item.id,
+                        reactions: item.reactions,
+                      })
+                    }
+                  />
+                </Pressable>
+              </View>
+            </View>
+            <Text
+              style={[
+                styles.chatTimestamp,
+                {
+                  marginLeft: isMe ? 0 : 44,
+                  alignSelf: isMe ? "flex-end" : "flex-start",
+                },
+              ]}
+            >
+              {formatTime(item.createdAt)}
+            </Text>
+          </View>
+        </RowWrapper>
+      );
+    },
+    [
+      activeChat?.participantImages,
+      ChatMessageBubble,
+      currentUserId,
+      iMessageBubbleColumnMaxWidth,
+      onIdeaBubblePress,
+      onMessageBubblePress,
+      onMessageLongPress,
+      shouldAnimateMessage,
+      styles,
+      windowWidth,
+    ]
+  );
 
   return (
     <View style={styles.modalBg}>
@@ -177,32 +446,32 @@ export default function MessagesChatPane({
       >
         <View style={styles.chatBody}>
           <FlatList
+            key={activeChat?.id ?? "chat"}
             ref={flatListRef}
             style={styles.chatList}
-            data={messages}
+            data={messagesReady ? messages : []}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
+            removeClippedSubviews={false}
+            initialNumToRender={Math.min(messages.length || 20, 30)}
+            maxToRenderPerBatch={20}
+            windowSize={Math.min(messages.length || 10, 15)}
             ListEmptyComponent={
-              <View style={styles.chatEmptyWrap}>
-                <View style={styles.chatEmptyIconWrap}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={26} color={ACCENT} />
+              messagesReady ? (
+                <View style={styles.chatEmptyWrap}>
+                  <View style={styles.chatEmptyIconWrap}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={26} color={ACCENT} />
+                  </View>
+                  <Text style={styles.chatEmptyTitle}>Start the conversation</Text>
+                  <Text style={styles.chatEmptyText}>
+                    Say hi to kick this Synq off.
+                  </Text>
                 </View>
-                <Text style={styles.chatEmptyTitle}>Start the conversation</Text>
-                <Text style={styles.chatEmptyText}>
-                  Say hi to kick this Synq off.
-                </Text>
-              </View>
+              ) : null
             }
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() => {
-              if (pendingScrollToMessageId) return;
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }}
-            onLayout={() => {
-              if (pendingScrollToMessageId) return;
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }}
+            renderItem={renderMessage}
             onScrollToIndexFailed={(info) => {
               setTimeout(() => {
                 try {
@@ -214,148 +483,11 @@ export default function MessagesChatPane({
                 } catch {}
               }, 350);
             }}
-            renderItem={({ item }) => {
-              const isMe = item.senderId === currentUserId;
-              const isSystemIdea =
-                item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
-              const senderAvatar = resolveAvatar(
-                activeChat?.participantImages?.[item.senderId] || item.imageurl
-              );
-              if (isSystemIdea) {
-                const { name, address } = parseIdeaText(item.text);
-                const ideaHeartCount =
-                  item.reactions &&
-                  Object.values(item.reactions).filter((v) => v === "heart")
-                    .length;
-
-                return (
-                  <View style={styles.centeredIdeaContainer}>
-                    <View style={{ width: "85%", alignSelf: "center" }}>
-                      <Pressable
-                        onPress={() =>
-                          onIdeaBubblePress(
-                            { id: item.id, reactions: item.reactions },
-                            { name, address }
-                          )
-                        }
-                      >
-                        <View
-                          style={[
-                            styles.ideaBubble,
-                            { width: "100%", position: "relative", overflow: "visible" },
-                          ]}
-                        >
-                          {item.venueImage ? (
-                            <ExpoImage
-                              source={{ uri: item.venueImage }}
-                              style={styles.ideaImage}
-                              contentFit="cover"
-                              cachePolicy="memory-disk"
-                              transition={0}
-                              recyclingKey={item.venueImage}
-                            />
-                          ) : null}
-                          <Text style={styles.ideaText}>{item.text}</Text>
-                          {ideaHeartCount ? (
-                            <View style={styles.heartReaction}>
-                              {Array.from({ length: ideaHeartCount }, (_, i) => (
-                                <Ionicons
-                                  key={i}
-                                  name="heart"
-                                  size={14}
-                                  color="#FF2D55"
-                                  style={{ marginLeft: i > 0 ? 3 : 0 }}
-                                />
-                              ))}
-                            </View>
-                          ) : null}
-                        </View>
-                      </Pressable>
-                    </View>
-
-                    <Text style={styles.timestampCentered}>{formatTime(item.createdAt)}</Text>
-                  </View>
-                );
-              }
-              const bubbleCap = iMessageBubbleColumnMaxWidth(windowWidth, isMe);
-              const heartCount =
-                item.reactions &&
-                Object.values(item.reactions).filter((v) => v === "heart").length;
-              return (
-                <View
-                  style={[
-                    styles.msgContainer,
-                    {
-                      alignItems: isMe ? "flex-end" : "flex-start",
-                    },
-                  ]}
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "flex-end",
-                    }}
-                  >
-                    {!isMe && (
-                      <ExpoImage
-                        source={{ uri: senderAvatar }}
-                        style={styles.chatAvatar}
-                        cachePolicy="memory-disk"
-                        transition={0}
-                        recyclingKey={senderAvatar}
-                      />
-                    )}
-
-                    <View
-                      style={[
-                        styles.messageBubbleColumn,
-                        {
-                          maxWidth: bubbleCap,
-                          alignSelf: isMe ? "flex-end" : "flex-start",
-                          alignItems: isMe ? "flex-end" : "flex-start",
-                        },
-                      ]}
-                    >
-                      <Pressable
-                        onLongPress={() =>
-                          onMessageLongPress?.({
-                            id: item.id,
-                            senderId: item.senderId,
-                            text: item.text,
-                          })
-                        }
-                        delayLongPress={400}
-                      >
-                        <ChatMessageBubble
-                          text={item.text}
-                          bubbleCap={bubbleCap}
-                          isMe={isMe}
-                          heartCount={heartCount || 0}
-                          onPress={() =>
-                            onMessageBubblePress({
-                              id: item.id,
-                              reactions: item.reactions,
-                            })
-                          }
-                        />
-                      </Pressable>
-                    </View>
-                  </View>
-                  <Text
-                    style={[
-                      styles.chatTimestamp,
-                      {
-                        marginLeft: isMe ? 0 : 44,
-                        alignSelf: isMe ? "flex-end" : "flex-start",
-                      },
-                    ]}
-                  >
-                    {formatTime(item.createdAt)}
-                  </Text>
-                </View>
-              );
-            }}
-            contentContainerStyle={styles.chatListContent}
+            contentContainerStyle={
+              messagesReady && messages.length > 0
+                ? styles.chatListContent
+                : [styles.chatListContent, styles.chatListContentEmpty]
+            }
           />
 
           {showAICard && (

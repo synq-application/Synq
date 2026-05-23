@@ -19,7 +19,7 @@ import {
   where
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   Animated,
   DeviceEventEmitter,
@@ -37,8 +37,6 @@ import {
   useWindowDimensions,
   Vibration,
   View,
-  type NativeSyntheticEvent,
-  type TextLayoutEventData,
 } from 'react-native';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -138,43 +136,10 @@ function ChatMessageBubble({
   onPress: () => void;
   heartCount: number;
 }) {
-  const [lineCount, setLineCount] = useState(1);
-  const [multiLineWidth, setMultiLineWidth] = useState<number | undefined>(
-    undefined
-  );
   const fontScale = PixelRatio.getFontScale();
   const padH = Math.round(IMESSAGE_BUBBLE_PADDING_H * fontScale);
   const padV = Math.round(IMESSAGE_BUBBLE_PADDING_V * fontScale);
-  const horizontalPad = 2 * padH;
-  const innerMax = bubbleCap - horizontalPad;
-
-  useEffect(() => {
-    setLineCount(1);
-    setMultiLineWidth(undefined);
-  }, [bubbleCap, text]);
-
-  const onTextLayout = useCallback(
-    (e: NativeSyntheticEvent<TextLayoutEventData>) => {
-      const lines = e.nativeEvent.lines;
-      if (!lines.length) return;
-      const count = lines.length;
-      setLineCount(count);
-      if (count <= 1) {
-        setMultiLineWidth(undefined);
-        return;
-      }
-      const longest = Math.max(...lines.map((l) => l.width), 0);
-      if (longest <= 0) return;
-      setMultiLineWidth(
-        Math.min(Math.max(longest + horizontalPad, horizontalPad + 8), bubbleCap)
-      );
-    },
-    [bubbleCap, horizontalPad]
-  );
-
-  const textAlign = isMe && lineCount === 1 ? "center" : "left";
-  const textMaxWidth =
-    multiLineWidth !== undefined ? multiLineWidth - horizontalPad : innerMax;
+  const innerMax = bubbleCap - 2 * padH;
 
   return (
     <Pressable onPress={onPress}>
@@ -184,20 +149,16 @@ function ChatMessageBubble({
           isMe ? styles.myBubble : styles.theirBubble,
           { paddingHorizontal: padH, paddingVertical: padV },
           { maxWidth: bubbleCap, alignSelf: "flex-start" },
-          multiLineWidth !== undefined
-            ? { width: multiLineWidth, flexShrink: 0 }
-            : null,
           { position: "relative", overflow: "visible" },
         ]}
       >
         <Text
-          onTextLayout={onTextLayout}
           style={[
             styles.bubbleText,
             {
               color: isMe ? "black" : "white",
-              maxWidth: textMaxWidth,
-              textAlign,
+              maxWidth: innerMax,
+              textAlign: "left",
             },
           ]}
         >
@@ -259,6 +220,7 @@ export default function SynqScreen() {
   } | null>(null);
   const [allChats, setAllChats] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [messagesReady, setMessagesReady] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isAILoading, setIsAILoading] = useState(false);
   const [showAICard, setShowAICard] = useState(false);
@@ -497,31 +459,10 @@ export default function SynqScreen() {
 
   useEffect(() => {
     if (!pendingScrollToMessageId) return;
-    if (!messages.length) return;
-    const idx = messages.findIndex((m) => m.id === pendingScrollToMessageId);
-    if (idx < 0) return;
-    const t = setTimeout(() => {
-      try {
-        flatListRef.current?.scrollToIndex({
-          index: idx,
-          animated: true,
-          viewPosition: 0.4,
-        });
-      } catch {
-        try {
-          flatListRef.current?.scrollToIndex({ index: idx, animated: true });
-        } catch {}
-      }
-      setPendingScrollToMessageId(null);
-    }, 400);
-    return () => clearTimeout(t);
-  }, [pendingScrollToMessageId, messages]);
-
-  useEffect(() => {
-    if (!pendingScrollToMessageId) return;
+    if (!messagesReady || !messages.length) return;
     const failSafe = setTimeout(() => setPendingScrollToMessageId(null), 10000);
     return () => clearTimeout(failSafe);
-  }, [pendingScrollToMessageId]);
+  }, [pendingScrollToMessageId, messagesReady, messages.length]);
   useEffect(() => {
     if (isExploreVisible) {
       Keyboard.dismiss();
@@ -689,7 +630,13 @@ export default function SynqScreen() {
   }, [status, user?.uid]);
 
   useEffect(() => {
-    if (!activeChatId || !isChatPaneOpen) return;
+    if (!activeChatId || !isChatPaneOpen) {
+      setMessagesReady(false);
+      return;
+    }
+
+    setMessages([]);
+    setMessagesReady(false);
     const q = query(collection(db, 'chats', activeChatId, 'messages'), orderBy('createdAt', 'asc'));
 
     return onSnapshot(
@@ -697,14 +644,12 @@ export default function SynqScreen() {
       (snap) => {
         const newMessages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         setMessages(newMessages);
-
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
+        setMessagesReady(true);
       },
       (error) => {
         ignoreSnapshotPermissionDenied(error);
         setMessages([]);
+        setMessagesReady(false);
         setActiveChatId(null);
         setMessagesPane("inbox");
       }
@@ -1243,6 +1188,7 @@ export default function SynqScreen() {
               pendingScrollToMessageId={pendingScrollToMessageId}
               flatListRef={flatListRef}
               messages={messages}
+              messagesReady={messagesReady}
               showAICard={showAICard}
               aiResponse={aiResponse}
               inputText={inputText}
@@ -1254,6 +1200,7 @@ export default function SynqScreen() {
               setIsExploreVisible={setIsExploreVisible}
               sendMessage={sendMessage}
               sendAISuggestionToChat={sendAISuggestionToChat}
+              setPendingScrollToMessageId={setPendingScrollToMessageId}
               onMessageBubblePress={onMessageBubblePress}
               onMessageLongPress={(item) => {
                 if (item.senderId === auth.currentUser?.uid) return;
@@ -1682,6 +1629,7 @@ const styles = StyleSheet.create({
   bubbleText: {
     fontSize: IMESSAGE_BUBBLE_FONT_SIZE,
     lineHeight: IMESSAGE_BUBBLE_LINE_HEIGHT,
+    textAlign: "left",
   },
   myBubble: {
     backgroundColor: ACCENT,
@@ -1747,10 +1695,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   chatListContent: {
-    flexGrow: 1,
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 12,
     paddingBottom: 12,
+  },
+  chatListContentEmpty: {
+    flexGrow: 1,
+    justifyContent: "center",
   },
   composerDock: {
     borderTopWidth: StyleSheet.hairlineWidth,
