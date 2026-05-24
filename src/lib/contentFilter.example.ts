@@ -1,6 +1,5 @@
-const BLOCKED_TERMS: string[] = [
-  // Added terms locally
-];
+/** Copy to src/lib/contentFilter.ts locally (gitignored). Do not commit real terms here. */
+const BLOCKED_TERMS: string[] = [];
 
 const LEET_MAP: Record<string, string> = {
   "@": "a",

@@ -19,6 +19,8 @@
       "buildNumber": "4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Synq needs access to your photo library so you can choose a profile photo.",
+        "NSLocationWhenInUseUsageDescription": "Synq uses your location when you choose to auto-fill your city and state, and for nearby hangout suggestions when you use those features.",
         "UIBackgroundModes": [
           "remote-notification"
         ]
@@ -42,7 +44,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Synq uses your location for nearby hangout suggestions and place search when you use those features."
+          "locationWhenInUsePermission": "Synq uses your location when you choose to auto-fill your city and state, and for nearby hangout suggestions when you use those features."
         }
       ],
       [
