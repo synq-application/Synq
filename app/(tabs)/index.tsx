@@ -1117,7 +1117,6 @@ export default function SynqScreen() {
             setMemo={setMemo}
             onStartSynq={startSynq}
             isStartingSynq={isStartingSynq}
-            styles={styles}
           />
         )}
         <Modal visible={messagesModalVisible} animationType="slide" presentationStyle="pageSheet">
