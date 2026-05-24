@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import Reanimated, { FadeOut } from 'react-native-reanimated';
 import {
   Animated,
   DeviceEventEmitter,
@@ -87,6 +88,7 @@ import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
 import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
 import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
+import SynqActivatingView from '../synq-screens/SynqActivatingView';
 
 function prefetchParticipantAvatars(chat: { participantImages?: Record<string, unknown> } | null | undefined) {
   const images = chat?.participantImages || {};
@@ -699,17 +701,11 @@ export default function SynqScreen() {
     let timer: any;
     if (status === 'activating') {
       timer = setTimeout(() => {
-        Vibration.vibrate(100);
         setSynqStatus(setSynq, 'finding');
-      }, 2000);
+      }, 1800);
     } else if (status === 'finding') {
       timer = setTimeout(() => {
-        Vibration.vibrate(100);
-        setSynqStatus(setSynq, 'optimizing');
-      }, 2000);
-    } else if (status === 'optimizing') {
-      timer = setTimeout(() => {
-        Vibration.vibrate(500);
+        Vibration.vibrate(400);
         setSynqStatus(setSynq, 'active');
       }, 2000);
     }
@@ -1067,6 +1063,9 @@ export default function SynqScreen() {
   const bootActive = synqBoot?.cachedSynqActive === true;
   if (!hydrated && !bootActive) return <View style={styles.darkFill} />;
 
+  const isActivating =
+    status === "activating" || status === "finding";
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={[styles.container, tabletContentStyle]}>
@@ -1093,31 +1092,27 @@ export default function SynqScreen() {
           />
           </>
         )}
-        {(status === 'activating' || status === 'finding' || status === 'optimizing') && (
-          <View style={styles.activatingContainer}>
-            <Text style={styles.unifiedTitle}>
-              {status === 'activating'
-                ? 'Synq activated...'
-                : status === 'finding'
-                  ? 'Finding connections...'
-                  : 'Optimizing your network...'}
-            </Text>
-            <ExpoImage
-              source={require('../../assets/pulse.gif')}
-              style={styles.gifLarge}
-              contentFit="contain"
-              transition={0}
-              cachePolicy="memory-disk"
-            />
+        {(isActivating || (status === "idle" && hydrated)) && (
+          <View style={styles.synqHomeLayer}>
+            {isActivating && (
+              <View style={StyleSheet.absoluteFill}>
+                <SynqActivatingView status={status} />
+              </View>
+            )}
+            {status === "idle" && hydrated && (
+              <Reanimated.View
+                exiting={FadeOut.duration(520)}
+                style={StyleSheet.absoluteFill}
+              >
+                <InactiveSynqView
+                  memo={memo}
+                  setMemo={setMemo}
+                  onStartSynq={startSynq}
+                  isStartingSynq={isStartingSynq}
+                />
+              </Reanimated.View>
+            )}
           </View>
-        )}
-        {status === "idle" && hydrated && (
-          <InactiveSynqView
-            memo={memo}
-            setMemo={setMemo}
-            onStartSynq={startSynq}
-            isStartingSynq={isStartingSynq}
-          />
         )}
         <Modal visible={messagesModalVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={styles.modalBg}>
@@ -1469,9 +1464,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnText: { fontSize: 16, color: ON_ACCENT_TEXT, fontFamily: fonts.heavy },
-  activatingContainer: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
-  unifiedTitle: { color: 'white', fontSize: 28, fontFamily: fonts.medium, marginBottom: 36, textAlign: 'center', paddingHorizontal: 24 },
-  gifLarge: { width: 280, height: 280 },
+  synqHomeLayer: {
+    flex: 1,
+  },
   inactiveCenter: {
     flex: 1,
     alignItems: 'center',
