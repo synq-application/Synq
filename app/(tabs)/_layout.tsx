@@ -141,13 +141,13 @@ const styles = StyleSheet.create({
   },
 
   synqButtonActive: {
-    transform: [{ scale: 1.05 }],
+    transform: [{ scale: 1.03 }],
     borderWidth: 0,
     shadowColor: ACCENT,
-    shadowOpacity: 0.42,
-    shadowRadius: 16,
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 12,
+    elevation: 8,
   },
 
   synqIcon: {

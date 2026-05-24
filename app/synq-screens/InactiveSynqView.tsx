@@ -98,7 +98,7 @@ export default function InactiveSynqView({
               See who's <Text style={styles.heroAccent}>free.</Text>
             </Text>
             <Text style={styles.heroSubtitle}>
-              Tap the pulse to start making plans.
+              Tap the pulse to activate Synq.
             </Text>
           </Animated.View>
 
