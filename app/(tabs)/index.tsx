@@ -19,7 +19,7 @@ import {
   where
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import React, { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import Reanimated, { FadeOut } from 'react-native-reanimated';
 import {
   Animated,
@@ -697,22 +697,10 @@ export default function SynqScreen() {
     });
   }, [activeChatId, isChatPaneOpen, pendingNewChat, allChats, messages]);
 
-  useEffect(() => {
-    let timer: any;
-    if (status === 'activating') {
-      timer = setTimeout(() => {
-        setSynqStatus(setSynq, 'finding');
-      }, 1800);
-    } else if (status === 'finding') {
-      timer = setTimeout(() => {
-        Vibration.vibrate(400);
-        setSynqStatus(setSynq, 'active');
-      }, 2000);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [status]);
+  const completeSynqLaunch = useCallback(() => {
+    Vibration.vibrate(400);
+    setSynqStatus(setSynq, "active");
+  }, [setSynq]);
 
   const triggerAISuggestion = async (category: string) => {
     if ((!activeChatId && !pendingNewChat) || isAILoading) return;
@@ -1063,8 +1051,7 @@ export default function SynqScreen() {
   const bootActive = synqBoot?.cachedSynqActive === true;
   if (!hydrated && !bootActive) return <View style={styles.darkFill} />;
 
-  const isActivating =
-    status === "activating" || status === "finding";
+  const isActivating = status === "activating";
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -1096,7 +1083,7 @@ export default function SynqScreen() {
           <View style={styles.synqHomeLayer}>
             {isActivating && (
               <View style={StyleSheet.absoluteFill}>
-                <SynqActivatingView status={status} />
+                <SynqActivatingView onComplete={completeSynqLaunch} />
               </View>
             )}
             {status === "idle" && hydrated && (

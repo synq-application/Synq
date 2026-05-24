@@ -1,7 +1,7 @@
 import { DEFAULT_AVATAR } from "@/constants/Variables";
 import * as ExpoImage from "expo-image";
 
-export type SynqStatus = "idle" | "activating" | "finding" | "active";
+export type SynqStatus = "idle" | "activating" | "active";
 
 export const formatTime = (timestamp: any) => {
   if (!timestamp) return "";

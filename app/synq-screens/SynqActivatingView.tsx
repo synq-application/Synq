@@ -1,98 +1,155 @@
-import { ACCENT, BG, TEXT, fonts } from "@/constants/Variables";
+import { ACCENT, BG, synqSvg } from "@/constants/Variables";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
-import React, { useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
   FadeIn,
   FadeOut,
-  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withDelay,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
-import type { SynqStatus } from "../helpers";
+import { SvgXml } from "react-native-svg";
 
-type ActivatingStatus = Extract<SynqStatus, "activating" | "finding">;
-
-const FADE_OUT_MS = 420;
-const FADE_IN_MS = 560;
+const LAUNCH_MS = 2600;
+const RING_COUNT = 4;
+const RING_STAGGER_MS = 420;
+const RING_DURATION_MS = 1180;
 
 type Props = {
-  status: ActivatingStatus;
+  onComplete: () => void;
 };
 
-function StatusLine({ phase }: { phase: ActivatingStatus }) {
-  if (phase === "finding") {
-    return (
-      <Text style={styles.title}>
-        Seeing who's <Text style={styles.accent}>free</Text>
-      </Text>
-    );
-  }
-
-  return <Text style={styles.title}>Activating Synq</Text>;
-}
-
-export default function SynqActivatingView({ status }: Props) {
-  const reduced = useReducedMotion();
-  const [phase, setPhase] = useState<ActivatingStatus>(status);
-  const textOpacity = useSharedValue(1);
-  const glowStrength = useSharedValue(0);
-  const isFirstLine = useRef(true);
+function SonarRing({
+  index,
+  disabled,
+}: {
+  index: number;
+  disabled: boolean;
+}) {
+  const scale = useSharedValue(0.55);
+  const opacity = useSharedValue(0);
 
   useEffect(() => {
-    if (reduced) {
-      setPhase(status);
-      glowStrength.value = status === "finding" ? 1 : 0;
-      return;
-    }
-
-    if (isFirstLine.current) {
-      isFirstLine.current = false;
-      setPhase(status);
-      glowStrength.value = status === "finding" ? 1 : 0;
-      return;
-    }
-
-    if (phase === status) return;
-
-    const nextPhase = status;
-
-    textOpacity.value = withTiming(
-      0,
-      { duration: FADE_OUT_MS, easing: Easing.out(Easing.cubic) },
-      (finished) => {
-        if (!finished) return;
-        runOnJS(setPhase)(nextPhase);
-        glowStrength.value = withTiming(nextPhase === "finding" ? 1 : 0, {
-          duration: FADE_IN_MS,
-          easing: Easing.inOut(Easing.cubic),
-        });
-        textOpacity.value = withTiming(1, {
-          duration: FADE_IN_MS,
-          easing: Easing.inOut(Easing.cubic),
-        });
-      }
+    if (disabled) return;
+    const delay = index * RING_STAGGER_MS;
+    scale.value = 0.55;
+    opacity.value = 0.44;
+    scale.value = withDelay(
+      delay,
+      withTiming(2.7, {
+        duration: RING_DURATION_MS,
+        easing: Easing.out(Easing.cubic),
+      })
     );
+    opacity.value = withDelay(
+      delay,
+      withTiming(0, {
+        duration: RING_DURATION_MS,
+        easing: Easing.out(Easing.quad),
+      })
+    );
+  }, [disabled, index, opacity, scale]);
 
-    if (nextPhase === "finding") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+  const ringStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return <Animated.View style={[styles.ring, ringStyle]} pointerEvents="none" />;
+}
+
+export default function SynqActivatingView({ onComplete }: Props) {
+  const reduced = useReducedMotion();
+  const finished = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  const bloom = useSharedValue(0);
+  const bgReveal = useSharedValue(0);
+  const pulseScale = useSharedValue(1);
+
+  const finishLaunch = () => {
+    if (finished.current) return;
+    finished.current = true;
+    onCompleteRef.current();
+  };
+
+  useEffect(() => {
+    const duration = reduced ? 480 : LAUNCH_MS;
+
+    if (!reduced) {
+      bloom.value = withTiming(1, {
+        duration: LAUNCH_MS - 180,
+        easing: Easing.inOut(Easing.cubic),
+      });
+      bgReveal.value = withTiming(1, {
+        duration: LAUNCH_MS,
+        easing: Easing.out(Easing.cubic),
+      });
+      pulseScale.value = withSequence(
+        withTiming(1.06, { duration: 360, easing: Easing.out(Easing.cubic) }),
+        withTiming(1, {
+          duration: LAUNCH_MS - 360,
+          easing: Easing.inOut(Easing.cubic),
+        })
+      );
+
+      const hapticAt = [0, RING_STAGGER_MS, RING_STAGGER_MS * 2, RING_STAGGER_MS * 3];
+      const hapticStyles = [
+        Haptics.ImpactFeedbackStyle.Light,
+        Haptics.ImpactFeedbackStyle.Light,
+        Haptics.ImpactFeedbackStyle.Medium,
+        Haptics.ImpactFeedbackStyle.Heavy,
+      ] as const;
+      const hapticTimers = hapticAt.map((ms, i) =>
+        setTimeout(() => {
+          Haptics.impactAsync(hapticStyles[i]).catch(() => {});
+        }, ms)
+      );
+
+      const completeTimer = setTimeout(() => {
+        Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success
+        ).catch(() => {});
+        finishLaunch();
+      }, duration);
+
+      return () => {
+        hapticTimers.forEach(clearTimeout);
+        clearTimeout(completeTimer);
+      };
     }
-  }, [status, phase, textOpacity, glowStrength, reduced]);
 
-  const textStyle = useAnimatedStyle(() => ({
-    opacity: textOpacity.value,
+    const completeTimer = setTimeout(finishLaunch, duration);
+    return () => clearTimeout(completeTimer);
+  }, [reduced, bloom, bgReveal, pulseScale]);
+
+  const bloomStyle = useAnimatedStyle(() => ({
+    opacity: 0.12 + bloom.value * 0.38,
+    transform: [{ scale: 0.85 + bloom.value * 0.35 }],
   }));
 
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: 0.14 + glowStrength.value * 0.16,
+  const bgStyle = useAnimatedStyle(() => ({
+    opacity: 0.06 + bgReveal.value * 0.2,
+    transform: [{ scale: 0.9 + bgReveal.value * 0.14 }],
   }));
 
-  const screenEnter = reduced ? FadeIn.duration(1) : FadeIn.duration(650);
-  const screenExit = reduced ? FadeOut.duration(1) : FadeOut.duration(480);
+  const bgTintStyle = useAnimatedStyle(() => ({
+    opacity: bgReveal.value * 0.12,
+  }));
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
+  }));
+
+  const screenEnter = reduced ? FadeIn.duration(1) : FadeIn.duration(380);
+  const screenExit = reduced ? FadeOut.duration(1) : FadeOut.duration(320);
 
   return (
     <Animated.View
@@ -100,27 +157,38 @@ export default function SynqActivatingView({ status }: Props) {
       exiting={screenExit}
       style={styles.container}
     >
-      <View style={styles.content}>
-        <View style={styles.copyBlock}>
-          <Animated.View style={[styles.lineWrap, textStyle]}>
-            <StatusLine phase={phase} />
+      <Animated.View style={[styles.bgWrap, bgStyle]} pointerEvents="none">
+        <SvgXml xml={synqSvg} width="115%" height="115%" />
+      </Animated.View>
+      <Animated.View
+        style={[styles.bgTint, bgTintStyle]}
+        pointerEvents="none"
+      />
+
+      <View style={styles.stage}>
+        <View style={styles.pulseArea}>
+          {Array.from({ length: RING_COUNT }, (_, i) => (
+            <SonarRing key={i} index={i} disabled={reduced} />
+          ))}
+          <Animated.View style={[styles.pulseGlow, bloomStyle]} pointerEvents="none" />
+          <Animated.View style={pulseStyle}>
+            <ExpoImage
+              source={require("../../assets/pulse.gif")}
+              style={styles.pulseGif}
+              contentFit="contain"
+              transition={0}
+              cachePolicy="memory-disk"
+            />
           </Animated.View>
         </View>
-
-        <View style={styles.pulseArea}>
-          <Animated.View style={[styles.pulseGlow, glowStyle]} pointerEvents="none" />
-          <ExpoImage
-            source={require("../../assets/pulse.gif")}
-            style={styles.pulseGif}
-            contentFit="contain"
-            transition={0}
-            cachePolicy="memory-disk"
-          />
-        </View>
       </View>
+
     </Animated.View>
   );
 }
+
+const PULSE_SIZE = 252;
+const STAGE = 300;
 
 const styles = StyleSheet.create({
   container: {
@@ -128,50 +196,44 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 32,
+    overflow: "hidden",
   },
-  content: {
-    width: "100%",
-    maxWidth: 340,
+  bgWrap: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
-  },
-  copyBlock: {
-    minHeight: 44,
     justifyContent: "center",
+  },
+  bgTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: ACCENT,
+  },
+  stage: {
     alignItems: "center",
-    width: "100%",
-    marginBottom: 36,
-  },
-  lineWrap: {
-    width: "100%",
-    alignItems: "center",
-  },
-  title: {
-    color: TEXT,
-    fontSize: 32,
-    lineHeight: 38,
-    fontFamily: fonts.heavy,
-    textAlign: "center",
-    letterSpacing: -0.3,
-    paddingHorizontal: 12,
-  },
-  accent: {
-    color: ACCENT,
-    fontFamily: fonts.heavy,
+    justifyContent: "center",
   },
   pulseArea: {
-    width: 268,
-    height: 268,
+    width: STAGE,
+    height: STAGE,
     alignItems: "center",
     justifyContent: "center",
   },
+  ring: {
+    position: "absolute",
+    width: PULSE_SIZE,
+    height: PULSE_SIZE,
+    borderRadius: PULSE_SIZE / 2,
+    borderWidth: 2,
+    borderColor: "rgba(0,255,133,0.42)",
+  },
   pulseGlow: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 134,
-    backgroundColor: "rgba(0,255,133,0.28)",
+    position: "absolute",
+    width: PULSE_SIZE + 28,
+    height: PULSE_SIZE + 28,
+    borderRadius: (PULSE_SIZE + 28) / 2,
+    backgroundColor: "rgba(0,255,133,0.32)",
   },
   pulseGif: {
-    width: 252,
-    height: 252,
+    width: PULSE_SIZE,
+    height: PULSE_SIZE,
   },
 });
