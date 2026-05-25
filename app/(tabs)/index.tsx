@@ -20,7 +20,14 @@ import {
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Reanimated, {
+  FadeIn,
+  FadeOut,
+  SlideInLeft,
+  SlideInRight,
+  SlideOutLeft,
+  SlideOutRight,
+} from 'react-native-reanimated';
 import {
   Animated,
   DeviceEventEmitter,
@@ -1105,9 +1112,15 @@ export default function SynqScreen() {
             <SynqActivatingView onComplete={completeSynqLaunch} />
           </Reanimated.View>
         )}
-        <Modal visible={messagesModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <Modal visible={messagesModalVisible} animationType="fade" presentationStyle="pageSheet">
           <View style={styles.modalBg}>
           {messagesPane === "inbox" ? (
+            <Reanimated.View
+              key="messages-inbox"
+              style={styles.messagesPaneFill}
+              entering={SlideInLeft.duration(300)}
+              exiting={SlideOutLeft.duration(280)}
+            >
             <MessagesInboxPane
               styles={styles}
               allChats={visibleChats}
@@ -1162,8 +1175,14 @@ export default function SynqScreen() {
                 />
               }
             />
+            </Reanimated.View>
           ) : (
-            <>
+            <Reanimated.View
+              key="messages-chat"
+              style={styles.messagesPaneFill}
+              entering={SlideInRight.duration(300)}
+              exiting={SlideOutRight.duration(280)}
+            >
               <MessagesChatPane
               styles={styles}
               insetsTop={insets.top}
@@ -1228,7 +1247,7 @@ export default function SynqScreen() {
               }}
               currentCategory={currentCategory}
               />
-            </>
+            </Reanimated.View>
           )}
           </View>
         </Modal>
@@ -1554,6 +1573,7 @@ const styles = StyleSheet.create({
     padding: 25,
   },
   modalBg: { flex: 1, backgroundColor: BG },
+  messagesPaneFill: { flex: 1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
   messagesHeaderDivider: {
     height: StyleSheet.hairlineWidth,
@@ -1682,7 +1702,7 @@ const styles = StyleSheet.create({
   },
   chatBody: {
     flex: 1,
-    backgroundColor: '#0A0B0C',
+    backgroundColor: BG,
   },
   chatList: {
     flex: 1,
@@ -1699,7 +1719,7 @@ const styles = StyleSheet.create({
   composerDock: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: BORDER,
-    backgroundColor: '#0C0D0F',
+    backgroundColor: "transparent",
     paddingHorizontal: 16,
     paddingTop: 12,
   },
@@ -1987,9 +2007,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: "rgba(43,255,136,0.07)",
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "rgba(43,255,136,0.22)",
+    borderColor: "#1C1C1E",
     gap: 6,
   },
   aiChipText: {
