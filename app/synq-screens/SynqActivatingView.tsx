@@ -5,8 +5,6 @@ import React, { useEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
-  FadeIn,
-  FadeOut,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -17,6 +15,8 @@ import Animated, {
 import { SvgXml } from "react-native-svg";
 
 const LAUNCH_MS = 2600;
+/** Start crossfade to active before the launch sequence fully ends */
+const CROSSFADE_LEAD_MS = 480;
 const RING_COUNT = 4;
 const RING_STAGGER_MS = 420;
 const RING_DURATION_MS = 1180;
@@ -113,12 +113,13 @@ export default function SynqActivatingView({ onComplete }: Props) {
         }, ms)
       );
 
+      const crossfadeAt = Math.max(600, duration - CROSSFADE_LEAD_MS);
       const completeTimer = setTimeout(() => {
         Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success
         ).catch(() => {});
         finishLaunch();
-      }, duration);
+      }, crossfadeAt);
 
       return () => {
         hapticTimers.forEach(clearTimeout);
@@ -148,15 +149,8 @@ export default function SynqActivatingView({ onComplete }: Props) {
     transform: [{ scale: pulseScale.value }],
   }));
 
-  const screenEnter = reduced ? FadeIn.duration(1) : FadeIn.duration(380);
-  const screenExit = reduced ? FadeOut.duration(1) : FadeOut.duration(320);
-
   return (
-    <Animated.View
-      entering={screenEnter}
-      exiting={screenExit}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <Animated.View style={[styles.bgWrap, bgStyle]} pointerEvents="none">
         <SvgXml xml={synqSvg} width="115%" height="115%" />
       </Animated.View>
@@ -183,7 +177,7 @@ export default function SynqActivatingView({ onComplete }: Props) {
         </View>
       </View>
 
-    </Animated.View>
+    </View>
   );
 }
 

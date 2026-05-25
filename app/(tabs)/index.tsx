@@ -20,7 +20,7 @@ import {
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import Reanimated, { FadeOut } from 'react-native-reanimated';
+import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import {
   Animated,
   DeviceEventEmitter,
@@ -241,6 +241,7 @@ export default function SynqScreen() {
   const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
   const [isStartingSynq, setIsStartingSynq] = useState(false);
+  const [launchOverlay, setLaunchOverlay] = useState(false);
   const [contentAlertVisible, setContentAlertVisible] = useState(false);
   const [contentAlertMessage, setContentAlertMessage] = useState("");
   const [reportModalVisible, setReportModalVisible] = useState(false);
@@ -700,6 +701,7 @@ export default function SynqScreen() {
   const completeSynqLaunch = useCallback(() => {
     Vibration.vibrate(400);
     setSynqStatus(setSynq, "active");
+    setLaunchOverlay(false);
   }, [setSynq]);
 
   const triggerAISuggestion = async (category: string) => {
@@ -811,6 +813,7 @@ export default function SynqScreen() {
         synqStartedAt: serverTimestamp()
       });
       AsyncStorage.setItem(synqStatusStorageKey(auth.currentUser.uid), "active").catch(() => {});
+      setLaunchOverlay(true);
       setSynqStatus(setSynq, 'activating');
     } catch {
       showActionError("Could not start Synq. Check your connection and try again.");
@@ -1051,55 +1054,56 @@ export default function SynqScreen() {
   const bootActive = synqBoot?.cachedSynqActive === true;
   if (!hydrated && !bootActive) return <View style={styles.darkFill} />;
 
-  const isActivating = status === "activating";
-
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={[styles.container, tabletContentStyle]}>
         <StatusBar barStyle="light-content" />
-        {status === 'active' && (
-          <>
-          <ProfileTabHeaderOverlay variant="title" />
-          <ActiveSynqSection
-            styles={styles}
-            memo={memo}
-            hasUnread={hasUnread}
-            activePulseOpacity={activePulseOpacity}
-            availableFriends={visibleAvailableFriends}
-            selectedFriends={selectedFriends}
-            setSelectedFriends={setSelectedFriends}
-            handleConnect={handleConnect}
-            endSynq={endSynq}
-            insetsBottom={insets.bottom}
-            openMessagesInbox={() => {
-              setMessagesModalVisible(true);
-              setMessagesPane("inbox");
-            }}
-            openEditModal={() => setIsEditModalVisible(true)}
-          />
-          </>
+        {status === "active" && (
+          <Reanimated.View entering={FadeIn.duration(520)} style={styles.activeSynqLayer}>
+            <ProfileTabHeaderOverlay variant="title" />
+            <ActiveSynqSection
+              styles={styles}
+              memo={memo}
+              hasUnread={hasUnread}
+              activePulseOpacity={activePulseOpacity}
+              availableFriends={visibleAvailableFriends}
+              selectedFriends={selectedFriends}
+              setSelectedFriends={setSelectedFriends}
+              handleConnect={handleConnect}
+              endSynq={endSynq}
+              insetsBottom={insets.bottom}
+              openMessagesInbox={() => {
+                setMessagesModalVisible(true);
+                setMessagesPane("inbox");
+              }}
+              openEditModal={() => setIsEditModalVisible(true)}
+            />
+          </Reanimated.View>
         )}
-        {(isActivating || (status === "idle" && hydrated)) && (
+        {status === "idle" && hydrated && (
           <View style={styles.synqHomeLayer}>
-            {isActivating && (
-              <View style={StyleSheet.absoluteFill}>
-                <SynqActivatingView onComplete={completeSynqLaunch} />
-              </View>
-            )}
-            {status === "idle" && hydrated && (
-              <Reanimated.View
-                exiting={FadeOut.duration(520)}
-                style={StyleSheet.absoluteFill}
-              >
-                <InactiveSynqView
-                  memo={memo}
-                  setMemo={setMemo}
-                  onStartSynq={startSynq}
-                  isStartingSynq={isStartingSynq}
-                />
-              </Reanimated.View>
-            )}
+            <Reanimated.View
+              exiting={FadeOut.duration(520)}
+              style={StyleSheet.absoluteFill}
+            >
+              <InactiveSynqView
+                memo={memo}
+                setMemo={setMemo}
+                onStartSynq={startSynq}
+                isStartingSynq={isStartingSynq}
+              />
+            </Reanimated.View>
           </View>
+        )}
+        {launchOverlay && (
+          <Reanimated.View
+            entering={FadeIn.duration(360)}
+            exiting={FadeOut.duration(560)}
+            style={styles.launchOverlay}
+            pointerEvents={status === "active" ? "none" : "auto"}
+          >
+            <SynqActivatingView onComplete={completeSynqLaunch} />
+          </Reanimated.View>
         )}
         <Modal visible={messagesModalVisible} animationType="slide" presentationStyle="pageSheet">
           <View style={styles.modalBg}>
@@ -1453,6 +1457,14 @@ const styles = StyleSheet.create({
   btnText: { fontSize: 16, color: ON_ACCENT_TEXT, fontFamily: fonts.heavy },
   synqHomeLayer: {
     flex: 1,
+  },
+  activeSynqLayer: {
+    flex: 1,
+  },
+  launchOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    backgroundColor: BG,
   },
   inactiveCenter: {
     flex: 1,

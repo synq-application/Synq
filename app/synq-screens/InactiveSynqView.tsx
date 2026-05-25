@@ -1,10 +1,8 @@
 import {
   ACCENT,
   BG,
-  MUTED,
   MUTED2,
   MUTED3,
-  RADIUS_MD,
   SPACE_3,
   SPACE_4,
   SPACE_5,
@@ -13,7 +11,6 @@ import {
   TEXT,
   TYPE_BODY,
   fonts,
-  synqSvg,
 } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -31,10 +28,14 @@ import {
 import Animated, {
   FadeIn,
   FadeInDown,
+  useAnimatedStyle,
   useReducedMotion,
+  useSharedValue,
+  withSpring,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { SvgXml } from "react-native-svg";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type Props = {
   memo: string;
@@ -43,12 +44,9 @@ type Props = {
   isStartingSynq?: boolean;
 };
 
-const STAGGER = [0, 80, 160] as const;
-
-function entering(reduced: boolean, delayMs: number) {
-  if (reduced) return FadeIn.duration(1);
-  return FadeInDown.duration(400).delay(delayMs);
-}
+const PULSE_SIZE = 252;
+/** Narrow column — memo aligns with pulse, not full screen width */
+const CONTENT_W = 280;
 
 export default function InactiveSynqView({
   memo,
@@ -58,9 +56,25 @@ export default function InactiveSynqView({
 }: Props) {
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
+  const pressScale = useSharedValue(1);
 
   const bottomPad =
-    TAB_BAR_SCROLL_INSET + (Platform.OS === "android" ? insets.bottom : 0);
+    TAB_BAR_SCROLL_INSET +
+    SPACE_6 +
+    (Platform.OS === "android" ? insets.bottom : 0);
+
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pressScale.value }],
+  }));
+
+  const handlePressIn = () => {
+    if (isStartingSynq) return;
+    pressScale.value = withSpring(0.94, { damping: 18, stiffness: 320 });
+  };
+
+  const handlePressOut = () => {
+    pressScale.value = withSpring(1, { damping: 16, stiffness: 280 });
+  };
 
   const handlePress = () => {
     if (isStartingSynq) return;
@@ -68,12 +82,10 @@ export default function InactiveSynqView({
     onStartSynq();
   };
 
+  const enter = reduced ? FadeIn.duration(1) : FadeInDown.duration(420).springify();
+
   return (
     <View style={styles.root}>
-      <View pointerEvents="none" style={styles.bgSvgWrap}>
-        <SvgXml xml={synqSvg} width="120%" height="120%" />
-      </View>
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
@@ -89,71 +101,72 @@ export default function InactiveSynqView({
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <View style={styles.stack}>
-          <Animated.View
-            entering={entering(reduced, STAGGER[0])}
-            style={styles.heroCopy}
-          >
-            <Text style={styles.heroTitle}>
-              See who's <Text style={styles.heroAccent}>free.</Text>
-            </Text>
-            <Text style={styles.heroSubtitle}>
-              Tap the pulse to activate Synq.
-            </Text>
-          </Animated.View>
+        <Animated.View entering={enter} style={styles.stack}>
+          <Text style={styles.headline}>
+            Go <Text style={styles.headlineAccent}>live.</Text>
+          </Text>
 
-          <Animated.View
-            entering={entering(reduced, STAGGER[1])}
-            style={styles.memoRow}
-          >
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={16}
-              color={MUTED2}
-              style={styles.memoIcon}
-            />
-            <TextInput
-              style={styles.memoInput}
-              value={memo}
-              onChangeText={setMemo}
-              placeholder="Memo (optional)"
-              placeholderTextColor={MUTED3}
-              blurOnSubmit
-              returnKeyType="done"
-              accessibilityLabel="Optional memo shown to friends when you start Synq"
-            />
-          </Animated.View>
+          <View style={styles.memoSection}>
+            <View style={styles.memoRow}>
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={17}
+                color={ACCENT}
+                style={styles.memoIcon}
+              />
+              <TextInput
+                style={styles.memoInput}
+                value={memo}
+                onChangeText={setMemo}
+                placeholder="Memo (optional)"
+                placeholderTextColor={MUTED3}
+                blurOnSubmit
+                returnKeyType="done"
+                accessibilityLabel="Optional memo shown to friends when you go live"
+              />
+            </View>
+          </View>
 
-          <Animated.View
-            entering={entering(reduced, STAGGER[2])}
-            style={styles.pulseWrap}
-          >
-            <Pressable
+          <View style={styles.pulseBlock}>
+            <AnimatedPressable
               onPress={handlePress}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
               disabled={isStartingSynq}
-              style={({ pressed }) => [
-                styles.pulseBox,
-                pressed && !isStartingSynq && styles.pulsePressed,
+              style={[
+                styles.pulseHit,
+                pressStyle,
                 isStartingSynq && styles.pulseStarting,
               ]}
               accessibilityRole="button"
               accessibilityLabel={
-                isStartingSynq
-                  ? "Starting Synq"
-                  : "Start Synq and show friends you are available"
+                isStartingSynq ? "Activating Synq" : "Tap to activate Synq"
               }
-              accessibilityHint="Shows friends who are free right now"
             >
+              <View style={styles.pulseGlow} pointerEvents="none" />
+              <View style={styles.pulseRing} pointerEvents="none" />
               <ExpoImage
                 source={require("../../assets/pulse.gif")}
-                style={styles.gifLarge}
+                style={styles.pulseGif}
                 contentFit="contain"
                 transition={0}
                 cachePolicy="memory-disk"
               />
+            </AnimatedPressable>
+            <Pressable
+              onPress={handlePress}
+              disabled={isStartingSynq}
+              hitSlop={{ top: 8, bottom: 12, left: 24, right: 24 }}
+              style={styles.ctaHit}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isStartingSynq ? "Activating Synq" : "Tap to activate Synq"
+              }
+            >
+              <Text style={styles.ctaLabel}>TAP TO ACTIVATE</Text>
             </Pressable>
-          </Animated.View>
-        </View>
+          </View>
+        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -168,65 +181,44 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "transparent",
   },
-  bgSvgWrap: {
-    position: "absolute",
-    top: -45,
-    left: -45,
-    right: -45,
-    bottom: -45,
-    opacity: 0.22,
-    transform: [{ rotate: "-10deg" }],
-  },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: SPACE_5,
     justifyContent: "center",
+    paddingHorizontal: SPACE_5,
   },
   stack: {
     width: "100%",
-    maxWidth: 400,
+    maxWidth: CONTENT_W + 40,
     alignSelf: "center",
     alignItems: "center",
   },
-  heroCopy: {
-    width: "100%",
-    alignItems: "center",
-    marginBottom: SPACE_4,
-  },
-  heroTitle: {
+  headline: {
     color: TEXT,
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 32,
+    lineHeight: 38,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.15,
+    letterSpacing: -0.4,
     textAlign: "center",
+    marginBottom: SPACE_5,
   },
-  heroAccent: {
+  headlineAccent: {
     color: ACCENT,
     fontFamily: fonts.heavy,
   },
-  heroSubtitle: {
-    color: MUTED,
-    fontSize: TYPE_BODY,
-    lineHeight: 24,
-    fontFamily: fonts.medium,
-    textAlign: "center",
-    marginTop: SPACE_4,
-    maxWidth: 300,
+  memoSection: {
+    width: CONTENT_W,
+    alignSelf: "center",
+    marginBottom: SPACE_5,
   },
   memoRow: {
     flexDirection: "row",
     alignItems: "center",
     width: "100%",
-    maxWidth: 300,
-    marginTop: SPACE_4,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    borderRadius: RADIUS_MD,
-    paddingHorizontal: SPACE_4,
-    paddingVertical: Platform.OS === "ios" ? 12 : 10,
-    marginBottom: SPACE_6,
+    paddingHorizontal: 2,
+    paddingTop: Platform.OS === "ios" ? 6 : 4,
+    paddingBottom: Platform.OS === "ios" ? 10 : 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.16)",
   },
   memoIcon: {
     marginRight: SPACE_3,
@@ -236,29 +228,58 @@ const styles = StyleSheet.create({
     color: TEXT,
     fontSize: TYPE_BODY,
     lineHeight: 22,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.book,
     padding: 0,
     margin: 0,
-    minHeight: 22,
+    minHeight: 24,
     backgroundColor: "transparent",
   },
-  pulseWrap: {
+  pulseBlock: {
     alignItems: "center",
+    width: CONTENT_W,
+    paddingTop: SPACE_3,
   },
-  pulseBox: {
+  pulseHit: {
     width: 306,
     height: 288,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
   },
-  pulsePressed: {
-    opacity: 0.9,
+  pulseGlow: {
+    position: "absolute",
+    width: PULSE_SIZE + 6,
+    height: PULSE_SIZE + 6,
+    borderRadius: (PULSE_SIZE + 6) / 2,
+    backgroundColor: "rgba(0,255,133,0.08)",
+  },
+  pulseRing: {
+    position: "absolute",
+    width: PULSE_SIZE + 2,
+    height: PULSE_SIZE + 2,
+    borderRadius: (PULSE_SIZE + 2) / 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,255,133,0.22)",
+  },
+  pulseGif: {
+    width: PULSE_SIZE,
+    height: PULSE_SIZE,
   },
   pulseStarting: {
-    opacity: 0.9,
+    opacity: 0.88,
   },
-  gifLarge: {
-    width: 252,
-    height: 252,
+  ctaHit: {
+    marginTop: SPACE_5,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: SPACE_4,
+  },
+  ctaLabel: {
+    color: MUTED2,
+    fontSize: 13,
+    lineHeight: 16,
+    fontFamily: fonts.medium,
+    letterSpacing: 1.4,
+    textAlign: "center",
   },
 });
