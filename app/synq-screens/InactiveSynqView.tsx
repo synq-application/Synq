@@ -49,6 +49,8 @@ type Props = {
 const PULSE_SIZE = 252;
 /** Narrow column — status area aligns with pulse, not full screen width */
 const CONTENT_W = 320;
+/** Nudge entire idle Synq column slightly lower on screen */
+const IDLE_CONTENT_TOP_NUDGE = 16;
 
 export default function InactiveSynqView({
   memo,
@@ -93,7 +95,7 @@ export default function InactiveSynqView({
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: insets.top + SPACE_5,
+            paddingTop: insets.top + SPACE_5 + IDLE_CONTENT_TOP_NUDGE,
             paddingBottom: bottomPad,
           },
         ]}
