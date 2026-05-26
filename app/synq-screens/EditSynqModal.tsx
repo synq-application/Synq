@@ -41,7 +41,7 @@ export default function EditSynqModal({
     "Movie night?",
     "Game night?",
     "Down for something fun",
-    "What’s the move?"
+    "What’s the move?",
   ];
 
   const [visibleSuggestions, setVisibleSuggestions] = useState<string[]>([]);
@@ -50,7 +50,6 @@ export default function EditSynqModal({
     const shuffled = [...suggestions]
       .sort(() => 0.5 - Math.random())
       .filter((s) => s.toLowerCase() !== memo.toLowerCase());
-
     setVisibleSuggestions(shuffled.slice(0, 4));
   };
 

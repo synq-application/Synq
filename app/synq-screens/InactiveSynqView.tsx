@@ -45,8 +45,8 @@ type Props = {
 };
 
 const PULSE_SIZE = 252;
-/** Narrow column — memo aligns with pulse, not full screen width */
-const CONTENT_W = 280;
+/** Narrow column — status area aligns with pulse, not full screen width */
+const CONTENT_W = 320;
 
 export default function InactiveSynqView({
   memo,
@@ -103,11 +103,12 @@ export default function InactiveSynqView({
       >
         <Animated.View entering={enter} style={styles.stack}>
           <Text style={styles.headline}>
-            Go <Text style={styles.headlineAccent}>live.</Text>
+            Let&apos;s <Text style={styles.headlineAccent}>Synq.</Text>
           </Text>
 
           <View style={styles.memoSection}>
-            <View style={styles.memoRow}>
+            <View style={styles.memoPill}>
+              <View style={styles.memoRow}>
               <Ionicons
                 name="chatbubble-ellipses-outline"
                 size={17}
@@ -118,12 +119,18 @@ export default function InactiveSynqView({
                 style={styles.memoInput}
                 value={memo}
                 onChangeText={setMemo}
-                placeholder="Memo (optional)"
+                placeholder="What are you down for?"
                 placeholderTextColor={MUTED3}
                 blurOnSubmit
                 returnKeyType="done"
-                accessibilityLabel="Optional memo shown to friends when you go live"
+                accessibilityLabel="Optional memo shown to friends"
               />
+            </View>
+            <View style={styles.memoOptionalBadgeWrap} pointerEvents="none">
+              <View style={styles.memoOptionalBadge}>
+                <Text style={styles.memoOptionalBadgeText}>Optional</Text>
+              </View>
+            </View>
             </View>
           </View>
 
@@ -199,7 +206,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     letterSpacing: -0.4,
     textAlign: "center",
-    marginBottom: SPACE_5,
+    marginBottom: SPACE_6,
   },
   headlineAccent: {
     color: ACCENT,
@@ -210,15 +217,20 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: SPACE_5,
   },
+  memoPill: {
+    width: "100%",
+    backgroundColor: "#141414",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    paddingHorizontal: SPACE_4,
+    paddingVertical: Platform.OS === "ios" ? 12 : 10,
+    position: "relative",
+  },
   memoRow: {
     flexDirection: "row",
     alignItems: "center",
     width: "100%",
-    paddingHorizontal: 2,
-    paddingTop: Platform.OS === "ios" ? 6 : 4,
-    paddingBottom: Platform.OS === "ios" ? 10 : 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.16)",
   },
   memoIcon: {
     marginRight: SPACE_3,
@@ -233,6 +245,29 @@ const styles = StyleSheet.create({
     margin: 0,
     minHeight: 24,
     backgroundColor: "transparent",
+    paddingRight: 74,
+  },
+  memoOptionalBadgeWrap: {
+    position: "absolute",
+    right: 10,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+  },
+  memoOptionalBadge: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  memoOptionalBadgeText: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 12,
+    lineHeight: 14,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.2,
   },
   pulseBlock: {
     alignItems: "center",
