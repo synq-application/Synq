@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     paddingHorizontal: SPACE_4 + 2,
-    paddingVertical: Platform.OS === "ios" ? 14 : 12,
+    paddingVertical: Platform.OS === "ios" ? 11 : 9,
   },
   memoRow: {
     flexDirection: "row",
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     padding: 0,
     margin: 0,
-    minHeight: 26,
+    minHeight: 22,
     backgroundColor: "transparent",
   },
   pulseBlock: {
