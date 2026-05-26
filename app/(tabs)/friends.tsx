@@ -1923,7 +1923,8 @@ const FRIENDS_SURFACE = "#0A0B0D";
 const FRIENDS_SURFACE_RAISED = "#0E1012";
 const FRIENDS_SEARCH_BG = "#0A0B0D";
 const FRIENDS_BORDER = "rgba(255,255,255,0.035)";
-const FRIENDS_SEARCH_BORDER = "rgba(255,255,255,0.05)";
+/** Original fill; slightly brighter stroke so the pill edge reads more clearly. */
+const FRIENDS_SEARCH_BORDER = "rgba(255,255,255,0.12)";
 const FRIENDS_SEARCH_FADE_GRADIENT = [
   BG,
   "rgba(9,10,11,0.88)",
@@ -2017,7 +2018,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-start",
     alignItems: "center",
-    marginTop: 2,
+    marginTop: SPACE_3,
     marginBottom: 14,
   },
   sortBarBtn: {
@@ -2030,7 +2031,7 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_RADIUS,
     backgroundColor: FRIENDS_SURFACE,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: FRIENDS_SEARCH_BORDER,
   },
   sortBarLabel: {
     color: "rgba(255,255,255,0.52)",
