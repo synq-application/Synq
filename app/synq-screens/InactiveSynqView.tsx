@@ -1,12 +1,14 @@
 import {
   ACCENT,
   BG,
+  BORDER,
   MUTED2,
   MUTED3,
   SPACE_3,
   SPACE_4,
   SPACE_5,
   SPACE_6,
+  SURFACE,
   TAB_BAR_SCROLL_INSET,
   TEXT,
   TYPE_BODY,
@@ -109,28 +111,24 @@ export default function InactiveSynqView({
           <View style={styles.memoSection}>
             <View style={styles.memoPill}>
               <View style={styles.memoRow}>
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={17}
-                color={ACCENT}
-                style={styles.memoIcon}
-              />
-              <TextInput
-                style={styles.memoInput}
-                value={memo}
-                onChangeText={setMemo}
-                placeholder="What are you down for?"
-                placeholderTextColor={MUTED3}
-                blurOnSubmit
-                returnKeyType="done"
-                accessibilityLabel="Optional memo shown to friends"
-              />
-            </View>
-            <View style={styles.memoOptionalBadgeWrap} pointerEvents="none">
-              <View style={styles.memoOptionalBadge}>
-                <Text style={styles.memoOptionalBadgeText}>Optional</Text>
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={17}
+                  color={MUTED2}
+                  style={styles.memoIcon}
+                />
+                <TextInput
+                  style={styles.memoInput}
+                  value={memo}
+                  onChangeText={setMemo}
+                  placeholder="What are you down for?"
+                  placeholderTextColor={MUTED3}
+                  blurOnSubmit
+                  returnKeyType="done"
+                  accessibilityLabel="What you're down for"
+                  accessibilityHint="Optional. Leave blank to skip."
+                />
               </View>
-            </View>
             </View>
           </View>
 
@@ -219,13 +217,12 @@ const styles = StyleSheet.create({
   },
   memoPill: {
     width: "100%",
-    backgroundColor: "#141414",
-    borderRadius: 16,
+    backgroundColor: SURFACE,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    paddingHorizontal: SPACE_4,
-    paddingVertical: Platform.OS === "ios" ? 12 : 10,
-    position: "relative",
+    borderColor: BORDER,
+    paddingHorizontal: SPACE_4 + 2,
+    paddingVertical: Platform.OS === "ios" ? 14 : 12,
   },
   memoRow: {
     flexDirection: "row",
@@ -240,34 +237,11 @@ const styles = StyleSheet.create({
     color: TEXT,
     fontSize: TYPE_BODY,
     lineHeight: 22,
-    fontFamily: fonts.book,
+    fontFamily: fonts.medium,
     padding: 0,
     margin: 0,
-    minHeight: 24,
+    minHeight: 26,
     backgroundColor: "transparent",
-    paddingRight: 74,
-  },
-  memoOptionalBadgeWrap: {
-    position: "absolute",
-    right: 10,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-  },
-  memoOptionalBadge: {
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  memoOptionalBadgeText: {
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 12,
-    lineHeight: 14,
-    fontFamily: fonts.medium,
-    letterSpacing: 0.2,
   },
   pulseBlock: {
     alignItems: "center",
