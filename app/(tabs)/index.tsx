@@ -1840,7 +1840,9 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: '#161616',
     borderRadius: 28,
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 28,
     alignItems: 'stretch',
   },
   panelTitle: {
@@ -1867,7 +1869,7 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_RADIUS,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: 20,
   },
   saveBtnText: { color: ON_ACCENT_TEXT, fontSize: 16, fontFamily: fonts.heavy },
   centeredIdeaContainer: {
@@ -2035,6 +2037,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+    marginBottom: 12,
   },
   suggestionChip: {
     borderWidth: 1,

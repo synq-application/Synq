@@ -21,6 +21,21 @@ type Props = {
   styles: any;
 };
 
+const SUGGESTIONS = [
+  "Down for drinks",
+  "Anyone for happy hour?",
+  "Coffee?",
+  "Down for something chill",
+  "Quick bite?",
+  "Down for a walk",
+  "Gym?",
+  "Going for a run",
+  "Movie night?",
+  "Game night?",
+  "Down for something fun",
+  "What's the move?",
+];
+
 export default function EditSynqModal({
   visible,
   onClose,
@@ -29,27 +44,13 @@ export default function EditSynqModal({
   onSaveMemo,
   styles,
 }: Props) {
-  const suggestions = [
-    "Down for drinks",
-    "Anyone for happy hour?",
-    "Coffee?",
-    "Down for something chill",
-    "Quick bite?",
-    "Down for a walk",
-    "Gym?",
-    "Going for a run",
-    "Movie night?",
-    "Game night?",
-    "Down for something fun",
-    "What’s the move?",
-  ];
-
   const [visibleSuggestions, setVisibleSuggestions] = useState<string[]>([]);
 
   const pickSuggestions = () => {
-    const shuffled = [...suggestions]
+    const exclude = memo.trim().toLowerCase();
+    const shuffled = [...SUGGESTIONS]
       .sort(() => 0.5 - Math.random())
-      .filter((s) => s.toLowerCase() !== memo.toLowerCase());
+      .filter((s) => s.toLowerCase() !== exclude);
     setVisibleSuggestions(shuffled.slice(0, 4));
   };
 
@@ -64,16 +65,16 @@ export default function EditSynqModal({
         <View style={styles.centeredModalOverlay}>
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.editPanel}>
-
-              <CloseButton onPress={onClose} style={styles.closeBtn} />
-
-              <Text style={styles.panelTitle}>Edit memo</Text>
+              <View style={localStyles.headerRow}>
+                <Text style={styles.panelTitle}>Edit status</Text>
+                <CloseButton onPress={onClose} style={localStyles.headerClose} />
+              </View>
 
               <TextInput
                 style={styles.panelInput}
                 value={memo}
                 onChangeText={setMemo}
-                placeholder="e.g. let’s grab drinks 🍸"
+                placeholder="e.g. let's grab drinks"
                 placeholderTextColor="rgba(255,255,255,0.25)"
                 multiline
                 submitBehavior="blurAndSubmit"
@@ -82,7 +83,6 @@ export default function EditSynqModal({
 
               <View style={localStyles.suggestionHeaderRow}>
                 <Text style={styles.suggestionSectionTitle}>Suggested ideas</Text>
-
                 <TouchableOpacity
                   onPress={pickSuggestions}
                   style={localStyles.shuffleBtn}
@@ -92,7 +92,7 @@ export default function EditSynqModal({
                 >
                   <Ionicons
                     name="shuffle-outline"
-                    size={26}
+                    size={24}
                     color="rgba(255,255,255,0.55)"
                   />
                 </TouchableOpacity>
@@ -118,7 +118,6 @@ export default function EditSynqModal({
               >
                 <Text style={styles.saveBtnText}>Update</Text>
               </TouchableOpacity>
-
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -128,18 +127,29 @@ export default function EditSynqModal({
 }
 
 const localStyles = StyleSheet.create({
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+    minHeight: 44,
+  },
+  headerClose: {
+    marginRight: -10,
+    marginTop: -2,
+  },
   suggestionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 8,
-    minHeight: 44,
+    minHeight: 40,
   },
   shuffleBtn: {
-    minWidth: 48,
-    minHeight: 48,
+    minWidth: 44,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: -4,
+    marginRight: -6,
   },
 });

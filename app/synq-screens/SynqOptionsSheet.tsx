@@ -44,10 +44,10 @@ export default function SynqOptionsSheet({
               }}
               activeOpacity={0.75}
               accessibilityRole="button"
-              accessibilityLabel="Edit memo"
+              accessibilityLabel="Edit status"
             >
               <Ionicons name="create-outline" size={22} color={TEXT} />
-              <Text style={styles.optionText}>Edit memo</Text>
+              <Text style={styles.optionText}>Edit status</Text>
             </TouchableOpacity>
             <View style={styles.divider} />
             <TouchableOpacity
