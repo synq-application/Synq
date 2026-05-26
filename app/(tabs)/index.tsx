@@ -1105,7 +1105,7 @@ export default function SynqScreen() {
         {launchOverlay && (
           <Reanimated.View
             entering={FadeIn.duration(360)}
-            exiting={FadeOut.duration(560)}
+            exiting={FadeOut.duration(680)}
             style={styles.launchOverlay}
             pointerEvents={status === "active" ? "none" : "auto"}
           >

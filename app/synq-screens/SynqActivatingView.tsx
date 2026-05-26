@@ -14,12 +14,17 @@ import Animated, {
 } from "react-native-reanimated";
 import { SvgXml } from "react-native-svg";
 
-const LAUNCH_MS = 2600;
-/** Start crossfade to active before the launch sequence fully ends */
-const CROSSFADE_LEAD_MS = 480;
 const RING_COUNT = 4;
 const RING_STAGGER_MS = 420;
 const RING_DURATION_MS = 1180;
+/** When the last sonar ring finishes fading out */
+const LAST_RING_END_MS =
+  (RING_COUNT - 1) * RING_STAGGER_MS + RING_DURATION_MS;
+/**
+ * Full launch choreography — must not end before rings complete, plus a short
+ * settle so the flash sequence never cuts off abruptly.
+ */
+const LAUNCH_MS = Math.max(2680, LAST_RING_END_MS + 260);
 
 type Props = {
   onComplete: () => void;
@@ -113,13 +118,12 @@ export default function SynqActivatingView({ onComplete }: Props) {
         }, ms)
       );
 
-      const crossfadeAt = Math.max(600, duration - CROSSFADE_LEAD_MS);
       const completeTimer = setTimeout(() => {
         Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success
         ).catch(() => {});
         finishLaunch();
-      }, crossfadeAt);
+      }, duration);
 
       return () => {
         hapticTimers.forEach(clearTimeout);
