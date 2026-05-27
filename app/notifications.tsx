@@ -112,7 +112,7 @@ function NotificationsEmptyState() {
       </View>
       <Text style={styles.emptyHeadline}>No notifications</Text>
       <Text style={styles.emptyHelper}>
-        Friend requests, plan updates, and other activity will show up here.
+        Friend requests and activity from your friends will appear here.
       </Text>
     </View>
   );
