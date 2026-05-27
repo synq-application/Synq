@@ -1046,6 +1046,108 @@ exports.onFriendAccepted = onDocumentCreated({
   }
 });
 
+const SYNQ_NUDGE_COOLDOWN_MS = 4 * 60 * 60 * 1000;
+
+/** Lets an active user ask an inactive friend if they're free. */
+exports.sendSynqNudge = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "Must be logged in.");
+  }
+
+  const callerUid = request.auth.uid;
+  const toUserId = String(request.data?.toUserId || "").trim();
+  if (!toUserId || toUserId === callerUid) {
+    throw new HttpsError("invalid-argument", "Invalid recipient.");
+  }
+
+  const db = admin.firestore();
+  const friendSnap = await db
+    .collection("users")
+    .doc(callerUid)
+    .collection("friends")
+    .doc(toUserId)
+    .get();
+  if (!friendSnap.exists) {
+    throw new HttpsError("permission-denied", "You can only ask friends.");
+  }
+
+  const [callerDoc, recipientDoc] = await Promise.all([
+    db.collection("users").doc(callerUid).get(),
+    db.collection("users").doc(toUserId).get(),
+  ]);
+
+  if (!recipientDoc.exists) {
+    throw new HttpsError("not-found", "User not found.");
+  }
+
+  const callerData = callerDoc.data() || {};
+  const recipientData = recipientDoc.data() || {};
+
+  if (!isSynqActive(callerData)) {
+    throw new HttpsError("failed-precondition", "Activate Synq first to ask if a friend is free.");
+  }
+
+  if (isSynqActive(recipientData)) {
+    throw new HttpsError("failed-precondition", "This friend is already active.");
+  }
+
+  const lockId = `synq_nudge_${callerUid}_${toUserId}`.slice(0, 1400);
+  const lockRef = db.collection("users").doc(toUserId).collection("notificationLocks").doc(lockId);
+  const lockSnap = await lockRef.get();
+  if (lockSnap.exists) {
+    const t = lockSnap.data()?.createdAt;
+    let lockMs = null;
+    if (t && typeof t.toMillis === "function") lockMs = t.toMillis();
+    else if (t && typeof t._seconds === "number") lockMs = t._seconds * 1000;
+    if (lockMs != null && Date.now() - lockMs < SYNQ_NUDGE_COOLDOWN_MS) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "You can ask this friend again in a few hours."
+      );
+    }
+  }
+
+  const callerName = String(callerData.displayName || "Your friend").trim() || "Your friend";
+  const nudgeBody = `${firstNameFromDisplay(callerName)} wants to know if you're free right now`;
+  const recipientToken = recipientData.pushToken || null;
+  const callerToken = callerData.pushToken || null;
+
+  if (recipientToken && callerToken && recipientToken === callerToken) {
+    logWarn("sendSynqNudge_skip_same_device_token", { callerUid, toUserId });
+  } else if (recipientToken) {
+    try {
+      await axios.post("https://exp.host/--/api/v2/push/send", {
+        to: recipientToken,
+        sound: "default",
+        title: "Are you free?",
+        body: nudgeBody,
+        data: {
+          type: "synq_nudge",
+          fromUserId: callerUid,
+        },
+      });
+    } catch (pushErr) {
+      logError("sendSynqNudge_push", pushErr, { callerUid, toUserId });
+      throw new HttpsError("internal", "Could not send notification.");
+    }
+  }
+
+  await lockRef.set({
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    type: "synq_nudge",
+    fromUserId: callerUid,
+  });
+
+  await writeInAppNotification(toUserId, lockId, {
+    type: "synq_nudge",
+    fromUserId: callerUid,
+    title: "Are you free?",
+    body: nudgeBody,
+  });
+
+  return { ok: true };
+});
+
 /** Notify active friends when a friend activates Synq (only to recipients also active). */
 exports.onFriendSynqActivated = onDocumentUpdated(
   {

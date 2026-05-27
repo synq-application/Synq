@@ -30,6 +30,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { initSentry } from "../src/lib/sentryInit";
 
@@ -772,6 +773,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardProvider>
       <ErrorBoundary>
         <AuthContext.Provider value={{ refreshAuth, user }}>
           <SynqBootProvider
@@ -822,6 +824,7 @@ export default function RootLayout() {
           </SynqBootProvider>
         </AuthContext.Provider>
       </ErrorBoundary>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

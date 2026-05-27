@@ -1,15 +1,23 @@
 import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
-import { ACCENT, MUTED2, ON_ACCENT_TEXT } from "@/constants/Variables";
+import { ACCENT, BG, MUTED2, ON_ACCENT_TEXT } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import * as Haptics from "expo-haptics";
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
+  Dimensions,
   FlatList,
   InteractionManager,
   Keyboard,
-  KeyboardAvoidingView,
+  type KeyboardEvent,
   Platform,
   Pressable,
   Text,
@@ -22,12 +30,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatTime, parseIdeaText, resolveAvatar } from "../../../app/helpers";
 
 const MESSAGE_ENTER = FadeInUp.duration(200);
+const COMPOSER_KEYBOARD_GAP = 14;
+
+function getKeyboardInset(event: KeyboardEvent): number {
+  const { screenY } = event.endCoordinates;
+  return Math.max(0, Dimensions.get("window").height - screenY);
+}
 
 type Props = {
   styles: any;
   insetsTop: number;
   activeChat: any;
   getChatTitle: (chat: any) => string;
+  renderAvatarStack: (images: Record<string, string> | undefined) => React.ReactNode;
   rotatingAIText: string;
   pendingScrollToMessageId: string | null;
   setPendingScrollToMessageId: (value: string | null) => void;
@@ -67,20 +82,12 @@ type Props = {
   currentUserId?: string;
 };
 
-function getHeaderAvatarUri(
-  chat: { participantImages?: Record<string, string> } | null | undefined,
-  currentUserId?: string
-) {
-  if (!chat?.participantImages || !currentUserId) return null;
-  const other = Object.entries(chat.participantImages).find(([uid]) => uid !== currentUserId);
-  return other ? resolveAvatar(other[1]) : null;
-}
-
 export default function MessagesChatPane({
   styles,
   insetsTop,
   activeChat,
   getChatTitle,
+  renderAvatarStack,
   rotatingAIText,
   pendingScrollToMessageId,
   setPendingScrollToMessageId,
@@ -108,22 +115,29 @@ export default function MessagesChatPane({
 }: Props) {
   const insets = useSafeAreaInsets();
   const canSend = inputText.trim().length > 0;
+  const listHeightRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
+  const isKeyboardOpenRef = useRef(false);
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const chatSeededRef = useRef(false);
   const initialScrollDoneRef = useRef(false);
   const lastMessageCountRef = useRef(0);
-  const headerAvatarUri = useMemo(
-    () => getHeaderAvatarUri(activeChat, currentUserId),
-    [activeChat, currentUserId]
-  );
-
   useEffect(() => {
     knownMessageIdsRef.current = new Set();
     chatSeededRef.current = false;
     initialScrollDoneRef.current = false;
     lastMessageCountRef.current = 0;
+    isKeyboardOpenRef.current = false;
+    setKeyboardOpen(false);
+    setKeyboardInset(0);
   }, [activeChat?.id]);
 
+  const composerBottomInset = Math.max(insets.bottom, 10) + 6;
+  const composerPaddingBottom = keyboardOpen
+    ? COMPOSER_KEYBOARD_GAP
+    : composerBottomInset;
   useLayoutEffect(() => {
     if (!messagesReady || messages.length === 0) {
       if (messagesReady && messages.length === 0) {
@@ -214,6 +228,106 @@ export default function MessagesChatPane({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     sendMessage();
   };
+
+  const scrollToLatest = useCallback(
+    (animated = false) => {
+      if (!messagesReady || messages.length === 0) return;
+
+      const listHeight = listHeightRef.current;
+      const contentHeight = contentHeightRef.current;
+      if (listHeight > 0 && contentHeight > 0) {
+        flatListRef.current?.scrollToOffset({
+          offset: Math.max(0, contentHeight - listHeight),
+          animated,
+        });
+        return;
+      }
+
+      const lastIndex = messages.length - 1;
+      try {
+        flatListRef.current?.scrollToIndex({
+          index: lastIndex,
+          animated,
+          viewPosition: 1,
+        });
+      } catch {
+        flatListRef.current?.scrollToEnd({ animated });
+      }
+    },
+    [messagesReady, messages.length, flatListRef]
+  );
+
+  const forceScrollToBottom = useCallback(() => {
+    if (!messagesReady || messages.length === 0) return;
+
+    const run = () => scrollToLatest(false);
+    run();
+    requestAnimationFrame(run);
+    setTimeout(run, 50);
+    setTimeout(run, 150);
+    setTimeout(run, 300);
+  }, [messagesReady, messages.length, scrollToLatest]);
+
+  const setKeyboardVisible = useCallback((visible: boolean) => {
+    isKeyboardOpenRef.current = visible;
+    setKeyboardOpen(visible);
+  }, []);
+
+  useEffect(() => {
+    const applyInset = (event: KeyboardEvent) => {
+      setKeyboardInset(getKeyboardInset(event));
+    };
+    const onShow = (event: KeyboardEvent) => {
+      applyInset(event);
+      setKeyboardVisible(true);
+      forceScrollToBottom();
+    };
+    const onHide = () => {
+      setKeyboardInset(0);
+      setKeyboardVisible(false);
+    };
+
+    if (Platform.OS === "ios") {
+      const frameSub = Keyboard.addListener("keyboardWillChangeFrame", applyInset);
+      const showSub = Keyboard.addListener("keyboardWillShow", (event) => {
+        onShow(event);
+        const delay = event.duration ?? 250;
+        setTimeout(() => forceScrollToBottom(), delay);
+      });
+      const hideSub = Keyboard.addListener("keyboardWillHide", onHide);
+      return () => {
+        frameSub.remove();
+        showSub.remove();
+        hideSub.remove();
+      };
+    }
+
+    const showSub = Keyboard.addListener("keyboardDidShow", onShow);
+    const hideSub = Keyboard.addListener("keyboardDidHide", onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [forceScrollToBottom, setKeyboardVisible]);
+
+  useLayoutEffect(() => {
+    if (keyboardOpen) {
+      forceScrollToBottom();
+    }
+  }, [keyboardOpen, forceScrollToBottom]);
+
+  const handleComposerFocus = useCallback(() => {
+    forceScrollToBottom();
+  }, [forceScrollToBottom]);
+
+  const listContentStyle = useMemo(
+    () => [
+      styles.chatListContent,
+      messagesReady && messages.length === 0 && styles.chatListContentEmpty,
+      messagesReady && messages.length > 0 && { flexGrow: 1 },
+    ],
+    [messages.length, messagesReady, styles.chatListContent, styles.chatListContentEmpty]
+  );
 
   const renderMessage = useCallback(
     ({ item }: { item: any }) => {
@@ -401,19 +515,9 @@ export default function MessagesChatPane({
         ]}
       >
         <View style={styles.chatHeaderMain}>
-          {headerAvatarUri ? (
-            <ExpoImage
-              source={{ uri: headerAvatarUri }}
-              style={styles.chatHeaderAvatar}
-              cachePolicy="memory-disk"
-              transition={120}
-              recyclingKey={headerAvatarUri}
-            />
-          ) : (
-            <View style={styles.chatHeaderAvatar}>
-              <Ionicons name="people" size={20} color={MUTED2} />
-            </View>
-          )}
+          <View style={styles.chatHeaderAvatarSlot}>
+            {renderAvatarStack(activeChat?.participantImages)}
+          </View>
           <View style={styles.chatHeaderTextCol}>
             <Text style={styles.chatTitle} numberOfLines={1}>
               {activeChat ? getChatTitle(activeChat) : "Synq Chat"}
@@ -429,11 +533,11 @@ export default function MessagesChatPane({
               accessibilityRole="button"
               accessibilityLabel="Open Synq AI place suggestions"
             >
-              <Ionicons name="sparkles" size={13} color={ACCENT} />
+              <Ionicons name="sparkles" size={11} color={ACCENT} />
               <Text style={styles.aiChipTextPremium} numberOfLines={1}>
                 {rotatingAIText}
               </Text>
-              <Ionicons name="chevron-forward" size={13} color={MUTED2} />
+              <Ionicons name="chevron-forward" size={11} color={MUTED2} />
             </TouchableOpacity>
           </View>
         </View>
@@ -451,11 +555,7 @@ export default function MessagesChatPane({
       </View>
       <View style={styles.chatHeaderDivider} />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={60}
-      >
+      <View style={{ flex: 1, paddingBottom: keyboardInset }}>
         <View style={styles.chatBody}>
           <FlatList
             key={activeChat?.id ?? "chat"}
@@ -468,6 +568,18 @@ export default function MessagesChatPane({
             initialNumToRender={Math.min(messages.length || 20, 30)}
             maxToRenderPerBatch={20}
             windowSize={Math.min(messages.length || 10, 15)}
+            onLayout={(event) => {
+              listHeightRef.current = event.nativeEvent.layout.height;
+              if (isKeyboardOpenRef.current) {
+                scrollToLatest(false);
+              }
+            }}
+            onContentSizeChange={(_width, height) => {
+              contentHeightRef.current = height;
+              if (isKeyboardOpenRef.current) {
+                scrollToLatest(false);
+              }
+            }}
             ListEmptyComponent={
               messagesReady ? (
                 <View style={styles.chatEmptyWrap}>
@@ -481,6 +593,7 @@ export default function MessagesChatPane({
                 </View>
               ) : null
             }
+            alwaysBounceVertical={Platform.OS === "ios"}
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             keyboardShouldPersistTaps="handled"
             renderItem={renderMessage}
@@ -490,16 +603,14 @@ export default function MessagesChatPane({
                   flatListRef.current?.scrollToIndex({
                     index: info.index,
                     animated: true,
-                    viewPosition: 0.4,
+                    viewPosition: isKeyboardOpenRef.current ? 1 : 0.4,
                   });
-                } catch {}
-              }, 350);
+                } catch {
+                  flatListRef.current?.scrollToEnd({ animated: true });
+                }
+              }, 100);
             }}
-            contentContainerStyle={
-              messagesReady && messages.length > 0
-                ? styles.chatListContent
-                : [styles.chatListContent, styles.chatListContentEmpty]
-            }
+            contentContainerStyle={listContentStyle}
           />
 
           {showAICard && (
@@ -533,7 +644,10 @@ export default function MessagesChatPane({
         <View
           style={[
             styles.composerDock,
-            { paddingBottom: Math.max(insets.bottom, 10) + 6 },
+            {
+              backgroundColor: BG,
+              paddingBottom: composerPaddingBottom,
+            },
           ]}
         >
           <View style={styles.composerShell}>
@@ -541,6 +655,7 @@ export default function MessagesChatPane({
               style={styles.composerInput}
               value={inputText}
               onChangeText={setInputText}
+              onFocus={handleComposerFocus}
               placeholder="Message"
               placeholderTextColor="rgba(255,255,255,0.32)"
               multiline
@@ -571,7 +686,7 @@ export default function MessagesChatPane({
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </View>
   );
 }

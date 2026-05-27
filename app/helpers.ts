@@ -60,6 +60,30 @@ export const resolveAvatar = (url?: any) => {
   return DEFAULT_AVATAR;
 };
 
+/** Max faces shown in inbox/chat overlapping avatar stacks (3+ person chats still show 2). */
+export const MAX_STACK_AVATARS = 2;
+
+export function getStackAvatarUris(
+  images: Record<string, string> | undefined | null,
+  currentUserId?: string
+): string[] {
+  if (!images) return [];
+
+  const seen = new Set<string>();
+  const uris: string[] = [];
+
+  for (const [uid, url] of Object.entries(images)) {
+    if (currentUserId && uid === currentUserId) continue;
+    const uri = resolveAvatar(url);
+    if (!uri || seen.has(uri)) continue;
+    seen.add(uri);
+    uris.push(uri);
+    if (uris.length >= MAX_STACK_AVATARS) break;
+  }
+
+  return uris;
+}
+
 export const prefetchResolvedAvatar = (url?: any) => {
   const resolved = resolveAvatar(url);
   if (typeof resolved === "string" && resolved.startsWith("http")) {

@@ -93,6 +93,7 @@ import { useBlockedUsers } from '@/src/lib/blockedUsers';
 import ReportModal from '../report-modal';
 import ExploreModal from '../explore-modal';
 import {
+  getStackAvatarUris,
   resolveAvatar,
   SynqStatus,
   wrapChatTitle,
@@ -404,7 +405,7 @@ export default function SynqScreen() {
     const interval = setInterval(() => {
       index = (index + 1) % aiPrompts.length;
       setRotatingAIText(aiPrompts[index]);
-    }, 10000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, []);
@@ -1222,7 +1223,9 @@ export default function SynqScreen() {
     : visibleChats.find((c) => c.id === activeChatId);
 
   const renderAvatarStack = (images: any) => {
-    if (!images) {
+    const stackUris = getStackAvatarUris(images, auth.currentUser?.uid);
+
+    if (stackUris.length === 0) {
       return (
         <View style={styles.inboxCircle}>
           <Ionicons name="people" size={20} color={ACCENT} />
@@ -1230,24 +1233,11 @@ export default function SynqScreen() {
       );
     }
 
-    const others = Object.entries(images)
-      .filter(([uid]) => uid !== auth.currentUser?.uid)
-      .map(([_, url]) => resolveAvatar(url))
-      .filter((uri): uri is string => Boolean(uri));
-
-    if (others.length === 0) {
-      return (
-        <View style={styles.inboxCircle}>
-          <Ionicons name="people" size={20} color={ACCENT} />
-        </View>
-      );
-    }
-
-    if (others.length === 1) {
+    if (stackUris.length === 1) {
       return (
         <View style={styles.inboxSingleWrap}>
           <ExpoImage
-            source={{ uri: others[0] }}
+            source={{ uri: stackUris[0] }}
             style={styles.inboxSinglePhoto}
             cachePolicy="memory-disk"
             transition={0}
@@ -1256,18 +1246,16 @@ export default function SynqScreen() {
       );
     }
 
-    const stack = others.slice(0, 2);
-
     return (
       <View style={styles.inboxStackWrap}>
         <ExpoImage
-          source={{ uri: stack[0] }}
+          source={{ uri: stackUris[0] }}
           style={[styles.inboxStackPhoto, styles.inboxStackPhotoBack]}
           cachePolicy="memory-disk"
           transition={0}
         />
         <ExpoImage
-          source={{ uri: stack[1] }}
+          source={{ uri: stackUris[1] }}
           style={[styles.inboxStackPhoto, styles.inboxStackPhotoFront]}
           cachePolicy="memory-disk"
           transition={0}
@@ -1436,6 +1424,7 @@ export default function SynqScreen() {
               insetsTop={insets.top}
               activeChat={activeChat}
               getChatTitle={getChatTitle}
+              renderAvatarStack={renderAvatarStack}
               rotatingAIText={rotatingAIText}
               pendingScrollToMessageId={pendingScrollToMessageId}
               flatListRef={flatListRef}
@@ -2065,9 +2054,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  chatHeaderAvatarSlot: {
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   chatHeaderTextCol: {
     flex: 1,
     minWidth: 0,
+    paddingTop: 5,
   },
   chatTitle: {
     color: TEXT,
@@ -2099,7 +2094,7 @@ const styles = StyleSheet.create({
   composerDock: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: BORDER,
-    backgroundColor: "transparent",
+    backgroundColor: BG,
     paddingHorizontal: 16,
     paddingTop: 12,
   },
@@ -2393,14 +2388,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    marginTop: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: "#1C1C1E",
-    gap: 6,
+    gap: 4,
+    maxWidth: "92%",
   },
   aiChipText: {
     color: "#aaa",
@@ -2409,11 +2405,11 @@ const styles = StyleSheet.create({
     fontFamily: "Avenir-Medium",
   },
   aiChipTextPremium: {
-    flex: 1,
+    flexShrink: 1,
     color: "rgba(255,255,255,0.7)",
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: fonts.medium,
-    letterSpacing: 0.15,
+    letterSpacing: 0.1,
   },
   suggestionSectionTitle: {
     color: "rgba(255,255,255,0.55)",
