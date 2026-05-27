@@ -1410,6 +1410,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   addToGroupBtn: {
+    width: "100%",
     minHeight: 48,
     borderRadius: BUTTON_RADIUS,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1424,12 +1425,11 @@ const styles = StyleSheet.create({
     color: TEXT,
   },
   removeFriendBtn: {
-    alignSelf: "center",
+    width: "100%",
+    minHeight: 48,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,69,58,0.45)",
     borderRadius: BUTTON_RADIUS,
-    paddingVertical: 13,
-    paddingHorizontal: 28,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
