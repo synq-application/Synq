@@ -32,6 +32,7 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import {
   Animated,
+  Easing,
   DeviceEventEmitter,
   FlatList,
   Keyboard,
@@ -275,6 +276,7 @@ export default function SynqScreen() {
   } | null>(null);
   const { isBlocked } = useBlockedUsers();
   const activePulseOpacity = useRef(new Animated.Value(1)).current;
+  const activePulseScale = useRef(new Animated.Value(1)).current;
 
   const visibleChats = useMemo(() => {
     const myId = auth.currentUser?.uid;
@@ -413,26 +415,42 @@ export default function SynqScreen() {
 
   useEffect(() => {
     if (status !== 'active') return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(activePulseOpacity, {
-          toValue: 0.45,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(activePulseOpacity, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    );
+    const pulseDown = Animated.parallel([
+      Animated.timing(activePulseOpacity, {
+        toValue: 0.62,
+        duration: 1200,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(activePulseScale, {
+        toValue: 0.94,
+        duration: 1200,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]);
+    const pulseUp = Animated.parallel([
+      Animated.timing(activePulseOpacity, {
+        toValue: 1,
+        duration: 1200,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(activePulseScale, {
+        toValue: 1,
+        duration: 1200,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]);
+    const loop = Animated.loop(Animated.sequence([pulseDown, pulseUp]));
     loop.start();
     return () => {
       loop.stop();
       activePulseOpacity.setValue(1);
+      activePulseScale.setValue(1);
     };
-  }, [status, activePulseOpacity]);
+  }, [status, activePulseOpacity, activePulseScale]);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('openChat', async (data: { chatId?: string; messageId?: string }) => {
@@ -1248,6 +1266,7 @@ export default function SynqScreen() {
               memo={memo}
               hasUnread={hasUnread}
               activePulseOpacity={activePulseOpacity}
+              activePulseScale={activePulseScale}
               availableFriends={visibleAvailableFriends}
               selectedFriends={selectedFriends}
               setSelectedFriends={setSelectedFriends}
@@ -1590,8 +1609,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#34D399",
     shadowColor: "#34D399",
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 5,
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
     elevation: 3,
   },
   headerDivider: {

@@ -32,6 +32,7 @@ type Props = {
   memo: string;
   hasUnread: boolean;
   activePulseOpacity: Animated.Value;
+  activePulseScale: Animated.Value;
   availableFriends: any[];
   selectedFriends: string[];
   setSelectedFriends: React.Dispatch<React.SetStateAction<string[]>>;
@@ -47,6 +48,7 @@ export default function ActiveSynqSection({
   memo,
   hasUnread,
   activePulseOpacity,
+  activePulseScale,
   availableFriends,
   selectedFriends,
   setSelectedFriends,
@@ -87,7 +89,13 @@ export default function ActiveSynqSection({
         <View style={styles.synqHeaderTitleCenter}>
           <View style={styles.headerTitleWithIndicator}>
             <Animated.View
-              style={[styles.activeStatusDot, { opacity: activePulseOpacity }]}
+              style={[
+                styles.activeStatusDot,
+                {
+                  opacity: activePulseOpacity,
+                  transform: [{ scale: activePulseScale }],
+                },
+              ]}
               accessibilityLabel="Synq session live"
             />
             <Text style={styles.headerTitle}>Synq is active</Text>
