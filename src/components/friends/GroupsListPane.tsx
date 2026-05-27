@@ -37,7 +37,7 @@ import {
 import CreateGroupModal from "./CreateGroupModal";
 
 const GROUPS_HINT =
-  "Only you can see your groups. These are custom filters to organize your friends.";
+  "Only you can see your groups. These are custom filters to choose who sees you on Synq.";
 
 type Props = {
   userId: string;

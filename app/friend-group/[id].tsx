@@ -70,6 +70,10 @@ export default function FriendGroupDetailScreen() {
   const [renameVisible, setRenameVisible] = useState(false);
   const [renameBusy, setRenameBusy] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
+  const [pendingRemoveMember, setPendingRemoveMember] = useState<{
+    id: string;
+    displayName: string;
+  } | null>(null);
 
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -134,22 +138,20 @@ export default function FriendGroupDetailScreen() {
     }
   };
 
-  const handleRemoveMember = (memberId: string, name: string) => {
+  const handleRemoveMember = (memberId: string, displayName: string) => {
     if (!uid || !group) return;
-    Alert.alert("Remove member?", `Remove ${name} from ${group.name}?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await removeMemberFromFriendGroup(uid, group.id, group.memberIds, memberId);
-          } catch {
-            Alert.alert("Error", "Could not remove member.");
-          }
-        },
-      },
-    ]);
+    setPendingRemoveMember({ id: memberId, displayName });
+  };
+
+  const confirmRemoveMember = async () => {
+    if (!uid || !group || !pendingRemoveMember) return;
+    const { id: memberId } = pendingRemoveMember;
+    setPendingRemoveMember(null);
+    try {
+      await removeMemberFromFriendGroup(uid, group.id, group.memberIds, memberId);
+    } catch {
+      Alert.alert("Error", "Could not remove member.");
+    }
   };
 
   const handleRename = async (name: string) => {
@@ -357,6 +359,20 @@ export default function FriendGroupDetailScreen() {
         destructive
         onCancel={() => setDeleteVisible(false)}
         onConfirm={() => void handleDelete()}
+      />
+
+      <ConfirmModal
+        visible={pendingRemoveMember != null}
+        title="Remove member?"
+        message={
+          pendingRemoveMember && group
+            ? `Remove ${pendingRemoveMember.displayName} from ${group.name}?`
+            : ""
+        }
+        confirmText="Remove"
+        destructive
+        onCancel={() => setPendingRemoveMember(null)}
+        onConfirm={() => void confirmRemoveMember()}
       />
     </SafeAreaView>
   );

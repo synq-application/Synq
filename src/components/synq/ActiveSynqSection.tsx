@@ -41,6 +41,8 @@ type Props = {
   insetsBottom: number;
   openMessagesInbox: () => void;
   openEditModal: () => void;
+  openChangeAudience?: () => void;
+  audienceLabel?: string | null;
 };
 
 export default function ActiveSynqSection({
@@ -57,6 +59,8 @@ export default function ActiveSynqSection({
   insetsBottom,
   openMessagesInbox,
   openEditModal,
+  openChangeAudience,
+  audienceLabel,
 }: Props) {
   const [optionsVisible, setOptionsVisible] = useState(false);
   const headerLayout = useTabHeaderLayout();
@@ -123,6 +127,15 @@ export default function ActiveSynqSection({
               {memo.trim()}
             </Text>
           </View>
+        </View>
+      ) : null}
+
+      {audienceLabel ? (
+        <View style={styles.audienceRow}>
+          <Ionicons name="people-outline" size={16} color={ACCENT} />
+          <Text style={styles.audienceText} numberOfLines={1}>
+            Shared with {audienceLabel}
+          </Text>
         </View>
       ) : null}
 
@@ -257,6 +270,7 @@ export default function ActiveSynqSection({
         visible={optionsVisible}
         onClose={() => setOptionsVisible(false)}
         onEditMemo={openEditModal}
+        onChangeAudience={openChangeAudience}
         onEndSynq={endSynq}
       />
     </View>

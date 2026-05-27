@@ -106,8 +106,21 @@ import ProfileTabHeaderOverlay from '@/src/components/ProfileTabHeaderOverlay';
 import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
 import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
 import EditSynqModal from '../synq-screens/EditSynqModal';
+import ChangeSynqAudienceModal from '../synq-screens/ChangeSynqAudienceModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
 import SynqActivatingView from '../synq-screens/SynqActivatingView';
+import {
+  buildSynqBroadcastFirestorePayload,
+  filterActiveFriendsForInbound,
+  formatSynqAudienceLabel,
+  loadSynqAudiencePreference,
+  saveSynqAudiencePreference,
+  selectionFromUserBroadcastFields,
+  type SynqAudienceSelection,
+  getMyAudienceSet,
+} from '@/src/lib/synqBroadcast';
+import { subscribeFriendGroups, type FriendGroup } from '@/src/lib/friendGroups';
+import { friendGroupsCacheByUser, friendsListCacheByUser } from '@/src/lib/socialCache';
 
 function prefetchParticipantAvatars(chat: { participantImages?: Record<string, unknown> } | null | undefined) {
   const images = chat?.participantImages || {};
@@ -256,6 +269,13 @@ export default function SynqScreen() {
   const ideaMapOpenTimerRef = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
   const [hasUnread, setHasUnread] = useState(false);
   const [showEndSynqModal, setShowEndSynqModal] = useState(false);
+  const [friendGroups, setFriendGroups] = useState<FriendGroup[]>([]);
+  const [audienceSelection, setAudienceSelection] = useState<SynqAudienceSelection>({
+    mode: "all",
+    groupIds: [],
+  });
+  const [changeAudienceVisible, setChangeAudienceVisible] = useState(false);
+  const [friendIds, setFriendIds] = useState<string[]>([]);
   const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
   const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
   const [mergeSelectMode, setMergeSelectMode] = useState(false);
@@ -308,11 +328,6 @@ export default function SynqScreen() {
       return bMs - aMs;
     });
   }, [visibleChats, pinnedChatIds]);
-
-  const visibleAvailableFriends = useMemo(
-    () => availableFriends.filter((f) => !isBlocked(f.id)),
-    [availableFriends, isBlocked]
-  );
 
   useEffect(() => {
     if (!activeChatId || !auth.currentUser?.uid) return;
@@ -533,6 +548,91 @@ export default function SynqScreen() {
     }
   }, [isExploreVisible]);
 
+  const clearSynqBroadcastFields = useMemo(
+    () => ({
+      synqBroadcastMode: deleteField(),
+      synqBroadcastGroupIds: deleteField(),
+      synqVisibleTo: deleteField(),
+    }),
+    []
+  );
+
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) return;
+    void loadSynqAudiencePreference(uid).then(setAudienceSelection);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) return;
+    const unsub = subscribeFriendGroups(
+      uid,
+      (groups) => {
+        friendGroupsCacheByUser[uid] = groups;
+        setFriendGroups(groups);
+      },
+      () => {}
+    );
+    return unsub;
+  }, [user?.uid]);
+
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) return;
+    const friendsRef = collection(db, "users", uid, "friends");
+    const unsub = onSnapshot(
+      friendsRef,
+      (snap) => {
+        setFriendIds(snap.docs.map((d) => d.id));
+      },
+      ignoreSnapshotPermissionDenied
+    );
+    return unsub;
+  }, [user?.uid]);
+
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) return;
+    const userRef = doc(db, "users", uid);
+    const unsub = onSnapshot(
+      userRef,
+      (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        setUserProfile(data);
+        if (computeSynqActiveFromUserData(data)) {
+          setAudienceSelection(selectionFromUserBroadcastFields(data));
+        }
+      },
+      ignoreSnapshotPermissionDenied
+    );
+    return unsub;
+  }, [user?.uid]);
+
+  const resolvedFriendIds = useMemo(() => {
+    const uid = user?.uid;
+    if (!uid) return [];
+    if (friendIds.length) return friendIds;
+    return (friendsListCacheByUser[uid] ?? []).map((f) => f.id);
+  }, [user?.uid, friendIds]);
+
+  const visibleAvailableFriends = useMemo(() => {
+    const unblocked = availableFriends.filter((f) => !isBlocked(f.id));
+    const uid = user?.uid;
+    if (!uid || status !== "active") return unblocked;
+    const myAudience = getMyAudienceSet(userProfile, resolvedFriendIds);
+    return filterActiveFriendsForInbound(unblocked, {
+      myAudience,
+      viewerId: uid,
+    });
+  }, [availableFriends, isBlocked, userProfile, resolvedFriendIds, status, user?.uid]);
+
+  const synqAudienceLabel = useMemo(
+    () => formatSynqAudienceLabel(userProfile, friendGroups),
+    [userProfile, friendGroups]
+  );
+
   useEffect(() => {
     const uid = user?.uid;
     if (!uid) return;
@@ -557,8 +657,12 @@ export default function SynqScreen() {
               const startTime = data.synqStartedAt.toDate().getTime();
               const hoursElapsed = (new Date().getTime() - startTime) / (1000 * 60 * 60);
               if (hoursElapsed > EXPIRATION_HOURS) {
-                await updateDoc(userRef, { status: 'inactive', memo: '' });
-                if (!cancelled) setMemo('');
+                await updateDoc(userRef, {
+                  status: "inactive",
+                  memo: "",
+                  ...clearSynqBroadcastFields,
+                });
+                if (!cancelled) setMemo("");
               }
             }
             nextStatus = "idle";
@@ -862,20 +966,54 @@ export default function SynqScreen() {
     }
   };
 
+  const applySynqAudience = async (selection: SynqAudienceSelection) => {
+    if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    const broadcast = buildSynqBroadcastFirestorePayload(
+      selection,
+      friendGroups,
+      resolvedFriendIds
+    );
+    await updateDoc(doc(db, "users", uid), broadcast);
+    await saveSynqAudiencePreference(uid, selection);
+    setAudienceSelection(selection);
+    setUserProfile((prev: Record<string, unknown> | null) =>
+      prev ? { ...prev, ...broadcast } : prev
+    );
+  };
+
   const startSynq = async () => {
     if (!auth.currentUser || isStartingSynq) return;
     if (memo.trim() && rejectIfObjectionable(memo)) return;
     Vibration.vibrate(200);
     setIsStartingSynq(true);
     try {
-      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+      const uid = auth.currentUser.uid;
+      const broadcast = buildSynqBroadcastFirestorePayload(
+        audienceSelection,
+        friendGroups,
+        resolvedFriendIds
+      );
+      await updateDoc(doc(db, "users", uid), {
         memo,
-        status: 'available',
-        synqStartedAt: serverTimestamp()
+        status: "available",
+        synqStartedAt: serverTimestamp(),
+        ...broadcast,
       });
-      AsyncStorage.setItem(synqStatusStorageKey(auth.currentUser.uid), "active").catch(() => {});
+      await saveSynqAudiencePreference(uid, audienceSelection);
+      AsyncStorage.setItem(synqStatusStorageKey(uid), "active").catch(() => {});
+      setUserProfile((prev: Record<string, unknown> | null) =>
+        prev
+          ? {
+              ...prev,
+              memo,
+              status: "available",
+              ...broadcast,
+            }
+          : prev
+      );
       setLaunchOverlay(true);
-      setSynqStatus(setSynq, 'activating');
+      setSynqStatus(setSynq, "activating");
     } catch {
       showActionError("Could not start Synq. Check your connection and try again.");
     } finally {
@@ -1130,7 +1268,7 @@ export default function SynqScreen() {
 
       const myDisplayName =
         participantNames[myId] || userProfile?.displayName || "Someone";
-      const systemText = `${firstName(myDisplayName)} combined two conversations`;
+      const systemText = `${(myDisplayName || "").trim().split(/\s+/)[0] || "Someone"} combined two conversations`;
 
       const chatRef = await addDoc(collection(db, "chats"), {
         participants: mergedParticipants,
@@ -1273,6 +1411,8 @@ export default function SynqScreen() {
               handleConnect={handleConnect}
               endSynq={endSynq}
               insetsBottom={insets.bottom}
+              audienceLabel={synqAudienceLabel}
+              openChangeAudience={() => setChangeAudienceVisible(true)}
               openMessagesInbox={() => {
                 setMessagesModalVisible(true);
                 setMessagesPane("inbox");
@@ -1292,6 +1432,14 @@ export default function SynqScreen() {
                 setMemo={setMemo}
                 onStartSynq={startSynq}
                 isStartingSynq={isStartingSynq}
+                friendGroups={friendGroups}
+                audienceSelection={audienceSelection}
+                onAudienceSelectionChange={(next) => {
+                  setAudienceSelection(next);
+                  if (auth.currentUser?.uid) {
+                    void saveSynqAudiencePreference(auth.currentUser.uid, next);
+                  }
+                }}
               />
             </Reanimated.View>
           </View>
@@ -1521,13 +1669,22 @@ export default function SynqScreen() {
             await updateDoc(doc(db, "users", auth.currentUser.uid), {
               status: "inactive",
               memo: "",
+              ...clearSynqBroadcastFields,
             });
             AsyncStorage.setItem(synqStatusStorageKey(auth.currentUser.uid), "idle").catch(() => {});
 
             setMemo("");
             setSynqStatus(setSynq, "idle");
             setIsEditModalVisible(false);
+            setAudienceSelection({ mode: "all", groupIds: [] });
           }}
+        />
+        <ChangeSynqAudienceModal
+          visible={changeAudienceVisible}
+          groups={friendGroups}
+          initialSelection={audienceSelection}
+          onClose={() => setChangeAudienceVisible(false)}
+          onSave={applySynqAudience}
         />
       </View>
     </TouchableWithoutFeedback>
@@ -1621,6 +1778,20 @@ const styles = StyleSheet.create({
   activeMemoRow: {
     marginTop: 14,
     width: "100%",
+  },
+  audienceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 2,
+  },
+  audienceText: {
+    flex: 1,
+    color: MUTED2,
+    fontSize: 13,
+    fontFamily: fonts.medium,
   },
   activeMemoCard: {
     flexDirection: "row",

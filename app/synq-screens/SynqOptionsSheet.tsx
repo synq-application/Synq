@@ -21,6 +21,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onEditMemo: () => void;
+  onChangeAudience?: () => void;
   onEndSynq: () => void;
 };
 
@@ -28,6 +29,7 @@ export default function SynqOptionsSheet({
   visible,
   onClose,
   onEditMemo,
+  onChangeAudience,
   onEndSynq,
 }: Props) {
   return (
@@ -49,6 +51,24 @@ export default function SynqOptionsSheet({
               <Ionicons name="create-outline" size={22} color={TEXT} />
               <Text style={styles.optionText}>Edit status</Text>
             </TouchableOpacity>
+            {onChangeAudience ? (
+              <>
+                <View style={styles.divider} />
+                <TouchableOpacity
+                  style={styles.option}
+                  onPress={() => {
+                    onClose();
+                    onChangeAudience();
+                  }}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change audience"
+                >
+                  <Ionicons name="people-outline" size={22} color={TEXT} />
+                  <Text style={styles.optionText}>Change audience</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
             <View style={styles.divider} />
             <TouchableOpacity
               style={styles.option}

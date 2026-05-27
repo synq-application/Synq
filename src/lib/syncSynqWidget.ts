@@ -5,7 +5,9 @@ import { doc, onSnapshot } from "firebase/firestore";
 import type { DocumentData } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { ignoreSnapshotPermissionDenied } from "./firestoreListeners";
+import { formatSynqAudienceLabel } from "./synqBroadcast";
 import { computeSynqActiveFromUserData } from "./synqSession";
+import { friendGroupsCacheByUser } from "./socialCache";
 
 const isExpoGo =
   Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -16,7 +18,10 @@ const isExpoGo =
  * Expo Go: no native widget module (noop).
  */
 
-export function mapUserDocToWidgetProps(data: DocumentData | undefined): {
+export function mapUserDocToWidgetProps(
+  data: DocumentData | undefined,
+  audienceLabel?: string | null
+): {
   statusLabel: string;
   memo: string;
   isActive: boolean;
@@ -25,8 +30,11 @@ export function mapUserDocToWidgetProps(data: DocumentData | undefined): {
   const rawMemo = typeof data?.memo === "string" ? data.memo.trim() : "";
   const memo =
     rawMemo.length > 120 ? `${rawMemo.slice(0, 117)}…` : rawMemo;
+  const baseStatus = isAvailable ? "Synq active" : "Not Synqing";
+  const statusLabel =
+    isAvailable && audienceLabel ? `${baseStatus} · ${audienceLabel}` : baseStatus;
   return {
-    statusLabel: isAvailable ? "Synq active" : "Not Synqing",
+    statusLabel,
     memo,
     isActive: Boolean(isAvailable),
   };
@@ -84,7 +92,10 @@ export function startSynqGlanceWidgetSync(): () => void {
     unsubDoc = onSnapshot(
       doc(db, "users", user.uid),
       (snap) => {
-        lastProps = mapUserDocToWidgetProps(snap.data());
+        const data = snap.data();
+        const groups = friendGroupsCacheByUser[user.uid] ?? [];
+        const audienceLabel = formatSynqAudienceLabel(data, groups);
+        lastProps = mapUserDocToWidgetProps(data, audienceLabel);
         push();
       },
       ignoreSnapshotPermissionDenied
