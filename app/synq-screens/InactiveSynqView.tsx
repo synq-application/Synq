@@ -59,14 +59,10 @@ type Props = {
 
 const PULSE_SIZE = 238;
 const ORB_STAGE = 312;
-const CONTENT_W = 300;
+const CONTENT_W = 322;
 const IDLE_RING_COUNT = 2;
 const IDLE_RING_CYCLE_MS = 4000;
 const IDLE_RING_STAGGER_MS = 1400;
-
-const FIELD_ICON_SIZE = 20;
-const ICON_SLOT_W = 24;
-const TRAILING_SLOT_W = 24;
 
 const MOOD_HINTS = [
   "What are you down for?",
@@ -76,10 +72,9 @@ const MOOD_HINTS = [
 ];
 const MOOD_HINT_INTERVAL_MS = 9000;
 
-const GLASS_BORDER_IDLE = "rgba(0,255,133,0.18)";
-const GLASS_BORDER_FOCUS = "rgba(0,255,133,0.42)";
-const GLASS_BG_IDLE = "rgba(255,255,255,0.028)";
-const GLASS_BG_FOCUS = "rgba(0,255,133,0.05)";
+const FIELD_BG_FOCUS = "rgba(255,255,255,0.05)";
+const ICON_WELL_BG = "rgba(0,255,133,0.07)";
+const ICON_MUTED = "rgba(0,255,133,0.88)";
 
 // ——— Mood hints ———
 
@@ -272,7 +267,7 @@ export default function InactiveSynqView({
   const pressScale = useSharedValue(1);
   const [audienceSheetOpen, setAudienceSheetOpen] = useState(false);
   const [memoFocused, setMemoFocused] = useState(false);
-  const ctaGlow = useSharedValue(0.76);
+  const ctaGlow = useSharedValue(0.88);
   const panelFocus = useSharedValue(0);
 
   const audienceLabel = formatAudienceSelectionLabel(audienceSelection, friendGroups);
@@ -291,16 +286,11 @@ export default function InactiveSynqView({
     opacity: ctaGlow.value,
   }));
 
-  const panelStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(
-      panelFocus.value,
-      [0, 1],
-      [GLASS_BORDER_IDLE, GLASS_BORDER_FOCUS]
-    ),
+  const moodRowStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       panelFocus.value,
       [0, 1],
-      [GLASS_BG_IDLE, GLASS_BG_FOCUS]
+      ["rgba(255,255,255,0)", FIELD_BG_FOCUS]
     ),
   }));
 
@@ -308,8 +298,8 @@ export default function InactiveSynqView({
     if (reduced || isStartingSynq) return;
     ctaGlow.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0.88, { duration: 2600, easing: Easing.inOut(Easing.sin) })
+        withTiming(1, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.8, { duration: 2800, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
@@ -373,16 +363,16 @@ export default function InactiveSynqView({
           </Animated.View>
 
           <Animated.View entering={enter(60)} style={styles.intentWrap}>
-            <Animated.View style={[styles.intentCard, panelStyle]}>
-              <View style={styles.intentRow}>
-                <View style={styles.iconSlot}>
+            <View style={styles.intentPanel}>
+              <Animated.View style={[styles.intentRow, moodRowStyle]}>
+                <View style={styles.iconWell}>
                   <Ionicons
                     name="chatbubble-ellipses-outline"
-                    size={FIELD_ICON_SIZE}
-                    color={ACCENT}
+                    size={18}
+                    color={ICON_MUTED}
                   />
                 </View>
-                <View style={styles.intentRowBody}>
+                <View style={styles.fieldBody}>
                   <SlowMoodPlaceholder active={showMoodHints} />
                   <TextInput
                     style={[styles.moodInput, showMoodHints && styles.moodInputGhost]}
@@ -397,35 +387,32 @@ export default function InactiveSynqView({
                     accessibilityHint="Optional. Friends see this while you're active."
                   />
                 </View>
-                <View style={styles.trailingSlot} />
-              </View>
+              </Animated.View>
 
-              <View style={styles.intentDivider} />
+              <View style={styles.intentRowDivider} />
 
               <Pressable
                 onPress={openAudienceSheet}
                 style={({ pressed }) => [
                   styles.intentRow,
-                  pressed && styles.rowPressed,
+                  pressed && styles.intentRowPressed,
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={`Visible to ${audienceLabel}`}
                 accessibilityHint="Opens audience picker"
               >
-                <View style={styles.iconSlot}>
-                  <Ionicons name="eye-outline" size={FIELD_ICON_SIZE} color={ACCENT} />
+                <View style={styles.iconWell}>
+                  <Ionicons name="eye-outline" size={18} color={ICON_MUTED} />
                 </View>
-                <View style={styles.audienceRowBody}>
-                  <Text style={styles.audienceLabel}>Visible to</Text>
-                  <View style={styles.audienceSelector}>
-                    <Text style={styles.audienceSelectorText} numberOfLines={1}>
-                      {audienceLabel}
-                    </Text>
-                    <Ionicons name="chevron-down" size={14} color={ACCENT} />
-                  </View>
+                <Text style={styles.audienceLabel}>Visible to</Text>
+                <View style={styles.audienceValueWrap}>
+                  <Text style={styles.audienceValue} numberOfLines={1}>
+                    {audienceLabel}
+                  </Text>
+                  <Ionicons name="chevron-down" size={14} color={MUTED3} />
                 </View>
               </Pressable>
-            </Animated.View>
+            </View>
           </Animated.View>
 
           <Animated.View entering={enter(120)} style={styles.activationBlock}>
@@ -504,40 +491,43 @@ const styles = StyleSheet.create({
   headlineAccent: {
     color: ACCENT,
     fontFamily: fonts.heavy,
-    textShadowColor: "rgba(0,255,133,0.22)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
   },
   intentWrap: {
     width: CONTENT_W,
     marginBottom: SPACE_6,
   },
-  intentCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER_IDLE,
-    backgroundColor: GLASS_BG_IDLE,
+  intentPanel: {
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.09)",
+    backgroundColor: "rgba(255,255,255,0.025)",
     overflow: "hidden",
   },
   intentRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 52,
+    minHeight: 56,
     paddingHorizontal: SPACE_4,
-    paddingVertical: SPACE_3,
     gap: SPACE_3,
   },
-  iconSlot: {
-    width: ICON_SLOT_W,
+  intentRowPressed: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  intentRowDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    marginLeft: SPACE_4 + 32 + SPACE_3,
+  },
+  iconWell: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: ICON_WELL_BG,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
-  trailingSlot: {
-    width: TRAILING_SLOT_W,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  intentRowBody: {
+  fieldBody: {
     flex: 1,
     minHeight: 24,
     justifyContent: "center",
@@ -547,17 +537,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     color: MUTED3,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 21,
     fontFamily: fonts.book,
-    letterSpacing: 0.05,
+    letterSpacing: 0.1,
   },
   moodInput: {
     flex: 1,
     color: TEXT,
-    fontSize: 16,
-    lineHeight: 22,
-    fontFamily: fonts.medium,
+    fontSize: 15,
+    lineHeight: 21,
+    fontFamily: fonts.book,
     padding: 0,
     margin: 0,
     minHeight: 24,
@@ -566,55 +556,36 @@ const styles = StyleSheet.create({
   moodInputGhost: {
     color: "transparent",
   },
-  intentDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    marginHorizontal: SPACE_4,
-  },
-  rowPressed: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-  },
-  audienceRowBody: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    minWidth: 0,
-    gap: SPACE_3,
-  },
   audienceLabel: {
     color: MUTED3,
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 21,
     fontFamily: fonts.book,
-    letterSpacing: 0.1,
+    letterSpacing: 0.08,
     flexShrink: 0,
   },
-  audienceSelector: {
+  audienceValueWrap: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    flexShrink: 1,
-    maxWidth: "62%",
-    paddingVertical: 7,
-    paddingLeft: SPACE_3,
-    paddingRight: SPACE_2 + 2,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.045)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.1)",
+    justifyContent: "flex-end",
+    gap: 6,
+    minWidth: 0,
+    marginLeft: SPACE_3,
   },
-  audienceSelectorText: {
+  audienceValue: {
     flexShrink: 1,
     color: MUTED2,
     fontSize: 15,
-    lineHeight: 20,
-    fontFamily: fonts.book,
-    letterSpacing: 0.05,
+    lineHeight: 21,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.02,
+    textAlign: "right",
   },
   activationBlock: {
     alignItems: "center",
     width: "100%",
+    marginTop: -SPACE_2,
   },
   stage: {
     width: ORB_STAGE,
@@ -641,26 +612,26 @@ const styles = StyleSheet.create({
     width: PULSE_SIZE + 36,
     height: PULSE_SIZE + 36,
     borderRadius: (PULSE_SIZE + 36) / 2,
-    backgroundColor: "rgba(0,255,133,0.04)",
+    backgroundColor: "rgba(0,255,133,0.03)",
   },
   orbHaloNear: {
     position: "absolute",
     width: PULSE_SIZE + 16,
     height: PULSE_SIZE + 16,
     borderRadius: (PULSE_SIZE + 16) / 2,
-    backgroundColor: "rgba(0,255,133,0.07)",
+    backgroundColor: "rgba(0,255,133,0.05)",
   },
   orbHaloCore: {
     position: "absolute",
     width: PULSE_SIZE + 4,
     height: PULSE_SIZE + 4,
     borderRadius: (PULSE_SIZE + 4) / 2,
-    backgroundColor: "rgba(0,255,133,0.03)",
+    backgroundColor: "rgba(0,255,133,0.02)",
     shadowColor: ACCENT,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    elevation: 3,
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    elevation: 2,
   },
   orbRingOuter: {
     position: "absolute",
@@ -696,16 +667,16 @@ const styles = StyleSheet.create({
   ctaBlock: {
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 36,
+    minHeight: 32,
     paddingHorizontal: SPACE_3,
-    marginTop: 0,
+    marginTop: -14,
   },
   ctaText: {
-    color: MUTED3,
+    color: MUTED2,
     fontSize: 13,
     lineHeight: 16,
     fontFamily: fonts.medium,
-    letterSpacing: 1.1,
+    letterSpacing: 1.4,
     textTransform: "uppercase",
     textAlign: "center",
   },
