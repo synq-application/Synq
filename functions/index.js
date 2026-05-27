@@ -311,6 +311,7 @@ exports.deleteMyAccount = onCall(
       await deleteCollectionInChunks(db.collection("users").doc(uid).collection("outgoingFriendRequests"), 400);
       await deleteCollectionInChunks(db.collection("users").doc(uid).collection("notificationLocks"), 400);
       await deleteCollectionInChunks(db.collection("users").doc(uid).collection("notifications"), 400);
+      await deleteCollectionInChunks(db.collection("users").doc(uid).collection("friendGroups"), 400);
       await db.collection("users").doc(uid).delete();
       await admin.auth().deleteUser(uid);
 
@@ -343,6 +344,38 @@ exports.removeFriendMutual = onCall(
     batch.delete(db.collection("users").doc(uid).collection("outgoingFriendRequests").doc(otherUid));
     batch.delete(db.collection("users").doc(otherUid).collection("outgoingFriendRequests").doc(uid));
     await batch.commit();
+
+    const pruneFriendFromGroups = async (ownerUid, removedFriendId) => {
+      const groupsSnap = await db
+        .collection("users")
+        .doc(ownerUid)
+        .collection("friendGroups")
+        .get();
+      if (groupsSnap.empty) return;
+
+      const pruneBatch = db.batch();
+      let pruneWrites = 0;
+      groupsSnap.docs.forEach((groupDoc) => {
+        const memberIds = Array.isArray(groupDoc.data()?.memberIds)
+          ? groupDoc.data().memberIds.map((id) => String(id || "").trim()).filter(Boolean)
+          : [];
+        if (!memberIds.includes(removedFriendId)) return;
+        pruneBatch.update(groupDoc.ref, {
+          memberIds: memberIds.filter((id) => id !== removedFriendId),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        pruneWrites += 1;
+      });
+      if (pruneWrites > 0) {
+        await pruneBatch.commit();
+      }
+    };
+
+    await Promise.all([
+      pruneFriendFromGroups(uid, otherUid),
+      pruneFriendFromGroups(otherUid, uid),
+    ]);
+
     return { ok: true };
   }
 );
