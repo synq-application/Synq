@@ -1,355 +1,715 @@
-import {
-  ACCENT,
-  BG,
-  BORDER,
-  MUTED2,
-  MUTED3,
-  SPACE_3,
-  SPACE_4,
-  SPACE_5,
-  SPACE_6,
-  SURFACE,
-  TAB_BAR_SCROLL_INSET,
-  TEXT,
-  TYPE_BODY,
-  fonts,
-} from "@/constants/Variables";
-import SynqAudienceSheet from "@/app/synq-screens/SynqAudienceSheet";
-import type { FriendGroup } from "@/src/lib/friendGroups";
-import { formatAudienceSelectionLabel, type SynqAudienceSelection } from "@/src/lib/synqBroadcast";
-import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { Image as ExpoImage } from "expo-image";
-import React, { useState } from "react";
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
-type Props = {
-  memo: string;
-  setMemo: (text: string) => void;
-  onStartSynq: () => void;
-  isStartingSynq?: boolean;
-  friendGroups: FriendGroup[];
-  audienceSelection: SynqAudienceSelection;
-  onAudienceSelectionChange: (next: SynqAudienceSelection) => void;
-};
-
-const PULSE_SIZE = 252;
-const CONTENT_W = 320;
-const IDLE_CONTENT_TOP_NUDGE = 16;
-
-export default function InactiveSynqView({
-  memo,
-  setMemo,
-  onStartSynq,
-  isStartingSynq = false,
-  friendGroups,
-  audienceSelection,
-  onAudienceSelectionChange,
-}: Props) {
-  const insets = useSafeAreaInsets();
-  const reduced = useReducedMotion();
-  const pressScale = useSharedValue(1);
-  const [audienceSheetOpen, setAudienceSheetOpen] = useState(false);
-
-  const audienceLabel = formatAudienceSelectionLabel(audienceSelection, friendGroups);
-
-  const bottomPad =
-    TAB_BAR_SCROLL_INSET +
-    SPACE_6 +
-    (Platform.OS === "android" ? insets.bottom : 0);
-
-  const pressStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pressScale.value }],
-  }));
-
-  const handlePressIn = () => {
-    if (isStartingSynq) return;
-    pressScale.value = withSpring(0.94, { damping: 18, stiffness: 320 });
-  };
-
-  const handlePressOut = () => {
-    pressScale.value = withSpring(1, { damping: 16, stiffness: 280 });
-  };
-
-  const handlePress = () => {
-    if (isStartingSynq) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    onStartSynq();
-  };
-
-  const openAudienceSheet = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setAudienceSheetOpen(true);
-  };
-
-  const enter = reduced ? FadeIn.duration(1) : FadeInDown.duration(420).springify();
-
-  return (
-    <View style={styles.root}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.scrollContent,
-          {
-            paddingTop: insets.top + SPACE_5 + IDLE_CONTENT_TOP_NUDGE,
-            paddingBottom: bottomPad,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
-        <Animated.View entering={enter} style={styles.stack}>
-          <Text style={styles.headline}>
-            Let&apos;s <Text style={styles.headlineAccent}>Synq.</Text>
-          </Text>
-
-          <View style={styles.composeSection}>
-            <View style={styles.composePill}>
-              <View style={styles.memoRow}>
-                <Ionicons
-                  name="chatbubble-ellipses-outline"
-                  size={17}
-                  color={MUTED2}
-                  style={styles.rowIcon}
-                />
-                <TextInput
-                  style={styles.memoInput}
-                  value={memo}
-                  onChangeText={setMemo}
-                  placeholder="What are you down for?"
-                  placeholderTextColor={MUTED3}
-                  blurOnSubmit
-                  returnKeyType="done"
-                  accessibilityLabel="What you're down for"
-                  accessibilityHint="Optional. Leave blank to skip."
-                />
-              </View>
-              <View style={styles.composeDivider} />
-              <Pressable
-                onPress={openAudienceSheet}
-                style={({ pressed }) => [styles.audienceRow, pressed && styles.audienceRowPressed]}
-                accessibilityRole="button"
-                accessibilityLabel={`Share with ${audienceLabel}`}
-                accessibilityHint="Opens audience picker"
-              >
-                <Ionicons name="people-outline" size={17} color={MUTED2} style={styles.rowIcon} />
-                <Text style={styles.audienceValue} numberOfLines={1}>
-                  {audienceLabel}
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={MUTED3} />
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.pulseBlock}>
-            <AnimatedPressable
-              onPress={handlePress}
-              onPressIn={handlePressIn}
-              onPressOut={handlePressOut}
-              disabled={isStartingSynq}
-              style={[
-                styles.pulseHit,
-                pressStyle,
-                isStartingSynq && styles.pulseStarting,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isStartingSynq ? "Activating Synq" : "Tap to activate Synq"
-              }
-            >
-              <View style={styles.pulseGlow} pointerEvents="none" />
-              <View style={styles.pulseRing} pointerEvents="none" />
-              <ExpoImage
-                source={require("../../assets/pulse.gif")}
-                style={styles.pulseGif}
-                contentFit="contain"
-                transition={0}
-                cachePolicy="memory-disk"
-              />
-            </AnimatedPressable>
-            <Pressable
-              onPress={handlePress}
-              disabled={isStartingSynq}
-              hitSlop={{ top: 8, bottom: 12, left: 24, right: 24 }}
-              style={styles.ctaHit}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isStartingSynq ? "Activating Synq" : "Tap to activate Synq"
-              }
-            >
-              <Text style={styles.ctaLabel}>TAP TO ACTIVATE</Text>
-            </Pressable>
-          </View>
-        </Animated.View>
-      </ScrollView>
-
-      <SynqAudienceSheet
-        visible={audienceSheetOpen}
-        groups={friendGroups}
-        selection={audienceSelection}
-        onChangeSelection={onAudienceSelectionChange}
-        onClose={() => setAudienceSheetOpen(false)}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: BG,
-  },
-  scroll: {
-    flex: 1,
-    backgroundColor: "transparent",
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: SPACE_5,
-  },
-  stack: {
-    width: "100%",
-    maxWidth: CONTENT_W + 40,
-    alignSelf: "center",
-    alignItems: "center",
-  },
-  headline: {
-    color: TEXT,
-    fontSize: 32,
-    lineHeight: 38,
-    fontFamily: fonts.heavy,
-    letterSpacing: -0.4,
-    textAlign: "center",
-    marginBottom: SPACE_6,
-  },
-  headlineAccent: {
-    color: ACCENT,
-    fontFamily: fonts.heavy,
-  },
-  composeSection: {
-    width: CONTENT_W,
-    alignSelf: "center",
-    marginBottom: SPACE_5,
-  },
-  composePill: {
-    width: "100%",
-    backgroundColor: SURFACE,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: BORDER,
-    overflow: "hidden",
-  },
-  memoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACE_4 + 2,
-    paddingVertical: Platform.OS === "ios" ? 11 : 9,
-  },
-  composeDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: BORDER,
-    marginHorizontal: SPACE_4,
-  },
-  audienceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACE_4 + 2,
-    paddingVertical: Platform.OS === "ios" ? 11 : 9,
-  },
-  audienceRowPressed: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-  },
-  rowIcon: {
-    marginRight: SPACE_3,
-  },
-  memoInput: {
-    flex: 1,
-    color: TEXT,
-    fontSize: TYPE_BODY,
-    lineHeight: 22,
-    fontFamily: fonts.medium,
-    padding: 0,
-    margin: 0,
-    minHeight: 22,
-    backgroundColor: "transparent",
-  },
-  audienceValue: {
-    flex: 1,
-    color: TEXT,
-    fontSize: TYPE_BODY,
-    lineHeight: 22,
-    fontFamily: fonts.medium,
-  },
-  pulseBlock: {
-    alignItems: "center",
-    width: CONTENT_W,
-    paddingTop: SPACE_3,
-  },
-  pulseHit: {
-    width: 306,
-    height: 288,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pulseGlow: {
-    position: "absolute",
-    width: PULSE_SIZE + 6,
-    height: PULSE_SIZE + 6,
-    borderRadius: (PULSE_SIZE + 6) / 2,
-    backgroundColor: "rgba(0,255,133,0.08)",
-  },
-  pulseRing: {
-    position: "absolute",
-    width: PULSE_SIZE + 2,
-    height: PULSE_SIZE + 2,
-    borderRadius: (PULSE_SIZE + 2) / 2,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,255,133,0.22)",
-  },
-  pulseGif: {
-    width: PULSE_SIZE,
-    height: PULSE_SIZE,
-  },
-  pulseStarting: {
-    opacity: 0.88,
-  },
-  ctaHit: {
-    marginTop: SPACE_5,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: SPACE_4,
-  },
-  ctaLabel: {
-    color: MUTED2,
-    fontSize: 13,
-    lineHeight: 16,
-    fontFamily: fonts.medium,
-    letterSpacing: 1.4,
-    textAlign: "center",
-  },
-});
-
+import {
+  ACCENT,
+  BG,
+  MUTED3,
+  SPACE_2,
+  SPACE_3,
+  SPACE_4,
+  SPACE_5,
+  SPACE_6,
+  TAB_BAR_SCROLL_INSET,
+  TEXT,
+  fonts,
+} from "@/constants/Variables";
+import SynqAudienceSheet from "@/app/synq-screens/SynqAudienceSheet";
+import type { FriendGroup } from "@/src/lib/friendGroups";
+import { formatAudienceSelectionLabel, type SynqAudienceSelection } from "@/src/lib/synqBroadcast";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { Image as ExpoImage } from "expo-image";
+import React, { useEffect, useState } from "react";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  interpolateColor,
+  runOnJS,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+type Props = {
+  memo: string;
+  setMemo: (text: string) => void;
+  onStartSynq: () => void;
+  isStartingSynq?: boolean;
+  friendGroups: FriendGroup[];
+  audienceSelection: SynqAudienceSelection;
+  onAudienceSelectionChange: (next: SynqAudienceSelection) => void;
+};
+
+const PULSE_SIZE = 238;
+const ORB_STAGE = 312;
+const CONTENT_W = 300;
+const IDLE_RING_COUNT = 2;
+const IDLE_RING_CYCLE_MS = 4000;
+const IDLE_RING_STAGGER_MS = 1400;
+
+const FIELD_ICON_SIZE = 20;
+const ICON_SLOT_W = 24;
+const TRAILING_SLOT_W = 24;
+
+const MOOD_HINTS = [
+  "What are you down for?",
+  "Drinks tonight?",
+  "What's the move?",
+  "Who's out?",
+];
+const MOOD_HINT_INTERVAL_MS = 9000;
+
+const GLASS_BORDER_IDLE = "rgba(0,255,133,0.18)";
+const GLASS_BORDER_FOCUS = "rgba(0,255,133,0.42)";
+const GLASS_BG_IDLE = "rgba(255,255,255,0.028)";
+const GLASS_BG_FOCUS = "rgba(0,255,133,0.05)";
+
+// ——— Mood hints ———
+
+function SlowMoodPlaceholder({ active }: { active: boolean }) {
+  const reduced = useReducedMotion();
+  const [index, setIndex] = useState(0);
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    if (!active || reduced) return;
+    const advance = () => setIndex((i) => (i + 1) % MOOD_HINTS.length);
+    const id = setInterval(() => {
+      opacity.value = withTiming(0, { duration: 600 }, (finished) => {
+        if (finished) {
+          runOnJS(advance)();
+          opacity.value = withTiming(1, { duration: 720 });
+        }
+      });
+    }, MOOD_HINT_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [active, reduced, opacity]);
+
+  const ghostStyle = useAnimatedStyle(() => ({ opacity: opacity.value * 0.92 }));
+
+  if (!active) {
+    if (reduced) {
+      return (
+        <Text style={styles.moodGhost} numberOfLines={1}>
+          {MOOD_HINTS[0]}
+        </Text>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <Animated.Text pointerEvents="none" style={[styles.moodGhost, ghostStyle]} numberOfLines={1}>
+      {MOOD_HINTS[index]}
+    </Animated.Text>
+  );
+}
+
+// ——— Orb effects ———
+
+function IdleSonarRing({ index, disabled }: { index: number; disabled: boolean }) {
+  const scale = useSharedValue(0.84);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (disabled) return;
+    const delay = index * IDLE_RING_STAGGER_MS;
+    const loopMs = IDLE_RING_CYCLE_MS + (IDLE_RING_COUNT - 1) * IDLE_RING_STAGGER_MS;
+
+    const runCycle = () => {
+      scale.value = 0.84;
+      opacity.value = 0.14;
+      scale.value = withDelay(
+        delay,
+        withTiming(1.52, { duration: IDLE_RING_CYCLE_MS, easing: Easing.out(Easing.cubic) })
+      );
+      opacity.value = withDelay(
+        delay,
+        withTiming(0, { duration: IDLE_RING_CYCLE_MS, easing: Easing.out(Easing.quad) })
+      );
+    };
+
+    runCycle();
+    const id = setInterval(runCycle, loopMs);
+    return () => clearInterval(id);
+  }, [disabled, index, opacity, scale]);
+
+  const ringStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return <Animated.View style={[styles.idleRing, ringStyle]} pointerEvents="none" />;
+}
+
+function OrbEdgeShimmer({ disabled }: { disabled: boolean }) {
+  const shimmer = useSharedValue(0.14);
+
+  useEffect(() => {
+    if (disabled) return;
+    shimmer.value = withRepeat(
+      withSequence(
+        withTiming(0.34, { duration: 3200, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.12, { duration: 3200, easing: Easing.inOut(Easing.sin) })
+      ),
+      -1,
+      true
+    );
+  }, [disabled, shimmer]);
+
+  const style = useAnimatedStyle(() => ({ opacity: shimmer.value }));
+  return <Animated.View style={[styles.orbRingShimmer, style]} pointerEvents="none" />;
+}
+
+function ActivationOrb({
+  disabled,
+  pressStyle,
+  onPress,
+  onPressIn,
+  onPressOut,
+  isStartingSynq,
+}: {
+  disabled: boolean;
+  pressStyle: ReturnType<typeof useAnimatedStyle>;
+  onPress: () => void;
+  onPressIn: () => void;
+  onPressOut: () => void;
+  isStartingSynq: boolean;
+}) {
+  const reduced = useReducedMotion();
+  const breathe = useSharedValue(1);
+  const glow = useSharedValue(0.28);
+
+  useEffect(() => {
+    if (reduced || isStartingSynq) return;
+    breathe.value = withRepeat(
+      withSequence(
+        withTiming(1.035, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
+        withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.sin) })
+      ),
+      -1,
+      true
+    );
+    glow.value = withRepeat(
+      withSequence(
+        withTiming(0.4, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.24, { duration: 3000, easing: Easing.inOut(Easing.sin) })
+      ),
+      -1,
+      true
+    );
+  }, [breathe, glow, isStartingSynq, reduced]);
+
+  const haloFar = useAnimatedStyle(() => ({
+    transform: [{ scale: breathe.value * 1.08 }],
+    opacity: glow.value * 0.45,
+  }));
+  const haloNear = useAnimatedStyle(() => ({
+    transform: [{ scale: 0.97 + (breathe.value - 1) * 2 }],
+    opacity: 0.12 + glow.value * 0.35,
+  }));
+
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      disabled={disabled}
+      style={[styles.orbHit, pressStyle, isStartingSynq && styles.orbStarting]}
+      accessibilityRole="button"
+      accessibilityLabel={isStartingSynq ? "Activating Synq" : "Tap to activate Synq"}
+    >
+      {Array.from({ length: IDLE_RING_COUNT }, (_, i) => (
+        <IdleSonarRing key={i} index={i} disabled={reduced || isStartingSynq} />
+      ))}
+      <Animated.View style={[styles.orbHaloFar, haloFar]} pointerEvents="none" />
+      <Animated.View style={[styles.orbHaloNear, haloNear]} pointerEvents="none" />
+      <View style={styles.orbHaloCore} pointerEvents="none" />
+      <View style={styles.orbRingOuter} pointerEvents="none" />
+      <OrbEdgeShimmer disabled={reduced || isStartingSynq} />
+      <View style={styles.orbRingInner} pointerEvents="none" />
+      <ExpoImage
+        source={require("../../assets/pulse.gif")}
+        style={styles.orbLogo}
+        contentFit="contain"
+        transition={0}
+        cachePolicy="memory-disk"
+      />
+    </AnimatedPressable>
+  );
+}
+
+// ——— Screen ———
+
+export default function InactiveSynqView({
+  memo,
+  setMemo,
+  onStartSynq,
+  isStartingSynq = false,
+  friendGroups,
+  audienceSelection,
+  onAudienceSelectionChange,
+}: Props) {
+  const insets = useSafeAreaInsets();
+  const reduced = useReducedMotion();
+  const pressScale = useSharedValue(1);
+  const [audienceSheetOpen, setAudienceSheetOpen] = useState(false);
+  const [memoFocused, setMemoFocused] = useState(false);
+  const ctaGlow = useSharedValue(0.76);
+  const panelFocus = useSharedValue(0);
+
+  const audienceLabel = formatAudienceSelectionLabel(audienceSelection, friendGroups);
+  const memoEmpty = memo.trim().length === 0;
+  const showMoodHints = memoEmpty && !memoFocused;
+  const panelActive = memoFocused || !memoEmpty;
+
+  const bottomPad =
+    TAB_BAR_SCROLL_INSET + SPACE_6 + (Platform.OS === "android" ? insets.bottom : 0);
+
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pressScale.value }],
+  }));
+
+  const ctaStyle = useAnimatedStyle(() => ({
+    opacity: ctaGlow.value,
+  }));
+
+  const panelStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(
+      panelFocus.value,
+      [0, 1],
+      [GLASS_BORDER_IDLE, GLASS_BORDER_FOCUS]
+    ),
+    backgroundColor: interpolateColor(
+      panelFocus.value,
+      [0, 1],
+      [GLASS_BG_IDLE, GLASS_BG_FOCUS]
+    ),
+  }));
+
+  useEffect(() => {
+    if (reduced || isStartingSynq) return;
+    ctaGlow.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.88, { duration: 2600, easing: Easing.inOut(Easing.sin) })
+      ),
+      -1,
+      true
+    );
+  }, [ctaGlow, isStartingSynq, reduced]);
+
+  useEffect(() => {
+    panelFocus.value = withTiming(panelActive ? 1 : 0, {
+      duration: panelActive ? 300 : 450,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [panelActive, panelFocus]);
+
+  const handlePressIn = () => {
+    if (isStartingSynq) return;
+    pressScale.value = withSpring(0.95, { damping: 20, stiffness: 340 });
+  };
+
+  const handlePressOut = () => {
+    pressScale.value = withSpring(1, { damping: 18, stiffness: 300 });
+  };
+
+  const handlePress = () => {
+    if (isStartingSynq) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    onStartSynq();
+  };
+
+  const openAudienceSheet = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setAudienceSheetOpen(true);
+  };
+
+  const enter = (delay: number) =>
+    reduced
+      ? FadeIn.duration(1)
+      : FadeInDown.delay(delay).duration(520).springify().damping(18);
+
+  return (
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: insets.top + SPACE_6 + SPACE_5,
+            paddingBottom: bottomPad,
+          },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <View style={styles.stack}>
+          <Animated.View entering={enter(0)} style={styles.hero}>
+            <Text style={styles.headline}>
+              Let&apos;s <Text style={styles.headlineAccent}>Synq.</Text>
+            </Text>
+          </Animated.View>
+
+          <Animated.View entering={enter(60)} style={styles.intentWrap}>
+            <Animated.View style={[styles.intentCard, panelStyle]}>
+              <View style={styles.intentRow}>
+                <View style={styles.iconSlot}>
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={FIELD_ICON_SIZE}
+                    color={ACCENT}
+                  />
+                </View>
+                <View style={styles.intentRowBody}>
+                  <SlowMoodPlaceholder active={showMoodHints} />
+                  <TextInput
+                    style={[styles.moodInput, showMoodHints && styles.moodInputGhost]}
+                    value={memo}
+                    onChangeText={setMemo}
+                    onFocus={() => setMemoFocused(true)}
+                    onBlur={() => setMemoFocused(false)}
+                    placeholder=""
+                    blurOnSubmit
+                    returnKeyType="done"
+                    accessibilityLabel="Mood or intention"
+                    accessibilityHint="Optional. Friends see this while you're active."
+                  />
+                </View>
+                <View style={styles.trailingSlot} />
+              </View>
+
+              <View style={styles.intentDivider} />
+
+              <Pressable
+                onPress={openAudienceSheet}
+                style={({ pressed }) => [
+                  styles.intentRow,
+                  pressed && styles.rowPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Visible to ${audienceLabel}`}
+                accessibilityHint="Opens audience picker"
+              >
+                <View style={styles.iconSlot}>
+                  <Ionicons name="eye-outline" size={FIELD_ICON_SIZE} color={ACCENT} />
+                </View>
+                <View style={styles.audienceTextRow}>
+                  <Text style={styles.audiencePrefix}>Visible to</Text>
+                  <View style={styles.audienceValueCluster}>
+                    <Text style={styles.audienceValue} numberOfLines={1}>
+                      {audienceLabel}
+                    </Text>
+                    <Ionicons
+                      name="chevron-down"
+                      size={16}
+                      color={ACCENT}
+                      style={styles.audienceChevron}
+                    />
+                  </View>
+                </View>
+              </Pressable>
+            </Animated.View>
+          </Animated.View>
+
+          <Animated.View entering={enter(120)} style={styles.activationBlock}>
+            <View style={styles.stage}>
+              <ActivationOrb
+                disabled={isStartingSynq}
+                pressStyle={pressStyle}
+                onPress={handlePress}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                isStartingSynq={isStartingSynq}
+              />
+            </View>
+            <Pressable
+              onPress={handlePress}
+              disabled={isStartingSynq}
+              hitSlop={{ top: 10, bottom: 14, left: 28, right: 28 }}
+              style={styles.ctaBlock}
+              accessibilityRole="button"
+              accessibilityLabel={isStartingSynq ? "Activating Synq" : "Tap to activate Synq"}
+            >
+              <Animated.Text style={[styles.ctaText, ctaStyle]}>
+                {isStartingSynq ? "ACTIVATING" : "TAP TO ACTIVATE"}
+              </Animated.Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+      </ScrollView>
+
+      <SynqAudienceSheet
+        visible={audienceSheetOpen}
+        groups={friendGroups}
+        selection={audienceSelection}
+        onChangeSelection={onAudienceSelectionChange}
+        onClose={() => setAudienceSheetOpen(false)}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+  scroll: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: SPACE_5,
+  },
+  stack: {
+    flexGrow: 1,
+    width: "100%",
+    maxWidth: CONTENT_W + 48,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: SPACE_6,
+    paddingBottom: SPACE_2,
+  },
+  hero: {
+    alignItems: "center",
+    marginBottom: SPACE_5,
+  },
+  headline: {
+    color: TEXT,
+    fontSize: 34,
+    lineHeight: 40,
+    fontFamily: fonts.heavy,
+    letterSpacing: -0.6,
+    textAlign: "center",
+  },
+  headlineAccent: {
+    color: ACCENT,
+    fontFamily: fonts.heavy,
+    textShadowColor: "rgba(0,255,133,0.22)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  intentWrap: {
+    width: CONTENT_W,
+    marginBottom: SPACE_6,
+  },
+  intentCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER_IDLE,
+    backgroundColor: GLASS_BG_IDLE,
+    overflow: "hidden",
+  },
+  intentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 52,
+    paddingHorizontal: SPACE_4,
+    paddingVertical: SPACE_3,
+    gap: SPACE_3,
+  },
+  iconSlot: {
+    width: ICON_SLOT_W,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trailingSlot: {
+    width: TRAILING_SLOT_W,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  intentRowBody: {
+    flex: 1,
+    minHeight: 24,
+    justifyContent: "center",
+  },
+  moodGhost: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    color: MUTED3,
+    fontSize: 16,
+    lineHeight: 22,
+    fontFamily: fonts.book,
+    letterSpacing: 0.05,
+  },
+  moodInput: {
+    flex: 1,
+    color: TEXT,
+    fontSize: 16,
+    lineHeight: 22,
+    fontFamily: fonts.medium,
+    padding: 0,
+    margin: 0,
+    minHeight: 24,
+    backgroundColor: "transparent",
+  },
+  moodInputGhost: {
+    color: "transparent",
+  },
+  intentDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    marginHorizontal: SPACE_4,
+  },
+  rowPressed: {
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  audienceTextRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minWidth: 0,
+    gap: SPACE_3,
+  },
+  audiencePrefix: {
+    color: MUTED3,
+    fontSize: 16,
+    lineHeight: 22,
+    fontFamily: fonts.book,
+    letterSpacing: 0.05,
+    flexShrink: 0,
+  },
+  audienceValueCluster: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 1,
+    maxWidth: "72%",
+    marginLeft: SPACE_2,
+  },
+  audienceValue: {
+    flexShrink: 1,
+    color: TEXT,
+    fontSize: 16,
+    lineHeight: 22,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.05,
+    textAlign: "right",
+  },
+  audienceChevron: {
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  activationBlock: {
+    alignItems: "center",
+    width: "100%",
+  },
+  stage: {
+    width: ORB_STAGE,
+    height: ORB_STAGE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  orbHit: {
+    width: ORB_STAGE,
+    height: ORB_STAGE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  idleRing: {
+    position: "absolute",
+    width: PULSE_SIZE,
+    height: PULSE_SIZE,
+    borderRadius: PULSE_SIZE / 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,255,133,0.2)",
+  },
+  orbHaloFar: {
+    position: "absolute",
+    width: PULSE_SIZE + 36,
+    height: PULSE_SIZE + 36,
+    borderRadius: (PULSE_SIZE + 36) / 2,
+    backgroundColor: "rgba(0,255,133,0.04)",
+  },
+  orbHaloNear: {
+    position: "absolute",
+    width: PULSE_SIZE + 16,
+    height: PULSE_SIZE + 16,
+    borderRadius: (PULSE_SIZE + 16) / 2,
+    backgroundColor: "rgba(0,255,133,0.07)",
+  },
+  orbHaloCore: {
+    position: "absolute",
+    width: PULSE_SIZE + 4,
+    height: PULSE_SIZE + 4,
+    borderRadius: (PULSE_SIZE + 4) / 2,
+    backgroundColor: "rgba(0,255,133,0.03)",
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  orbRingOuter: {
+    position: "absolute",
+    width: PULSE_SIZE + 8,
+    height: PULSE_SIZE + 8,
+    borderRadius: (PULSE_SIZE + 8) / 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,255,133,0.1)",
+  },
+  orbRingShimmer: {
+    position: "absolute",
+    width: PULSE_SIZE + 2,
+    height: PULSE_SIZE + 2,
+    borderRadius: (PULSE_SIZE + 2) / 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,255,133,0.32)",
+  },
+  orbRingInner: {
+    position: "absolute",
+    width: PULSE_SIZE,
+    height: PULSE_SIZE,
+    borderRadius: PULSE_SIZE / 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,255,133,0.16)",
+  },
+  orbLogo: {
+    width: PULSE_SIZE,
+    height: PULSE_SIZE,
+  },
+  orbStarting: {
+    opacity: 0.9,
+  },
+  ctaBlock: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: SPACE_3,
+    marginTop: 0,
+  },
+  ctaText: {
+    color: MUTED3,
+    fontSize: 12,
+    lineHeight: 15,
+    fontFamily: fonts.medium,
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+    textAlign: "center",
+  },
+});

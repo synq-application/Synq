@@ -879,6 +879,7 @@ function AddFriendsUserRow({
   onPressProfile,
   trailing,
   cardStyle,
+  stackTrailing,
 }: {
   item: { id: string; displayName?: string; imageurl?: string | null };
   subtitle: string;
@@ -886,37 +887,52 @@ function AddFriendsUserRow({
   onPressProfile: () => void;
   trailing: React.ReactNode;
   cardStyle?: ViewStyle;
+  /** Friend-request rows: name on top, actions below so long names are not clipped. */
+  stackTrailing?: boolean;
 }) {
+  const profileBlock = (
+    <TouchableOpacity
+      onPress={onPressProfile}
+      style={stackTrailing ? styles.addFriendCardMainStacked : styles.addFriendCardMain}
+      activeOpacity={0.8}
+    >
+      <View style={styles.avatarRing}>
+        <ExpoImage
+          source={{ uri: resolveAvatar(item.imageurl) }}
+          style={styles.img}
+          cachePolicy="memory-disk"
+          transition={120}
+        />
+      </View>
+      <View style={styles.addFriendRowContent}>
+        <Text style={styles.friendNameAccent} numberOfLines={stackTrailing ? 2 : 1}>
+          {item.displayName || "User"}
+        </Text>
+        <Text
+          style={[
+            styles.addFriendSubtitle,
+            subtitleAccent && styles.addFriendSubtitleAccent,
+          ]}
+          numberOfLines={1}
+        >
+          {subtitle}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  if (stackTrailing) {
+    return (
+      <View style={[styles.addFriendRowStacked, cardStyle]}>
+        {profileBlock}
+        <View style={styles.addFriendRequestActionsStacked}>{trailing}</View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.addFriendRow, cardStyle]}>
-      <TouchableOpacity
-        onPress={onPressProfile}
-        style={styles.addFriendCardMain}
-        activeOpacity={0.8}
-      >
-        <View style={styles.avatarRing}>
-          <ExpoImage
-            source={{ uri: resolveAvatar(item.imageurl) }}
-            style={styles.img}
-            cachePolicy="memory-disk"
-            transition={120}
-          />
-        </View>
-        <View style={styles.addFriendRowContent}>
-          <Text style={styles.friendNameAccent} numberOfLines={1}>
-            {item.displayName || "User"}
-          </Text>
-          <Text
-            style={[
-              styles.addFriendSubtitle,
-              subtitleAccent && styles.addFriendSubtitleAccent,
-            ]}
-            numberOfLines={1}
-          >
-            {subtitle}
-          </Text>
-        </View>
-      </TouchableOpacity>
+      {profileBlock}
       <View style={styles.addFriendCardTrailing}>{trailing}</View>
     </View>
   );
@@ -1747,6 +1763,7 @@ function SearchModal({
           subtitleAccent
           onPressProfile={() => openProfile(item)}
           cardStyle={styles.addFriendCardIncoming}
+          stackTrailing
           trailing={
             <View style={styles.addFriendRequestActions}>
               <TouchableOpacity
@@ -2155,6 +2172,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 14,
+    minWidth: 0,
+  },
+  addFriendRowStacked: {
+    paddingVertical: 14,
+    minWidth: 0,
+  },
+  addFriendCardMainStacked: {
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
+    paddingRight: 0,
+  },
+  addFriendRequestActionsStacked: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+    marginTop: 10,
+    marginLeft: 60,
   },
   friendRowContent: { flex: 1, justifyContent: "center" },
   friendRowName: {

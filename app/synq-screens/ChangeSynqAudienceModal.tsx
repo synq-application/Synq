@@ -1,14 +1,18 @@
 import CloseButton from "@/src/components/CloseButton";
 import SynqAudiencePicker from "@/src/components/synq/SynqAudiencePicker";
 import {
+  ACCENT,
   BG,
   BORDER,
   BUTTON_RADIUS,
   fonts,
   ON_ACCENT_TEXT,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
   SPACE_4,
   SPACE_5,
   SURFACE,
+  stackScreenHeaderTitle,
   TEXT,
 } from "@/constants/Variables";
 import type { FriendGroup } from "@/src/lib/friendGroups";
@@ -60,11 +64,10 @@ export default function ChangeSynqAudienceModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.screen, { paddingTop: SPACE_4 }]}>
         <View style={styles.header}>
-          <CloseButton onPress={onClose} />
           <Text style={styles.headerTitle}>Change audience</Text>
-          <View style={styles.headerSpacer} />
+          <CloseButton onPress={onClose} style={styles.headerClose} />
         </View>
         <ScrollView
           style={styles.scroll}
@@ -107,20 +110,22 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: SPACE_4,
+    justifyContent: "space-between",
+    paddingHorizontal: SPACE_5,
     paddingBottom: SPACE_4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: BORDER,
   },
   headerTitle: {
+    ...stackScreenHeaderTitle,
     flex: 1,
-    textAlign: "center",
-    color: TEXT,
-    fontSize: 17,
-    fontFamily: fonts.heavy,
+    fontSize: 24,
+    lineHeight: 30,
+    marginRight: SPACE_4,
+    includeFontPadding: false,
   },
-  headerSpacer: {
-    width: 40,
+  headerClose: {
+    marginTop: -2,
   },
   scroll: {
     flex: 1,
@@ -136,15 +141,18 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   footer: {
+    alignItems: "center",
     paddingHorizontal: SPACE_5,
     paddingTop: SPACE_4,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: BORDER,
   },
   saveBtn: {
-    backgroundColor: "#00FF85",
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
+    backgroundColor: ACCENT,
     borderRadius: BUTTON_RADIUS,
-    minHeight: 48,
+    minHeight: PRIMARY_CTA_HEIGHT,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -153,7 +161,8 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     color: ON_ACCENT_TEXT,
-    fontSize: 16,
-    fontFamily: fonts.medium,
+    fontSize: 17,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
   },
 });
