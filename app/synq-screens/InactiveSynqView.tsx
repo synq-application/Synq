@@ -1,6 +1,7 @@
 import {
   ACCENT,
   BG,
+  MUTED2,
   MUTED3,
   SPACE_2,
   SPACE_3,
@@ -414,18 +415,13 @@ export default function InactiveSynqView({
                 <View style={styles.iconSlot}>
                   <Ionicons name="eye-outline" size={FIELD_ICON_SIZE} color={ACCENT} />
                 </View>
-                <View style={styles.audienceTextRow}>
-                  <Text style={styles.audiencePrefix}>Visible to</Text>
-                  <View style={styles.audienceValueCluster}>
-                    <Text style={styles.audienceValue} numberOfLines={1}>
+                <View style={styles.audienceRowBody}>
+                  <Text style={styles.audienceLabel}>Visible to</Text>
+                  <View style={styles.audienceSelector}>
+                    <Text style={styles.audienceSelectorText} numberOfLines={1}>
                       {audienceLabel}
                     </Text>
-                    <Ionicons
-                      name="chevron-down"
-                      size={16}
-                      color={ACCENT}
-                      style={styles.audienceChevron}
-                    />
+                    <Ionicons name="chevron-down" size={14} color={ACCENT} />
                   </View>
                 </View>
               </Pressable>
@@ -578,7 +574,7 @@ const styles = StyleSheet.create({
   rowPressed: {
     backgroundColor: "rgba(255,255,255,0.03)",
   },
-  audienceTextRow: {
+  audienceRowBody: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -586,34 +582,35 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: SPACE_3,
   },
-  audiencePrefix: {
+  audienceLabel: {
     color: MUTED3,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 20,
     fontFamily: fonts.book,
-    letterSpacing: 0.05,
+    letterSpacing: 0.1,
     flexShrink: 0,
   },
-  audienceValueCluster: {
+  audienceSelector: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
     flexShrink: 1,
-    maxWidth: "72%",
-    marginLeft: SPACE_2,
+    maxWidth: "62%",
+    paddingVertical: 7,
+    paddingLeft: SPACE_3,
+    paddingRight: SPACE_2 + 2,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.045)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.1)",
   },
-  audienceValue: {
+  audienceSelectorText: {
     flexShrink: 1,
-    color: TEXT,
-    fontSize: 16,
-    lineHeight: 22,
-    fontFamily: fonts.medium,
+    color: MUTED2,
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: fonts.book,
     letterSpacing: 0.05,
-    textAlign: "right",
-  },
-  audienceChevron: {
-    flexShrink: 0,
-    marginTop: 1,
   },
   activationBlock: {
     alignItems: "center",
@@ -705,8 +702,8 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     color: MUTED3,
-    fontSize: 12,
-    lineHeight: 15,
+    fontSize: 13,
+    lineHeight: 16,
     fontFamily: fonts.medium,
     letterSpacing: 1.1,
     textTransform: "uppercase",
