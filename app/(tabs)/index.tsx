@@ -5,6 +5,8 @@ import { Image as ExpoImage } from "expo-image";
 import * as Notifications from "expo-notifications";
 import {
   addDoc,
+  arrayRemove,
+  arrayUnion,
   collection,
   deleteDoc,
   deleteField,
@@ -65,6 +67,7 @@ import {
   PRIMARY_CTA_WIDTH,
   SPACE_4,
   SPACE_5,
+  SURFACE,
   TEXT,
   tabScreenMainHeaderTitle,
   TYPE_BODY
@@ -80,6 +83,12 @@ import {
 import ConfirmModal from '../confirm-modal';
 import AlertModal from '../alert-modal';
 import { filterOrReject } from '@/src/lib/contentFilter';
+import {
+  findChatWithParticipants,
+  mergeParticipantMaps,
+  mergeParticipantSets,
+  participantsMatch,
+} from '@/src/lib/mergeChats';
 import { useBlockedUsers } from '@/src/lib/blockedUsers';
 import ReportModal from '../report-modal';
 import ExploreModal from '../explore-modal';
@@ -246,6 +255,11 @@ export default function SynqScreen() {
   const [showEndSynqModal, setShowEndSynqModal] = useState(false);
   const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
   const [pendingDeleteChatId, setPendingDeleteChatId] = useState<string | null>(null);
+  const [mergeSelectMode, setMergeSelectMode] = useState(false);
+  const [selectedMergeChatIds, setSelectedMergeChatIds] = useState<string[]>([]);
+  const [showMergeConfirmModal, setShowMergeConfirmModal] = useState(false);
+  const [isMergingChats, setIsMergingChats] = useState(false);
+  const [inboxActionChat, setInboxActionChat] = useState<any | null>(null);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
   const [isStartingSynq, setIsStartingSynq] = useState(false);
   const [launchOverlay, setLaunchOverlay] = useState(false);
@@ -270,6 +284,26 @@ export default function SynqScreen() {
         )
     );
   }, [allChats, isBlocked]);
+
+  const pinnedChatIds = useMemo(
+    () =>
+      Array.isArray(userProfile?.pinnedChatIds)
+        ? (userProfile.pinnedChatIds as string[]).filter(Boolean)
+        : [],
+    [userProfile?.pinnedChatIds]
+  );
+
+  const inboxChats = useMemo(() => {
+    const pinned = new Set(pinnedChatIds);
+    return [...visibleChats].sort((a, b) => {
+      const aPinned = pinned.has(a.id) ? 1 : 0;
+      const bPinned = pinned.has(b.id) ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+      const aMs = a.updatedAt?.toMillis?.() ?? a.createdAt?.toMillis?.() ?? 0;
+      const bMs = b.updatedAt?.toMillis?.() ?? b.createdAt?.toMillis?.() ?? 0;
+      return bMs - aMs;
+    });
+  }, [visibleChats, pinnedChatIds]);
 
   const visibleAvailableFriends = useMemo(
     () => availableFriends.filter((f) => !isBlocked(f.id)),
@@ -942,6 +976,176 @@ export default function SynqScreen() {
     setShowDeleteChatModal(true);
   };
 
+  const resetMergeSelect = () => {
+    setMergeSelectMode(false);
+    setSelectedMergeChatIds([]);
+    setShowMergeConfirmModal(false);
+  };
+
+  const startCombineWithChat = (chatId: string) => {
+    setInboxActionChat(null);
+    setMergeSelectMode(true);
+    setSelectedMergeChatIds([chatId]);
+  };
+
+  const togglePinChat = async (chatId: string) => {
+    if (!auth.currentUser) return;
+    const myId = auth.currentUser.uid;
+    const isPinned = pinnedChatIds.includes(chatId);
+
+    setInboxActionChat(null);
+    setUserProfile((prev: any) => {
+      const current = Array.isArray(prev?.pinnedChatIds)
+        ? prev.pinnedChatIds.filter(Boolean)
+        : [];
+      return {
+        ...prev,
+        pinnedChatIds: isPinned
+          ? current.filter((id: string) => id !== chatId)
+          : [...current, chatId],
+      };
+    });
+
+    try {
+      await updateDoc(doc(db, "users", myId), {
+        pinnedChatIds: isPinned ? arrayRemove(chatId) : arrayUnion(chatId),
+      });
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      setUserProfile((prev: any) => {
+        const current = Array.isArray(prev?.pinnedChatIds)
+          ? prev.pinnedChatIds.filter(Boolean)
+          : [];
+        return {
+          ...prev,
+          pinnedChatIds: isPinned
+            ? [...current, chatId]
+            : current.filter((id: string) => id !== chatId),
+        };
+      });
+      showActionError("Could not update pin. Please try again.");
+    }
+  };
+
+  const toggleMergeChatSelection = (chatId: string) => {
+    setSelectedMergeChatIds((prev) => {
+      if (prev.includes(chatId)) {
+        return prev.filter((id) => id !== chatId);
+      }
+      if (prev.length >= 2) return prev;
+
+      const next = [...prev, chatId];
+      if (next.length === 2) {
+        const chatA = visibleChats.find((c) => c.id === next[0]);
+        const chatB = visibleChats.find((c) => c.id === next[1]);
+        if (
+          chatA &&
+          chatB &&
+          participantsMatch(chatA.participants || [], chatB.participants || [])
+        ) {
+          showActionError("These conversations already include the same people.");
+          return prev;
+        }
+      }
+      return next;
+    });
+  };
+
+  const mergePreviewChat = useMemo(() => {
+    if (selectedMergeChatIds.length !== 2) return null;
+    const chatA = visibleChats.find((c) => c.id === selectedMergeChatIds[0]);
+    const chatB = visibleChats.find((c) => c.id === selectedMergeChatIds[1]);
+    if (!chatA || !chatB) return null;
+
+    const participants = mergeParticipantSets(chatA, chatB);
+    const { participantNames, participantImages } = mergeParticipantMaps(
+      chatA,
+      chatB,
+      participants
+    );
+    return { participants, participantNames, participantImages };
+  }, [selectedMergeChatIds, visibleChats]);
+
+  const executeMergeChats = async () => {
+    if (!auth.currentUser || selectedMergeChatIds.length !== 2) return;
+
+    const myId = auth.currentUser.uid;
+    const chatA = visibleChats.find((c) => c.id === selectedMergeChatIds[0]);
+    const chatB = visibleChats.find((c) => c.id === selectedMergeChatIds[1]);
+    if (!chatA || !chatB) return;
+
+    setIsMergingChats(true);
+    try {
+      const mergedParticipants = mergeParticipantSets(chatA, chatB);
+      const existing = findChatWithParticipants(visibleChats, mergedParticipants);
+
+      if (existing) {
+        resetMergeSelect();
+        prefetchParticipantAvatars(existing);
+        setPendingNewChat(null);
+        setActiveChatId(existing.id);
+        setMessagesPane("chat");
+        await markChatRead(existing.id);
+        return;
+      }
+
+      let { participantNames, participantImages } = mergeParticipantMaps(
+        chatA,
+        chatB,
+        mergedParticipants
+      );
+
+      for (const uid of mergedParticipants) {
+        if (participantNames[uid]?.trim() && participantImages[uid]) continue;
+        const uSnap = await getDoc(doc(db, "users", uid));
+        if (!uSnap.exists()) continue;
+        const data = uSnap.data();
+        if (!participantNames[uid]?.trim()) {
+          participantNames[uid] = data.displayName || "";
+        }
+        if (!participantImages[uid]) {
+          participantImages[uid] = resolveAvatar(data.imageurl);
+        }
+      }
+
+      const myDisplayName =
+        participantNames[myId] || userProfile?.displayName || "Someone";
+      const systemText = `${firstName(myDisplayName)} combined two conversations`;
+
+      const chatRef = await addDoc(collection(db, "chats"), {
+        participants: mergedParticipants,
+        participantNames,
+        participantImages,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastMessage: systemText,
+        lastMessageSenderId: myId,
+        mergedFrom: [chatA.id, chatB.id],
+      });
+
+      await addDoc(collection(db, "chats", chatRef.id, "messages"), {
+        text: systemText,
+        senderId: myId,
+        type: "system",
+        imageurl: resolveAvatar(userProfile?.imageurl),
+        createdAt: serverTimestamp(),
+      });
+
+      resetMergeSelect();
+      prefetchParticipantAvatars({ participantImages });
+      setPendingNewChat(null);
+      setActiveChatId(chatRef.id);
+      setMessagesPane("chat");
+      await markChatRead(chatRef.id);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      showActionError("Could not create group chat. Please try again.");
+    } finally {
+      setIsMergingChats(false);
+      setShowMergeConfirmModal(false);
+    }
+  };
+
   const toggleHeartReaction = async (messageId: string, currentReactions: any) => {
     if (!auth.currentUser || !activeChatId) return;
 
@@ -993,6 +1197,20 @@ export default function SynqScreen() {
 
     return title;
   };
+
+  const mergePreviewTitle = useMemo(() => {
+    if (!mergePreviewChat) return "";
+    return getChatTitle({
+      ...mergePreviewChat,
+      customName: undefined,
+    });
+  }, [mergePreviewChat, auth.currentUser?.uid]);
+
+  const mergeAnchorTitle = useMemo(() => {
+    if (selectedMergeChatIds.length !== 1) return "";
+    const chat = inboxChats.find((c) => c.id === selectedMergeChatIds[0]);
+    return chat ? getChatTitle(chat) : "";
+  }, [selectedMergeChatIds, inboxChats, auth.currentUser?.uid]);
 
   const activeChat = pendingNewChat
     ? {
@@ -1123,11 +1341,14 @@ export default function SynqScreen() {
             >
             <MessagesInboxPane
               styles={styles}
-              allChats={visibleChats}
+              allChats={inboxChats}
+              pinnedChatIds={pinnedChatIds}
               currentUserId={auth.currentUser?.uid}
               getChatTitle={getChatTitle}
               renderAvatarStack={renderAvatarStack}
               onCloseMessages={() => {
+                resetMergeSelect();
+                setInboxActionChat(null);
                 setMessagesModalVisible(false);
                 setMessagesPane("inbox");
                 setActiveChatId(null);
@@ -1142,6 +1363,33 @@ export default function SynqScreen() {
                 await markChatRead(item.id);
               }}
               onDeleteChat={handleDeleteChat}
+              onChatLongPress={(chat) => setInboxActionChat(chat)}
+              mergeSelectMode={mergeSelectMode}
+              selectedMergeChatIds={selectedMergeChatIds}
+              mergePreviewTitle={mergePreviewTitle}
+              mergeAnchorTitle={mergeAnchorTitle}
+              mergeBusy={isMergingChats}
+              onCancelMergeMode={resetMergeSelect}
+              onToggleMergeChatSelection={toggleMergeChatSelection}
+              onConfirmMerge={() => setShowMergeConfirmModal(true)}
+              inboxActionChat={inboxActionChat}
+              onCloseInboxAction={() => setInboxActionChat(null)}
+              onPinChat={(chatId) => void togglePinChat(chatId)}
+              onCombineChat={startCombineWithChat}
+              onDeleteFromAction={(chatId) => {
+                setInboxActionChat(null);
+                handleDeleteChat(chatId);
+              }}
+              renderMergeConfirmModal={
+                <ConfirmModal
+                  visible={showMergeConfirmModal}
+                  title="Create group chat"
+                  message={`Everyone from both conversations will be added to a chat with ${mergePreviewTitle}.`}
+                  confirmText="Create"
+                  onCancel={() => setShowMergeConfirmModal(false)}
+                  onConfirm={() => void executeMergeChats()}
+                />
+              }
               renderDeleteConfirmModal={
                 <ConfirmModal
                   visible={showDeleteChatModal}
@@ -1575,6 +1823,138 @@ const styles = StyleSheet.create({
   modalBg: { flex: 1, backgroundColor: BG },
   messagesPaneFill: { flex: 1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
+  inboxHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  inboxTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+  },
+  inboxTitleText: {
+    flexShrink: 1,
+  },
+  inboxPinIcon: {
+    marginLeft: 6,
+    transform: [{ rotate: '45deg' }],
+  },
+  inboxMergeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 12,
+    paddingRight: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  inboxMergeBackBtn: {
+    width: 40,
+  },
+  inboxMergeHeaderTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: TEXT,
+    fontSize: 22,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.15,
+  },
+  inboxMergeHeaderSide: {
+    width: 40,
+  },
+  inboxMergeSubtitle: {
+    color: MUTED2,
+    fontFamily: fonts.book,
+    fontSize: 13,
+    letterSpacing: 0.1,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+  },
+  inboxMergeFooterCard: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 18,
+    borderRadius: MODAL_RADIUS,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  inboxMergeFooterLabel: {
+    color: MUTED2,
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  inboxMergeFooterTitle: {
+    color: TEXT,
+    fontFamily: fonts.heavy,
+    fontSize: 20,
+    letterSpacing: 0.1,
+    lineHeight: 26,
+    marginBottom: 16,
+  },
+  inboxMergeFooterHint: {
+    color: MUTED,
+    fontFamily: fonts.book,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  inboxMergePrimaryBtn: {
+    backgroundColor: ACCENT,
+    borderRadius: BUTTON_RADIUS,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inboxMergePrimaryBtnDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  inboxMergePrimaryBtnText: {
+    color: ON_ACCENT_TEXT,
+    fontFamily: fonts.heavy,
+    fontSize: 15,
+    letterSpacing: 0.2,
+  },
+  inboxMergePrimaryBtnTextDisabled: {
+    color: MUTED3,
+  },
+  inboxListContentMerge: {
+    paddingBottom: 12,
+  },
+  inboxItemSelected: {
+    backgroundColor: 'rgba(0,255,133,0.06)',
+  },
+  inboxSelectBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.18)',
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  inboxSelectBadgeActive: {
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
+  },
+  inboxSelectBadgeText: {
+    color: ON_ACCENT_TEXT,
+    fontFamily: fonts.heavy,
+    fontSize: 13,
+  },
   messagesHeaderDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: "rgba(255,255,255,0.16)",
@@ -1927,6 +2307,14 @@ const styles = StyleSheet.create({
     color: MUTED2,
     fontSize: 10,
     marginTop: 4,
+  },
+  systemMessageText: {
+    color: MUTED2,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
   inboxSingleWrap: {
     width: 56,

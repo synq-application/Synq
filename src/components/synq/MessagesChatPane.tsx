@@ -219,6 +219,7 @@ export default function MessagesChatPane({
     ({ item }: { item: any }) => {
       const animateEntry = shouldAnimateMessage(item.id);
       const isMe = item.senderId === currentUserId;
+      const isSystemMessage = item.type === "system";
       const isSystemIdea =
         item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
       const senderAvatar = resolveAvatar(
@@ -226,6 +227,17 @@ export default function MessagesChatPane({
       );
       const RowWrapper = animateEntry ? Animated.View : View;
       const rowWrapperProps = animateEntry ? { entering: MESSAGE_ENTER } : {};
+
+      if (isSystemMessage) {
+        return (
+          <RowWrapper {...rowWrapperProps}>
+            <View style={styles.centeredIdeaContainer}>
+              <Text style={styles.systemMessageText}>{item.text}</Text>
+              <Text style={styles.timestampCentered}>{formatTime(item.createdAt)}</Text>
+            </View>
+          </RowWrapper>
+        );
+      }
 
       if (isSystemIdea) {
         const { name, address } = parseIdeaText(item.text);

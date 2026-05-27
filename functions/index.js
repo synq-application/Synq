@@ -310,6 +310,7 @@ exports.deleteMyAccount = onCall(
       await deleteCollectionInChunks(db.collection("users").doc(uid).collection("friendRequests"), 400);
       await deleteCollectionInChunks(db.collection("users").doc(uid).collection("outgoingFriendRequests"), 400);
       await deleteCollectionInChunks(db.collection("users").doc(uid).collection("notificationLocks"), 400);
+      await deleteCollectionInChunks(db.collection("users").doc(uid).collection("notifications"), 400);
       await db.collection("users").doc(uid).delete();
       await admin.auth().deleteUser(uid);
 
@@ -707,6 +708,24 @@ function firstNameFromDisplay(name) {
   return String(name || "").trim().split(/\s+/)[0] || "Someone";
 }
 
+/** Persists an in-app notification for the notifications screen (admin-only writes). */
+async function writeInAppNotification(recipientUid, docId, fields) {
+  const notifRef = admin
+    .firestore()
+    .collection("users")
+    .doc(recipientUid)
+    .collection("notifications")
+    .doc(docId);
+  await notifRef.set(
+    {
+      ...fields,
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
 /** Must match app `EXPIRATION_HOURS` in constants/Variables.ts */
 const SYNQ_EXPIRATION_HOURS = 12;
 const SYNQ_EXPIRATION_MS = SYNQ_EXPIRATION_HOURS * 60 * 60 * 1000;
@@ -933,6 +952,15 @@ exports.onOpenPlanInterest = onDocumentUpdated(
             joinerId,
             planTitle: planTitle || null,
           });
+          await writeInAppNotification(hostUid, lockId, {
+            type: "open_plan_interest",
+            fromUserId: joinerId,
+            eventId: eventIdForClient,
+            planHostUid: hostUid,
+            planTitle: planTitle || null,
+            title: "Open plan",
+            body,
+          });
         } catch (error) {
           logError("onOpenPlanInterest_push", error, { hostUid, joinerId });
         }
@@ -1006,6 +1034,13 @@ exports.onFriendAccepted = onDocumentCreated({
       to: friendId,
       type: "friend_accepted",
     });
+
+    await writeInAppNotification(friendId, notifId, {
+      type: "friend_accepted",
+      fromUserId: userId,
+      title: "Request Accepted! ✨",
+      body: `${accepterData?.displayName || "A user"} accepted your friend request.`,
+    });
   } catch (error) {
     logError("onFriendAccepted", error, { userId, friendId });
   }
@@ -1062,16 +1097,27 @@ exports.onFriendSynqActivated = onDocumentUpdated(
           continue;
         }
 
+        const synqBody = `${firstNameFromDisplay(activatedName)} just activated Synq.`;
         try {
           await axios.post("https://exp.host/--/api/v2/push/send", {
             to: recipientToken,
             sound: "default",
             title: "Friend active on Synq",
-            body: `${firstNameFromDisplay(activatedName)} just activated Synq.`,
+            body: synqBody,
             data: {
               type: "friend_synq_active",
               fromUserId: activatedUserId,
             },
+          });
+          const synqNotifId = `synq_active_${activatedUserId}_${recipientId}_${Date.now()}`.slice(
+            0,
+            1400
+          );
+          await writeInAppNotification(recipientId, synqNotifId, {
+            type: "friend_synq_active",
+            fromUserId: activatedUserId,
+            title: "Friend active on Synq",
+            body: synqBody,
           });
         } catch (pushErr) {
           logError("onFriendSynqActivated_push", pushErr, {
