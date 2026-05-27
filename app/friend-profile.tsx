@@ -71,6 +71,12 @@ import MonthlyMemoReadOnly from "./readonly-monthly-memo";
 import SynqNudgeCard from "@/src/components/synq/SynqNudgeCard";
 import { computeSynqActiveFromUserData } from "@/src/lib/synqSession";
 import { sendSynqNudge, synqNudgeErrorMessage } from "@/src/lib/synqNudge";
+import {
+  addMembersToFriendGroup,
+  subscribeFriendGroups,
+  type FriendGroup,
+} from "@/src/lib/friendGroups";
+import AddFriendToGroupSheet from "@/src/components/friends/AddFriendToGroupSheet";
 
 export default function FriendProfile() {
   const { friendId, from } = useLocalSearchParams<{
@@ -115,6 +121,10 @@ export default function FriendProfile() {
   const [requestSent, setRequestSent] = useState(cachedRelationship.requestSent);
   const [actionLoading, setActionLoading] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [friendGroups, setFriendGroups] = useState<FriendGroup[]>([]);
+  const [addToGroupSheetVisible, setAddToGroupSheetVisible] = useState(false);
+  const [pendingAddGroup, setPendingAddGroup] = useState<FriendGroup | null>(null);
+  const [showAddToGroupConfirm, setShowAddToGroupConfirm] = useState(false);
   const [joinedPlanKeys, setJoinedPlanKeys] = useState<Record<string, boolean>>({});
   const [showUnjoinModal, setShowUnjoinModal] = useState(false);
   const [pendingUnjoinEvent, setPendingUnjoinEvent] = useState<any>(null);
@@ -209,6 +219,15 @@ export default function FriendProfile() {
     };
     hydrateJoinedPlans();
   }, [friendKey]);
+
+  useEffect(() => {
+    if (!viewerId || !isFriend) {
+      setFriendGroups([]);
+      return;
+    }
+    const unsub = subscribeFriendGroups(viewerId, setFriendGroups);
+    return unsub;
+  }, [viewerId, isFriend]);
 
   useEffect(() => {
     if (!viewerId) return;
@@ -1107,7 +1126,16 @@ export default function FriendProfile() {
         ) : null}
 
         {isFriend && !userIsBlocked ? (
-          <View style={styles.removeFriendWrap}>
+          <View style={styles.friendActionsWrap}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.addToGroupBtn}
+              onPress={() => setAddToGroupSheetVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Add friend to group"
+            >
+              <Text style={styles.addToGroupText}>Add friend to group</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.8}
               style={styles.removeFriendBtn}
@@ -1213,6 +1241,44 @@ export default function FriendProfile() {
           } catch {
             setAlertTitle("Error");
             setAlertMessage("Could not block user.");
+            setAlertVisible(true);
+          }
+        }}
+      />
+      <AddFriendToGroupSheet
+        visible={addToGroupSheetVisible}
+        groups={friendGroups}
+        friendName={friend?.displayName || "Friend"}
+        memberId={friendKey}
+        onClose={() => setAddToGroupSheetVisible(false)}
+        onSelectGroup={(group) => {
+          setAddToGroupSheetVisible(false);
+          setPendingAddGroup(group);
+          setShowAddToGroupConfirm(true);
+        }}
+      />
+      <ConfirmModal
+        visible={showAddToGroupConfirm}
+        title="Confirm add to group"
+        message={`Add ${friend?.displayName || "this friend"} to ${pendingAddGroup?.name || "this group"}?`}
+        confirmText="Add"
+        onCancel={() => {
+          setShowAddToGroupConfirm(false);
+          setPendingAddGroup(null);
+        }}
+        onConfirm={async () => {
+          const group = pendingAddGroup;
+          setShowAddToGroupConfirm(false);
+          setPendingAddGroup(null);
+          if (!viewerId || !friendKey || !group) return;
+          try {
+            await addMembersToFriendGroup(viewerId, group.id, group.memberIds, [friendKey]);
+            setAlertTitle("Added to group");
+            setAlertMessage(`Added to ${group.name}.`);
+            setAlertVisible(true);
+          } catch (err) {
+            setAlertTitle("Error");
+            setAlertMessage(err instanceof Error ? err.message : "Could not add to group.");
             setAlertVisible(true);
           }
         }}
@@ -1338,10 +1404,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  removeFriendWrap: {
-    marginTop: 32,
-    paddingTop: 8,
+  friendActionsWrap: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  addToGroupBtn: {
+    minHeight: 48,
+    borderRadius: BUTTON_RADIUS,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  addToGroupText: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    color: TEXT,
   },
   removeFriendBtn: {
     alignSelf: "center",

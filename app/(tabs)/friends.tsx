@@ -106,6 +106,11 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
+import { createFriendGroup } from "@/src/lib/friendGroups";
+import FriendsGroupsHeaderTitle, {
+  type FriendsTabMode,
+} from "@/src/components/friends/FriendsGroupsSegment";
+import GroupsListPane from "@/src/components/friends/GroupsListPane";
 import { auth, db } from "../../src/lib/firebase";
 import { useAuthRefresh } from "../_layout";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
@@ -436,6 +441,7 @@ export default function FriendsScreen() {
   const [distanceSortReady, setDistanceSortReady] = useState(sortMode !== "distance");
   const [headerFadeTop, setHeaderFadeTop] = useState(0);
   const [listScrollY, setListScrollY] = useState(0);
+  const [friendsTabMode, setFriendsTabMode] = useState<FriendsTabMode>("friends");
 
   const showAddFriendsModal = searchModalVisible;
   const headerFadeOpacity = Math.min(1, listScrollY / 28);
@@ -623,8 +629,17 @@ export default function FriendsScreen() {
     return sortFriendsByNameWithNoLocationLast(filtered);
   }, [friends, searchText, sortMode, distanceSortReady, friendDistancesKm, isBlocked]);
 
-  const showFriendSearch = friends.length > 0 && !isFriendsInitialLoading;
+  const showFriendSearch =
+    friendsTabMode === "friends" && friends.length > 0 && !isFriendsInitialLoading;
   const listIsEmpty = displayFriends.length === 0;
+
+  const handleCreateGroup = useCallback(
+    async (name: string) => {
+      if (!myId) throw new Error("Not signed in.");
+      return createFriendGroup(myId, name);
+    },
+    [myId]
+  );
 
   const renderFriendRowSeparator = () => <View style={styles.friendRowSeparator} />;
 
@@ -701,9 +716,13 @@ export default function FriendsScreen() {
 
       <ProfileTabHeaderOverlay variant="title" />
       <TabHeaderIconRow>
-        <Text style={styles.headerTitle}>Friends</Text>
+        <FriendsGroupsHeaderTitle mode={friendsTabMode} onChange={setFriendsTabMode} />
         <FriendsHeaderAddButton
-          pulse={!isFriendsInitialLoading && friends.length === 0}
+          pulse={
+            friendsTabMode === "friends" &&
+            !isFriendsInitialLoading &&
+            friends.length === 0
+          }
           onPress={openAddFriendsModal}
         />
       </TabHeaderIconRow>
@@ -752,7 +771,15 @@ export default function FriendsScreen() {
         </View>
       ) : null}
 
-      {isFriendsInitialLoading ? (
+      {friendsTabMode === "groups" ? (
+        <View style={[styles.friendsList, styles.screenPadding]}>
+          <GroupsListPane
+            userId={myId}
+            listBottomInset={TAB_BAR_SCROLL_INSET + 40}
+            onCreateGroup={handleCreateGroup}
+          />
+        </View>
+      ) : isFriendsInitialLoading ? (
         <View style={styles.friendsList}>
           {["1", "2", "3"].map((k, i) => (
             <View key={k}>

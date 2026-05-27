@@ -4,6 +4,7 @@ import { Image as ExpoImage } from "expo-image";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 
 import { db } from "./firebase";
+import type { FriendGroup } from "./friendGroups";
 
 export type Connection = {
   id: string;
@@ -22,6 +23,7 @@ export const suggestedCacheByUser: Record<string, any[]> = {};
 export const mutualFriendsCacheByUser: Record<string, Record<string, Friend[]>> = {};
 /** viewerId -> target user ids with an outgoing friend request. */
 export const outgoingFriendRequestIdsCacheByUser: Record<string, Set<string>> = {};
+export const friendGroupsCacheByUser: Record<string, FriendGroup[]> = {};
 
 const warmFriendsInFlight: Record<string, Promise<void> | undefined> = {};
 const warmOutgoingInFlight: Record<string, Promise<void> | undefined> = {};

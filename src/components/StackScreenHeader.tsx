@@ -35,7 +35,7 @@ export default function StackScreenHeader({ title, onBack, right }: Props) {
           </Text>
         </View>
 
-        <View style={styles.sideSlot}>
+        <View style={styles.sideSlotRight}>
           {right ? <View style={styles.right}>{right}</View> : null}
         </View>
       </View>
@@ -60,6 +60,12 @@ const styles = StyleSheet.create({
   sideSlot: {
     width: SIDE_SLOT_WIDTH,
     alignItems: "flex-start",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  sideSlotRight: {
+    minWidth: SIDE_SLOT_WIDTH,
+    alignItems: "flex-end",
     justifyContent: "center",
     zIndex: 1,
   },
