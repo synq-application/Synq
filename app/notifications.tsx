@@ -62,7 +62,11 @@ function prefetchActorAvatars(items: FeedItem[]) {
 const SURFACE = "rgba(255,255,255,0.06)";
 const BACKGROUND = BG;
 
-type ActivityType = "friend_accepted" | "open_plan_interest" | "friend_synq_active";
+type ActivityType =
+  | "friend_accepted"
+  | "open_plan_interest"
+  | "friend_synq_active"
+  | "synq_nudge";
 
 type FeedItem =
   | {
@@ -209,6 +213,8 @@ export default function NotificationsScreen() {
           : `${firstName(actorName)} is interested in your plan`;
       } else if (type === "friend_synq_active") {
         body = `${firstName(actorName)} just activated Synq.`;
+      } else if (type === "synq_nudge") {
+        body = `${firstName(actorName)} wants to know if you're free right now`;
       }
     }
 
@@ -224,7 +230,9 @@ export default function NotificationsScreen() {
           ? "Request accepted"
           : type === "open_plan_interest"
             ? "Open plan"
-            : "Friend active on Synq"),
+            : type === "synq_nudge"
+              ? "Are you free?"
+              : "Friend active on Synq"),
       body,
       sortMs: timestampMillis(item.createdAt) || Date.now(),
       read: item.read === true,
@@ -416,7 +424,9 @@ export default function NotificationsScreen() {
 
     const activity: FeedItem[] = mergedActivity
       .filter((a) =>
-        ["friend_accepted", "open_plan_interest", "friend_synq_active"].includes(a.type)
+        ["friend_accepted", "open_plan_interest", "friend_synq_active", "synq_nudge"].includes(
+          a.type
+        )
       )
       .map((a) => ({
         feedKey: `act_${a.id}`,
@@ -574,7 +584,7 @@ export default function NotificationsScreen() {
       return;
     }
 
-    if (item.kind === "friend_synq_active") {
+    if (item.kind === "friend_synq_active" || item.kind === "synq_nudge") {
       router.push("/(tabs)");
     }
   }, []);
@@ -589,6 +599,8 @@ export default function NotificationsScreen() {
         return "Plan interest";
       case "friend_synq_active":
         return "Synq active";
+      case "synq_nudge":
+        return "Are you free?";
       default:
         return "Notification";
     }

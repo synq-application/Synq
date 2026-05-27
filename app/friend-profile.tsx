@@ -68,6 +68,9 @@ import { useBlockedUsers } from "@/src/lib/blockedUsers";
 import { blockUser, unblockUser } from "@/src/lib/moderation";
 import { formatLastSynq, resolveAvatar } from "./helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
+import SynqNudgeCard from "@/src/components/synq/SynqNudgeCard";
+import { computeSynqActiveFromUserData } from "@/src/lib/synqSession";
+import { sendSynqNudge, synqNudgeErrorMessage } from "@/src/lib/synqNudge";
 
 export default function FriendProfile() {
   const { friendId, from } = useLocalSearchParams<{
@@ -122,6 +125,9 @@ export default function FriendProfile() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showOptionsSheet, setShowOptionsSheet] = useState(false);
+  const [viewerSynqActive, setViewerSynqActive] = useState(false);
+  const [nudgeLoading, setNudgeLoading] = useState(false);
+  const [nudgeSent, setNudgeSent] = useState(false);
   const { isBlocked } = useBlockedUsers();
   const userIsBlocked = friendKey ? isBlocked(friendKey) : false;
   const [hostDisplayNameByUid, setHostDisplayNameByUid] = useState<Record<string, string>>({});
@@ -203,6 +209,44 @@ export default function FriendProfile() {
     };
     hydrateJoinedPlans();
   }, [friendKey]);
+
+  useEffect(() => {
+    if (!viewerId) return;
+    const unsub = onSnapshot(
+      doc(db, "users", viewerId),
+      (snap) => {
+        if (snap.exists()) {
+          setViewerSynqActive(computeSynqActiveFromUserData(snap.data()));
+        } else {
+          setViewerSynqActive(false);
+        }
+      },
+      () => setViewerSynqActive(false)
+    );
+    return () => unsub();
+  }, [viewerId]);
+
+  const friendSynqActive = useMemo(
+    () => computeSynqActiveFromUserData(friend),
+    [friend]
+  );
+
+  const canNudgeFriend =
+    isFriend && viewerSynqActive && !friendSynqActive && !userIsBlocked;
+
+  const handleSynqNudge = async () => {
+    if (!friendKey || nudgeLoading || nudgeSent || !canNudgeFriend) return;
+    setNudgeLoading(true);
+    try {
+      await sendSynqNudge(friendKey);
+      setNudgeSent(true);
+      showAlert("Nudge sent", "They'll get a notification asking if they're free.");
+    } catch (err) {
+      showAlert("Couldn't nudge", synqNudgeErrorMessage(err));
+    } finally {
+      setNudgeLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!friendKey) return;
@@ -876,55 +920,61 @@ export default function FriendProfile() {
             <Ionicons name="ellipsis-horizontal" size={22} color={TEXT} />
           </TouchableOpacity>
         </View>
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => setAvatarPreviewOpen(true)}
-            onLongPress={() => setAvatarPreviewOpen(true)}
-            activeOpacity={0.9}
-            accessibilityRole="imagebutton"
-            accessibilityLabel="Open profile photo preview"
-          >
-            <View style={styles.avatarGlowWrap}>
-              <ExpoImage
-                source={{ uri: avatarUri }}
-                style={styles.avatar}
-                cachePolicy="memory-disk"
-                transition={0}
-                recyclingKey={avatarUri}
+        <View style={styles.friendCard}>
+          <View style={[styles.header, canNudgeFriend && styles.headerWithNudge]}>
+            <TouchableOpacity
+              onPress={() => setAvatarPreviewOpen(true)}
+              onLongPress={() => setAvatarPreviewOpen(true)}
+              activeOpacity={0.9}
+              accessibilityRole="imagebutton"
+              accessibilityLabel="Open profile photo preview"
+            >
+              <View style={styles.avatarGlowWrap}>
+                <ExpoImage
+                  source={{ uri: avatarUri }}
+                  style={styles.avatar}
+                  cachePolicy="memory-disk"
+                  transition={0}
+                  recyclingKey={avatarUri}
+                />
+              </View>
+            </TouchableOpacity>
+
+            <Text style={styles.name}>
+              {friend.displayName || "User"}
+            </Text>
+
+            {locationText && (
+              <View style={styles.locationRow}>
+                <Ionicons name="location-outline" size={14} color={MUTED2} />
+                <Text style={styles.locationText}>{locationText}</Text>
+              </View>
+            )}
+
+            {lastSynq ? (
+              <Text style={styles.lastSynqText}>
+                Last Synq: {formatLastSynq(lastSynq)}
+              </Text>
+            ) : null}
+          </View>
+
+          {canNudgeFriend ? (
+            <View style={styles.nudgeCardWrap}>
+              <SynqNudgeCard
+                onNudge={handleSynqNudge}
+                loading={nudgeLoading}
+                sent={nudgeSent}
               />
             </View>
-          </TouchableOpacity>
-
-          <Text style={styles.name}>
-            {friend.displayName || "User"}
-          </Text>
-
-          {locationText && (
-            <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={14} color={MUTED2} />
-              <Text style={styles.locationText}>{locationText}</Text>
-            </View>
-          )}
-
-          {lastSynq && (
-            <Text style={styles.lastSynqText}>
-              Last Synq: {formatLastSynq(lastSynq)}
-            </Text>
-          )}
+          ) : null}
         </View>
 
-        <View style={styles.profileActionWrap}>
-          {userIsBlocked ? (
+        {userIsBlocked ? (
+          <View style={styles.profileActionWrap}>
             <Text style={styles.blockedHint}>You’ve blocked this user.</Text>
-          ) : isFriend ? (
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={styles.removeFriendBtn}
-              onPress={() => setShowRemoveModal(true)}
-            >
-              <Text style={styles.removeFriendText}>Remove friend</Text>
-            </TouchableOpacity>
-          ) : (
+          </View>
+        ) : !isFriend ? (
+          <View style={styles.profileActionWrap}>
             <TouchableOpacity
               activeOpacity={0.8}
               style={[synqOutlineAddBtn, requestSent && synqOutlineAddBtnDisabled]}
@@ -940,8 +990,8 @@ export default function FriendProfile() {
                 {requestSent ? "Pending" : actionLoading ? "Sending..." : "Add friend"}
               </Text>
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        ) : null}
 
         {mutualFriends.length > 0 && (
           <>
@@ -1054,6 +1104,20 @@ export default function FriendProfile() {
             />
           </View>
           </>
+        ) : null}
+
+        {isFriend && !userIsBlocked ? (
+          <View style={styles.removeFriendWrap}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.removeFriendBtn}
+              onPress={() => setShowRemoveModal(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Remove friend"
+            >
+              <Text style={styles.removeFriendText}>Remove friend</Text>
+            </TouchableOpacity>
+          </View>
         ) : null}
       </ScrollView>
       <Modal visible={showOptionsSheet} transparent animationType="fade">
@@ -1252,7 +1316,44 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  header: { alignItems: "center", marginTop: 4 },
+  friendCard: {
+    marginTop: 4,
+    marginBottom: 4,
+    backgroundColor: PROFILE_SURFACE,
+    borderRadius: RADIUS_MD,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: PROFILE_BORDER,
+    overflow: "hidden",
+  },
+  header: {
+    alignItems: "center",
+    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+  headerWithNudge: {
+    paddingBottom: 14,
+  },
+  nudgeCardWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  removeFriendWrap: {
+    marginTop: 32,
+    paddingTop: 8,
+    alignItems: "center",
+  },
+  removeFriendBtn: {
+    alignSelf: "center",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,69,58,0.45)",
+    borderRadius: BUTTON_RADIUS,
+    paddingVertical: 13,
+    paddingHorizontal: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
   avatarGlowWrap: {
     borderRadius: 80,
     marginBottom: 16,
@@ -1322,6 +1423,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontFamily: fonts.medium,
     fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
   },
 
   section: {
@@ -1500,18 +1603,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.book,
     fontStyle: "italic",
   },
-  removeFriendBtn: {
-    alignSelf: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,69,58,0.45)",
-    borderRadius: BUTTON_RADIUS,
-    paddingVertical: 13,
-    paddingHorizontal: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-  },
-
   removeFriendText: {
     color: DESTRUCTIVE,
     fontFamily: fonts.heavy,

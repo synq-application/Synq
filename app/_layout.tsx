@@ -252,7 +252,7 @@ export default function RootLayout() {
         return;
       }
 
-      if (type === "friend_synq_active") {
+      if (type === "friend_synq_active" || type === "synq_nudge") {
         setPendingNotificationTap({ kind: "synq_home" });
         return;
       }

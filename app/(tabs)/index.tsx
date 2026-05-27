@@ -70,7 +70,7 @@ import {
   SURFACE,
   TEXT,
   tabScreenMainHeaderTitle,
-  TYPE_BODY
+  TYPE_BODY,
 } from '../../constants/Variables';
 import { ignoreSnapshotPermissionDenied } from '@/src/lib/firestoreListeners';
 import { auth, db } from '../../src/lib/firebase';
