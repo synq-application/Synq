@@ -10,19 +10,25 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
+  updateDoc,
   writeBatch,
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  RefreshControl,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  useWindowDimensions,
+  View,
 } from "react-native";
 import {
   ACCENT,
@@ -30,11 +36,14 @@ import {
   BORDER,
   DEFAULT_AVATAR,
   fonts,
+  MUTED,
   MUTED2,
   RADIUS_MD,
   SPACE_3,
   SPACE_4,
+  SPACE_5,
   SPACE_6,
+  TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
   TYPE_SECTION,
@@ -44,22 +53,80 @@ import { auth, db } from "../src/lib/firebase";
 import AlertModal from "./alert-modal";
 import { prefetchResolvedAvatar, resolveAvatar } from "./helpers";
 
-function prefetchRequestRows(items: any[]) {
+function prefetchActorAvatars(items: FeedItem[]) {
   items.forEach((item) => {
-    prefetchResolvedAvatar(
-      item.senderImageUrl || item.fromImageUrl || item.fromImageurl || item.imageurl
-    );
+    if (item.actorImageUrl) prefetchResolvedAvatar(item.actorImageUrl);
   });
 }
 
 const SURFACE = "rgba(255,255,255,0.06)";
 const BACKGROUND = BG;
 
+type ActivityType = "friend_accepted" | "open_plan_interest" | "friend_synq_active";
+
+type FeedItem =
+  | {
+      feedKey: string;
+      kind: "friend_request";
+      id: string;
+      fromUserId: string;
+      actorName: string;
+      actorImageUrl: string | null;
+      sortMs: number;
+      raw: Record<string, unknown>;
+    }
+  | {
+      feedKey: string;
+      kind: ActivityType;
+      id: string;
+      source: "notifications" | "legacy";
+      fromUserId: string | null;
+      actorName: string;
+      actorImageUrl: string | null;
+      title: string;
+      body: string;
+      sortMs: number;
+      read: boolean;
+      eventId?: string | null;
+      planHostUid?: string | null;
+      raw: Record<string, unknown>;
+    };
+
+function timestampMillis(v: unknown): number {
+  if (!v) return 0;
+  const t = v as { toMillis?: () => number; seconds?: number };
+  if (typeof t.toMillis === "function") return t.toMillis();
+  if (typeof t.seconds === "number") return t.seconds * 1000;
+  return 0;
+}
+
+function firstName(name: string): string {
+  return String(name || "").trim().split(/\s+/)[0] || "Someone";
+}
+
+function NotificationsEmptyState() {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIconRing}>
+        <Ionicons name="notifications-outline" size={34} color={ACCENT} />
+      </View>
+      <Text style={styles.emptyHeadline}>No notifications</Text>
+      <Text style={styles.emptyHelper}>
+        Friend requests, plan updates, and other activity will show up here.
+      </Text>
+    </View>
+  );
+}
+
 export default function NotificationsScreen() {
-  const [requests, setRequests] = useState<any[]>([]);
+  const { height: windowHeight } = useWindowDimensions();
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [activityItems, setActivityItems] = useState<any[]>([]);
+  const [legacyActivityItems, setLegacyActivityItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [dismissingKeys, setDismissingKeys] = useState<Set<string>>(() => new Set());
 
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{
@@ -72,100 +139,346 @@ export default function NotificationsScreen() {
     setAlertVisible(true);
   };
 
-  const resolveRequestDisplay = async (request: any) => {
-    const senderId = request.from || request.fromId || request.id;
-    let senderName =
-      request.senderName ||
-      request.fromName ||
-      "Someone";
-    let senderImageUrl =
-      request.senderImageUrl ||
-      request.fromImageUrl ||
-      request.fromImageurl ||
-      request.imageurl ||
-      null;
+  const resolveActor = async (
+    fromUserId: string | null | undefined,
+    fallbackName?: string,
+    fallbackImage?: string | null
+  ) => {
+    let actorName = fallbackName || "Someone";
+    let actorImageUrl = fallbackImage || null;
+
+    if (!fromUserId) {
+      return { actorName, actorImageUrl };
+    }
 
     try {
-      const senderSnap = await getDoc(doc(db, "users", senderId));
+      const senderSnap = await getDoc(doc(db, "users", fromUserId));
       if (senderSnap.exists()) {
-        const senderData = senderSnap.data() as any;
-        senderName = senderData?.displayName || senderName;
-        senderImageUrl = senderData?.imageurl || senderImageUrl;
+        const senderData = senderSnap.data() as Record<string, unknown>;
+        actorName = (senderData?.displayName as string) || actorName;
+        actorImageUrl = (senderData?.imageurl as string) || actorImageUrl;
       }
     } catch {}
 
+    return { actorName, actorImageUrl };
+  };
+
+  const resolveFriendRequest = async (request: Record<string, unknown> & { id: string }) => {
+    const fromUserId = String(request.from || request.fromId || request.id || "");
+    const inlineName =
+      (request.senderName as string) ||
+      (request.fromName as string) ||
+      undefined;
+    const inlineImage =
+      (request.senderImageUrl as string) ||
+      (request.fromImageUrl as string) ||
+      (request.fromImageurl as string) ||
+      (request.imageurl as string) ||
+      null;
+
+    const { actorName, actorImageUrl } = await resolveActor(
+      fromUserId,
+      inlineName,
+      inlineImage
+    );
+
     return {
       ...request,
-      senderName,
-      senderImageUrl,
+      fromUserId,
+      actorName,
+      actorImageUrl,
+      sortMs: timestampMillis(request.sentAt) || Date.now(),
     };
   };
 
-  const fetchRequests = async () => {
+  const resolveActivity = async (item: Record<string, unknown> & { id: string }) => {
+    const fromUserId = item.fromUserId ? String(item.fromUserId) : null;
+    const { actorName, actorImageUrl } = await resolveActor(fromUserId);
+    const type = String(item.type || "") as ActivityType;
+    const planTitle = String(item.planTitle || "").trim();
+    const title = String(item.title || "").trim();
+    const storedBody = String(item.body || "").trim();
+
+    let body = storedBody;
+    if (!body) {
+      if (type === "friend_accepted") {
+        body = `${actorName} accepted your friend request.`;
+      } else if (type === "open_plan_interest") {
+        body = planTitle
+          ? `${firstName(actorName)} is interested in your plan ${planTitle}`
+          : `${firstName(actorName)} is interested in your plan`;
+      } else if (type === "friend_synq_active") {
+        body = `${firstName(actorName)} just activated Synq.`;
+      }
+    }
+
+    return {
+      ...item,
+      type,
+      fromUserId,
+      actorName,
+      actorImageUrl,
+      title:
+        title ||
+        (type === "friend_accepted"
+          ? "Request accepted"
+          : type === "open_plan_interest"
+            ? "Open plan"
+            : "Friend active on Synq"),
+      body,
+      sortMs: timestampMillis(item.createdAt) || Date.now(),
+      read: item.read === true,
+      eventId: item.eventId ? String(item.eventId) : null,
+      planHostUid: item.planHostUid ? String(item.planHostUid) : null,
+    };
+  };
+
+  const fetchAll = async () => {
     if (!auth.currentUser) return;
+    const myId = auth.currentUser.uid;
 
-    const snap = await getDocs(
-      collection(db, "users", auth.currentUser.uid, "friendRequests")
-    );
+    const [reqSnap, activitySnap, legacySnap] = await Promise.all([
+      getDocs(collection(db, "users", myId, "friendRequests")),
+      getDocs(
+        query(
+          collection(db, "users", myId, "notifications"),
+          orderBy("createdAt", "desc")
+        )
+      ),
+      getDocs(collection(db, "users", myId, "notificationLocks")),
+    ]);
 
-    const reqList = snap.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    }));
+    const reqList = reqSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const activityList = activitySnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const legacyList = legacySnap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((row) =>
+        ["friend_accepted", "open_plan_interest"].includes(String(row.type || ""))
+      );
 
-    const resolved = await Promise.all(reqList.map(resolveRequestDisplay));
-    setRequests(resolved);
+    const [resolvedReqs, resolvedActivity, resolvedLegacy] = await Promise.all([
+      Promise.all(reqList.map(resolveFriendRequest)),
+      Promise.all(activityList.map(resolveActivity)),
+      Promise.all(
+        legacyList.map((row) =>
+          resolveActivity({
+            id: row.id,
+            type: row.type,
+            fromUserId: row.from || row.joinerId || null,
+            planTitle: row.planTitle || null,
+            createdAt: row.createdAt,
+            read: true,
+          })
+        )
+      ),
+    ]);
+
+    setFriendRequests(resolvedReqs);
+    setActivityItems(resolvedActivity);
+    setLegacyActivityItems(resolvedLegacy);
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchRequests();
+    await fetchAll();
     setRefreshing(false);
   };
 
   useEffect(() => {
     if (!auth.currentUser) return;
+    const myId = auth.currentUser.uid;
 
-    const reqRef = collection(
-      db,
-      "users",
-      auth.currentUser.uid,
-      "friendRequests"
+    const reqRef = collection(db, "users", myId, "friendRequests");
+    const activityRef = query(
+      collection(db, "users", myId, "notifications"),
+      orderBy("createdAt", "desc")
     );
+    const legacyRef = collection(db, "users", myId, "notificationLocks");
 
-    const unsubscribe = onSnapshot(
+    let reqReady = false;
+    let activityReady = false;
+    let legacyReady = false;
+
+    const maybeDoneLoading = () => {
+      if (reqReady && activityReady && legacyReady) setLoading(false);
+    };
+
+    const unsubReq = onSnapshot(
       reqRef,
       async (snapshot) => {
-        const reqList = snapshot.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }));
-        const resolved = await Promise.all(reqList.map(resolveRequestDisplay));
-        prefetchRequestRows(resolved);
-        setRequests(resolved);
-        setLoading(false);
+        const reqList = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const resolved = await Promise.all(reqList.map(resolveFriendRequest));
+        setFriendRequests(resolved);
         setLoadError(false);
+        reqReady = true;
+        maybeDoneLoading();
       },
       (error) => {
-        console.error("Firestore Snapshot failed:", error);
-        setLoading(false);
+        console.error("friendRequests snapshot:", error);
         setLoadError(true);
+        reqReady = true;
+        maybeDoneLoading();
       }
     );
 
-    return () => unsubscribe();
+    const unsubActivity = onSnapshot(
+      activityRef,
+      async (snapshot) => {
+        const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const resolved = await Promise.all(list.map(resolveActivity));
+        prefetchActorAvatars(
+          resolved.map((r) => ({
+            feedKey: r.id,
+            kind: r.type,
+            id: r.id,
+            fromUserId: r.fromUserId,
+            actorName: r.actorName,
+            actorImageUrl: r.actorImageUrl,
+            title: r.title,
+            body: r.body,
+            sortMs: r.sortMs,
+            read: r.read,
+            eventId: r.eventId,
+            raw: r,
+          }))
+        );
+        setActivityItems(resolved);
+        setLoadError(false);
+        activityReady = true;
+        maybeDoneLoading();
+      },
+      (error) => {
+        console.error("notifications snapshot:", error);
+        setLoadError(true);
+        activityReady = true;
+        maybeDoneLoading();
+      }
+    );
+
+    const unsubLegacy = onSnapshot(
+      legacyRef,
+      async (snapshot) => {
+        const list = snapshot.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((row) =>
+            ["friend_accepted", "open_plan_interest"].includes(String(row.type || ""))
+          );
+        const resolved = await Promise.all(
+          list.map((row) =>
+            resolveActivity({
+              id: row.id,
+              type: row.type,
+              fromUserId: row.from || row.joinerId || null,
+              planTitle: row.planTitle || null,
+              createdAt: row.createdAt,
+              read: true,
+            })
+          )
+        );
+        setLegacyActivityItems(resolved);
+        legacyReady = true;
+        maybeDoneLoading();
+      },
+      () => {
+        legacyReady = true;
+        maybeDoneLoading();
+      }
+    );
+
+    return () => {
+      unsubReq();
+      unsubActivity();
+      unsubLegacy();
+    };
   }, []);
 
   useEffect(() => {
     prefetchResolvedAvatar(DEFAULT_AVATAR);
   }, []);
 
-  const handleRequest = async (request: any, accept: boolean) => {
+  const feedItems: FeedItem[] = useMemo(() => {
+    const requests: FeedItem[] = friendRequests.map((r) => ({
+      feedKey: `req_${r.id}`,
+      kind: "friend_request" as const,
+      id: r.id,
+      fromUserId: r.fromUserId,
+      actorName: r.actorName,
+      actorImageUrl: r.actorImageUrl,
+      sortMs: r.sortMs,
+      raw: r,
+    }));
+
+    const activityIds = new Set(activityItems.map((a) => a.id));
+    const mergedActivity = [
+      ...activityItems,
+      ...legacyActivityItems.filter((a) => !activityIds.has(a.id)),
+    ];
+
+    const activity: FeedItem[] = mergedActivity
+      .filter((a) =>
+        ["friend_accepted", "open_plan_interest", "friend_synq_active"].includes(a.type)
+      )
+      .map((a) => ({
+        feedKey: `act_${a.id}`,
+        kind: a.type as ActivityType,
+        id: a.id,
+        source: activityIds.has(a.id)
+          ? ("notifications" as const)
+          : ("legacy" as const),
+        fromUserId: a.fromUserId,
+        actorName: a.actorName,
+        actorImageUrl: a.actorImageUrl,
+        title: a.title,
+        body: a.body,
+        sortMs: a.sortMs,
+        read: a.read,
+        eventId: a.eventId,
+        planHostUid: a.planHostUid,
+        raw: a,
+      }));
+
+    return [...requests, ...activity].sort((a, b) => b.sortMs - a.sortMs);
+  }, [friendRequests, activityItems, legacyActivityItems]);
+
+  const markActivityRead = async (item: Extract<FeedItem, { kind: ActivityType }>) => {
+    if (!auth.currentUser || item.source !== "notifications") return;
+    try {
+      await updateDoc(
+        doc(db, "users", auth.currentUser.uid, "notifications", item.id),
+        { read: true }
+      );
+    } catch {}
+  };
+
+  const dismissActivity = async (item: Extract<FeedItem, { kind: ActivityType }>) => {
+    if (!auth.currentUser || dismissingKeys.has(item.feedKey)) return;
+
+    const myId = auth.currentUser.uid;
+    setDismissingKeys((prev) => new Set(prev).add(item.feedKey));
+
+    try {
+      if (item.source === "legacy") {
+        await deleteDoc(doc(db, "users", myId, "notificationLocks", item.id));
+      } else {
+        await deleteDoc(doc(db, "users", myId, "notifications", item.id));
+      }
+    } catch {
+      showAlert("Error", "Could not dismiss notification. Please try again.");
+    } finally {
+      setDismissingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(item.feedKey);
+        return next;
+      });
+    }
+  };
+
+  const handleRequest = async (request: Record<string, unknown> & { id: string }, accept: boolean) => {
     if (!auth.currentUser) return;
 
     try {
       const myId = auth.currentUser.uid;
-      const senderId = request.from || request.fromId;
+      const senderId = String(request.from || request.fromId || "");
 
       if (!senderId) throw new Error("Missing sender ID.");
 
@@ -174,31 +487,31 @@ export default function NotificationsScreen() {
         const meData = meSnap.exists() ? meSnap.data() : {};
 
         const myName =
-          meData?.displayName ||
+          (meData as Record<string, unknown>)?.displayName ||
           auth.currentUser.displayName ||
           "User";
 
-        const myImageUrl = resolveAvatar(meData?.imageurl);
+        const myImageUrl = resolveAvatar((meData as Record<string, unknown>)?.imageurl);
 
         let senderName =
-          request.senderName ||
-          request.fromName ||
+          (request.senderName as string) ||
+          (request.fromName as string) ||
           "User";
 
         let senderImageUrl =
-          request.senderImageUrl ||
-          request.fromImageUrl ||
-          request.fromImageurl ||
-          request.imageurl ||
+          (request.senderImageUrl as string) ||
+          (request.fromImageUrl as string) ||
+          (request.fromImageurl as string) ||
+          (request.imageurl as string) ||
           null;
 
         if (!senderImageUrl || !senderName) {
           const senderSnap = await getDoc(doc(db, "users", senderId));
           if (senderSnap.exists()) {
-            const senderData = senderSnap.data();
+            const senderData = senderSnap.data() as Record<string, unknown>;
             senderName =
               senderName ||
-              senderData?.displayName ||
+              (senderData?.displayName as string) ||
               "User";
             senderImageUrl =
               senderImageUrl ||
@@ -223,32 +536,66 @@ export default function NotificationsScreen() {
           imageurl: myImageUrl,
         });
 
-        batch.delete(
-          doc(db, "users", myId, "friendRequests", request.id)
-        );
+        batch.delete(doc(db, "users", myId, "friendRequests", request.id));
 
         await batch.commit();
 
         showAlert("Success", `You are now connected with ${senderName}!`);
       } else {
-        await deleteDoc(
-          doc(db, "users", myId, "friendRequests", request.id)
-        );
+        await deleteDoc(doc(db, "users", myId, "friendRequests", request.id));
       }
-    } catch (e: any) {
-      showAlert("Error", `Could not process request: ${e.message}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Unknown error";
+      showAlert("Error", `Could not process request: ${message}`);
     }
   };
 
-  const RequestRow = ({ item }: { item: any }) => {
-    const fromImageUrl =
-      item.senderImageUrl ||
-      item.fromImageUrl ||
-      item.fromImageurl ||
-      item.imageurl ||
-      null;
+  const handleActivityPress = useCallback(async (item: FeedItem) => {
+    if (item.kind === "friend_request") return;
 
-    const avatarUri = resolveAvatar(fromImageUrl);
+    void markActivityRead(item);
+
+    if (item.kind === "friend_accepted" && item.fromUserId) {
+      router.push({
+        pathname: "/friend-profile",
+        params: { friendId: item.fromUserId },
+      });
+      return;
+    }
+
+    if (item.kind === "open_plan_interest") {
+      if (item.eventId) {
+        router.push(
+          `/(tabs)/me?focusEventId=${encodeURIComponent(item.eventId)}`
+        );
+      } else {
+        router.push("/(tabs)/me");
+      }
+      return;
+    }
+
+    if (item.kind === "friend_synq_active") {
+      router.push("/(tabs)");
+    }
+  }, []);
+
+  const kickerFor = (kind: FeedItem["kind"]) => {
+    switch (kind) {
+      case "friend_request":
+        return "Friend request";
+      case "friend_accepted":
+        return "Request accepted";
+      case "open_plan_interest":
+        return "Plan interest";
+      case "friend_synq_active":
+        return "Synq active";
+      default:
+        return "Notification";
+    }
+  };
+
+  const FriendRequestRow = ({ item }: { item: Extract<FeedItem, { kind: "friend_request" }> }) => {
+    const avatarUri = resolveAvatar(item.actorImageUrl);
 
     return (
       <View style={styles.row}>
@@ -266,11 +613,9 @@ export default function NotificationsScreen() {
           </View>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.rowKicker}>Friend Request</Text>
+            <Text style={styles.rowKicker}>{kickerFor(item.kind)}</Text>
             <Text style={styles.rowText}>
-              <Text style={styles.boldWhite}>
-                {item.senderName || item.fromName || "Someone"}
-              </Text>
+              <Text style={styles.boldWhite}>{item.actorName}</Text>
               <Text style={styles.grayText}> wants to be your friend.</Text>
             </Text>
           </View>
@@ -278,14 +623,14 @@ export default function NotificationsScreen() {
 
         <View style={styles.rowRight}>
           <TouchableOpacity
-            onPress={() => handleRequest(item, true)}
+            onPress={() => handleRequest(item.raw as Record<string, unknown> & { id: string }, true)}
             style={styles.acceptBtn}
           >
             <Ionicons name="checkmark" size={22} color="black" />
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => handleRequest(item, false)}
+            onPress={() => handleRequest(item.raw as Record<string, unknown> & { id: string }, false)}
             style={styles.denyBtn}
           >
             <CloseIcon size={22} />
@@ -295,11 +640,77 @@ export default function NotificationsScreen() {
     );
   };
 
+  const ActivityRow = ({ item }: { item: Extract<FeedItem, { kind: ActivityType }> }) => {
+    const avatarUri = resolveAvatar(item.actorImageUrl);
+    const unread = !item.read;
+    const isDismissing = dismissingKeys.has(item.feedKey);
+
+    return (
+      <View
+        style={[styles.row, styles.activityRow, unread && styles.activityRowUnread]}
+      >
+        <TouchableOpacity
+          style={styles.activityTapArea}
+          activeOpacity={0.75}
+          onPress={() => handleActivityPress(item)}
+          disabled={isDismissing}
+        >
+          <View style={styles.rowLeft}>
+            <View style={styles.avatar}>
+              <ExpoImage
+                source={{ uri: avatarUri }}
+                style={styles.avatarImg}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={0}
+                recyclingKey={avatarUri}
+                priority="high"
+              />
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowKicker}>{kickerFor(item.kind)}</Text>
+              <Text style={styles.rowText}>{item.body}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => dismissActivity(item)}
+          style={styles.dismissBtn}
+          disabled={isDismissing}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss notification"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          {isDismissing ? (
+            <ActivityIndicator size="small" color={MUTED2} />
+          ) : (
+            <CloseIcon size={20} />
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderFeedItem = ({ item }: { item: FeedItem }) => (
+    <View style={styles.group}>
+      {item.kind === "friend_request" ? (
+        <FriendRequestRow item={item} />
+      ) : (
+        <ActivityRow item={item} />
+      )}
+    </View>
+  );
+
+  const isEmpty = feedItems.length === 0;
+  const emptyTopOffset = Math.round(windowHeight * 0.2);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <StackScreenHeader title="Friend requests" />
+      <StackScreenHeader title="Notifications" />
 
       {loading ? (
         <View style={styles.center}>
@@ -307,36 +718,35 @@ export default function NotificationsScreen() {
         </View>
       ) : loadError ? (
         <View style={styles.center}>
-          <Text style={styles.emptyTitle}>Could not load requests</Text>
+          <Text style={styles.emptyTitle}>Could not load notifications</Text>
           <Text style={styles.emptySubtitle}>Pull down to refresh or try again later.</Text>
         </View>
+      ) : isEmpty ? (
+        <ScrollView
+          style={styles.emptyScroll}
+          contentContainerStyle={[
+            styles.emptyScrollContent,
+            { paddingTop: emptyTopOffset },
+          ]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={ACCENT}
+            />
+          }
+        >
+          <NotificationsEmptyState />
+        </ScrollView>
       ) : (
         <FlatList
-          data={requests}
-          keyExtractor={(item) => item.id}
+          data={feedItems}
+          keyExtractor={(item) => item.feedKey}
           contentContainerStyle={styles.listContent}
           refreshing={refreshing}
           onRefresh={onRefresh}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <View style={styles.emptyIcon}>
-                <Ionicons
-                  name="notifications-off-outline"
-                  size={34}
-                  color={MUTED2}
-                />
-              </View>
-              <Text style={styles.emptyTitle}>All caught up</Text>
-              <Text style={styles.emptySubtitle}>
-                No pending friend requests right now.
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <View style={styles.group}>
-              <RequestRow item={item} />
-            </View>
-          )}
+          renderItem={renderFeedItem}
         />
       )}
 
@@ -349,12 +759,28 @@ export default function NotificationsScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BACKGROUND },
   center: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: SPACE_4 },
   listContent: {
     paddingBottom: SPACE_6 + 8,
     paddingTop: SPACE_3,
+  },
+  emptyScroll: {
+    flex: 1,
+  },
+  emptyScrollContent: {
+    flexGrow: 1,
+    alignItems: "center",
+    paddingBottom: SPACE_6,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingHorizontal: SPACE_5,
+    maxWidth: 300,
+    width: "100%",
+    alignSelf: "center",
   },
   group: {
     backgroundColor: SURFACE,
@@ -373,6 +799,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE_4 + 2,
     borderBottomWidth: 0.5,
     borderBottomColor: "#252525",
+  },
+  activityRow: {
+    borderBottomWidth: 0,
+  },
+  activityRowUnread: {
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  activityTapArea: {
+    flex: 1,
+    marginRight: SPACE_3,
+  },
+  dismissBtn: {
+    backgroundColor: "#222",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#333",
   },
   rowLeft: {
     flexDirection: "row",
@@ -434,22 +880,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#333",
   },
-  emptyWrap: {
-    marginTop: SPACE_6 + 8,
-    marginHorizontal: SPACE_4 + 4,
-    padding: SPACE_4 + 2,
-    borderRadius: RADIUS_MD,
-    backgroundColor: SURFACE,
+  emptyIconRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 1,
+    borderColor: "rgba(0,255,133,0.22)",
+    backgroundColor: "rgba(0,255,133,0.06)",
     alignItems: "center",
-  },
-  emptyIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#222",
     justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
+    marginBottom: SPACE_5,
+  },
+  emptyHeadline: {
+    color: TEXT,
+    fontSize: TYPE_SECTION + 2,
+    fontFamily: fonts.heavy,
+    textAlign: "center",
+    letterSpacing: 0.15,
+  },
+  emptyHelper: {
+    color: MUTED,
+    fontSize: TYPE_BODY,
+    fontFamily: fonts.book,
+    textAlign: "center",
+    lineHeight: 24,
+    marginTop: SPACE_3,
+    maxWidth: 280,
   },
   emptyTitle: {
     color: "white",
@@ -462,6 +918,6 @@ const styles = StyleSheet.create({
     fontSize: TYPE_BODY - 1,
     fontFamily: fonts.medium,
     textAlign: "center",
-    marginTop: 8
+    marginTop: 8,
   },
 });

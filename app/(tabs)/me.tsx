@@ -223,6 +223,7 @@ export default function ProfileScreen() {
   const [city, setCity] = useState<string | null>(() => meBootstrap?.city ?? null);
   const [state, setState] = useState<string | null>(() => meBootstrap?.state ?? null);
   const [requestCount, setRequestCount] = useState(0);
+  const [unreadActivityCount, setUnreadActivityCount] = useState(0);
   type OpenPlanEvent = {
     id: string;
     date: string;
@@ -511,6 +512,7 @@ export default function ProfileScreen() {
     );
 
     const reqRef = collection(db, "users", myId, "friendRequests");
+    const notifRef = collection(db, "users", myId, "notifications");
     const unsubscribeRequests = onSnapshot(
       reqRef,
       (snap) => {
@@ -531,6 +533,15 @@ export default function ProfileScreen() {
               .catch(() => {});
           }
         });
+      },
+      ignoreSnapshotPermissionDenied
+    );
+
+    const unsubscribeNotifications = onSnapshot(
+      notifRef,
+      (snap) => {
+        const unread = snap.docs.filter((d) => d.data()?.read !== true).length;
+        setUnreadActivityCount(unread);
       },
       ignoreSnapshotPermissionDenied
     );
@@ -593,6 +604,7 @@ export default function ProfileScreen() {
     return () => {
       unsubscribeProfile();
       unsubscribeRequests();
+      unsubscribeNotifications();
       unsubscribeFriends();
     };
   }, [myId]);
@@ -1304,10 +1316,13 @@ export default function ProfileScreen() {
         <HeaderIconButton
           name="notifications-outline"
           onPress={() => router.push("/notifications")}
-          accessibilityLabel="Friend requests"
+          accessibilityLabel="Notifications"
           badge={
-            requestCount > 0 ? (
-              <NotificationBadge variant="count" count={requestCount} />
+            requestCount + unreadActivityCount > 0 ? (
+              <NotificationBadge
+                variant="count"
+                count={requestCount + unreadActivityCount}
+              />
             ) : undefined
           }
         />
