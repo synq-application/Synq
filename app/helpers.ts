@@ -9,16 +9,31 @@ export const formatTime = (timestamp: any) => {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
 
-export const getChatTitle = (chat: any, myId: string) => {
-  if (!chat?.participantNames) return "Synq Chat";
-  const otherNames = Object.entries(chat.participantNames)
-    .filter(([uid]) => uid !== myId)
-    .map(([_, name]) => name as string);
+const chatFirstName = (fullName: string) =>
+  (fullName || "").trim().split(/\s+/)[0];
 
-  if (otherNames.length === 0) return "Just You";
-  if (otherNames.length === 1) return `${otherNames[0]}`;
-  const last = otherNames.pop();
-  return `You, ${otherNames.join(", ")} & ${last}`;
+/** Stable display title for inbox preview and open chat (names sorted A→Z). */
+export const getChatTitle = (chat: any, myId?: string) => {
+  if (!chat) return "Synq Chat";
+
+  if (chat.customName?.trim()) {
+    return wrapChatTitle(chat.customName.trim(), 25);
+  }
+
+  if (!chat.participantNames || !myId) return "Synq Chat";
+
+  const otherUsers = Object.entries(chat.participantNames)
+    .filter(([uid]) => uid !== myId)
+    .map(([, name]) => (name as string).trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
+  if (otherUsers.length === 0) return "Just You";
+  if (otherUsers.length === 1) return otherUsers[0];
+
+  const firstNames = otherUsers.map(chatFirstName);
+  const lastFriend = firstNames.pop();
+  return `${firstNames.join(", ")} & ${lastFriend}`;
 };
 
 export const getLeadingEmoji = (text: string) => {

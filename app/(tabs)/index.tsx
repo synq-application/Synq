@@ -93,6 +93,7 @@ import { useBlockedUsers } from '@/src/lib/blockedUsers';
 import ReportModal from '../report-modal';
 import ExploreModal from '../explore-modal';
 import {
+  getChatTitle as buildChatTitle,
   getStackAvatarUris,
   resolveAvatar,
   SynqStatus,
@@ -1164,40 +1165,8 @@ export default function SynqScreen() {
     }
   };
 
-  const firstName = (fullName: string) =>
-    (fullName || "").trim().split(/\s+/)[0];
-
-
-  const getChatTitle = (chat: any) => {
-    if (!chat) return "Synq Chat";
-
-    if (chat.customName?.trim()) {
-      return wrapChatTitle(chat.customName.trim(), 25);
-    }
-
-    const myId = auth.currentUser?.uid;
-
-    const otherUsers = Object.entries(chat.participantNames || {})
-      .filter(([uid]) => uid !== myId)
-      .map(([_, name]) => name as string);
-
-    if (otherUsers.length === 0) return "Just You";
-
-    let title = "";
-
-    if (otherUsers.length === 1) {
-      title = otherUsers[0];
-    }
-    else {
-      const firstNames = otherUsers.map((name) => firstName(name));
-      const names = [...firstNames];
-      const lastFriend = names.pop();
-
-      title = `${names.join(", ")} & ${lastFriend}`;
-    }
-
-    return title;
-  };
+  const getChatTitle = (chat: any) =>
+    buildChatTitle(chat, auth.currentUser?.uid);
 
   const mergePreviewTitle = useMemo(() => {
     if (!mergePreviewChat) return "";
