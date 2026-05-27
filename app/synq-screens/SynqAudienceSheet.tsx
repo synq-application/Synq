@@ -1,9 +1,12 @@
 import SynqAudiencePicker from "@/src/components/synq/SynqAudiencePicker";
 import {
-  BG,
+  ACCENT,
   BORDER,
   BUTTON_RADIUS,
   fonts,
+  ON_ACCENT_TEXT,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
   SPACE_4,
   SPACE_5,
   TEXT,
@@ -20,6 +23,9 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+/** Opaque panel fill — matches SynqOptionsSheet sheet. */
+const SHEET_SURFACE = "#141414";
 
 type Props = {
   visible: boolean;
@@ -43,23 +49,25 @@ export default function SynqAudienceSheet({
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
         <View style={[styles.sheetGroup, { paddingBottom: insets.bottom + SPACE_4 }]}>
-          <View style={styles.sheet}>
+          <View style={styles.sheetCard}>
             <Text style={styles.sheetTitle}>Share with</Text>
             <SynqAudiencePicker
               groups={groups}
               selection={selection}
               onChangeSelection={onChangeSelection}
             />
+            <View style={styles.footer}>
+              <TouchableOpacity
+                style={styles.doneBtn}
+                onPress={onClose}
+                activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityLabel="Done"
+              >
+                <Text style={styles.doneText}>Done</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <TouchableOpacity
-            style={styles.doneBtn}
-            onPress={onClose}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Done"
-          >
-            <Text style={styles.doneText}>Done</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -70,22 +78,19 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.55)",
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
   },
   sheetGroup: {
     paddingHorizontal: SPACE_5,
-    gap: 10,
   },
-  sheet: {
-    backgroundColor: BG,
-    borderRadius: BUTTON_RADIUS,
-    borderWidth: StyleSheet.hairlineWidth,
+  sheetCard: {
+    backgroundColor: SHEET_SURFACE,
+    borderRadius: BUTTON_RADIUS + 4,
+    borderWidth: 1,
     borderColor: BORDER,
-    paddingTop: SPACE_4,
-    paddingBottom: SPACE_4,
     overflow: "hidden",
   },
   sheetTitle: {
@@ -93,19 +98,33 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: fonts.heavy,
     textAlign: "center",
-    marginBottom: SPACE_4,
+    paddingTop: SPACE_4 + 2,
+    paddingBottom: SPACE_4,
     paddingHorizontal: SPACE_4,
   },
+  footer: {
+    alignItems: "center",
+    paddingHorizontal: SPACE_4,
+    paddingTop: SPACE_4,
+    paddingBottom: SPACE_4 + 2,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BORDER,
+    backgroundColor: SHEET_SURFACE,
+  },
   doneBtn: {
-    backgroundColor: "rgba(255,255,255,0.12)",
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
+    backgroundColor: ACCENT,
     borderRadius: BUTTON_RADIUS,
-    minHeight: 50,
+    minHeight: PRIMARY_CTA_HEIGHT,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: SPACE_4,
   },
   doneText: {
-    color: TEXT,
+    color: ON_ACCENT_TEXT,
     fontSize: 17,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.2,
   },
 });
