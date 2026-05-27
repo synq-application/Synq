@@ -15,7 +15,7 @@ import {
   SPACE_5,
   SPACE_6,
   SURFACE,
-  synqOutlineAddBtn,
+  synqOutlineAddBtnCompact,
   synqOutlineAddBtnText,
   TEXT,
   TYPE_BODY,
@@ -255,11 +255,12 @@ export default function FriendGroupDetailScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => handleRemoveMember(item.id, item.displayName)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityLabel={`Remove ${item.displayName}`}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${item.displayName} from group`}
                   style={styles.removeMemberBtn}
                 >
-                  <Ionicons name="person-remove-outline" size={20} color={MUTED2} />
+                  <Text style={styles.removeMemberLabel}>Remove</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -268,7 +269,7 @@ export default function FriendGroupDetailScreen() {
 
           <View style={styles.footer}>
             <TouchableOpacity
-              style={[synqOutlineAddBtn, styles.addMembersBtn]}
+              style={[synqOutlineAddBtnCompact, styles.addMembersBtn]}
               onPress={() => setAddSheetVisible(true)}
               activeOpacity={0.85}
             >
@@ -442,10 +443,20 @@ const styles = StyleSheet.create({
     letterSpacing: 0.05,
   },
   removeMemberBtn: {
-    width: 36,
-    height: 36,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: BUTTON_RADIUS,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,69,58,0.35)",
+    backgroundColor: "rgba(255,69,58,0.06)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  removeMemberLabel: {
+    fontFamily: fonts.medium,
+    fontSize: TYPE_CAPTION,
+    color: DESTRUCTIVE,
+    letterSpacing: 0.15,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
@@ -458,11 +469,14 @@ const styles = StyleSheet.create({
     paddingBottom: SPACE_6,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: BORDER,
+    alignItems: "center",
   },
   addMembersBtn: {
     flexDirection: "row",
     gap: 8,
-    alignSelf: "stretch",
+    alignSelf: "center",
+    paddingHorizontal: 26,
+    paddingVertical: 11,
   },
   successOverlay: {
     flex: 1,
