@@ -1,9 +1,10 @@
+import ConfirmModal from "@/app/confirm-modal";
 import {
   ACCENT,
   BORDER,
   fonts,
-  MUTED,
   MUTED2,
+  MUTED3,
   RADIUS_LG,
   SPACE_4,
   SPACE_5,
@@ -12,12 +13,16 @@ import {
   synqOutlineAddBtn,
   synqOutlineAddBtnText,
   TEXT,
-  TYPE_BODY,
   TYPE_CAPTION,
 } from "@/constants/Variables";
-import { FriendGroup, subscribeFriendGroups } from "@/src/lib/friendGroups";
+import {
+  deleteFriendGroup,
+  FriendGroup,
+  subscribeFriendGroups,
+} from "@/src/lib/friendGroups";
 import { friendGroupsCacheByUser } from "@/src/lib/socialCache";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -31,6 +36,9 @@ import {
 } from "react-native";
 import CreateGroupModal from "./CreateGroupModal";
 
+const GROUPS_HINT =
+  "Only you can see your groups. These are custom filters to organize your friends.";
+
 type Props = {
   userId: string;
   listBottomInset?: number;
@@ -41,9 +49,7 @@ function GroupsEmptyState({ onCreatePress }: { onCreatePress: () => void }) {
   return (
     <View style={styles.emptyWrap}>
       <Text style={styles.emptyTitle}>No groups yet</Text>
-      <Text style={styles.emptySubtitle}>
-        Only you can see your groups.{"\n"}Use them as custom filters to organize friends.
-      </Text>
+      <Text style={[styles.groupsHint, styles.groupsHintCenter]}>{GROUPS_HINT}</Text>
       <TouchableOpacity
         style={[synqOutlineAddBtn, styles.emptyCta]}
         onPress={onCreatePress}
@@ -86,6 +92,8 @@ export default function GroupsListPane({
   const [loading, setLoading] = useState(cached.length === 0);
   const [createVisible, setCreateVisible] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
+  const [pendingDeleteGroup, setPendingDeleteGroup] = useState<FriendGroup | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -126,6 +134,29 @@ export default function GroupsListPane({
 
   const openCreate = () => setCreateVisible(true);
 
+  const promptDeleteGroup = (group: FriendGroup) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setPendingDeleteGroup(group);
+  };
+
+  const handleConfirmDelete = async () => {
+    const group = pendingDeleteGroup;
+    if (!userId || !group) return;
+    setDeleteBusy(true);
+    try {
+      await deleteFriendGroup(userId, group.id);
+      setPendingDeleteGroup(null);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err: unknown) {
+      Alert.alert(
+        "Could not delete group",
+        err instanceof Error ? err.message : "Try again."
+      );
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loading}>
@@ -150,9 +181,7 @@ export default function GroupsListPane({
         ListHeaderComponent={
           hasGroups ? (
             <View style={styles.listHeader}>
-              <Text style={styles.hint}>
-                Only you can see your groups. Use them as custom filters to organize friends.
-              </Text>
+              <Text style={styles.groupsHint}>{GROUPS_HINT}</Text>
               <NewGroupRow onPress={openCreate} />
             </View>
           ) : null
@@ -164,9 +193,12 @@ export default function GroupsListPane({
             onPress={() =>
               router.push({ pathname: "/friend-group/[id]", params: { id: item.id } })
             }
+            onLongPress={() => promptDeleteGroup(item)}
+            delayLongPress={400}
             activeOpacity={0.82}
             accessibilityRole="button"
             accessibilityLabel={`${item.name}, ${item.memberIds.length} members`}
+            accessibilityHint="Long press to delete this group"
           >
             <View style={styles.groupIconRing}>
               <Ionicons name="people-outline" size={20} color={ACCENT} />
@@ -192,6 +224,22 @@ export default function GroupsListPane({
         onClose={() => setCreateVisible(false)}
         onCreate={handleCreate}
       />
+
+      <ConfirmModal
+        visible={pendingDeleteGroup != null}
+        title="Delete group?"
+        message={
+          pendingDeleteGroup
+            ? `Delete "${pendingDeleteGroup.name}"? This cannot be undone.`
+            : ""
+        }
+        confirmText="Delete"
+        destructive
+        onCancel={() => {
+          if (!deleteBusy) setPendingDeleteGroup(null);
+        }}
+        onConfirm={() => void handleConfirmDelete()}
+      />
     </>
   );
 }
@@ -211,11 +259,17 @@ const styles = StyleSheet.create({
     marginBottom: SPACE_4,
     gap: SPACE_5,
   },
-  hint: {
+  groupsHint: {
     fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION + 1,
-    color: MUTED2,
-    lineHeight: 20,
+    fontSize: TYPE_CAPTION,
+    color: MUTED3,
+    lineHeight: 18,
+    letterSpacing: 0.1,
+  },
+  groupsHintCenter: {
+    textAlign: "center",
+    maxWidth: 280,
+    marginBottom: SPACE_6,
   },
   loading: {
     flex: 1,
@@ -240,15 +294,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     letterSpacing: 0.15,
     marginBottom: SPACE_4,
-  },
-  emptySubtitle: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_BODY,
-    lineHeight: 24,
-    color: MUTED,
-    textAlign: "center",
-    maxWidth: 300,
-    marginBottom: SPACE_6,
   },
   emptyCta: {
     flexDirection: "row",
