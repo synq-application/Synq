@@ -75,3 +75,14 @@ export function filterOutPastOpenPlans<T extends { date?: string }>(
   if (!Array.isArray(events)) return [];
   return events.filter((e) => !isOpenPlanDatePast(String(e?.date || "")));
 }
+
+/** True when the viewer created this plan (not a copy joined from a friend). */
+export function canEditOpenPlan(event: any, viewerUid: string): boolean {
+  const viewer = String(viewerUid || "").trim();
+  if (!viewer) return false;
+  const host = String(event?.planHostUid || "").trim();
+  if (host) return host === viewer;
+  const joinedFromFriend = String(event?.joinedFromFriendUid || "").trim();
+  if (joinedFromFriend && joinedFromFriend !== viewer) return false;
+  return true;
+}

@@ -345,6 +345,86 @@ export default function ProfileScreen() {
     }
   };
 
+  const updateEvent = async (
+    id: string,
+    fields: { title: string; date: string; time: string; location: string }
+  ) => {
+    if (!auth.currentUser) return;
+
+    const existing = events.find((e) => e.id === id);
+    if (!existing) return;
+
+    const myUid = auth.currentUser.uid;
+    const host = String(existing.planHostUid || myUid).trim();
+    if (host !== myUid) {
+      showAlert("Can't edit", "You can only edit plans you created.");
+      return;
+    }
+
+    if (!fields.title.trim()) {
+      showAlert("Missing info", "Add a title");
+      return;
+    }
+
+    for (const field of [fields.title, fields.location]) {
+      if (!field) continue;
+      const check = filterOrReject(String(field));
+      if (!check.ok) {
+        showAlert("Content not allowed", check.reason);
+        return;
+      }
+    }
+
+    const updatedPayload = {
+      title: fields.title.trim(),
+      date: fields.date,
+      time: fields.time || "",
+      location: fields.location || "",
+    };
+
+    const oldSnapshot = { ...existing };
+    const attendeeIds = new Set<string>();
+    attendeeIds.add(myUid);
+    if (host) attendeeIds.add(host);
+    for (const raw of [
+      ...((Array.isArray(existing.joinedFromIds) ? existing.joinedFromIds : []) as string[]),
+      existing.joinedFromId,
+    ].filter(Boolean)) {
+      attendeeIds.add(String(raw).trim());
+    }
+
+    const patchOnUserCalendar = async (uid: string) => {
+      const ref = doc(db, "users", uid);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const evs = (snap.data() as any).events || [];
+      let changed = false;
+      const next = evs.map((e: any) => {
+        if (uid === myUid && String(e?.id || "") === String(id)) {
+          changed = true;
+          return { ...e, ...updatedPayload };
+        }
+        if (!matchesPlanEvent(e, oldSnapshot, evs)) return e;
+        changed = true;
+        return { ...e, ...updatedPayload };
+      });
+      if (changed) await updateDoc(ref, { events: next });
+    };
+
+    try {
+      await patchOnUserCalendar(myUid);
+    } catch {
+      showAlert("Error", "Could not update event.");
+      return;
+    }
+
+    const otherAttendeeIds = [...attendeeIds].filter((uid) => uid !== myUid);
+    await Promise.allSettled(otherAttendeeIds.map((uid) => patchOnUserCalendar(uid)));
+
+    setShowEventModal(false);
+    setNewEvent({ title: "", date: "", time: "", location: "" });
+  };
+
   const deleteEvent = async (id: string) => {
     if (!auth.currentUser) return;
 
@@ -984,6 +1064,7 @@ export default function ProfileScreen() {
           newEvent={newEvent}
           setNewEvent={setNewEvent}
           saveEvent={saveEvent}
+          updateEvent={updateEvent}
           events={events}
           deleteEvent={deleteEvent}
           viewerUid={myId}

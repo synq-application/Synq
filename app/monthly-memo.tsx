@@ -5,15 +5,17 @@ import {
   BUTTON_RADIUS,
   fonts,
   MODAL_RADIUS,
+  PRIMARY_CTA_WIDTH,
   profileScreenSectionTitle,
   TEXT,
 } from "@/constants/Variables";
 import PlanDateCalendar from "@/src/components/PlanDateCalendar";
 import PlanTimePicker from "@/src/components/PlanTimePicker";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
-import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
+import { canEditOpenPlan, filterOutPastOpenPlans } from "@/src/lib/planEvents";
 import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
@@ -52,6 +54,10 @@ type Props = {
   newEvent: { title: string; date: string; time: string; location: string };
   setNewEvent: React.Dispatch<any>;
   saveEvent: (event?: any) => void;
+  updateEvent: (
+    id: string,
+    fields: { title: string; date: string; time: string; location: string }
+  ) => void;
   deleteEvent: (id: string) => void;
   events: EventItem[];
   viewerUid?: string;
@@ -73,6 +79,7 @@ export default function OpenPlans({
   newEvent,
   setNewEvent,
   saveEvent,
+  updateEvent,
   deleteEvent,
   events,
   viewerUid = "",
@@ -135,7 +142,9 @@ export default function OpenPlans({
   };
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
   const [activePicker, setActivePicker] = useState<"date" | "time" | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<EventItem | null>(null);
+  const isEditing = !!editingEvent;
   const [keyboardInset, setKeyboardInset] = useState(0);
   const planScrollRef = useRef<ScrollView>(null);
   const locationInputRef = useRef<TextInput>(null);
@@ -145,15 +154,6 @@ export default function OpenPlans({
     d.setHours(0, 0, 0, 0);
     return d;
   }, []);
-
-  useEffect(() => {
-    if (showEventModal) {
-      setSelectedDate(getInitialDate());
-      setActivePicker(null);
-      setNewEvent({ title: "", date: "", time: "", location: "" });
-      setKeyboardInset(0);
-    }
-  }, [showEventModal, setNewEvent]);
 
   useEffect(() => {
     if (!showEventModal) return;
@@ -178,9 +178,47 @@ export default function OpenPlans({
 
   const visibleEvents = useMemo(() => filterOutPastOpenPlans(events), [events]);
 
+  const parseTimeToDate = (dateStr: string, timeStr?: string) => {
+    const d = parseDate(dateStr);
+    if (!timeStr) {
+      d.setHours(12, 0, 0, 0);
+      return d;
+    }
+    const [t, period] = timeStr.split(" ");
+    let [hours, minutes] = t.split(":").map(Number);
+    if (period === "PM" && hours !== 12) hours += 12;
+    if (period === "AM" && hours === 12) hours = 0;
+    d.setHours(hours, minutes || 0, 0, 0);
+    return d;
+  };
+
+  const openAddModal = () => {
+    setEditingEvent(null);
+    setSelectedDate(getInitialDate());
+    setActivePicker(null);
+    setNewEvent({ title: "", date: "", time: "", location: "" });
+    setKeyboardInset(0);
+    setShowEventModal(true);
+  };
+
+  const openEditModal = (event: EventItem) => {
+    setEditingEvent(event);
+    setSelectedDate(parseTimeToDate(event.date, event.time));
+    setActivePicker(null);
+    setNewEvent({
+      title: event.title,
+      date: event.date,
+      time: event.time || "",
+      location: event.location || "",
+    });
+    setKeyboardInset(0);
+    setShowEventModal(true);
+  };
+
   const closeModal = () => {
     Keyboard.dismiss();
     setActivePicker(null);
+    setEditingEvent(null);
     setShowEventModal(false);
   };
 
@@ -278,17 +316,26 @@ export default function OpenPlans({
     const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
     const day = String(selectedDate.getDate()).padStart(2, "0");
     const localDate = `${year}-${month}-${day}`;
-
-    saveEvent({
+    const payload = {
       ...newEvent,
       date: localDate,
       time: formatTime(selectedDate),
-    });
+    };
 
+    if (isEditing && editingEvent?.id) {
+      updateEvent(editingEvent.id, payload);
+    } else {
+      saveEvent(payload);
+    }
+
+    setEditingEvent(null);
     setShowEventModal(false);
   };
 
-  const handleDelete = (event: EventItem) => setPendingDeleteEvent(event);
+  const handleDelete = (event: EventItem) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setPendingDeleteEvent(event);
+  };
 
   return (
     <View style={styles.container}>
@@ -333,6 +380,7 @@ export default function OpenPlans({
           const { primary: hostLine, secondary: othersLine } = planAttributionLines(p);
           const isHighlighted =
             !!highlightEventId && String(p.id) === String(highlightEventId);
+          const canEdit = canEditOpenPlan(p, viewerUid);
           return (
             <TouchableOpacity
               key={p.id}
@@ -342,7 +390,9 @@ export default function OpenPlans({
                 isHighlighted && { borderColor: ACCENT, borderWidth: 2 },
                 isLast && { marginBottom: 0 },
               ]}
+              onPress={canEdit ? () => openEditModal(p) : undefined}
               onLongPress={() => handleDelete(p)}
+              delayLongPress={400}
             >
             <View style={styles.dateBlock}>
               <Text style={styles.day}>
@@ -388,7 +438,7 @@ export default function OpenPlans({
 
       <View style={styles.addBtnRow}>
         <SynqPlusAddButton
-          onPress={() => setShowEventModal(true)}
+          onPress={openAddModal}
           accessibilityLabel="Add plan"
           style={styles.addBtnSpacing}
         />
@@ -414,7 +464,9 @@ export default function OpenPlans({
               }}
             >
               <View style={styles.popupTitleRow}>
-                <Text style={styles.popupTitle}>Add a plan</Text>
+                <Text style={styles.popupTitle}>
+                  {isEditing ? "Edit plan" : "Add a plan"}
+                </Text>
                 <CloseButton onPress={closeModal} accessibilityLabel="Close" />
               </View>
 
@@ -424,7 +476,9 @@ export default function OpenPlans({
               >
                 <View>
                   <Text style={styles.sheetSub}>
-                    Tell friends what you&apos;re doing, they can join.
+                    {isEditing
+                      ? "Update your plan details."
+                      : "Tell friends what you're doing, they can join."}
                   </Text>
                 </View>
               </TouchableWithoutFeedback>
@@ -592,7 +646,9 @@ export default function OpenPlans({
                 disabled={!canPost}
                 onPress={handleSave}
               >
-                <Text style={styles.popupPostBtnText}>Post</Text>
+                <Text style={styles.popupPostBtnText}>
+                  {isEditing ? "Save" : "Post"}
+                </Text>
               </TouchableOpacity>
             </Pressable>
           </KeyboardAvoidingView>
@@ -785,6 +841,8 @@ const styles = StyleSheet.create({
   },
   popupPostBtn: {
     marginTop: 14,
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
     height: 50,
     borderRadius: BUTTON_RADIUS,
     backgroundColor: ACCENT,
