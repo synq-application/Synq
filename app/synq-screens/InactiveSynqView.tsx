@@ -1,3 +1,4 @@
+import SynqAudienceSheet from "@/app/synq-screens/SynqAudienceSheet";
 import {
   ACCENT,
   BG,
@@ -12,7 +13,6 @@ import {
   TEXT,
   fonts,
 } from "@/constants/Variables";
-import SynqAudienceSheet from "@/app/synq-screens/SynqAudienceSheet";
 import type { FriendGroup } from "@/src/lib/friendGroups";
 import { formatAudienceSelectionLabel, type SynqAudienceSelection } from "@/src/lib/synqBroadcast";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,7 +32,6 @@ import Animated, {
   Easing,
   FadeIn,
   FadeInDown,
-  interpolateColor,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
@@ -67,14 +66,16 @@ const IDLE_RING_STAGGER_MS = 1400;
 const MOOD_HINTS = [
   "What are you down for?",
   "Drinks tonight?",
-  "What's the move?",
-  "Who's out?",
+  "Let's grab coffee!",
+  "Quick bite?",
+  "Dinner and a catch-up?",
+  "Movie night?",
+  "Down for a night out",
+  "Game night?",
+  "Looking to go for a hike",
+  "Try a new restaurant?",
 ];
 const MOOD_HINT_INTERVAL_MS = 9000;
-
-const FIELD_BG_FOCUS = "rgba(255,255,255,0.05)";
-const ICON_WELL_BG = "rgba(0,255,133,0.07)";
-const ICON_MUTED = "rgba(0,255,133,0.88)";
 
 // ——— Mood hints ———
 
@@ -268,12 +269,10 @@ export default function InactiveSynqView({
   const [audienceSheetOpen, setAudienceSheetOpen] = useState(false);
   const [memoFocused, setMemoFocused] = useState(false);
   const ctaGlow = useSharedValue(0.88);
-  const panelFocus = useSharedValue(0);
 
   const audienceLabel = formatAudienceSelectionLabel(audienceSelection, friendGroups);
   const memoEmpty = memo.trim().length === 0;
   const showMoodHints = memoEmpty && !memoFocused;
-  const panelActive = memoFocused || !memoEmpty;
 
   const bottomPad =
     TAB_BAR_SCROLL_INSET + SPACE_6 + (Platform.OS === "android" ? insets.bottom : 0);
@@ -286,32 +285,17 @@ export default function InactiveSynqView({
     opacity: ctaGlow.value,
   }));
 
-  const moodRowStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      panelFocus.value,
-      [0, 1],
-      ["rgba(255,255,255,0)", FIELD_BG_FOCUS]
-    ),
-  }));
-
   useEffect(() => {
     if (reduced || isStartingSynq) return;
     ctaGlow.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 2800, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0.8, { duration: 2800, easing: Easing.inOut(Easing.sin) })
+        withTiming(0.78, { duration: 2800, easing: Easing.inOut(Easing.sin) })
       ),
       -1,
       true
     );
   }, [ctaGlow, isStartingSynq, reduced]);
-
-  useEffect(() => {
-    panelFocus.value = withTiming(panelActive ? 1 : 0, {
-      duration: panelActive ? 300 : 450,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [panelActive, panelFocus]);
 
   const handlePressIn = () => {
     if (isStartingSynq) return;
@@ -345,7 +329,7 @@ export default function InactiveSynqView({
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: insets.top + SPACE_6 + SPACE_5,
+            paddingTop: insets.top + SPACE_5,
             paddingBottom: bottomPad,
           },
         ]}
@@ -355,24 +339,15 @@ export default function InactiveSynqView({
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <View style={styles.stack}>
-          <Animated.View entering={enter(0)} style={styles.hero}>
-            <Text style={styles.headline}>
-              Let&apos;s <Text style={styles.headlineAccent}>Synq.</Text>
+        <View style={styles.compose}>
+          <Animated.View entering={enter(0)} style={styles.stack}>
+            <Text style={styles.title}>
+              Let&apos;s <Text style={styles.titleAccent}>Synq.</Text>
             </Text>
-          </Animated.View>
 
-          <Animated.View entering={enter(60)} style={styles.intentWrap}>
-            <View style={styles.intentPanel}>
-              <Animated.View style={[styles.intentRow, moodRowStyle]}>
-                <View style={styles.iconWell}>
-                  <Ionicons
-                    name="chatbubble-ellipses-outline"
-                    size={18}
-                    color={ICON_MUTED}
-                  />
-                </View>
-                <View style={styles.fieldBody}>
+            <Animated.View entering={enter(60)} style={styles.footer}>
+              <View style={styles.moodPill}>
+                <View style={styles.moodField}>
                   <SlowMoodPlaceholder active={showMoodHints} />
                   <TextInput
                     style={[styles.moodInput, showMoodHints && styles.moodInputGhost]}
@@ -387,35 +362,23 @@ export default function InactiveSynqView({
                     accessibilityHint="Optional. Friends see this while you're active."
                   />
                 </View>
-              </Animated.View>
-
-              <View style={styles.intentRowDivider} />
+              </View>
 
               <Pressable
                 onPress={openAudienceSheet}
-                style={({ pressed }) => [
-                  styles.intentRow,
-                  pressed && styles.intentRowPressed,
-                ]}
+                style={({ pressed }) => [styles.audienceRow, pressed && styles.audienceRowPressed]}
                 accessibilityRole="button"
-                accessibilityLabel={`Visible to ${audienceLabel}`}
+                accessibilityLabel={`Sharing with ${audienceLabel}`}
                 accessibilityHint="Opens audience picker"
               >
-                <View style={styles.iconWell}>
-                  <Ionicons name="eye-outline" size={18} color={ICON_MUTED} />
-                </View>
-                <Text style={styles.audienceLabel}>Visible to</Text>
-                <View style={styles.audienceValueWrap}>
-                  <Text style={styles.audienceValue} numberOfLines={1}>
-                    {audienceLabel}
-                  </Text>
-                  <Ionicons name="chevron-down" size={14} color={MUTED3} />
-                </View>
+                <Text style={styles.sharingLabel}>Sharing with</Text>
+                <Text style={styles.sharingValue} numberOfLines={1}>
+                  {audienceLabel}
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={MUTED3} />
               </Pressable>
-            </View>
-          </Animated.View>
+            </Animated.View>
 
-          <Animated.View entering={enter(120)} style={styles.activationBlock}>
             <View style={styles.stage}>
               <ActivationOrb
                 disabled={isStartingSynq}
@@ -426,16 +389,17 @@ export default function InactiveSynqView({
                 isStartingSynq={isStartingSynq}
               />
             </View>
+
             <Pressable
               onPress={handlePress}
               disabled={isStartingSynq}
-              hitSlop={{ top: 10, bottom: 14, left: 28, right: 28 }}
+              hitSlop={{ top: 12, bottom: 16, left: 40, right: 40 }}
               style={styles.ctaBlock}
               accessibilityRole="button"
               accessibilityLabel={isStartingSynq ? "Activating Synq" : "Tap to activate Synq"}
             >
               <Animated.Text style={[styles.ctaText, ctaStyle]}>
-                {isStartingSynq ? "ACTIVATING" : "TAP TO ACTIVATE"}
+                {isStartingSynq ? "ACTIVATING…" : "TAP TO ACTIVATE"}
               </Animated.Text>
             </Pressable>
           </Animated.View>
@@ -466,126 +430,120 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: SPACE_5,
   },
-  stack: {
+  compose: {
     flexGrow: 1,
     width: "100%",
-    maxWidth: CONTENT_W + 48,
-    alignSelf: "center",
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: SPACE_6,
     paddingBottom: SPACE_2,
   },
-  hero: {
+  stack: {
+    width: CONTENT_W,
+    maxWidth: "100%",
     alignItems: "center",
+  },
+  title: {
+    color: TEXT,
+    fontSize: 30,
+    lineHeight: 36,
+    fontFamily: fonts.heavy,
+    letterSpacing: -0.45,
+    textAlign: "center",
     marginBottom: SPACE_5,
   },
-  headline: {
-    color: TEXT,
-    fontSize: 34,
-    lineHeight: 40,
-    fontFamily: fonts.heavy,
-    letterSpacing: -0.6,
-    textAlign: "center",
-  },
-  headlineAccent: {
+  titleAccent: {
     color: ACCENT,
     fontFamily: fonts.heavy,
   },
-  intentWrap: {
-    width: CONTENT_W,
-    marginBottom: SPACE_6,
+  footer: {
+    width: "100%",
+    marginBottom: SPACE_3,
+    alignItems: "center",
+    paddingHorizontal: SPACE_2,
   },
-  intentPanel: {
-    borderRadius: 18,
+  moodPill: {
+    width: "100%",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.09)",
-    backgroundColor: "rgba(255,255,255,0.025)",
-    overflow: "hidden",
-  },
-  intentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 56,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderRadius: 999,
     paddingHorizontal: SPACE_4,
-    gap: SPACE_3,
+    paddingVertical: SPACE_2,
   },
-  intentRowPressed: {
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  intentRowDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    marginLeft: SPACE_4 + 32 + SPACE_3,
-  },
-  iconWell: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: ICON_WELL_BG,
+  moodField: {
+    width: "100%",
+    minHeight: 30,
+    justifyContent: "center",
     alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  fieldBody: {
-    flex: 1,
-    minHeight: 24,
-    justifyContent: "center",
   },
   moodGhost: {
     position: "absolute",
-    left: 0,
-    right: 0,
+    left: SPACE_2,
+    right: SPACE_2,
     color: MUTED3,
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 22,
     fontFamily: fonts.book,
     letterSpacing: 0.1,
+    textAlign: "center",
   },
   moodInput: {
-    flex: 1,
+    width: "100%",
     color: TEXT,
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 22,
     fontFamily: fonts.book,
+    letterSpacing: 0.1,
+    textAlign: "center",
     padding: 0,
     margin: 0,
-    minHeight: 24,
+    minHeight: 28,
     backgroundColor: "transparent",
   },
   moodInputGhost: {
     color: "transparent",
   },
-  audienceLabel: {
-    color: MUTED3,
-    fontSize: 15,
-    lineHeight: 21,
-    fontFamily: fonts.book,
-    letterSpacing: 0.08,
-    flexShrink: 0,
-  },
-  audienceValueWrap: {
-    flex: 1,
+  audienceRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "center",
     gap: 6,
-    minWidth: 0,
-    marginLeft: SPACE_3,
+    maxWidth: "100%",
+    marginTop: SPACE_4,
+    paddingVertical: SPACE_2,
+    paddingHorizontal: SPACE_2,
   },
-  audienceValue: {
+  audienceRowPressed: {
+    opacity: 0.7,
+  },
+  sharingLabel: {
+    color: MUTED3,
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: fonts.book,
+  },
+  sharingValue: {
     flexShrink: 1,
     color: MUTED2,
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 14,
+    lineHeight: 20,
     fontFamily: fonts.medium,
-    letterSpacing: 0.02,
-    textAlign: "right",
+    maxWidth: "58%",
   },
-  activationBlock: {
+  ctaBlock: {
     alignItems: "center",
-    width: "100%",
-    marginTop: -SPACE_2,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: SPACE_3,
+    marginTop: -6,
+  },
+  ctaText: {
+    color: MUTED2,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.medium,
+    letterSpacing: 1.2,
+    textAlign: "center",
   },
   stage: {
     width: ORB_STAGE,
@@ -663,21 +621,5 @@ const styles = StyleSheet.create({
   },
   orbStarting: {
     opacity: 0.9,
-  },
-  ctaBlock: {
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 32,
-    paddingHorizontal: SPACE_3,
-    marginTop: -14,
-  },
-  ctaText: {
-    color: MUTED2,
-    fontSize: 13,
-    lineHeight: 16,
-    fontFamily: fonts.medium,
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
-    textAlign: "center",
   },
 });

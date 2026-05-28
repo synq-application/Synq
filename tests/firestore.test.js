@@ -144,6 +144,39 @@ describe("Firestore", () => {
       await assertFails(getDoc(doc(aliceDb, "invites", "alice_bob")));
     });
 
+    test("friend groups are private to the owner", async () => {
+      const alice = testEnv.authenticatedContext("alice");
+      const bob = testEnv.authenticatedContext("bob");
+      const aliceDb = alice.firestore();
+      const bobDb = bob.firestore();
+
+      await assertSucceeds(
+        setDoc(doc(aliceDb, "users", "alice"), { displayName: "Alice" })
+      );
+      await assertSucceeds(
+        setDoc(doc(bobDb, "users", "bob"), { displayName: "Bob" })
+      );
+
+      await assertSucceeds(
+        setDoc(doc(aliceDb, "users", "alice", "friendGroups", "g1"), {
+          name: "Roommates",
+          memberIds: [],
+          sortOrder: 1,
+        })
+      );
+
+      await assertSucceeds(
+        getDoc(doc(aliceDb, "users", "alice", "friendGroups", "g1"))
+      );
+      await assertFails(getDoc(doc(bobDb, "users", "alice", "friendGroups", "g1")));
+      await assertFails(
+        setDoc(doc(bobDb, "users", "alice", "friendGroups", "g1"), {
+          name: "Hacked",
+          memberIds: [],
+        })
+      );
+    });
+
     test("only chat participants can read chat and messages", async () => {
       const alice = testEnv.authenticatedContext("alice");
       const bob = testEnv.authenticatedContext("bob");
