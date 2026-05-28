@@ -1820,8 +1820,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...tabScreenMainHeaderTitle,
-    fontSize: 24,
-    lineHeight: 28,
+    fontSize: 26,
+    lineHeight: 30,
     textAlign: "center",
     includeFontPadding: false,
   },
