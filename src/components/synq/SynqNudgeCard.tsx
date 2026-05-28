@@ -49,16 +49,16 @@ export default function SynqNudgeCard({
       ) : null}
 
       <View style={styles.copy}>
-        <Text style={styles.kicker}>
+        <Text style={[styles.kicker, sent && styles.kickerSent]}>
           {sent ? "Nudge sent" : "Inactive right now"}
         </Text>
-        <Text style={styles.subtitle} numberOfLines={2}>
-          {sent
-            ? `${firstName} got a ping to see if they're free`
-            : friend
+        {!sent ? (
+          <Text style={styles.subtitle} numberOfLines={2}>
+            {friend
               ? `See if ${firstName} is free`
               : "See if they're free"}
-        </Text>
+          </Text>
+        ) : null}
       </View>
 
       <TouchableOpacity
@@ -77,7 +77,7 @@ export default function SynqNudgeCard({
           <ActivityIndicator size="small" color={sent ? MUTED2 : ACCENT} />
         ) : (
           <Text style={[styles.ctaText, sent && styles.ctaTextSent]}>
-            {sent ? "Sent" : "Nudge"}
+            {sent ? "Nudged" : "Nudge"}
           </Text>
         )}
       </TouchableOpacity>
@@ -119,6 +119,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     letterSpacing: 0.1,
+  },
+  kickerSent: {
+    color: TEXT,
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    lineHeight: 20,
   },
   subtitle: {
     color: TEXT,

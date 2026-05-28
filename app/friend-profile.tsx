@@ -28,6 +28,7 @@ import {
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -253,15 +254,46 @@ export default function FriendProfile() {
   const canNudgeFriend =
     isFriend && viewerSynqActive && !friendSynqActive && !userIsBlocked;
 
+  const showNudgeCard =
+    isFriend && !userIsBlocked && (canNudgeFriend || nudgeSent);
+
+  const nudgeSentStorageKey =
+    viewerId && friendKey ? `synq-nudge-sent:${viewerId}:${friendKey}` : null;
+
+  useEffect(() => {
+    if (!nudgeSentStorageKey) {
+      setNudgeSent(false);
+      return;
+    }
+    let cancelled = false;
+    AsyncStorage.getItem(nudgeSentStorageKey).then((value) => {
+      if (!cancelled) setNudgeSent(value === "1");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [nudgeSentStorageKey]);
+
   const handleSynqNudge = async () => {
     if (!friendKey || nudgeLoading || nudgeSent || !canNudgeFriend) return;
     setNudgeLoading(true);
     try {
       await sendSynqNudge(friendKey);
       setNudgeSent(true);
+      if (nudgeSentStorageKey) {
+        await AsyncStorage.setItem(nudgeSentStorageKey, "1");
+      }
       showAlert("Nudge sent", "They'll get a notification asking if they're free.");
     } catch (err) {
-      showAlert("Couldn't nudge", synqNudgeErrorMessage(err));
+      const msg = synqNudgeErrorMessage(err);
+      if (
+        msg.includes("again in a few hours") &&
+        nudgeSentStorageKey
+      ) {
+        setNudgeSent(true);
+        await AsyncStorage.setItem(nudgeSentStorageKey, "1");
+      }
+      showAlert("Couldn't nudge", msg);
     } finally {
       setNudgeLoading(false);
     }
@@ -940,7 +972,7 @@ export default function FriendProfile() {
           </TouchableOpacity>
         </View>
         <View style={styles.friendCard}>
-          <View style={[styles.header, canNudgeFriend && styles.headerWithNudge]}>
+          <View style={[styles.header, showNudgeCard && styles.headerWithNudge]}>
             <TouchableOpacity
               onPress={() => setAvatarPreviewOpen(true)}
               onLongPress={() => setAvatarPreviewOpen(true)}
@@ -977,7 +1009,7 @@ export default function FriendProfile() {
             ) : null}
           </View>
 
-          {canNudgeFriend ? (
+          {showNudgeCard ? (
             <View style={styles.nudgeCardWrap}>
               <SynqNudgeCard
                 onNudge={handleSynqNudge}
