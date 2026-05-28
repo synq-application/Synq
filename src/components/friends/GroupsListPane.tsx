@@ -26,7 +26,7 @@ import { Ionicons } from "@expo/vector-icons";
 import GroupListAvatar from "./GroupListAvatar";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -52,32 +52,8 @@ type Props = {
   onCreateGroup: (name: string) => Promise<string>;
 };
 
-function firstName(displayName?: string) {
-  const trimmed = (displayName || "").trim();
-  if (!trimmed) return "Friend";
-  return trimmed.split(/\s+/)[0] || "Friend";
-}
-
-function formatGroupMeta(memberIds: string[], friends: Friend[]) {
-  if (memberIds.length === 0) return "No members yet";
-
-  const byId = new Map(friends.map((f) => [f.id, f]));
-
-  if (memberIds.length === 1) {
-    const name = firstName(byId.get(memberIds[0])?.displayName);
-    return name;
-  }
-
-  if (memberIds.length === 2) {
-    const names = memberIds.map((id) => firstName(byId.get(id)?.displayName));
-    return names.join(" & ");
-  }
-
-  const preview = memberIds
-    .slice(0, 2)
-    .map((id) => firstName(byId.get(id)?.displayName))
-    .join(", ");
-  return `${preview} · ${memberIds.length} members`;
+function formatMemberCount(count: number): string {
+  return count === 1 ? "1 member" : `${count} members`;
 }
 
 function GroupsEmptyState({ onCreatePress }: { onCreatePress: () => void }) {
@@ -137,10 +113,7 @@ function GroupRow({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const meta = useMemo(
-    () => formatGroupMeta(group.memberIds, friends),
-    [group.memberIds, friends]
-  );
+  const memberLabel = formatMemberCount(group.memberIds.length);
 
   return (
     <TouchableOpacity
@@ -159,7 +132,7 @@ function GroupRow({
           {group.name}
         </Text>
         <Text style={styles.groupMeta} numberOfLines={1}>
-          {meta}
+          {memberLabel}
         </Text>
       </View>
     </TouchableOpacity>

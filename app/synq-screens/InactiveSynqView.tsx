@@ -32,7 +32,6 @@ import {
 import Animated, {
   Easing,
   FadeIn,
-  FadeInDown,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
@@ -319,9 +318,7 @@ export default function InactiveSynqView({
   };
 
   const enter = (delay: number) =>
-    reduced
-      ? FadeIn.duration(1)
-      : FadeInDown.delay(delay).duration(520).springify().damping(18);
+    reduced ? FadeIn.duration(1) : FadeIn.delay(delay).duration(320);
 
   return (
     <View style={styles.root}>
