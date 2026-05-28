@@ -69,7 +69,7 @@ export default function TabsLayout() {
           tabBarAccessibilityLabel: "Synq home",
           tabBarIcon: ({ focused }) => (
             <View style={[styles.synqButton, focused && styles.synqButtonActive]}>
-              <View style={styles.synqButtonInner}>
+              <View style={[styles.synqButtonInner, focused && styles.synqButtonInnerActive]}>
                 <ExpoImage
                   source={SYNQ_ICON}
                   style={[styles.synqIcon, focused && styles.synqIconActive]}
@@ -139,15 +139,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     overflow: "hidden",
   },
+  synqButtonInnerActive: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
 
   synqButtonActive: {
-    transform: [{ scale: 1.02 }],
+    transform: [{ scale: 1 }],
     borderWidth: 0,
     shadowColor: ACCENT,
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
+    shadowOpacity: 0.44,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 3,
+    elevation: 12,
   },
 
   synqIcon: {
@@ -155,7 +160,7 @@ const styles = StyleSheet.create({
     height: 100,
   },
   synqIconActive: {
-    width: 106,
-    height: 106,
+    width: 110,
+    height: 110,
   },
 });
