@@ -378,6 +378,8 @@ export default function OpenPlans({
             !!p.joinedFromName ||
             (Array.isArray(p.joinedFromNames) && p.joinedFromNames.length > 0);
           const { primary: hostLine, secondary: othersLine } = planAttributionLines(p);
+          const hasInterestLines =
+            isJoinedPlan && !!(hostLine || othersLine);
           const isHighlighted =
             !!highlightEventId && String(p.id) === String(highlightEventId);
           const canEdit = canEditOpenPlan(p, viewerUid);
@@ -407,13 +409,18 @@ export default function OpenPlans({
                 {d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()}
               </Text>
             </View>
-              <View style={{ flex: 1 }}>
+              <View
+                style={[
+                  styles.planBody,
+                  hasInterestLines && styles.planBodyWithInterest,
+                ]}
+              >
                 <Text style={styles.title}>{p.title}</Text>
                 <Text style={styles.meta}>
                   {p.time}
                   {p.location ? ` · ${p.location}` : ""}
                 </Text>
-                {isJoinedPlan && (hostLine || othersLine) ? (
+                {hasInterestLines ? (
                   <>
                     {hostLine ? (
                       <Text style={styles.hostPlanLine}>{hostLine}</Text>
@@ -751,6 +758,15 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     marginBottom: 6,
     flexDirection: "row",
+    alignItems: "stretch",
+  },
+  planBody: {
+    flex: 1,
+    alignSelf: "stretch",
+    justifyContent: "center",
+  },
+  planBodyWithInterest: {
+    justifyContent: "flex-start",
   },
   joinedCard: {
     borderColor: "rgba(43,255,136,0.35)",

@@ -87,6 +87,7 @@ export default function FriendOpenPlans({
         const joined = isPlanJoined?.(p) ?? false;
         const isHost = isViewerHostOfPlan?.(p) ?? false;
         const rowHostLabel = planHostLabelForRow(p);
+        const hasInterestLine = !!rowHostLabel;
 
         return (
           <View key={p.id} style={styles.card}>
@@ -104,7 +105,12 @@ export default function FriendOpenPlans({
               </Text>
             </View>
 
-            <View style={{ flex: 1 }}>
+            <View
+              style={[
+                styles.planBody,
+                hasInterestLine && styles.planBodyWithInterest,
+              ]}
+            >
               <Text style={[styles.title, { fontFamily: fonts.medium }]}>
                 {p.title}
               </Text>
@@ -119,7 +125,7 @@ export default function FriendOpenPlans({
               ) : null}
             </View>
             {isHost ? (
-              <View style={styles.hostPill}>
+              <View style={[styles.hostPill, styles.planSidePill]}>
                 <Text
                   numberOfLines={1}
                   style={[
@@ -136,6 +142,7 @@ export default function FriendOpenPlans({
                 <TouchableOpacity
                   style={[
                     styles.interestPill,
+                    styles.planSidePill,
                     joined
                       ? {
                           borderColor: "rgba(255,255,255,0.14)",
@@ -199,13 +206,26 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 14,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "stretch",
   },
 
   dateBlock: {
     width: 48,
     alignItems: "center",
     marginRight: 12,
+    alignSelf: "stretch",
+    justifyContent: "center",
+  },
+  planBody: {
+    flex: 1,
+    alignSelf: "stretch",
+    justifyContent: "center",
+  },
+  planBodyWithInterest: {
+    justifyContent: "flex-start",
+  },
+  planSidePill: {
+    alignSelf: "center",
   },
 
   day: {

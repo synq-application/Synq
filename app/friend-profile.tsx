@@ -1129,15 +1129,6 @@ export default function FriendProfile() {
           <View style={styles.friendActionsWrap}>
             <TouchableOpacity
               activeOpacity={0.8}
-              style={styles.addToGroupBtn}
-              onPress={() => setAddToGroupSheetVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Add friend to group"
-            >
-              <Text style={styles.addToGroupText}>Add friend to group</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.8}
               style={styles.removeFriendBtn}
               onPress={() => setShowRemoveModal(true)}
               accessibilityRole="button"
@@ -1179,6 +1170,23 @@ export default function FriendProfile() {
                 </TouchableOpacity>
               ) : (
                 <>
+                  {isFriend ? (
+                    <>
+                      <TouchableOpacity
+                        style={styles.optionsRow}
+                        onPress={() => {
+                          setShowOptionsSheet(false);
+                          setAddToGroupSheetVisible(true);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Add friend to group"
+                      >
+                        <Ionicons name="people-outline" size={22} color={TEXT} />
+                        <Text style={styles.optionsRowText}>Add friend to group</Text>
+                      </TouchableOpacity>
+                      <View style={styles.optionsDivider} />
+                    </>
+                  ) : null}
                   <TouchableOpacity
                     style={styles.optionsRow}
                     onPress={() => {
@@ -1409,21 +1417,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 12,
   },
-  addToGroupBtn: {
-    width: "100%",
-    minHeight: 48,
-    borderRadius: BUTTON_RADIUS,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  addToGroupText: {
-    fontFamily: fonts.medium,
-    fontSize: 15,
-    color: TEXT,
-  },
   removeFriendBtn: {
     width: "100%",
     minHeight: 48,
@@ -1448,7 +1441,7 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: ACCENT,
   },
   avatarPreviewOverlay: {
@@ -1466,7 +1459,7 @@ const styles = StyleSheet.create({
     width: 300,
     height: 300,
     borderRadius: 150,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.22)",
   },
 
