@@ -10,6 +10,7 @@ import React, { useMemo, useState } from "react";
 import {
   Animated,
   FlatList,
+  Pressable,
   Text,
   TouchableOpacity,
   View,
@@ -18,6 +19,7 @@ import { friendLocationLine, resolveAvatar } from "../../../app/helpers";
 import {
   ACCENT,
   BG,
+  MUTED2,
   PRIMARY_CTA_HEIGHT,
   TAB_BAR_SCROLL_INSET,
 } from "../../../constants/Variables";
@@ -84,12 +86,14 @@ export default function ActiveSynqSection({
   return (
     <View style={styles.activeSynqRoot}>
       <TabHeaderIconRow>
-        <HeaderIconButton
-          name="chatbubbles-outline"
-          onPress={openMessagesInbox}
-          accessibilityLabel="Open messages"
-          badge={hasUnread ? <NotificationBadge variant="dot" /> : undefined}
-        />
+        <View style={styles.synqHeaderSide}>
+          <HeaderIconButton
+            name="chatbubbles-outline"
+            onPress={openMessagesInbox}
+            accessibilityLabel="Open messages"
+            badge={hasUnread ? <NotificationBadge variant="dot" /> : undefined}
+          />
+        </View>
         <View style={styles.synqHeaderTitleCenter}>
           <View style={styles.headerTitleWithIndicator}>
             <Animated.View
@@ -102,16 +106,25 @@ export default function ActiveSynqSection({
               ]}
               accessibilityLabel="Synq session live"
             />
-            <Text style={styles.headerTitle}>Synq is active</Text>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              Synq is active
+            </Text>
           </View>
         </View>
-        <HeaderIconButton
-          name="ellipsis-horizontal"
-          onPress={() => setOptionsVisible(true)}
-          accessibilityLabel="Synq options"
-        />
+        <View style={styles.synqHeaderSide}>
+          <HeaderIconButton
+            name="ellipsis-horizontal"
+            onPress={() => setOptionsVisible(true)}
+            accessibilityLabel="Synq options"
+          />
+        </View>
       </TabHeaderIconRow>
-      <View style={[styles.activeBody, { paddingTop: headerLayout.iconRowBottom }]}>
+      <View
+        style={[
+          styles.activeBody,
+          { paddingTop: headerLayout.iconRowBottom + 14 },
+        ]}
+      >
       <View style={styles.headerDivider} />
 
       {memo.trim() !== "" ? (
@@ -131,12 +144,27 @@ export default function ActiveSynqSection({
       ) : null}
 
       {audienceLabel ? (
-        <View style={styles.audienceRow}>
+        <Pressable
+          onPress={openChangeAudience}
+          disabled={!openChangeAudience}
+          style={({ pressed }) => [
+            styles.audienceRow,
+            openChangeAudience && pressed && styles.audienceRowPressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`Shared with ${audienceLabel}`}
+          accessibilityHint={
+            openChangeAudience ? "Opens change audience" : undefined
+          }
+        >
           <Ionicons name="people-outline" size={16} color={ACCENT} />
           <Text style={styles.audienceText} numberOfLines={1}>
             Shared with {audienceLabel}
           </Text>
-        </View>
+          {openChangeAudience ? (
+            <Ionicons name="chevron-forward" size={14} color={MUTED2} />
+          ) : null}
+        </Pressable>
       ) : null}
 
       <View style={styles.activeListFooterDock}>

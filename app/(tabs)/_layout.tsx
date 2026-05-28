@@ -140,19 +140,19 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   synqButtonInnerActive: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
   },
 
   synqButtonActive: {
     transform: [{ scale: 1 }],
     borderWidth: 0,
     shadowColor: ACCENT,
-    shadowOpacity: 0.44,
-    shadowRadius: 14,
+    shadowOpacity: 0.36,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 12,
+    elevation: 8,
   },
 
   synqIcon: {
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     height: 100,
   },
   synqIconActive: {
-    width: 110,
-    height: 110,
+    width: 104,
+    height: 104,
   },
 });

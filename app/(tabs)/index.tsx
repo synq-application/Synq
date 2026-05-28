@@ -1741,10 +1741,10 @@ const styles = StyleSheet.create({
     marginTop: SPACE_4,
   },
   activeBody: { flex: 1, minHeight: 0 },
-  headerTitleRow: {
-    flexDirection: "row",
+  synqHeaderSide: {
+    width: 40,
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
   },
   synqHeaderTitleCenter: {
     flex: 1,
@@ -1771,9 +1771,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   headerDivider: {
-    marginTop: 16,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.16)",
   },
   activeMemoRow: {
     marginTop: 14,
@@ -1786,6 +1785,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 4,
     paddingHorizontal: 2,
+    paddingVertical: 6,
+  },
+  audienceRowPressed: {
+    opacity: 0.72,
   },
   audienceText: {
     flex: 1,
@@ -1817,7 +1820,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...tabScreenMainHeaderTitle,
+    fontSize: 24,
+    lineHeight: 28,
     textAlign: "center",
+    includeFontPadding: false,
   },
   headerIconContainer: { width: 40, alignItems: 'center', justifyContent: 'center' },
   badge: {
