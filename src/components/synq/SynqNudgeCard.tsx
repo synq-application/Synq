@@ -1,16 +1,14 @@
 import { resolveAvatar } from "@/app/helpers";
 import {
   ACCENT,
-  BUTTON_RADIUS,
+  BORDER,
   fonts,
   MUTED2,
-  ON_ACCENT_TEXT,
   RADIUS_MD,
+  SURFACE,
   TEXT,
 } from "@/constants/Variables";
-import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import {
   ActivityIndicator,
@@ -40,168 +38,117 @@ export default function SynqNudgeCard({
   const showAvatar = !!friend;
 
   return (
-    <View style={styles.outer}>
-      <LinearGradient
-        colors={
+    <View style={[styles.card, sent && styles.cardSent]}>
+      {showAvatar ? (
+        <ExpoImage
+          source={{ uri: resolveAvatar(friend?.imageurl) }}
+          style={styles.avatar}
+          cachePolicy="memory-disk"
+          transition={0}
+        />
+      ) : null}
+
+      <View style={styles.copy}>
+        <Text style={styles.kicker}>
+          {sent ? "Nudge sent" : "Inactive right now"}
+        </Text>
+        <Text style={styles.subtitle} numberOfLines={2}>
+          {sent
+            ? `${firstName} got a ping to see if they're free`
+            : friend
+              ? `See if ${firstName} is free`
+              : "See if they're free"}
+        </Text>
+      </View>
+
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[styles.cta, sent && styles.ctaSent]}
+        onPress={onNudge}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={
           sent
-            ? ["rgba(255,255,255,0.04)", "rgba(255,255,255,0.02)"]
-            : ["rgba(0,255,133,0.14)", "rgba(0,255,133,0.04)", "rgba(255,255,255,0.02)"]
+            ? `Nudge already sent${friend ? ` to ${friend.displayName}` : ""}`
+            : `Nudge${friend ? ` ${friend.displayName}` : ""}`
         }
-        locations={sent ? [0, 1] : [0, 0.45, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradientBorder}
       >
-        <View style={[styles.card, sent && styles.cardSent]}>
-          {showAvatar ? (
-            <ExpoImage
-              source={{ uri: resolveAvatar(friend?.imageurl) }}
-              style={styles.avatar}
-              cachePolicy="memory-disk"
-              transition={0}
-            />
-          ) : null}
-
-          <View style={styles.copy}>
-            <View style={styles.statusRow}>
-              {!sent ? (
-                <View style={styles.statusDot} />
-              ) : (
-                <Ionicons
-                  name="checkmark-circle"
-                  size={14}
-                  color={MUTED2}
-                  style={styles.statusIcon}
-                />
-              )}
-              <Text style={styles.kicker}>
-                {sent ? "Nudge sent" : "Not currently active"}
-              </Text>
-            </View>
-            <Text style={styles.subtitle} numberOfLines={2}>
-              {sent
-                ? `${firstName} will get a ping to see if they're free`
-                : friend
-                  ? `Ask ${firstName} if they're free to Synq`
-                  : "Ask if they're free to Synq"}
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={[styles.cta, sent && styles.ctaSent]}
-            onPress={onNudge}
-            disabled={disabled}
-            accessibilityRole="button"
-            accessibilityLabel={
-              sent
-                ? `Nudge already sent${friend ? ` to ${friend.displayName}` : ""}`
-                : `Nudge${friend ? ` ${friend.displayName}` : ""} — not currently active`
-            }
-          >
-            {loading ? (
-              <ActivityIndicator
-                size="small"
-                color={sent ? MUTED2 : ON_ACCENT_TEXT}
-              />
-            ) : (
-              <Text style={[styles.ctaText, sent && styles.ctaTextSent]}>
-                {sent ? "Nudged" : "Nudge"}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+        {loading ? (
+          <ActivityIndicator size="small" color={sent ? MUTED2 : ACCENT} />
+        ) : (
+          <Text style={[styles.ctaText, sent && styles.ctaTextSent]}>
+            {sent ? "Sent" : "Nudge"}
+          </Text>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
 
-const SURFACE = "#0E1012";
-const BORDER = "rgba(255,255,255,0.07)";
-
 const styles = StyleSheet.create({
-  outer: {
-    width: "100%",
-  },
-  gradientBorder: {
-    borderRadius: RADIUS_MD,
-    padding: StyleSheet.hairlineWidth,
-  },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     backgroundColor: SURFACE,
-    borderRadius: RADIUS_MD - 1,
+    borderRadius: RADIUS_MD,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    borderColor: "rgba(0,255,133,0.18)",
+    paddingVertical: 11,
+    paddingHorizontal: 12,
   },
   cardSent: {
-    backgroundColor: "#0A0B0D",
+    borderColor: BORDER,
+    backgroundColor: "rgba(255,255,255,0.03)",
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.1)",
   },
   copy: {
     flex: 1,
     minWidth: 0,
-    gap: 4,
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: "rgba(255,255,255,0.28)",
-  },
-  statusIcon: {
-    marginRight: -2,
+    gap: 2,
   },
   kicker: {
-    color: TEXT,
+    color: MUTED2,
     fontFamily: fonts.medium,
-    fontSize: 13,
-    lineHeight: 18,
-    letterSpacing: 0.15,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: 0.1,
   },
   subtitle: {
-    color: MUTED2,
+    color: TEXT,
     fontFamily: fonts.book,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 15,
+    lineHeight: 21,
+    opacity: 0.92,
   },
   cta: {
-    minWidth: 76,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: BUTTON_RADIUS,
-    backgroundColor: ACCENT,
+    minWidth: 58,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(0,255,133,0.45)",
+    backgroundColor: "rgba(0,255,133,0.08)",
     alignItems: "center",
     justifyContent: "center",
   },
   ctaSent: {
+    borderColor: "rgba(255,255,255,0.1)",
     backgroundColor: "transparent",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.12)",
   },
   ctaText: {
-    color: ON_ACCENT_TEXT,
-    fontFamily: fonts.heavy,
-    fontSize: 14,
-    letterSpacing: 0.2,
+    color: ACCENT,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    letterSpacing: 0.1,
   },
   ctaTextSent: {
     color: MUTED2,
-    fontFamily: fonts.medium,
   },
 });

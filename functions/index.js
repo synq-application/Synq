@@ -779,6 +779,14 @@ function isSynqActive(userData) {
   return Date.now() - ms <= SYNQ_EXPIRATION_MS;
 }
 
+const { isRecipientInSynqVisibleTo } = require("../src/lib/synqBroadcastCore");
+
+const synqBroadcastClearFields = {
+  synqBroadcastMode: admin.firestore.FieldValue.delete(),
+  synqBroadcastGroupIds: admin.firestore.FieldValue.delete(),
+  synqVisibleTo: admin.firestore.FieldValue.delete(),
+};
+
 /**
  * Deactivates Synq for users past the window (server-side, no app open required).
  * Also clears legacy rows that are still `available` but missing `synqStartedAt`.
@@ -792,7 +800,11 @@ exports.expireStaleSynq = onSchedule(
   async () => {
     const db = admin.firestore();
     const cutoffTs = admin.firestore.Timestamp.fromMillis(Date.now() - SYNQ_EXPIRATION_MS);
-    const deactivatePayload = { status: "inactive", memo: "" };
+    const deactivatePayload = {
+      status: "inactive",
+      memo: "",
+      ...synqBroadcastClearFields,
+    };
 
     try {
       const expiredByTime = await db
@@ -1223,6 +1235,7 @@ exports.onFriendSynqActivated = onDocumentUpdated(
         const recipientToken = friendData?.pushToken;
         if (!recipientToken) continue;
         if (!isSynqActive(friendData)) continue;
+        if (!isRecipientInSynqVisibleTo(recipientId, after)) continue;
 
         if (activatedPushToken && recipientToken === activatedPushToken) {
           logWarn("onFriendSynqActivated_skip_same_device_token", {
