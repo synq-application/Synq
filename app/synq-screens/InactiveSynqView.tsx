@@ -4,6 +4,7 @@ import {
   BG,
   MUTED2,
   MUTED3,
+  RADIUS_MD,
   SPACE_2,
   SPACE_3,
   SPACE_4,
@@ -366,16 +367,18 @@ export default function InactiveSynqView({
 
               <Pressable
                 onPress={openAudienceSheet}
-                style={({ pressed }) => [styles.audienceRow, pressed && styles.audienceRowPressed]}
+                style={({ pressed }) => [styles.audiencePill, pressed && styles.audiencePillPressed]}
                 accessibilityRole="button"
                 accessibilityLabel={`Sharing with ${audienceLabel}`}
                 accessibilityHint="Opens audience picker"
               >
                 <Text style={styles.sharingLabel}>Sharing with</Text>
-                <Text style={styles.sharingValue} numberOfLines={1}>
-                  {audienceLabel}
-                </Text>
-                <Ionicons name="chevron-forward" size={14} color={MUTED3} />
+                <View style={styles.audienceValueRow}>
+                  <Text style={styles.sharingValue} numberOfLines={1}>
+                    {audienceLabel}
+                  </Text>
+                  <Ionicons name="chevron-down" size={15} color={MUTED2} />
+                </View>
               </Pressable>
             </Animated.View>
 
@@ -449,7 +452,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
     letterSpacing: -0.45,
     textAlign: "center",
-    marginBottom: SPACE_5,
+    marginBottom: SPACE_6 + SPACE_4,
   },
   titleAccent: {
     color: ACCENT,
@@ -466,7 +469,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 999,
+    borderRadius: RADIUS_MD,
     paddingHorizontal: SPACE_4,
     paddingVertical: SPACE_2,
   },
@@ -474,18 +477,18 @@ const styles = StyleSheet.create({
     width: "100%",
     minHeight: 30,
     justifyContent: "center",
-    alignItems: "center",
+    alignItems: "stretch",
   },
   moodGhost: {
     position: "absolute",
-    left: SPACE_2,
-    right: SPACE_2,
+    left: 0,
+    right: 0,
     color: MUTED3,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 21,
     fontFamily: fonts.book,
-    letterSpacing: 0.1,
-    textAlign: "center",
+    letterSpacing: 0.08,
+    textAlign: "left",
   },
   moodInput: {
     width: "100%",
@@ -494,7 +497,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontFamily: fonts.book,
     letterSpacing: 0.1,
-    textAlign: "center",
+    textAlign: "left",
     padding: 0,
     margin: 0,
     minHeight: 28,
@@ -503,32 +506,48 @@ const styles = StyleSheet.create({
   moodInputGhost: {
     color: "transparent",
   },
-  audienceRow: {
+  audiencePill: {
+    width: "100%",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    maxWidth: "100%",
-    marginTop: SPACE_4,
-    paddingVertical: SPACE_2,
-    paddingHorizontal: SPACE_2,
+    justifyContent: "space-between",
+    gap: SPACE_3,
+    marginTop: SPACE_3,
+    paddingVertical: 13,
+    paddingHorizontal: SPACE_4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderRadius: RADIUS_MD,
   },
-  audienceRowPressed: {
-    opacity: 0.7,
+  audiencePillPressed: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  audienceValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: "62%",
+    justifyContent: "flex-end",
   },
   sharingLabel: {
     color: MUTED3,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 21,
     fontFamily: fonts.book,
+    letterSpacing: 0.08,
+    flexShrink: 0,
   },
   sharingValue: {
     flexShrink: 1,
-    color: MUTED2,
-    fontSize: 14,
-    lineHeight: 20,
+    color: TEXT,
+    fontSize: 15,
+    lineHeight: 21,
     fontFamily: fonts.medium,
-    maxWidth: "58%",
+    letterSpacing: 0.02,
+    textAlign: "right",
   },
   ctaBlock: {
     alignItems: "center",

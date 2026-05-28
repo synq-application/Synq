@@ -5,10 +5,9 @@ import {
   BUTTON_RADIUS,
   fonts,
   ON_ACCENT_TEXT,
-  PRIMARY_CTA_HEIGHT,
-  PRIMARY_CTA_WIDTH,
   SPACE_4,
   SPACE_5,
+  SPACE_6,
   TEXT,
 } from "@/constants/Variables";
 import type { FriendGroup } from "@/src/lib/friendGroups";
@@ -51,11 +50,13 @@ export default function SynqAudienceSheet({
         <View style={[styles.sheetGroup, { paddingBottom: insets.bottom + SPACE_4 }]}>
           <View style={styles.sheetCard}>
             <Text style={styles.sheetTitle}>Share with</Text>
-            <SynqAudiencePicker
-              groups={groups}
-              selection={selection}
-              onChangeSelection={onChangeSelection}
-            />
+            <View style={styles.pickerSection}>
+              <SynqAudiencePicker
+                groups={groups}
+                selection={selection}
+                onChangeSelection={onChangeSelection}
+              />
+            </View>
             <View style={styles.footer}>
               <TouchableOpacity
                 style={styles.doneBtn}
@@ -102,29 +103,33 @@ const styles = StyleSheet.create({
     paddingBottom: SPACE_4,
     paddingHorizontal: SPACE_4,
   },
+  pickerSection: {
+    paddingBottom: SPACE_4,
+  },
   footer: {
     alignItems: "center",
     paddingHorizontal: SPACE_4,
-    paddingTop: SPACE_4,
-    paddingBottom: SPACE_4 + 2,
+    paddingTop: SPACE_6,
+    paddingBottom: SPACE_5,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: BORDER,
+    borderTopColor: "rgba(255,255,255,0.06)",
     backgroundColor: SHEET_SURFACE,
   },
   doneBtn: {
     alignSelf: "center",
-    width: PRIMARY_CTA_WIDTH,
     backgroundColor: ACCENT,
     borderRadius: BUTTON_RADIUS,
-    minHeight: PRIMARY_CTA_HEIGHT,
+    minHeight: 48,
+    minWidth: 128,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: SPACE_4,
+    paddingHorizontal: SPACE_5,
+    paddingVertical: 12,
   },
   doneText: {
     color: ON_ACCENT_TEXT,
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
+    letterSpacing: 0.15,
   },
 });
