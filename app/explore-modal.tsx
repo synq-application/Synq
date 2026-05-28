@@ -8,6 +8,7 @@ import {
 import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
+import SynqPulseStage from "@/app/synq-screens/SynqPulseStage";
 import { Image as ExpoImage } from "expo-image";
 import React, { useState } from "react";
 import {
@@ -83,16 +84,9 @@ export default function ExploreModal({
 
     return (
         <View style={[StyleSheet.absoluteFill, styles.overlay]}>
-            {isThinking && ( 
+            {isThinking && (
                 <View style={styles.thinkingOverlay}>
-                    <ExpoImage
-                        source={require("../assets/pulse.gif")}
-                        style={styles.thinkingOrb}
-                        contentFit="contain"
-                        cachePolicy="memory-disk"
-                        transition={0}
-                    />
-                    <Text style={styles.thinkingText}>Finding the move...</Text>
+                    <SynqPulseStage title="Finding the move" />
                 </View>
             )}
 
@@ -348,18 +342,6 @@ const styles = StyleSheet.create({
 
     thinkingOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: "rgba(0,0,0,0.92)",
-        justifyContent: "center",
-        alignItems: "center",
         zIndex: 2000,
-    },
-    thinkingOrb: {
-        width: 280,
-        height: 280,
-    },
-    thinkingText: {
-        color: "#999",
-        marginTop: 20,
-        fontSize: 26
     },
 });
