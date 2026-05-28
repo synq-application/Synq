@@ -776,6 +776,7 @@ export default function FriendsScreen() {
         <View style={[styles.friendsList, styles.screenPadding]}>
           <GroupsListPane
             userId={myId}
+            friends={friends}
             listBottomInset={TAB_BAR_SCROLL_INSET + 40}
             onCreateGroup={handleCreateGroup}
           />

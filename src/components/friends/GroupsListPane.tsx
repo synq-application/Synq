@@ -21,7 +21,9 @@ import {
   subscribeFriendGroups,
 } from "@/src/lib/friendGroups";
 import { friendGroupsCacheByUser } from "@/src/lib/socialCache";
+import { Friend } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
+import GroupListAvatar from "./GroupListAvatar";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -41,6 +43,7 @@ const GROUPS_HINT =
 
 type Props = {
   userId: string;
+  friends?: Friend[];
   listBottomInset?: number;
   onCreateGroup: (name: string) => Promise<string>;
 };
@@ -83,6 +86,7 @@ function NewGroupRow({ onPress }: { onPress: () => void }) {
 
 export default function GroupsListPane({
   userId,
+  friends = [],
   listBottomInset = 40,
   onCreateGroup,
 }: Props) {
@@ -200,9 +204,7 @@ export default function GroupsListPane({
             accessibilityLabel={`${item.name}, ${item.memberIds.length} members`}
             accessibilityHint="Long press to delete this group"
           >
-            <View style={styles.groupIconRing}>
-              <Ionicons name="people-outline" size={20} color={ACCENT} />
-            </View>
+            <GroupListAvatar memberIds={item.memberIds} friends={friends} />
             <View style={styles.groupCardMain}>
               <Text style={styles.groupName} numberOfLines={1}>
                 {item.name}
@@ -337,14 +339,6 @@ const styles = StyleSheet.create({
     backgroundColor: SURFACE,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: BORDER,
-  },
-  groupIconRing: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
   },
   groupCardMain: {
     flex: 1,
