@@ -8,11 +8,11 @@ import {
   friendsListCacheByUser,
 } from "./socialCache";
 
-export type CachedRecentSynq = {
+export type CachedTopSynq = {
   friendId: string;
   displayName: string;
   imageurl: string | null;
-  lastSynqAt: string;
+  messageCount: number;
 };
 
 export type OwnProfileSnapshot = {
@@ -21,14 +21,14 @@ export type OwnProfileSnapshot = {
   events: unknown[];
   city: string | null;
   state: string | null;
-  recentSynqs: CachedRecentSynq[];
+  topSynqs: CachedTopSynq[];
 };
 
-export type RecentSynqRow = { friend: Friend; at: Date };
+export type TopSynqRow = { friend: Friend; messageCount: number };
 
 export const ownProfileCacheByUser: Record<string, OwnProfileSnapshot> = {};
 
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 const ownProfileCacheKey = (userId: string) =>
   `own-profile-cache:${CACHE_VERSION}:${userId}`;
 
@@ -40,7 +40,7 @@ const emptySnapshot = (): OwnProfileSnapshot => ({
   events: [],
   city: null,
   state: null,
-  recentSynqs: [],
+  topSynqs: [],
 });
 
 const prefetchProfileImage = (url: string | null | undefined) => {
@@ -50,56 +50,38 @@ const prefetchProfileImage = (url: string | null | undefined) => {
   }
 };
 
-const prefetchRecentSynqAvatars = (rows: CachedRecentSynq[]) => {
+const prefetchTopSynqAvatars = (rows: CachedTopSynq[]) => {
   rows.forEach((row) => prefetchProfileImage(row.imageurl));
 };
 
-const lastSynqToDate = (raw: unknown): Date | null => {
-  if (raw == null) return null;
-  try {
-    const d =
-      typeof (raw as { toDate?: () => Date }).toDate === "function"
-        ? (raw as { toDate: () => Date }).toDate()
-        : new Date(raw as string | number);
-    return Number.isNaN(d.getTime()) ? null : d;
-  } catch {
-    return null;
-  }
-};
-
-export function computeRecentSynqRows(
-  userId: string,
-  friends: Friend[]
-): RecentSynqRow[] {
+/** Friends you've messaged most (synqCount on the friend doc). */
+export function computeTopSynqRows(userId: string, friends: Friend[]): TopSynqRow[] {
   if (!userId) return [];
   const rel = friendRelationCacheByUser[userId];
   if (!rel) return [];
-  const rows: RecentSynqRow[] = [];
+  const rows: TopSynqRow[] = [];
   for (const friend of friends) {
-    const at = lastSynqToDate(rel[friend.id]?.lastSynqAt);
-    if (!at) continue;
-    rows.push({ friend, at });
+    const messageCount = rel[friend.id]?.synqCount ?? 0;
+    if (messageCount <= 0) continue;
+    rows.push({ friend, messageCount });
   }
-  rows.sort((a, b) => b.at.getTime() - a.at.getTime());
+  rows.sort((a, b) => b.messageCount - a.messageCount);
   return rows.slice(0, 3);
 }
 
-export function recentSynqRowsEqual(a: RecentSynqRow[], b: RecentSynqRow[]): boolean {
+export function topSynqRowsEqual(a: TopSynqRow[], b: TopSynqRow[]): boolean {
   if (a.length !== b.length) return false;
   return a.every(
     (row, i) =>
-      row.friend.id === b[i]?.friend.id && row.at.getTime() === b[i]?.at.getTime()
+      row.friend.id === b[i]?.friend.id && row.messageCount === b[i]?.messageCount
   );
 }
 
-export function recentSynqRowsFromCache(
-  cached: CachedRecentSynq[] | undefined
-): RecentSynqRow[] {
+export function topSynqRowsFromCache(cached: CachedTopSynq[] | undefined): TopSynqRow[] {
   if (!cached?.length) return [];
   return cached
     .map((row) => {
-      const at = new Date(row.lastSynqAt);
-      if (Number.isNaN(at.getTime())) return null;
+      if (!row.messageCount || row.messageCount <= 0) return null;
       return {
         friend: {
           id: row.friendId,
@@ -107,21 +89,21 @@ export function recentSynqRowsFromCache(
           imageurl: row.imageurl,
           mutualCount: 0,
         } as Friend,
-        at,
+        messageCount: row.messageCount,
       };
     })
-    .filter((row): row is RecentSynqRow => row != null);
+    .filter((row): row is TopSynqRow => row != null);
 }
 
-export function recentSynqRowsToCache(rows: RecentSynqRow[]): CachedRecentSynq[] {
-  return rows.map(({ friend, at }) => ({
+export function topSynqRowsToCache(rows: TopSynqRow[]): CachedTopSynq[] {
+  return rows.map(({ friend, messageCount }) => ({
     friendId: friend.id,
     displayName: friend.displayName || "Friend",
     imageurl:
       typeof friend.imageurl === "string" && friend.imageurl.trim().startsWith("http")
         ? friend.imageurl
         : null,
-    lastSynqAt: at.toISOString(),
+    messageCount,
   }));
 }
 
@@ -136,11 +118,11 @@ export function setCachedOwnProfile(userId: string, snapshot: OwnProfileSnapshot
   const next: OwnProfileSnapshot = {
     ...emptySnapshot(),
     ...snapshot,
-    recentSynqs: snapshot.recentSynqs ?? [],
+    topSynqs: snapshot.topSynqs ?? [],
   };
   ownProfileCacheByUser[userId] = next;
   prefetchProfileImage(next.imageurl);
-  prefetchRecentSynqAvatars(next.recentSynqs);
+  prefetchTopSynqAvatars(next.topSynqs);
   void AsyncStorage.setItem(ownProfileCacheKey(userId), JSON.stringify(next)).catch(
     () => {}
   );
@@ -162,17 +144,17 @@ export type MeTabInitialState = {
   state: string | null;
   events: unknown[];
   friendsForHostNames: Friend[];
-  recentSynqRows: RecentSynqRow[];
-  recentSynqsReady: boolean;
+  topSynqRows: TopSynqRow[];
+  topSynqsReady: boolean;
 };
 
 /** Synchronous snapshot for Me tab first paint (after disk hydrate at app boot). */
 export function getMeTabInitialState(userId: string): MeTabInitialState {
   const profile = getCachedOwnProfile(userId);
   const friends = friendsListCacheByUser[userId] ?? [];
-  const cachedRecent = recentSynqRowsFromCache(profile?.recentSynqs);
-  const recentSynqRows =
-    cachedRecent.length > 0 ? cachedRecent : computeRecentSynqRows(userId, friends);
+  const cachedTop = topSynqRowsFromCache(profile?.topSynqs);
+  const topSynqRows =
+    cachedTop.length > 0 ? cachedTop : computeTopSynqRows(userId, friends);
   const socialCacheReady = friendsListCacheByUser[userId] !== undefined;
 
   return {
@@ -183,8 +165,8 @@ export function getMeTabInitialState(userId: string): MeTabInitialState {
     state: profile?.state ?? null,
     events: profile?.events ?? [],
     friendsForHostNames: friends,
-    recentSynqRows,
-    recentSynqsReady: recentSynqRows.length > 0 || socialCacheReady,
+    topSynqRows,
+    topSynqsReady: topSynqRows.length > 0 || socialCacheReady,
   };
 }
 
@@ -194,7 +176,7 @@ export function prewarmMeTabScreen(userId: string): void {
   const profile = getCachedOwnProfile(userId);
   if (profile) {
     prefetchProfileImage(profile.imageurl);
-    prefetchRecentSynqAvatars(profile.recentSynqs);
+    prefetchTopSynqAvatars(profile.topSynqs);
   }
   const friends = friendsListCacheByUser[userId] ?? [];
   friends.slice(0, 3).forEach((friend) => prefetchProfileImage(friend.imageurl));
@@ -219,10 +201,10 @@ export async function hydrateOwnProfileFromDisk(userId: string): Promise<void> {
         events: Array.isArray(parsed.events) ? parsed.events : [],
         city: parsed.city ?? null,
         state: parsed.state ?? null,
-        recentSynqs: Array.isArray(parsed.recentSynqs) ? parsed.recentSynqs : [],
+        topSynqs: Array.isArray(parsed.topSynqs) ? parsed.topSynqs : [],
       };
       prefetchProfileImage(ownProfileCacheByUser[userId].imageurl);
-      prefetchRecentSynqAvatars(ownProfileCacheByUser[userId].recentSynqs);
+      prefetchTopSynqAvatars(ownProfileCacheByUser[userId].topSynqs);
     } catch {}
   })();
 

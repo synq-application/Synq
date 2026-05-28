@@ -11,6 +11,8 @@ import {
   ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
+  profileInterestPillText,
+  profileInterestPillTextActive,
   profileScreenSectionTitle,
   tabScreenMainHeaderTitle,
   SURFACE,
@@ -72,15 +74,15 @@ import { auth, db } from "../../src/lib/firebase";
 import { filterOutPastOpenPlans, matchesPlanEvent } from "../../src/lib/planEvents";
 import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
-  computeRecentSynqRows,
+  computeTopSynqRows,
   getCachedOwnProfile,
   getMeTabInitialState,
   hydrateOwnProfileFromDisk,
   mergeCachedOwnProfile,
-  recentSynqRowsEqual,
-  recentSynqRowsToCache,
   setCachedOwnProfile,
-  type RecentSynqRow,
+  topSynqRowsEqual,
+  topSynqRowsToCache,
+  type TopSynqRow,
 } from "../../src/lib/ownProfileCache";
 import {
   friendRelationCacheByUser,
@@ -92,7 +94,7 @@ import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
 import AlertModal from "../alert-modal";
 import { useAuthRefresh } from "../_layout";
 import ConfirmModal from "../confirm-modal";
-import { formatLastSynq, prefetchResolvedAvatar, resolveAvatar } from "../helpers";
+import { prefetchResolvedAvatar, resolveAvatar } from "../helpers";
 import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
@@ -193,11 +195,11 @@ export default function ProfileScreen() {
     () => meBootstrap?.friendsForHostNames ?? []
   );
   const [friendsDataEpoch, setFriendsDataEpoch] = useState(0);
-  const [recentSynqRows, setRecentSynqRows] = useState<RecentSynqRow[]>(
-    () => meBootstrap?.recentSynqRows ?? []
+  const [topSynqRows, setTopSynqRows] = useState<TopSynqRow[]>(
+    () => meBootstrap?.topSynqRows ?? []
   );
-  const [recentSynqsReady, setRecentSynqsReady] = useState(
-    () => meBootstrap?.recentSynqsReady ?? false
+  const [topSynqsReady, setTopSynqsReady] = useState(
+    () => meBootstrap?.topSynqsReady ?? false
   );
   const [profileImage, setProfileImage] = useState<string | null>(
     () => meBootstrap?.profileImage ?? null
@@ -278,8 +280,8 @@ export default function ProfileScreen() {
     return m;
   }, [myId, friendsForHostNames]);
 
-  const computedRecentSynqRows = useMemo(
-    () => computeRecentSynqRows(myId, friendsForHostNames),
+  const computedTopSynqRows = useMemo(
+    () => computeTopSynqRows(myId, friendsForHostNames),
     [myId, friendsForHostNames, friendsDataEpoch]
   );
 
@@ -496,7 +498,7 @@ export default function ProfileScreen() {
             events: prunedEvents,
             city: nextCity,
             state: stateAbbr,
-            recentSynqs: prevOwn?.recentSynqs ?? [],
+            topSynqs: prevOwn?.topSynqs ?? [],
           });
 
           setCity(nextCity);
@@ -578,7 +580,7 @@ export default function ProfileScreen() {
               : cachedList
           );
           setFriendsDataEpoch((n) => n + 1);
-          setRecentSynqsReady(true);
+          setTopSynqsReady(true);
           return;
         }
 
@@ -595,7 +597,7 @@ export default function ProfileScreen() {
         } catch (e) {
           console.error("[ProfileScreen] warmFriendsAndConnectionsCache:", e);
         } finally {
-          setRecentSynqsReady(true);
+          setTopSynqsReady(true);
         }
       },
       ignoreSnapshotPermissionDenied
@@ -864,11 +866,11 @@ export default function ProfileScreen() {
       setFriendsForHostNames((prev) =>
         prev.length > 0 ? prev : next.friendsForHostNames
       );
-      setRecentSynqRows((prev) =>
-        prev.length > 0 ? prev : next.recentSynqRows
+      setTopSynqRows((prev) =>
+        prev.length > 0 ? prev : next.topSynqRows
       );
-      if (next.recentSynqsReady) {
-        setRecentSynqsReady(true);
+      if (next.topSynqsReady) {
+        setTopSynqsReady(true);
       }
     });
     return () => {
@@ -877,27 +879,27 @@ export default function ProfileScreen() {
   }, [myId]);
 
   useEffect(() => {
-    if (computedRecentSynqRows.length > 0) {
-      setRecentSynqRows((prev) => {
-        if (recentSynqRowsEqual(computedRecentSynqRows, prev)) return prev;
+    if (computedTopSynqRows.length > 0) {
+      setTopSynqRows((prev) => {
+        if (topSynqRowsEqual(computedTopSynqRows, prev)) return prev;
         if (myId) {
           mergeCachedOwnProfile(myId, {
-            recentSynqs: recentSynqRowsToCache(computedRecentSynqRows),
+            topSynqs: topSynqRowsToCache(computedTopSynqRows),
           });
         }
-        return computedRecentSynqRows;
+        return computedTopSynqRows;
       });
       return;
     }
-    if (!recentSynqsReady) return;
-    setRecentSynqRows((prev) => {
+    if (!topSynqsReady) return;
+    setTopSynqRows((prev) => {
       if (prev.length === 0) return prev;
       if (myId) {
-        mergeCachedOwnProfile(myId, { recentSynqs: [] });
+        mergeCachedOwnProfile(myId, { topSynqs: [] });
       }
       return [];
     });
-  }, [computedRecentSynqRows, recentSynqsReady, myId]);
+  }, [computedTopSynqRows, topSynqsReady, myId]);
 
   useEffect(() => {
     if (isFocused) return;
@@ -1014,10 +1016,10 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.sectionAfterHero}>
-        <Text style={styles.sectionTitle}>Recent Synqs</Text>
-        {recentSynqRows.length > 0 ? (
+        <Text style={styles.sectionTitle}>Top Synqs</Text>
+        {topSynqRows.length > 0 ? (
           <View style={styles.synqsContainer}>
-            {recentSynqRows.map(({ friend, at }, i) => {
+            {topSynqRows.map(({ friend }, i) => {
               const firstName =
                 String(friend.displayName || "Friend")
                   .trim()
@@ -1033,7 +1035,7 @@ export default function ProfileScreen() {
                         params: { friendId: friend.id },
                       })
                     }
-                    accessibilityLabel={`${firstName}, last Synq ${formatLastSynq(at)}`}
+                    accessibilityLabel={`${firstName}, top messaging friend`}
                   >
                     <View style={styles.imageCircle}>
                       <ExpoImage
@@ -1057,14 +1059,14 @@ export default function ProfileScreen() {
               );
             })}
           </View>
-        ) : recentSynqsReady ? (
+        ) : topSynqsReady ? (
           <Text style={styles.profileHelperText}>
             {friendsForHostNames.length === 0
-              ? "Add friends to see recent Synqs here."
-              : "No Synqs yet. Start a Synq with a friend to see it here."}
+              ? "Add friends to see your 3 top Synqs here."
+              : "Message friends to see your 3 top Synqs here."}
           </Text>
         ) : (
-          <ActivityIndicator color={ACCENT} style={styles.recentSynqsLoading} />
+          <ActivityIndicator color={ACCENT} style={styles.topSynqsLoading} />
         )}
       </View>
 
@@ -1357,7 +1359,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     position: "relative",
   },
-  recentSynqsLoading: { alignSelf: "center", marginVertical: 16 },
+  topSynqsLoading: { alignSelf: "center", marginVertical: 16 },
   profileSection: { alignItems: "center", marginTop: 0, overflow: "visible" },
   qrContainer: {
     width: 200,
@@ -1493,11 +1495,9 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   connName: {
-    color: TEXT,
-    fontSize: 13,
+    ...profileInterestPillText,
     marginTop: 8,
     textAlign: "center",
-    fontFamily: fonts.medium,
   },
   profileHelperText: {
     color: MUTED2,
@@ -1530,7 +1530,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  interestText: { color: TEXT, fontFamily: fonts.book, fontSize: 13 },
+  interestText: profileInterestPillText,
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", justifyContent: "center", alignItems: "center" },
   qrModalBox: { backgroundColor: "white", padding: 25, borderRadius: MODAL_RADIUS + 18 },
   interestModalFullscreen: {
@@ -1593,15 +1593,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,255,133,0.12)",
     borderColor: "rgba(0,255,133,0.55)",
   },
-  interestPillText: {
-    color: TEXT,
-    fontFamily: fonts.book,
-    fontSize: 13,
-  },
-  interestPillTextOn: {
-    color: ACCENT,
-    fontFamily: fonts.medium,
-  },
+  interestPillText: profileInterestPillText,
+  interestPillTextOn: profileInterestPillTextActive,
   interestSaveBtn: {
     marginTop: 20,
     alignSelf: "center",

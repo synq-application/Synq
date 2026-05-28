@@ -125,13 +125,26 @@ export const TYPE_SECTION = 20;
 export const TYPE_BODY = 16;
 export const TYPE_CAPTION = 13;
 
-/** Section headings on Me and Friends (Recent Synqs, Open plans, Top Synqs, etc.). */
+/** Section headings on Me and Friends (Top Synqs, Open plans, etc.). */
 export const profileScreenSectionTitle: TextStyle = {
   color: TEXT,
   fontSize: 18,
   fontFamily: fonts.heavy,
   letterSpacing: 0.15,
   marginBottom: 12,
+};
+
+/** Interest tags and Top Synqs names on the Me profile. */
+export const profileInterestPillText: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.medium,
+  fontSize: TYPE_CAPTION,
+};
+
+export const profileInterestPillTextActive: TextStyle = {
+  color: ACCENT,
+  fontFamily: fonts.medium,
+  fontSize: TYPE_CAPTION,
 };
 
 /** Main tab headings: Friends, Synq active state — identical scale and weight. */
