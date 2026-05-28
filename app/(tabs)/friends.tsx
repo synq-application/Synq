@@ -718,14 +718,12 @@ export default function FriendsScreen() {
       <ProfileTabHeaderOverlay variant="title" />
       <TabHeaderIconRow>
         <FriendsGroupsHeaderTitle mode={friendsTabMode} onChange={setFriendsTabMode} />
-        <FriendsHeaderAddButton
-          pulse={
-            friendsTabMode === "friends" &&
-            !isFriendsInitialLoading &&
-            friends.length === 0
-          }
-          onPress={openAddFriendsModal}
-        />
+        {friendsTabMode === "friends" ? (
+          <FriendsHeaderAddButton
+            pulse={!isFriendsInitialLoading && friends.length === 0}
+            onPress={openAddFriendsModal}
+          />
+        ) : null}
       </TabHeaderIconRow>
 
       <View onLayout={onFriendsHeaderLayout}>

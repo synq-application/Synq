@@ -1,18 +1,18 @@
 import ConfirmModal from "@/app/confirm-modal";
 import {
   ACCENT,
-  BORDER,
   fonts,
   MUTED2,
   MUTED3,
   RADIUS_LG,
+  SPACE_3,
   SPACE_4,
   SPACE_5,
   SPACE_6,
-  SURFACE,
   synqOutlineAddBtn,
   synqOutlineAddBtnText,
   TEXT,
+  TYPE_BODY,
   TYPE_CAPTION,
 } from "@/constants/Variables";
 import {
@@ -26,7 +26,7 @@ import { Ionicons } from "@expo/vector-icons";
 import GroupListAvatar from "./GroupListAvatar";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -39,7 +39,11 @@ import {
 import CreateGroupModal from "./CreateGroupModal";
 
 const GROUPS_HINT =
-  "Only you can see your groups. These are custom filters to choose who sees you on Synq.";
+  "Only you can see your groups. Use them as custom filters for who sees you when you're active.";
+
+const GROUP_SURFACE = "#0E1012";
+const GROUP_BORDER = "rgba(255,255,255,0.06)";
+const ROW_INSET = 72;
 
 type Props = {
   userId: string;
@@ -48,10 +52,44 @@ type Props = {
   onCreateGroup: (name: string) => Promise<string>;
 };
 
+function firstName(displayName?: string) {
+  const trimmed = (displayName || "").trim();
+  if (!trimmed) return "Friend";
+  return trimmed.split(/\s+/)[0] || "Friend";
+}
+
+function formatGroupMeta(memberIds: string[], friends: Friend[]) {
+  if (memberIds.length === 0) return "No members yet";
+
+  const byId = new Map(friends.map((f) => [f.id, f]));
+
+  if (memberIds.length === 1) {
+    const name = firstName(byId.get(memberIds[0])?.displayName);
+    return name;
+  }
+
+  if (memberIds.length === 2) {
+    const names = memberIds.map((id) => firstName(byId.get(id)?.displayName));
+    return names.join(" & ");
+  }
+
+  const preview = memberIds
+    .slice(0, 2)
+    .map((id) => firstName(byId.get(id)?.displayName))
+    .join(", ");
+  return `${preview} · ${memberIds.length} members`;
+}
+
 function GroupsEmptyState({ onCreatePress }: { onCreatePress: () => void }) {
   return (
     <View style={styles.emptyWrap}>
-      <Text style={styles.emptyTitle}>No groups yet</Text>
+      <View style={styles.emptyIconOrb}>
+        <Ionicons name="layers-outline" size={28} color={ACCENT} />
+      </View>
+      <Text style={styles.emptyTitle}>
+        Organize your{"\n"}
+        <Text style={styles.emptyTitleAccent}>audience</Text>
+      </Text>
       <Text style={[styles.groupsHint, styles.groupsHintCenter]}>{GROUPS_HINT}</Text>
       <TouchableOpacity
         style={[synqOutlineAddBtn, styles.emptyCta]}
@@ -67,19 +105,63 @@ function GroupsEmptyState({ onCreatePress }: { onCreatePress: () => void }) {
   );
 }
 
-function NewGroupRow({ onPress }: { onPress: () => void }) {
+function GroupRowSeparator() {
+  return <View style={styles.rowSeparator} />;
+}
+
+function NewGroupRow({ onPress, isFooter }: { onPress: () => void; isFooter?: boolean }) {
   return (
     <TouchableOpacity
-      style={styles.newGroupRow}
+      style={[styles.newGroupRow, isFooter && styles.newGroupRowFooter]}
       onPress={onPress}
-      activeOpacity={0.82}
+      activeOpacity={0.75}
       accessibilityRole="button"
       accessibilityLabel="New group"
     >
       <View style={styles.newGroupIcon}>
-        <Ionicons name="add" size={22} color={ACCENT} />
+        <Ionicons name="add" size={20} color={ACCENT} />
       </View>
       <Text style={styles.newGroupLabel}>New group</Text>
+    </TouchableOpacity>
+  );
+}
+
+function GroupRow({
+  group,
+  friends,
+  onPress,
+  onLongPress,
+}: {
+  group: FriendGroup;
+  friends: Friend[];
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
+  const meta = useMemo(
+    () => formatGroupMeta(group.memberIds, friends),
+    [group.memberIds, friends]
+  );
+
+  return (
+    <TouchableOpacity
+      style={styles.groupRow}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={400}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel={`${group.name}, ${group.memberIds.length} members`}
+      accessibilityHint="Long press to delete this group"
+    >
+      <GroupListAvatar memberIds={group.memberIds} friends={friends} />
+      <View style={styles.groupRowMain}>
+        <Text style={styles.groupName} numberOfLines={1}>
+          {group.name}
+        </Text>
+        <Text style={styles.groupMeta} numberOfLines={1}>
+          {meta}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -136,7 +218,15 @@ export default function GroupsListPane({
     }
   };
 
-  const openCreate = () => setCreateVisible(true);
+  const openCreate = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setCreateVisible(true);
+  };
+
+  const openGroup = (id: string) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({ pathname: "/friend-group/[id]", params: { id } });
+  };
 
   const promptDeleteGroup = (group: FriendGroup) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -171,11 +261,28 @@ export default function GroupsListPane({
 
   const hasGroups = groups.length > 0;
 
+  const groupsListBody = hasGroups ? (
+    <View style={styles.groupSurface}>
+      {groups.map((group, index) => (
+        <React.Fragment key={group.id}>
+          {index > 0 ? <GroupRowSeparator /> : null}
+          <GroupRow
+            group={group}
+            friends={friends}
+            onPress={() => openGroup(group.id)}
+            onLongPress={() => promptDeleteGroup(group)}
+          />
+        </React.Fragment>
+      ))}
+      <GroupRowSeparator />
+      <NewGroupRow onPress={openCreate} isFooter />
+    </View>
+  ) : null;
+
   return (
     <>
       <FlatList
-        data={groups}
-        keyExtractor={(item) => item.id}
+        data={[]}
         style={styles.list}
         contentContainerStyle={[
           styles.listContent,
@@ -186,38 +293,20 @@ export default function GroupsListPane({
           hasGroups ? (
             <View style={styles.listHeader}>
               <Text style={styles.groupsHint}>{GROUPS_HINT}</Text>
-              <NewGroupRow onPress={openCreate} />
+              <View style={styles.sectionRow}>
+                <Text style={styles.sectionTitle}>Your groups</Text>
+                <View style={styles.sectionCountPill}>
+                  <Text style={styles.sectionCountText}>{groups.length}</Text>
+                </View>
+              </View>
+              {groupsListBody}
             </View>
           ) : null
         }
-        ListEmptyComponent={<GroupsEmptyState onCreatePress={openCreate} />}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.groupCard}
-            onPress={() =>
-              router.push({ pathname: "/friend-group/[id]", params: { id: item.id } })
-            }
-            onLongPress={() => promptDeleteGroup(item)}
-            delayLongPress={400}
-            activeOpacity={0.82}
-            accessibilityRole="button"
-            accessibilityLabel={`${item.name}, ${item.memberIds.length} members`}
-            accessibilityHint="Long press to delete this group"
-          >
-            <GroupListAvatar memberIds={item.memberIds} friends={friends} />
-            <View style={styles.groupCardMain}>
-              <Text style={styles.groupName} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <Text style={styles.groupMeta}>
-                {item.memberIds.length === 1
-                  ? "1 member"
-                  : `${item.memberIds.length} members`}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={MUTED2} />
-          </TouchableOpacity>
-        )}
+        ListEmptyComponent={
+          !hasGroups ? <GroupsEmptyState onCreatePress={openCreate} /> : null
+        }
+        renderItem={() => null}
       />
 
       <CreateGroupModal
@@ -252,26 +341,129 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingTop: 4,
+    paddingTop: 2,
   },
   listContentEmpty: {
     flexGrow: 1,
   },
   listHeader: {
     marginBottom: SPACE_4,
-    gap: SPACE_5,
+    gap: SPACE_3,
   },
   groupsHint: {
     fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION,
+    fontSize: TYPE_CAPTION + 1,
     color: MUTED3,
-    lineHeight: 18,
+    lineHeight: 19,
     letterSpacing: 0.1,
   },
   groupsHintCenter: {
     textAlign: "center",
-    maxWidth: 280,
+    maxWidth: 300,
+    marginTop: SPACE_4,
     marginBottom: SPACE_6,
+  },
+  sectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: SPACE_3,
+  },
+  sectionTitle: {
+    fontFamily: fonts.heavy,
+    fontSize: 18,
+    color: TEXT,
+    letterSpacing: 0.12,
+  },
+  sectionCountPill: {
+    minWidth: 26,
+    height: 22,
+    paddingHorizontal: 8,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: GROUP_BORDER,
+  },
+  sectionCountText: {
+    fontFamily: fonts.medium,
+    fontSize: TYPE_CAPTION,
+    color: MUTED2,
+    fontVariant: ["tabular-nums"],
+    includeFontPadding: false,
+  },
+  groupSurface: {
+    marginTop: SPACE_3,
+    backgroundColor: GROUP_SURFACE,
+    borderRadius: RADIUS_LG,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: GROUP_BORDER,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  groupRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    backgroundColor: GROUP_SURFACE,
+  },
+  groupRowMain: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
+  },
+  groupName: {
+    fontFamily: fonts.heavy,
+    fontSize: 17,
+    color: TEXT,
+    letterSpacing: 0.08,
+    marginBottom: 4,
+  },
+  groupMeta: {
+    fontFamily: fonts.book,
+    fontSize: TYPE_CAPTION + 1,
+    color: MUTED2,
+    letterSpacing: 0.05,
+  },
+  rowSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: GROUP_BORDER,
+    marginLeft: ROW_INSET,
+  },
+  newGroupRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    backgroundColor: GROUP_SURFACE,
+  },
+  newGroupRowFooter: {
+    borderBottomLeftRadius: RADIUS_LG,
+    borderBottomRightRadius: RADIUS_LG,
+  },
+  newGroupIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,255,133,0.08)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,255,133,0.2)",
+  },
+  newGroupLabel: {
+    fontFamily: fonts.medium,
+    fontSize: TYPE_BODY,
+    color: ACCENT,
+    letterSpacing: 0.12,
   },
   loading: {
     flex: 1,
@@ -284,76 +476,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: SPACE_5,
-    paddingTop: SPACE_6,
+    paddingTop: SPACE_5,
     paddingBottom: SPACE_6,
-    minHeight: 360,
+    minHeight: 380,
+  },
+  emptyIconOrb: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: SPACE_5,
+    backgroundColor: "rgba(0,255,133,0.08)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,255,133,0.22)",
   },
   emptyTitle: {
     fontFamily: fonts.heavy,
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 32,
+    lineHeight: 38,
     color: TEXT,
     textAlign: "center",
     letterSpacing: 0.15,
-    marginBottom: SPACE_4,
+    marginBottom: SPACE_3,
+  },
+  emptyTitleAccent: {
+    color: ACCENT,
+    fontFamily: fonts.heavy,
+    fontSize: 32,
+    lineHeight: 38,
+    letterSpacing: 0.15,
   },
   emptyCta: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 22,
-  },
-  newGroupRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: RADIUS_LG,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,255,133,0.28)",
-    backgroundColor: "rgba(0,255,133,0.06)",
-  },
-  newGroupIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,255,133,0.1)",
-  },
-  newGroupLabel: {
-    fontFamily: fonts.medium,
-    fontSize: 16,
-    color: ACCENT,
-    letterSpacing: 0.15,
-  },
-  groupCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    marginBottom: 10,
-    borderRadius: RADIUS_LG,
-    backgroundColor: SURFACE,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
-  },
-  groupCardMain: {
-    flex: 1,
-    minWidth: 0,
-  },
-  groupName: {
-    fontFamily: fonts.heavy,
-    fontSize: 17,
-    color: TEXT,
-    letterSpacing: 0.1,
-    marginBottom: 3,
-  },
-  groupMeta: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION + 1,
-    color: MUTED2,
+    marginTop: SPACE_4,
   },
 });

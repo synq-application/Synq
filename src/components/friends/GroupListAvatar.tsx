@@ -5,6 +5,9 @@ import { Image as ExpoImage } from "expo-image";
 import React, { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 
+const AVATAR_SLOT = 48;
+const GROUP_SURFACE = "#0E1012";
+
 type FriendLike = { id: string; imageurl?: string };
 
 type Props = {
@@ -28,7 +31,7 @@ export default function GroupListAvatar({ memberIds, friends }: Props) {
   if (memberIds.length === 0) {
     return (
       <View style={styles.iconRing}>
-        <Ionicons name="people-outline" size={20} color={ACCENT} />
+        <Ionicons name="people-outline" size={21} color={ACCENT} />
       </View>
     );
   }
@@ -40,7 +43,7 @@ export default function GroupListAvatar({ memberIds, friends }: Props) {
           source={{ uri: stackUris[0] }}
           style={styles.singlePhoto}
           cachePolicy="memory-disk"
-          transition={0}
+          transition={120}
         />
       </View>
     );
@@ -52,13 +55,13 @@ export default function GroupListAvatar({ memberIds, friends }: Props) {
         source={{ uri: stackUris[0] }}
         style={[styles.stackPhoto, styles.stackPhotoBack]}
         cachePolicy="memory-disk"
-        transition={0}
+        transition={120}
       />
       <ExpoImage
         source={{ uri: stackUris[1] }}
         style={[styles.stackPhoto, styles.stackPhotoFront]}
         cachePolicy="memory-disk"
-        transition={0}
+        transition={120}
       />
     </View>
   );
@@ -66,49 +69,51 @@ export default function GroupListAvatar({ memberIds, friends }: Props) {
 
 const styles = StyleSheet.create({
   iconRing: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: AVATAR_SLOT,
+    height: AVATAR_SLOT,
+    borderRadius: AVATAR_SLOT / 2,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   singleWrap: {
-    width: 44,
-    height: 44,
+    width: AVATAR_SLOT,
+    height: AVATAR_SLOT,
     alignItems: "center",
     justifyContent: "center",
   },
   singlePhoto: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: AVATAR_SLOT,
+    height: AVATAR_SLOT,
+    borderRadius: AVATAR_SLOT / 2,
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.1)",
     backgroundColor: "#1C1C1E",
   },
   stackWrap: {
-    width: 44,
-    height: 42,
+    width: AVATAR_SLOT,
+    height: AVATAR_SLOT,
     position: "relative",
   },
   stackPhoto: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     position: "absolute",
     borderWidth: 2,
-    borderColor: "#0A0A0A",
+    borderColor: GROUP_SURFACE,
     backgroundColor: "#1C1C1E",
   },
   stackPhotoBack: {
     left: 0,
-    top: 4,
+    top: 6,
     zIndex: 1,
   },
   stackPhotoFront: {
-    left: 12,
-    top: 10,
+    left: 14,
+    top: 12,
     zIndex: 2,
   },
 });
