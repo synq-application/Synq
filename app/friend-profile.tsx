@@ -33,6 +33,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  InteractionManager,
   Modal,
   Pressable,
   ScrollView,
@@ -166,6 +167,10 @@ export default function FriendProfile() {
     try {
       await removeFriendMutual(friendKey);
       setIsFriend(false);
+      setRemovingFriend(false);
+      await new Promise<void>((resolve) => {
+        InteractionManager.runAfterInteractions(() => resolve());
+      });
       goBackOrHome();
     } catch (e) {
       console.error("Failed to remove friend", e);
@@ -1341,15 +1346,17 @@ export default function FriendProfile() {
         onCancel={() => setShowRemoveModal(false)}
         onConfirm={() => {
           setShowRemoveModal(false);
-          void handleRemoveFriend();
+          requestAnimationFrame(() => {
+            void handleRemoveFriend();
+          });
         }}
       />
-      <Modal visible={removingFriend} transparent animationType="fade">
-        <View style={styles.removingOverlay}>
+      {removingFriend ? (
+        <View style={styles.removingOverlay} pointerEvents="auto">
           <ActivityIndicator color={ACCENT} size="large" />
           <Text style={styles.removingText}>Removing friend…</Text>
         </View>
-      </Modal>
+      ) : null}
       <ConfirmModal
         visible={showUnjoinModal}
         title="Remove this plan?"
@@ -1466,11 +1473,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   removingOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: BG,
     justifyContent: "center",
     alignItems: "center",
     gap: 16,
+    zIndex: 100,
   },
   removingText: {
     color: MUTED2,

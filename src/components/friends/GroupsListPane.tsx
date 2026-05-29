@@ -35,6 +35,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  useReducedMotion,
+} from "react-native-reanimated";
 import CreateGroupModal from "./CreateGroupModal";
 import GroupListAvatar from "./GroupListAvatar";
 
@@ -44,6 +49,14 @@ const GROUPS_HINT =
 const GROUP_SURFACE = "#0E1012";
 const GROUP_BORDER = "rgba(255,255,255,0.06)";
 const ROW_INSET = 72;
+const STAGGER_DELAYS = [0, 120] as const;
+
+function emptyEntering(reduced: boolean, delayMs: number) {
+  if (reduced) {
+    return FadeIn.duration(1);
+  }
+  return FadeInDown.duration(380).delay(delayMs);
+}
 
 type Props = {
   userId: string;
@@ -57,23 +70,32 @@ function formatMemberCount(count: number): string {
 }
 
 function GroupsEmptyState({ onCreatePress }: { onCreatePress: () => void }) {
+  const reduced = useReducedMotion();
+
   return (
     <View style={styles.emptyWrap}>
-      <Text style={styles.emptyTitle}>
-        Organize your{"\n"}
-        <Text style={styles.emptyTitleAccent}>circle</Text>
-      </Text>
-      <Text style={[styles.groupsHint, styles.groupsHintCenter]}>{GROUPS_HINT}</Text>
-      <TouchableOpacity
-        style={[synqOutlineAddBtn, styles.emptyCta]}
-        onPress={onCreatePress}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel="Create your first group"
+      <Animated.View
+        entering={emptyEntering(reduced, STAGGER_DELAYS[0])}
+        style={styles.emptyHeroBlock}
       >
-        <Ionicons name="add" size={20} color={ACCENT} />
-        <Text style={synqOutlineAddBtnText}>Create group</Text>
-      </TouchableOpacity>
+        <Text style={styles.emptyTitle}>
+          Organize your{"\n"}
+          <Text style={styles.emptyTitleAccent}>circle</Text>
+        </Text>
+        <Text style={[styles.groupsHint, styles.groupsHintCenter]}>{GROUPS_HINT}</Text>
+      </Animated.View>
+      <Animated.View entering={emptyEntering(reduced, STAGGER_DELAYS[1])}>
+        <TouchableOpacity
+          style={[synqOutlineAddBtn, styles.emptyCta]}
+          onPress={onCreatePress}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Create your first group"
+        >
+          <Ionicons name="add" size={20} color={ACCENT} />
+          <Text style={synqOutlineAddBtnText}>Create group</Text>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -450,6 +472,10 @@ const styles = StyleSheet.create({
     paddingBottom: SPACE_6,
     minHeight: 380,
   },
+  emptyHeroBlock: {
+    alignItems: "center",
+    width: "100%",
+  },
   emptyIconOrb: {
     width: 64,
     height: 64,
@@ -482,6 +508,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 22,
-    marginTop: SPACE_4,
   },
 });
