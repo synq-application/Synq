@@ -29,8 +29,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -78,28 +77,34 @@ import {
   type FriendGroup,
 } from "@/src/lib/friendGroups";
 import AddFriendToGroupSheet from "@/src/components/friends/AddFriendToGroupSheet";
+import {
+  removeFriendMutual,
+  removeFriendMutualErrorMessage,
+} from "@/src/lib/friends";
 
 export default function FriendProfile() {
   const { friendId, from } = useLocalSearchParams<{
-    friendId?: string;
+    friendId?: string | string[];
     from?: string;
   }>();
   const router = useRouter();
 
-  const goBackOrHome = () => {
+  const goBackOrHome = useCallback(() => {
     if (router.canGoBack()) {
       router.back();
       return;
     }
     router.replace("/(tabs)/friends");
-  };
+  }, [router]);
 
   const handleBack = () => {
     goBackOrHome();
   };
 
   const viewerId = auth.currentUser?.uid ?? "";
-  const friendKey = String(friendId || "");
+  const friendKey = String(
+    Array.isArray(friendId) ? friendId[0] : friendId || ""
+  );
   const cachedFriend =
     viewerId && friendKey
       ? friendProfileCacheByUser[viewerId]?.[friendKey] ?? null
@@ -122,6 +127,7 @@ export default function FriendProfile() {
   const [requestSent, setRequestSent] = useState(cachedRelationship.requestSent);
   const [actionLoading, setActionLoading] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [removingFriend, setRemovingFriend] = useState(false);
   const [friendGroups, setFriendGroups] = useState<FriendGroup[]>([]);
   const [addToGroupSheetVisible, setAddToGroupSheetVisible] = useState(false);
   const [pendingAddGroup, setPendingAddGroup] = useState<FriendGroup | null>(null);
@@ -148,6 +154,25 @@ export default function FriendProfile() {
     setAlertMessage(message);
     setAlertVisible(true);
   };
+
+  const handleRemoveFriend = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user || !friendKey) {
+      showAlert("Could not remove friend", "This profile is unavailable.");
+      return;
+    }
+
+    setRemovingFriend(true);
+    try {
+      await removeFriendMutual(friendKey);
+      setIsFriend(false);
+      goBackOrHome();
+    } catch (e) {
+      console.error("Failed to remove friend", e);
+      setRemovingFriend(false);
+      showAlert("Could not remove friend", removeFriendMutualErrorMessage(e));
+    }
+  }, [friendKey, goBackOrHome]);
 
   const showFriendOpenPlansSection = useMemo(
     () => filterOutPastOpenPlans(friend?.events).length > 0,
@@ -542,23 +567,6 @@ export default function FriendProfile() {
     friend.location || [city, state].filter(Boolean).join(", ");
 
   const avatarUri = resolveAvatar(friend.imageurl);
-
-  const removeFriend = async () => {
-    const user = auth.currentUser;
-    if (!user || !friendId) return;
-
-    try {
-      const functions = getFunctions(undefined, "us-central1");
-      const removeFriendMutual = httpsCallable(functions, "removeFriendMutual");
-      await removeFriendMutual({ otherUid: friendId as string });
-      goBackOrHome();
-    } catch (e) {
-      console.error("Failed to remove friend", e);
-      setAlertTitle("Could not remove friend");
-      setAlertMessage("Please check your connection and try again.");
-      setAlertVisible(true);
-    }
-  };
 
   const addFriend = async () => {
     const user = auth.currentUser;
@@ -1163,6 +1171,7 @@ export default function FriendProfile() {
               activeOpacity={0.8}
               style={styles.removeFriendBtn}
               onPress={() => setShowRemoveModal(true)}
+              disabled={removingFriend}
               accessibilityRole="button"
               accessibilityLabel="Remove friend"
             >
@@ -1330,11 +1339,17 @@ export default function FriendProfile() {
         confirmText="Remove"
         destructive
         onCancel={() => setShowRemoveModal(false)}
-        onConfirm={async () => {
+        onConfirm={() => {
           setShowRemoveModal(false);
-          await removeFriend();
+          void handleRemoveFriend();
         }}
       />
+      <Modal visible={removingFriend} transparent animationType="fade">
+        <View style={styles.removingOverlay}>
+          <ActivityIndicator color={ACCENT} size="large" />
+          <Text style={styles.removingText}>Removing friend…</Text>
+        </View>
+      </Modal>
       <ConfirmModal
         visible={showUnjoinModal}
         title="Remove this plan?"
@@ -1449,6 +1464,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 12,
     alignItems: "center",
+  },
+  removingOverlay: {
+    flex: 1,
+    backgroundColor: BG,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+  },
+  removingText: {
+    color: MUTED2,
+    fontFamily: fonts.medium,
+    fontSize: 15,
   },
   removeFriendBtn: {
     alignSelf: "center",
