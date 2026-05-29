@@ -1700,8 +1700,20 @@ const styles = StyleSheet.create({
     minHeight: 0,
     position: "relative",
   },
+  audienceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 4,
+    paddingVertical: 6,
+  },
+  audienceIconGutter: {
+    width: 16,
+    marginRight: 8,
+    alignItems: "center",
+  },
   activeFriendsList: { flex: 1 },
-  activeListContent: { paddingTop: 12, paddingHorizontal: 0 },
+  activeListContent: { paddingHorizontal: 0 },
   activeListBottomFade: {
     position: "absolute",
     left: 0,
@@ -1777,15 +1789,6 @@ const styles = StyleSheet.create({
   activeMemoRow: {
     marginTop: 14,
     width: "100%",
-  },
-  audienceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 10,
-    marginBottom: 4,
-    paddingHorizontal: 2,
-    paddingVertical: 6,
   },
   audienceRowPressed: {
     opacity: 0.72,

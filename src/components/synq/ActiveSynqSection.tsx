@@ -143,31 +143,33 @@ export default function ActiveSynqSection({
         </View>
       ) : null}
 
-      {audienceLabel ? (
-        <Pressable
-          onPress={openChangeAudience}
-          disabled={!openChangeAudience}
-          style={({ pressed }) => [
-            styles.audienceRow,
-            openChangeAudience && pressed && styles.audienceRowPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={`Shared with ${audienceLabel}`}
-          accessibilityHint={
-            openChangeAudience ? "Opens change audience" : undefined
-          }
-        >
-          <Ionicons name="people-outline" size={16} color={ACCENT} />
-          <Text style={styles.audienceText} numberOfLines={1}>
-            Shared with {audienceLabel}
-          </Text>
-          {openChangeAudience ? (
-            <Ionicons name="chevron-forward" size={14} color={MUTED2} />
-          ) : null}
-        </Pressable>
-      ) : null}
-
       <View style={styles.activeListFooterDock}>
+        {audienceLabel ? (
+          <Pressable
+            onPress={openChangeAudience}
+            disabled={!openChangeAudience}
+            style={({ pressed }) => [
+              styles.audienceRow,
+              openChangeAudience && pressed && styles.audienceRowPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Shared with ${audienceLabel}`}
+            accessibilityHint={
+              openChangeAudience ? "Opens change audience" : undefined
+            }
+          >
+            <View style={styles.audienceIconGutter}>
+              <Ionicons name="people-outline" size={16} color={ACCENT} />
+            </View>
+            <Text style={styles.audienceText} numberOfLines={1}>
+              Shared with {audienceLabel}
+            </Text>
+            {openChangeAudience ? (
+              <Ionicons name="chevron-forward" size={14} color={MUTED2} />
+            ) : null}
+          </Pressable>
+        ) : null}
+
         <FlatList
           style={styles.activeFriendsList}
           data={availableFriends}
@@ -237,6 +239,7 @@ export default function ActiveSynqSection({
           contentContainerStyle={[
             styles.activeListContent,
             {
+              paddingTop: audienceLabel ? 8 : 12,
               paddingBottom:
                 availableFriends.length > 0
                   ? footerLayout.listBottomPad
