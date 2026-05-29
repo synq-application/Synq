@@ -16,7 +16,7 @@ import { canEditOpenPlan, filterOutPastOpenPlans } from "@/src/lib/planEvents";
 import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
   Keyboard,
@@ -238,27 +238,13 @@ export default function OpenPlans({
 
   const dismissPickers = () => setActivePicker(null);
 
-  const locationScrollY = useRef(0);
-  const pendingLocationScroll = useRef(false);
-  const popupScrollMaxHeight = useMemo(
-    () => Math.min(420, Dimensions.get("window").height * 0.48),
-    []
-  );
-
-  const scrollToLocationField = () => {
-    requestAnimationFrame(() => {
-      planScrollRef.current?.scrollTo({
-        y: Math.max(0, locationScrollY.current - 20),
-        animated: true,
-      });
-    });
-  };
-
-  useEffect(() => {
-    if (keyboardInset <= 0 || !pendingLocationScroll.current) return;
-    pendingLocationScroll.current = false;
-    scrollToLocationField();
-  }, [keyboardInset]);
+  const popupScrollMaxHeight = useMemo(() => {
+    const windowH = Dimensions.get("window").height;
+    if (activePicker === "date" || activePicker === "time") {
+      return Math.min(200, windowH * 0.26);
+    }
+    return Math.min(420, windowH * 0.48);
+  }, [activePicker]);
 
   const collapseActivePicker = () => {
     if (activePicker) setActivePicker(null);
@@ -269,10 +255,9 @@ export default function OpenPlans({
     setActivePicker(null);
   };
 
-  const handleTimeSelect = (d: Date) => {
+  const handleTimeChange = useCallback((d: Date) => {
     setSelectedDate(d);
-    setActivePicker(null);
-  };
+  }, []);
 
   const formatTime = (d: Date) =>
     d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -462,14 +447,7 @@ export default function OpenPlans({
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.popupAvoid}
           >
-            <Pressable
-              style={styles.popupCard}
-              onPress={(e) => {
-                e.stopPropagation();
-                Keyboard.dismiss();
-                if (activePicker) setActivePicker(null);
-              }}
-            >
+            <View style={styles.popupCard}>
               <View style={styles.popupTitleRow}>
                 <Text style={styles.popupTitle}>
                   {isEditing ? "Edit plan" : "Add a plan"}
@@ -503,11 +481,6 @@ export default function OpenPlans({
                 showsVerticalScrollIndicator={false}
                 bounces={false}
               >
-              <TouchableWithoutFeedback
-                onPress={Keyboard.dismiss}
-                accessible={false}
-              >
-                <View>
               <TextInput
                 placeholder="What's the plan?"
                 placeholderTextColor="#555"
@@ -598,55 +571,42 @@ export default function OpenPlans({
                     </View>
                   </View>
                 </TouchableWithoutFeedback>
-
-                {activePicker === "date" ? (
-                  <View style={styles.calendarWrap}>
-                    <PlanDateCalendar
-                      value={selectedDate}
-                      minimumDate={minimumSelectableDate}
-                      accentColor={ACCENT}
-                      onChange={handleCalendarSelect}
-                    />
-                  </View>
-                ) : null}
-
-                {activePicker === "time" ? (
-                  <PlanTimePicker
-                    value={selectedDate}
-                    accentColor={ACCENT}
-                    onSelect={handleTimeSelect}
-                  />
-                ) : null}
               </View>
+              </ScrollView>
 
-              <View
-                onLayout={(e) => {
-                  locationScrollY.current = e.nativeEvent.layout.y;
-                }}
-              >
+              {activePicker === "date" ? (
+                <View style={styles.calendarWrap}>
+                  <PlanDateCalendar
+                    value={selectedDate}
+                    minimumDate={minimumSelectableDate}
+                    accentColor={ACCENT}
+                    onChange={handleCalendarSelect}
+                  />
+                </View>
+              ) : null}
+
+              {activePicker === "time" ? (
+                <PlanTimePicker
+                  value={selectedDate}
+                  accentColor={ACCENT}
+                  onChange={handleTimeChange}
+                />
+              ) : null}
+
+              <View style={styles.locationFieldWrap}>
                 <TextInput
                   ref={locationInputRef}
                   placeholder="Add location"
                   placeholderTextColor="#555"
                   style={styles.planInputSecondary}
                   value={newEvent.location}
-                  onFocus={() => {
-                    dismissPickers();
-                    pendingLocationScroll.current = true;
-                    if (keyboardInset > 0) {
-                      pendingLocationScroll.current = false;
-                      scrollToLocationField();
-                    }
-                  }}
+                  onFocus={dismissPickers}
                   onChangeText={(t) =>
                     setNewEvent((p: any) => ({ ...p, location: t }))
                   }
                   returnKeyType="done"
                 />
               </View>
-                </View>
-              </TouchableWithoutFeedback>
-              </ScrollView>
 
               <TouchableOpacity
                 style={[styles.popupPostBtn, !canPost && styles.popupPostBtnDisabled]}
@@ -657,7 +617,7 @@ export default function OpenPlans({
                   {isEditing ? "Save" : "Post"}
                 </Text>
               </TouchableOpacity>
-            </Pressable>
+            </View>
           </KeyboardAvoidingView>
         </Pressable>
       </Modal>
@@ -875,7 +835,8 @@ const styles = StyleSheet.create({
   },
   calendarWrap: {
     marginTop: 6,
-    marginBottom: 2,
+    marginBottom: 8,
+    paddingHorizontal: 2,
   },
   sheetSub: {
     color: "rgba(255,255,255,0.62)",
@@ -894,6 +855,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fonts.medium,
     marginBottom: 10,
+  },
+  locationFieldWrap: {
+    marginTop: 10,
   },
   planInputSecondary: {
     backgroundColor: "#0c0c0c",

@@ -1,116 +1,80 @@
 import { fonts } from "@/constants/Variables";
-import React, { useMemo } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
+import React, { useCallback } from "react";
+import { Platform, StyleSheet, View } from "react-native";
 
-type TimeSlot = {
-  key: string;
-  hours: number;
-  minutes: number;
-  label: string;
-};
-
-function buildTimeSlots(): TimeSlot[] {
-  const slots: TimeSlot[] = [];
-  for (let hours = 7; hours <= 23; hours++) {
-    for (const minutes of [0, 30]) {
-      if (hours === 23 && minutes === 30) break;
-      const d = new Date();
-      d.setHours(hours, minutes, 0, 0);
-      slots.push({
-        key: `${hours}-${minutes}`,
-        hours,
-        minutes,
-        label: d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
-      });
-    }
-  }
-  return slots;
-}
-
-const TIME_SLOTS = buildTimeSlots();
+const WHEEL_BG = "#050505";
 
 type Props = {
   value: Date;
-  onSelect: (date: Date) => void;
+  onChange: (date: Date) => void;
   accentColor: string;
 };
 
-export default function PlanTimePicker({ value, onSelect, accentColor }: Props) {
-  const selectedKey = useMemo(() => {
-    const h = value.getHours();
-    const m = value.getMinutes();
-    const match = TIME_SLOTS.find((s) => s.hours === h && s.minutes === m);
-    return match?.key ?? null;
-  }, [value]);
+/** Plan times: 7:00 AM – 11:00 PM in 30-minute steps. */
+export function clampPlanTime(date: Date, base: Date): Date {
+  const next = new Date(base);
+  let hours = date.getHours();
+  let minutes = date.getMinutes() >= 30 ? 30 : 0;
+
+  if (hours < 7) {
+    hours = 7;
+    minutes = 0;
+  } else if (hours > 23 || (hours === 23 && minutes > 0)) {
+    hours = 23;
+    minutes = 0;
+  }
+
+  next.setHours(hours, minutes, 0, 0);
+  return next;
+}
+
+export default function PlanTimePicker({ value, onChange, accentColor }: Props) {
+  const handleChange = useCallback(
+    (event: DateTimePickerEvent, picked?: Date) => {
+      if (event.type === "dismissed" || !picked) return;
+      onChange(clampPlanTime(picked, value));
+    },
+    [onChange, value]
+  );
 
   return (
     <View style={styles.root}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        style={styles.scroll}
-        contentContainerStyle={styles.grid}
-      >
-        {TIME_SLOTS.map((slot) => {
-          const selected = slot.key === selectedKey;
-          return (
-            <TouchableOpacity
-              key={slot.key}
-              style={[
-                styles.chip,
-                selected && {
-                  borderColor: accentColor,
-                  backgroundColor: `${accentColor}22`,
-                },
-              ]}
-              onPress={() => {
-                const next = new Date(value);
-                next.setHours(slot.hours, slot.minutes, 0, 0);
-                onSelect(next);
-              }}
-              accessibilityLabel={slot.label}
-              accessibilityState={{ selected }}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  selected && { color: accentColor, fontFamily: fonts.heavy },
-                ]}
-              >
-                {slot.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.frame}>
+        <DateTimePicker
+          value={value}
+          mode="time"
+          display="spinner"
+          minuteInterval={30}
+          onChange={handleChange}
+          themeVariant="dark"
+          accentColor={accentColor}
+          textColor="#FFFFFF"
+          style={styles.picker}
+        />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
-    marginTop: 8,
+    marginTop: 10,
   },
-  scroll: {
-    maxHeight: 132,
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    paddingBottom: 2,
-  },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+  frame: {
+    borderRadius: 14,
+    backgroundColor: WHEEL_BG,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    backgroundColor: "#050505",
+    borderColor: "rgba(255,255,255,0.08)",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    height: Platform.OS === "ios" ? 216 : 200,
   },
-  chipText: {
-    color: "white",
-    fontFamily: fonts.medium,
-    fontSize: 14,
+  picker: {
+    height: Platform.OS === "ios" ? 216 : 200,
+    width: "100%",
   },
 });
