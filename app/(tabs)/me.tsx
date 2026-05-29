@@ -1019,7 +1019,7 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Top Synqs</Text>
         {topSynqRows.length > 0 ? (
           <View style={styles.synqsContainer}>
-            {topSynqRows.map(({ friend }, i) => {
+            {topSynqRows.map(({ friend }) => {
               const firstName =
                 String(friend.displayName || "Friend")
                   .trim()
@@ -1045,11 +1045,6 @@ export default function ProfileScreen() {
                         transition={0}
                         recyclingKey={friend.id}
                       />
-                      {i === 0 && (
-                        <View style={styles.crown}>
-                          <Ionicons name="star" size={8} color={ON_ACCENT_TEXT} />
-                        </View>
-                      )}
                     </View>
                   </ProfilePressable>
                   <Text style={styles.connName} numberOfLines={1}>
@@ -1481,19 +1476,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     position: "relative",
     overflow: "hidden",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: SURFACE,
   },
   connImg: { width: 55, height: 55, borderRadius: 50 },
-  crown: {
-    position: "absolute",
-    bottom: -1,
-    right: -1,
-    backgroundColor: ACCENT,
-    padding: 2,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "black",
-    zIndex: 10,
-  },
   connName: {
     ...profileInterestPillText,
     marginTop: 8,
