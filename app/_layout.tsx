@@ -80,41 +80,48 @@ Notifications.setNotificationHandler({
   }),
 });
 
-async function registerForPushNotificationsAsync() {
-  let token: string | null = null;
+async function registerForPushNotificationsAsync(): Promise<string | null> {
+  try {
+    let token: string | null = null;
 
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: ACCENT,
-    });
-  }
-
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "default",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: ACCENT,
+      });
     }
 
-    if (finalStatus !== "granted") return null;
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
 
-    const projectId =
-      Constants.expoConfig?.extra?.eas?.projectId ??
-      Constants.easConfig?.projectId;
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
 
-    token = (
-      await Notifications.getExpoPushTokenAsync({
-        projectId,
-      })
-    ).data;
+      if (finalStatus !== "granted") return null;
+
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        Constants.easConfig?.projectId;
+
+      token = (
+        await Notifications.getExpoPushTokenAsync({
+          projectId,
+        })
+      ).data;
+    }
+
+    return token;
+  } catch (e) {
+    if (__DEV__) {
+      console.warn("[push] Push token registration skipped:", e);
+    }
+    return null;
   }
-
-  return token;
 }
 
 const AuthContext = createContext({
@@ -379,12 +386,14 @@ export default function RootLayout() {
 
       if (u) {
         warmSocialCachesInBackground(u.uid);
-        const token = await registerForPushNotificationsAsync();
-        if (token) {
-          try {
-            await updateDoc(doc(db, "users", u.uid), { pushToken: token });
-          } catch {}
-        }
+        void registerForPushNotificationsAsync()
+          .then(async (token) => {
+            if (!token) return;
+            try {
+              await updateDoc(doc(db, "users", u.uid), { pushToken: token });
+            } catch {}
+          })
+          .catch(() => {});
       }
     });
 
