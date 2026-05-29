@@ -72,14 +72,11 @@ export default function ActiveSynqSection({
     const ctaBottomPad = TAB_BAR_SCROLL_INSET + ACTIVE_CTA_BOTTOM_NUDGE;
     const ctaBlockHeight = ctaPadTop + PRIMARY_CTA_HEIGHT;
     const dockHeight = ctaBlockHeight + ctaBottomPad;
-    const fadeBottom = ctaBottomPad + PRIMARY_CTA_HEIGHT;
     return {
       ctaPadTop,
       ctaBottomPad,
-      ctaBlockHeight,
       dockHeight,
-      fadeBottom,
-      listBottomPad: fadeBottom + ACTIVE_LIST_BOTTOM_FADE_HEIGHT,
+      listBottomPad: dockHeight + ACTIVE_LIST_BOTTOM_FADE_HEIGHT,
     };
   }, []);
 
@@ -250,48 +247,48 @@ export default function ActiveSynqSection({
 
         {availableFriends.length > 0 ? (
           <>
-        <LinearGradient
-          pointerEvents="none"
-          colors={["rgba(9,10,11,0)", "rgba(9,10,11,0.55)", BG]}
-          locations={[0, 0.7, 1]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={[
-            styles.activeListBottomFade,
-            {
-              height: ACTIVE_LIST_BOTTOM_FADE_HEIGHT,
-              bottom: footerLayout.fadeBottom,
-            },
-          ]}
-        />
-          <View
-            style={[
-              styles.activeFooterDock,
-              {
-                height: footerLayout.dockHeight,
-                paddingTop: footerLayout.ctaPadTop,
-                paddingBottom: footerLayout.ctaBottomPad,
-              },
-            ]}
-          >
-            <TouchableOpacity
-              style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
-              onPress={handleConnect}
-              disabled={!selectedFriends.length}
-              accessibilityRole="button"
-              accessibilityLabel={
-                selectedFriends.length === 0
-                  ? "Select friends who are free to start planning"
-                  : `Start plan with ${selectedFriends.length} friend${
-                      selectedFriends.length === 1 ? "" : "s"
-                    }`
-              }
+            <LinearGradient
+              pointerEvents="none"
+              colors={["rgba(9,10,11,0)", "rgba(9,10,11,0.5)", BG]}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={[
+                styles.activeListBottomFade,
+                {
+                  height: ACTIVE_LIST_BOTTOM_FADE_HEIGHT,
+                  bottom: footerLayout.dockHeight,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.activeFooterDock,
+                {
+                  height: footerLayout.dockHeight,
+                  paddingTop: footerLayout.ctaPadTop,
+                  paddingBottom: footerLayout.ctaBottomPad,
+                },
+              ]}
             >
-              <Text style={styles.btnText}>
-                {selectedFriends.length === 0 ? "Select friends" : "Start plan"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={[styles.btn, !selectedFriends.length && { opacity: 0.5 }]}
+                onPress={handleConnect}
+                disabled={!selectedFriends.length}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  selectedFriends.length === 0
+                    ? "Select friends who are free to start planning"
+                    : `Start plan with ${selectedFriends.length} friend${
+                        selectedFriends.length === 1 ? "" : "s"
+                      }`
+                }
+              >
+                <Text style={styles.btnText}>
+                  {selectedFriends.length === 0 ? "Select friends" : "Start plan"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </>
         ) : null}
       </View>

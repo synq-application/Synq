@@ -1704,7 +1704,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 10,
-    marginBottom: 4,
+    marginBottom: 14,
     paddingVertical: 6,
   },
   audienceIconGutter: {
