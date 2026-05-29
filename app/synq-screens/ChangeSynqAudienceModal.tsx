@@ -1,8 +1,6 @@
-import CloseButton from "@/src/components/CloseButton";
 import SynqAudiencePicker from "@/src/components/synq/SynqAudiencePicker";
 import {
   ACCENT,
-  BG,
   BORDER,
   BUTTON_RADIUS,
   fonts,
@@ -11,8 +9,7 @@ import {
   PRIMARY_CTA_WIDTH,
   SPACE_4,
   SPACE_5,
-  SURFACE,
-  stackScreenHeaderTitle,
+  SPACE_6,
   TEXT,
 } from "@/constants/Variables";
 import type { FriendGroup } from "@/src/lib/friendGroups";
@@ -20,7 +17,9 @@ import type { SynqAudienceSelection } from "@/src/lib/synqBroadcast";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,6 +27,9 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+/** Opaque panel fill — matches SynqOptionsSheet / SynqAudienceSheet. */
+const SHEET_SURFACE = "#141414";
 
 type Props = {
   visible: boolean;
@@ -63,39 +65,46 @@ export default function ChangeSynqAudienceModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <View style={[styles.screen, { paddingTop: SPACE_4 }]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Change audience</Text>
-          <CloseButton onPress={onClose} style={styles.headerClose} />
-        </View>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.pickerCard}>
-            <SynqAudiencePicker
-              groups={groups}
-              selection={selection}
-              onChangeSelection={setSelection}
-            />
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <Pressable
+          style={styles.backdrop}
+          onPress={onClose}
+          accessibilityLabel="Close change audience"
+        />
+        <View style={[styles.sheetGroup, { paddingBottom: insets.bottom + SPACE_4 }]}>
+          <View style={styles.sheetCard}>
+            <Text style={styles.sheetTitle}>Change audience</Text>
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <SynqAudiencePicker
+                groups={groups}
+                selection={selection}
+                onChangeSelection={setSelection}
+              />
+            </ScrollView>
+            <View style={styles.footer}>
+              <TouchableOpacity
+                style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+                onPress={() => void handleSave()}
+                disabled={saving}
+                activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityLabel="Save audience"
+              >
+                {saving ? (
+                  <ActivityIndicator color={ON_ACCENT_TEXT} />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        </ScrollView>
-        <View style={[styles.footer, { paddingBottom: insets.bottom + SPACE_4 }]}>
-          <TouchableOpacity
-            style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-            onPress={() => void handleSave()}
-            disabled={saving}
-            accessibilityRole="button"
-            accessibilityLabel="Save audience"
-          >
-            {saving ? (
-              <ActivityIndicator color={ON_ACCENT_TEXT} />
-            ) : (
-              <Text style={styles.saveBtnText}>Save</Text>
-            )}
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -103,49 +112,48 @@ export default function ChangeSynqAudienceModal({
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  overlay: {
     flex: 1,
-    backgroundColor: BG,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.55)",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sheetGroup: {
     paddingHorizontal: SPACE_5,
-    paddingBottom: SPACE_4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
   },
-  headerTitle: {
-    ...stackScreenHeaderTitle,
-    flex: 1,
-    fontSize: 24,
-    lineHeight: 30,
-    marginRight: SPACE_4,
-    includeFontPadding: false,
-  },
-  headerClose: {
-    marginTop: -2,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: SPACE_5,
-  },
-  pickerCard: {
-    backgroundColor: SURFACE,
-    borderRadius: BUTTON_RADIUS,
-    borderWidth: StyleSheet.hairlineWidth,
+  sheetCard: {
+    backgroundColor: SHEET_SURFACE,
+    borderRadius: BUTTON_RADIUS + 4,
+    borderWidth: 1,
     borderColor: BORDER,
     overflow: "hidden",
+    maxHeight: Dimensions.get("window").height * 0.72,
+  },
+  sheetTitle: {
+    color: TEXT,
+    fontSize: 17,
+    fontFamily: fonts.heavy,
+    textAlign: "left",
+    paddingTop: SPACE_4 + 2,
+    paddingBottom: SPACE_4,
+    paddingHorizontal: SPACE_4,
+  },
+  scroll: {
+    flexGrow: 0,
+  },
+  scrollContent: {
+    paddingBottom: SPACE_4,
   },
   footer: {
     alignItems: "center",
-    paddingHorizontal: SPACE_5,
-    paddingTop: SPACE_4,
+    paddingHorizontal: SPACE_4,
+    paddingTop: SPACE_6,
+    paddingBottom: SPACE_5,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: BORDER,
+    borderTopColor: "rgba(255,255,255,0.06)",
+    backgroundColor: SHEET_SURFACE,
   },
   saveBtn: {
     alignSelf: "center",
@@ -161,8 +169,8 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     color: ON_ACCENT_TEXT,
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
+    letterSpacing: 0.15,
   },
 });
