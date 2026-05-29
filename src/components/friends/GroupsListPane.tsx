@@ -2,6 +2,7 @@ import ConfirmModal from "@/app/confirm-modal";
 import {
   ACCENT,
   fonts,
+  Friend,
   MUTED2,
   MUTED3,
   RADIUS_LG,
@@ -21,9 +22,7 @@ import {
   subscribeFriendGroups,
 } from "@/src/lib/friendGroups";
 import { friendGroupsCacheByUser } from "@/src/lib/socialCache";
-import { Friend } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
-import GroupListAvatar from "./GroupListAvatar";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -37,6 +36,7 @@ import {
   View,
 } from "react-native";
 import CreateGroupModal from "./CreateGroupModal";
+import GroupListAvatar from "./GroupListAvatar";
 
 const GROUPS_HINT =
   "Only you can see your groups. Use them as custom filters for who sees you when you're active.";
@@ -59,12 +59,9 @@ function formatMemberCount(count: number): string {
 function GroupsEmptyState({ onCreatePress }: { onCreatePress: () => void }) {
   return (
     <View style={styles.emptyWrap}>
-      <View style={styles.emptyIconOrb}>
-        <Ionicons name="layers-outline" size={28} color={ACCENT} />
-      </View>
       <Text style={styles.emptyTitle}>
         Organize your{"\n"}
-        <Text style={styles.emptyTitleAccent}>audience</Text>
+        <Text style={styles.emptyTitleAccent}>circle</Text>
       </Text>
       <Text style={[styles.groupsHint, styles.groupsHintCenter]}>{GROUPS_HINT}</Text>
       <TouchableOpacity
