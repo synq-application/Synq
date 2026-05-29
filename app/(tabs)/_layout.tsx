@@ -3,7 +3,8 @@ import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tabs } from "expo-router";
 import React from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { DeviceEventEmitter, Platform, StyleSheet, View } from "react-native";
+import { FRIENDS_TAB_PRESS } from "../../src/lib/friendsTabEvents";
 import {
     ACCENT,
     SPACE_2,
@@ -52,6 +53,11 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="friends"
+        listeners={{
+          tabPress: () => {
+            DeviceEventEmitter.emit(FRIENDS_TAB_PRESS);
+          },
+        }}
         options={{
           title: "Friends",
           tabBarAccessibilityLabel: "Friends",

@@ -114,6 +114,7 @@ import FriendsGroupsHeaderTitle, {
 import GroupsListPane from "@/src/components/friends/GroupsListPane";
 import { auth, db } from "../../src/lib/firebase";
 import { useAuthRefresh } from "../_layout";
+import { FRIENDS_TAB_PRESS } from "../../src/lib/friendsTabEvents";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
 import {
   friendProfileCacheByUser,
@@ -459,6 +460,16 @@ export default function FriendsScreen() {
   const closeAddFriendsModal = useCallback(() => {
     setSearchModalVisible(false);
   }, []);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(FRIENDS_TAB_PRESS, () => {
+      closeAddFriendsModal();
+      if (openAddFriends === "1") {
+        router.setParams({ openAddFriends: "" });
+      }
+    });
+    return () => subscription.remove();
+  }, [closeAddFriendsModal, openAddFriends, router]);
 
   useEffect(() => {
     if (openAddFriends !== "1") return;
