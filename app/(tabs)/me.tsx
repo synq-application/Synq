@@ -14,18 +14,30 @@ import {
   profileInterestPillText,
   profileInterestPillTextActive,
   profileScreenSectionTitle,
-  tabScreenMainHeaderTitle,
+  SPACE_6,
   SURFACE,
   TAB_BAR_SCROLL_INSET,
-  SPACE_6,
+  tabScreenMainHeaderTitle,
   TEXT,
 } from "@/constants/Variables";
+import CloseButton from "@/src/components/CloseButton";
 import HeaderIconButton from "@/src/components/HeaderIconButton";
 import NotificationBadge from "@/src/components/NotificationBadge";
+import ProfilePhotoActionSheet from "@/src/components/ProfilePhotoActionSheet";
 import ProfileTabHeaderOverlay, {
   useTabHeaderLayout,
 } from "@/src/components/ProfileTabHeaderOverlay";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
+import { filterOrReject } from "@/src/lib/contentFilter";
+import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
+import { setPendingProfilePhotoSource } from "@/src/lib/pendingProfilePhoto";
+import {
+  getPhotoLibraryPermission,
+  launchProfilePhotoPicker,
+  photoLibraryAccessGranted,
+  requestPhotoLibraryAccess,
+} from "@/src/lib/profilePhotoPicker";
+import { removeProfilePhoto } from "@/src/lib/uploadProfilePhoto";
 import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
@@ -33,15 +45,6 @@ import { Image as ExpoImage } from "expo-image";
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
-import { filterOrReject } from "@/src/lib/contentFilter";
-import {
-  getPhotoLibraryPermission,
-  launchProfilePhotoPicker,
-  photoLibraryAccessGranted,
-  requestPhotoLibraryAccess,
-} from "@/src/lib/profilePhotoPicker";
-import { setPendingProfilePhotoSource } from "@/src/lib/pendingProfilePhoto";
-import { removeProfilePhoto } from "@/src/lib/uploadProfilePhoto";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
@@ -67,12 +70,8 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import CloseButton from "@/src/components/CloseButton";
-import ProfilePhotoActionSheet from "@/src/components/ProfilePhotoActionSheet";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db } from "../../src/lib/firebase";
-import { filterOutPastOpenPlans, matchesPlanEvent } from "../../src/lib/planEvents";
-import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
   computeTopSynqRows,
   getCachedOwnProfile,
@@ -84,15 +83,16 @@ import {
   topSynqRowsToCache,
   type TopSynqRow,
 } from "../../src/lib/ownProfileCache";
+import { filterOutPastOpenPlans, matchesPlanEvent } from "../../src/lib/planEvents";
+import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
   friendRelationCacheByUser,
   friendsListCacheByUser,
   pruneSocialCachesToFriendIds,
   warmFriendsAndConnectionsCache,
 } from "../../src/lib/socialCache";
-import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
-import AlertModal from "../alert-modal";
 import { useAuthRefresh } from "../_layout";
+import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
 import { prefetchResolvedAvatar, resolveAvatar } from "../helpers";
 import MonthlyMemo from "../monthly-memo";
@@ -1062,8 +1062,8 @@ export default function ProfileScreen() {
         ) : topSynqsReady ? (
           <Text style={styles.profileHelperText}>
             {friendsForHostNames.length === 0
-              ? "Add friends to see your 3 top Synqs here."
-              : "Message friends to see your 3 top Synqs here."}
+              ? "Add friends to see your top Synqs here."
+              : "Message friends to see your top Synqs here."}
           </Text>
         ) : (
           <ActivityIndicator color={ACCENT} style={styles.topSynqsLoading} />
