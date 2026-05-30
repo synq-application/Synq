@@ -24,6 +24,8 @@ import {
   TAB_BAR_SCROLL_INSET,
 } from "../../../constants/Variables";
 
+/** Matches memo + audience lead icons on the active Synq screen. */
+const ACTIVE_LEAD_ICON_SIZE = 20;
 /** Fade strip sitting just above the Select friends button. */
 const ACTIVE_LIST_BOTTOM_FADE_HEIGHT = 52;
 /** Extra lift for the Select friends CTA above the tab bar. */
@@ -129,9 +131,9 @@ export default function ActiveSynqSection({
           <View style={styles.activeMemoCard}>
             <Ionicons
               name="chatbubble-ellipses-outline"
-              size={20}
+              size={ACTIVE_LEAD_ICON_SIZE}
               color={ACCENT}
-              style={styles.activeMemoIcon}
+              style={styles.activeSynqLeadIcon}
             />
             <Text style={styles.activeMemoText} numberOfLines={6}>
               {memo.trim()}
@@ -155,9 +157,12 @@ export default function ActiveSynqSection({
               openChangeAudience ? "Opens change audience" : undefined
             }
           >
-            <View style={styles.audienceIconGutter}>
-              <Ionicons name="people-outline" size={16} color={ACCENT} />
-            </View>
+            <Ionicons
+              name="people-outline"
+              size={ACTIVE_LEAD_ICON_SIZE}
+              color={ACCENT}
+              style={styles.activeSynqLeadIcon}
+            />
             <Text style={styles.audienceText} numberOfLines={1}>
               Shared with {audienceLabel}
             </Text>

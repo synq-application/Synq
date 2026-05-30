@@ -1706,11 +1706,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 14,
     paddingVertical: 6,
-  },
-  audienceIconGutter: {
-    width: 16,
-    marginRight: 8,
-    alignItems: "center",
+    paddingLeft: 14,
   },
   activeFriendsList: { flex: 1 },
   activeListContent: { paddingHorizontal: 0 },
@@ -1809,9 +1805,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
-  activeMemoIcon: {
+  activeSynqLeadIcon: {
+    width: 20,
     marginTop: 2,
     marginRight: 12,
+    textAlign: "center",
   },
   activeMemoText: {
     flex: 1,
