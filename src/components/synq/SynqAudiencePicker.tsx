@@ -17,6 +17,8 @@ type Props = {
   groups: FriendGroup[];
   selection: SynqAudienceSelection;
   onChangeSelection: (next: SynqAudienceSelection) => void;
+  /** Tighter rows for bottom-sheet modals. */
+  compact?: boolean;
 };
 
 type RowProps = {
@@ -32,13 +34,15 @@ function Row({
   disabled,
   onPress,
   isFirst = false,
-}: RowProps & { isFirst?: boolean }) {
+  compact = false,
+}: RowProps & { isFirst?: boolean; compact?: boolean }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.row,
+        compact && styles.rowCompact,
         !isFirst && styles.rowBorder,
         selected && styles.rowSelected,
         disabled && styles.rowDisabled,
@@ -49,15 +53,19 @@ function Row({
       accessibilityLabel={label}
     >
       <Text
-        style={[styles.rowLabel, disabled && styles.rowLabelDisabled]}
+        style={[
+          styles.rowLabel,
+          compact && styles.rowLabelCompact,
+          disabled && styles.rowLabelDisabled,
+        ]}
         numberOfLines={1}
       >
         {label}
       </Text>
       {selected ? (
-        <Ionicons name="checkmark" size={20} color={ACCENT} />
+        <Ionicons name="checkmark" size={compact ? 18 : 20} color={ACCENT} />
       ) : (
-        <View style={styles.checkPlaceholder} />
+        <View style={[styles.checkPlaceholder, compact && styles.checkPlaceholderCompact]} />
       )}
     </Pressable>
   );
@@ -67,6 +75,7 @@ export default function SynqAudiencePicker({
   groups,
   selection,
   onChangeSelection,
+  compact = false,
 }: Props) {
   const selectAllFriends = () => {
     onChangeSelection({ mode: "all", groupIds: [] });
@@ -93,7 +102,13 @@ export default function SynqAudiencePicker({
 
   return (
     <View style={styles.wrap}>
-      <Row label="All friends" selected={allSelected} onPress={selectAllFriends} isFirst />
+      <Row
+        label="All friends"
+        selected={allSelected}
+        onPress={selectAllFriends}
+        isFirst
+        compact={compact}
+      />
       {groups.map((group) => {
         const count = group.memberIds.length;
         const disabled = count === 0;
@@ -106,6 +121,7 @@ export default function SynqAudiencePicker({
             selected={selected}
             disabled={disabled}
             onPress={() => toggleGroup(group.id, count)}
+            compact={compact}
           />
         );
       })}
@@ -124,6 +140,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: SPACE_4,
     minHeight: 48,
+  },
+  rowCompact: {
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    minHeight: 42,
   },
   rowBorder: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -145,11 +166,19 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     marginRight: 12,
   },
+  rowLabelCompact: {
+    fontSize: 15,
+    marginRight: 10,
+  },
   rowLabelDisabled: {
     color: MUTED2,
   },
   checkPlaceholder: {
     width: 20,
     height: 20,
+  },
+  checkPlaceholderCompact: {
+    width: 18,
+    height: 18,
   },
 });

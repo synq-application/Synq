@@ -4,12 +4,8 @@ import {
   BORDER,
   BUTTON_RADIUS,
   fonts,
-  ON_ACCENT_TEXT,
-  PRIMARY_CTA_HEIGHT,
-  PRIMARY_CTA_WIDTH,
+  SPACE_3,
   SPACE_4,
-  SPACE_5,
-  SPACE_6,
   TEXT,
 } from "@/constants/Variables";
 import type { FriendGroup } from "@/src/lib/friendGroups";
@@ -72,9 +68,26 @@ export default function ChangeSynqAudienceModal({
           onPress={onClose}
           accessibilityLabel="Close change audience"
         />
-        <View style={[styles.sheetGroup, { paddingBottom: insets.bottom + SPACE_4 }]}>
+        <View style={[styles.sheetGroup, { paddingBottom: insets.bottom + SPACE_3 }]}>
           <View style={styles.sheetCard}>
-            <Text style={styles.sheetTitle}>Change audience</Text>
+            <View style={styles.headerRow}>
+              <Text style={styles.sheetTitle}>Change audience</Text>
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={() => void handleSave()}
+                disabled={saving}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Save audience"
+                hitSlop={8}
+              >
+                {saving ? (
+                  <ActivityIndicator color={ACCENT} size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={styles.scrollContent}
@@ -86,24 +99,9 @@ export default function ChangeSynqAudienceModal({
                 groups={groups}
                 selection={selection}
                 onChangeSelection={setSelection}
+                compact
               />
             </ScrollView>
-            <View style={styles.footer}>
-              <TouchableOpacity
-                style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-                onPress={() => void handleSave()}
-                disabled={saving}
-                activeOpacity={0.88}
-                accessibilityRole="button"
-                accessibilityLabel="Save audience"
-              >
-                {saving ? (
-                  <ActivityIndicator color={ON_ACCENT_TEXT} />
-                ) : (
-                  <Text style={styles.saveBtnText}>Save</Text>
-                )}
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </View>
@@ -121,7 +119,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   sheetGroup: {
-    paddingHorizontal: SPACE_5,
+    paddingHorizontal: 12,
   },
   sheetCard: {
     backgroundColor: SHEET_SURFACE,
@@ -129,48 +127,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     overflow: "hidden",
-    maxHeight: Dimensions.get("window").height * 0.72,
+    maxHeight: Dimensions.get("window").height * 0.58,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: SPACE_3 + 2,
+    paddingBottom: SPACE_3,
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.06)",
   },
   sheetTitle: {
+    flex: 1,
     color: TEXT,
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: fonts.heavy,
-    textAlign: "left",
-    paddingTop: SPACE_4 + 2,
-    paddingBottom: SPACE_4,
-    paddingHorizontal: SPACE_4,
+    marginRight: SPACE_3,
+  },
+  saveBtn: {
+    minWidth: 44,
+    minHeight: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveBtnText: {
+    color: ACCENT,
+    fontSize: 16,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.1,
   },
   scroll: {
     flexGrow: 0,
   },
   scrollContent: {
-    paddingBottom: SPACE_4,
-  },
-  footer: {
-    alignItems: "center",
-    paddingHorizontal: SPACE_4,
-    paddingTop: SPACE_6,
-    paddingBottom: SPACE_5,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255,255,255,0.06)",
-    backgroundColor: SHEET_SURFACE,
-  },
-  saveBtn: {
-    alignSelf: "center",
-    width: PRIMARY_CTA_WIDTH,
-    backgroundColor: ACCENT,
-    borderRadius: BUTTON_RADIUS,
-    minHeight: PRIMARY_CTA_HEIGHT,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  saveBtnDisabled: {
-    opacity: 0.6,
-  },
-  saveBtnText: {
-    color: ON_ACCENT_TEXT,
-    fontSize: 16,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.15,
+    paddingBottom: SPACE_3,
   },
 });
