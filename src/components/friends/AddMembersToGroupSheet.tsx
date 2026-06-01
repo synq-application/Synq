@@ -125,12 +125,13 @@ export default function AddMembersToGroupSheet({
     handleClose();
   };
 
-  const handleAdd = async () => {
+  const handleAdd = () => {
     if (selected.size === 0 || busy) return;
+    const memberIds = [...selected];
     Keyboard.dismiss();
-    await onAdd([...selected]);
     setQuery("");
     setSelected(new Set());
+    void onAdd(memberIds);
   };
 
   return (

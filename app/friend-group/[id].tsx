@@ -1,5 +1,5 @@
-import { resolveAvatar } from "@/app/helpers";
 import ConfirmModal from "@/app/confirm-modal";
+import { resolveAvatar } from "@/app/helpers";
 import {
   ACCENT,
   BG,
@@ -7,6 +7,7 @@ import {
   BUTTON_RADIUS,
   DESTRUCTIVE,
   fonts,
+  Friend,
   MUTED2,
   profileScreenSectionTitle,
   RADIUS_MD,
@@ -22,24 +23,26 @@ import {
   TYPE_CAPTION,
 } from "@/constants/Variables";
 import AddMembersToGroupSheet from "@/src/components/friends/AddMembersToGroupSheet";
+import CreateGroupModal from "@/src/components/friends/CreateGroupModal";
 import HeaderIconButton from "@/src/components/HeaderIconButton";
 import StackScreenHeader from "@/src/components/StackScreenHeader";
+import { auth } from "@/src/lib/firebase";
 import {
   addMembersToFriendGroup,
   deleteFriendGroup,
   friendGroupRef,
+  mergeFriendGroupMemberIds,
   removeMemberFromFriendGroup,
   renameFriendGroup,
   type FriendGroup,
 } from "@/src/lib/friendGroups";
-import { auth, db } from "@/src/lib/firebase";
 import { friendsListCacheByUser } from "@/src/lib/socialCache";
 import { Ionicons } from "@expo/vector-icons";
-import { Image as ExpoImage } from "expo-image";
 import * as Haptics from "expo-haptics";
+import { Image as ExpoImage } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { doc, onSnapshot } from "firebase/firestore";
-import React, { useEffect, useMemo, useState } from "react";
+import { onSnapshot } from "firebase/firestore";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -53,7 +56,24 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import CreateGroupModal from "@/src/components/friends/CreateGroupModal";
+
+function formatNameList(names: string[]): string {
+  if (names.length === 0) return "them";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
+function addedToGroupSuccessMessage(
+  memberIds: string[],
+  friends: Friend[],
+  groupName: string
+): string {
+  const byId = new Map(friends.map((f) => [f.id, f]));
+  const names = memberIds.map((id) => byId.get(id)?.displayName?.trim() || "Friend");
+  const group = groupName.trim() || "the group";
+  return `You successfully added ${formatNameList(names)} to ${group}`;
+}
 
 export default function FriendGroupDetailScreen() {
   const router = useRouter();
@@ -64,8 +84,9 @@ export default function FriendGroupDetailScreen() {
   const [group, setGroup] = useState<FriendGroup | null>(null);
   const [loading, setLoading] = useState(true);
   const [addSheetVisible, setAddSheetVisible] = useState(false);
-  const [addBusy, setAddBusy] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const pendingMemberIdsRef = useRef<string[] | null>(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [renameVisible, setRenameVisible] = useState(false);
   const [renameBusy, setRenameBusy] = useState(false);
@@ -92,12 +113,23 @@ export default function FriendGroupDetailScreen() {
           return;
         }
         const data = snap.data();
+        const serverMemberIds = Array.isArray(data.memberIds)
+          ? [...new Set((data.memberIds as string[]).filter(Boolean))]
+          : [];
+        const pending = pendingMemberIdsRef.current;
+        let memberIds = serverMemberIds;
+        if (pending) {
+          const serverHasPending = pending.every((id) => serverMemberIds.includes(id));
+          if (serverHasPending && serverMemberIds.length >= pending.length) {
+            pendingMemberIdsRef.current = null;
+          } else {
+            memberIds = pending;
+          }
+        }
         setGroup({
           id: snap.id,
           name: String(data.name || "").trim() || "Group",
-          memberIds: Array.isArray(data.memberIds)
-            ? [...new Set((data.memberIds as string[]).filter(Boolean))]
-            : [],
+          memberIds,
           sortOrder: typeof data.sortOrder === "number" ? data.sortOrder : 0,
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
@@ -122,20 +154,29 @@ export default function FriendGroupDetailScreen() {
     });
   }, [group, friends]);
 
-  const handleAddMembers = async (memberIds: string[]) => {
+  const handleAddMembers = (memberIds: string[]) => {
     if (!uid || !group || memberIds.length === 0) return;
-    setAddBusy(true);
-    try {
-      await addMembersToFriendGroup(uid, group.id, group.memberIds, memberIds);
-      setAddSheetVisible(false);
-      setSuccessVisible(true);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setTimeout(() => setSuccessVisible(false), 1800);
-    } catch (e: unknown) {
-      Alert.alert("Could not add members", e instanceof Error ? e.message : "Try again.");
-    } finally {
-      setAddBusy(false);
-    }
+    const previousMemberIds = group.memberIds;
+    const merged = mergeFriendGroupMemberIds(previousMemberIds, memberIds);
+
+    pendingMemberIdsRef.current = merged;
+    setGroup({ ...group, memberIds: merged });
+    setAddSheetVisible(false);
+    setSuccessMessage(addedToGroupSuccessMessage(memberIds, friends, group.name));
+    setSuccessVisible(true);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setTimeout(() => {
+      setSuccessVisible(false);
+      setSuccessMessage("");
+    }, 1800);
+
+    void addMembersToFriendGroup(uid, group.id, previousMemberIds, memberIds).catch(
+      (e: unknown) => {
+        pendingMemberIdsRef.current = null;
+        setGroup((g) => (g ? { ...g, memberIds: previousMemberIds } : g));
+        Alert.alert("Could not add members", e instanceof Error ? e.message : "Try again.");
+      }
+    );
   };
 
   const handleRemoveMember = (memberId: string, displayName: string) => {
@@ -284,7 +325,6 @@ export default function FriendGroupDetailScreen() {
 
       <AddMembersToGroupSheet
         visible={addSheetVisible}
-        busy={addBusy}
         friends={friends}
         existingMemberIds={group?.memberIds ?? []}
         onClose={() => setAddSheetVisible(false)}
@@ -346,7 +386,7 @@ export default function FriendGroupDetailScreen() {
         <View style={styles.successOverlay}>
           <View style={styles.successCard}>
             <Ionicons name="checkmark-circle" size={40} color={ACCENT} />
-            <Text style={styles.successTitle}>You have successfully added.</Text>
+            <Text style={styles.successTitle}>{successMessage}</Text>
           </View>
         </View>
       </Modal>

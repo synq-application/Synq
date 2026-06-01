@@ -126,13 +126,20 @@ export async function setFriendGroupMembers(
   });
 }
 
+export function mergeFriendGroupMemberIds(
+  currentMemberIds: string[],
+  newMemberIds: string[]
+): string[] {
+  return normalizeMemberIds([...currentMemberIds, ...newMemberIds]);
+}
+
 export async function addMembersToFriendGroup(
   uid: string,
   groupId: string,
   currentMemberIds: string[],
   newMemberIds: string[]
 ): Promise<string[]> {
-  const merged = normalizeMemberIds([...currentMemberIds, ...newMemberIds]);
+  const merged = mergeFriendGroupMemberIds(currentMemberIds, newMemberIds);
   await setFriendGroupMembers(uid, groupId, merged);
   return merged;
 }
