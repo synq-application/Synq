@@ -75,6 +75,12 @@ function addedToGroupSuccessMessage(
   return `You successfully added ${formatNameList(names)} to ${group}`;
 }
 
+function removedFromGroupSuccessMessage(displayName: string, groupName: string): string {
+  const name = displayName.trim() || "Friend";
+  const group = groupName.trim() || "the group";
+  return `You successfully removed ${name} from ${group}`;
+}
+
 export default function FriendGroupDetailScreen() {
   const router = useRouter();
   const { id: groupId } = useLocalSearchParams<{ id?: string }>();
@@ -184,15 +190,29 @@ export default function FriendGroupDetailScreen() {
     setPendingRemoveMember({ id: memberId, displayName });
   };
 
-  const confirmRemoveMember = async () => {
+  const confirmRemoveMember = () => {
     if (!uid || !group || !pendingRemoveMember) return;
-    const { id: memberId } = pendingRemoveMember;
+    const { id: memberId, displayName } = pendingRemoveMember;
     setPendingRemoveMember(null);
-    try {
-      await removeMemberFromFriendGroup(uid, group.id, group.memberIds, memberId);
-    } catch {
+
+    const previousMemberIds = group.memberIds;
+    const nextMemberIds = previousMemberIds.filter((id) => id !== memberId);
+
+    pendingMemberIdsRef.current = nextMemberIds;
+    setGroup({ ...group, memberIds: nextMemberIds });
+    setSuccessMessage(removedFromGroupSuccessMessage(displayName, group.name));
+    setSuccessVisible(true);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setTimeout(() => {
+      setSuccessVisible(false);
+      setSuccessMessage("");
+    }, 1800);
+
+    void removeMemberFromFriendGroup(uid, group.id, previousMemberIds, memberId).catch(() => {
+      pendingMemberIdsRef.current = null;
+      setGroup((g) => (g ? { ...g, memberIds: previousMemberIds } : g));
       Alert.alert("Error", "Could not remove member.");
-    }
+    });
   };
 
   const handleRename = async (name: string) => {
