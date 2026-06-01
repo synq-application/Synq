@@ -51,6 +51,7 @@ import {
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
+import ConfirmModal from "./confirm-modal";
 import { prefetchResolvedAvatar, resolveAvatar } from "./helpers";
 
 function prefetchActorAvatars(items: FeedItem[]) {
@@ -131,6 +132,8 @@ export default function NotificationsScreen() {
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dismissingKeys, setDismissingKeys] = useState<Set<string>>(() => new Set());
+  const [clearingAll, setClearingAll] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState<{
@@ -460,6 +463,37 @@ export default function NotificationsScreen() {
     } catch {}
   };
 
+  const clearAll = async () => {
+    if (!auth.currentUser || clearingAll || feedItems.length === 0) return;
+
+    const myId = auth.currentUser.uid;
+    setClearingAll(true);
+    setShowClearConfirm(false);
+
+    const refs = feedItems.map((item) => {
+      if (item.kind === "friend_request") {
+        return doc(db, "users", myId, "friendRequests", item.id);
+      }
+      if (item.kind !== "friend_request" && item.source === "legacy") {
+        return doc(db, "users", myId, "notificationLocks", item.id);
+      }
+      return doc(db, "users", myId, "notifications", item.id);
+    });
+
+    const BATCH_LIMIT = 450;
+    try {
+      for (let i = 0; i < refs.length; i += BATCH_LIMIT) {
+        const batch = writeBatch(db);
+        refs.slice(i, i + BATCH_LIMIT).forEach((ref) => batch.delete(ref));
+        await batch.commit();
+      }
+    } catch {
+      showAlert("Error", "Could not clear notifications. Please try again.");
+    } finally {
+      setClearingAll(false);
+    }
+  };
+
   const dismissActivity = async (item: Extract<FeedItem, { kind: ActivityType }>) => {
     if (!auth.currentUser || dismissingKeys.has(item.feedKey)) return;
 
@@ -722,7 +756,26 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <StackScreenHeader title="Notifications" />
+      <StackScreenHeader
+        title="Notifications"
+        right={
+          !loading && !loadError && !isEmpty ? (
+            <TouchableOpacity
+              onPress={() => setShowClearConfirm(true)}
+              disabled={clearingAll}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear all notifications"
+            >
+              {clearingAll ? (
+                <ActivityIndicator size="small" color={ACCENT} />
+              ) : (
+                <Text style={styles.clearAllText}>Clear all</Text>
+              )}
+            </TouchableOpacity>
+          ) : null
+        }
+      />
 
       {loading ? (
         <View style={styles.center}>
@@ -761,6 +814,16 @@ export default function NotificationsScreen() {
           renderItem={renderFeedItem}
         />
       )}
+
+      <ConfirmModal
+        visible={showClearConfirm}
+        title="Clear all?"
+        message="This removes every item in your notifications list. Pending friend requests will be declined."
+        confirmText="Clear all"
+        destructive
+        onCancel={() => setShowClearConfirm(false)}
+        onConfirm={clearAll}
+      />
 
       <AlertModal
         visible={alertVisible}
@@ -931,5 +994,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     textAlign: "center",
     marginTop: 8,
+  },
+  clearAllText: {
+    color: ACCENT,
+    fontSize: TYPE_CAPTION,
+    fontFamily: fonts.heavy,
   },
 });
