@@ -13,12 +13,15 @@ import {
 import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Keyboard,
+  KeyboardEvent,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -26,6 +29,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveAvatar } from "@/app/helpers";
 
 type Props = {
@@ -43,6 +48,10 @@ function addMembersCtaLabel(selectedCount: number): string {
   return `Add members (${selectedCount})`;
 }
 
+const WINDOW_HEIGHT = Dimensions.get("window").height;
+const LIST_MAX_HEIGHT_DEFAULT = 340;
+const SHEET_CHROME_HEIGHT = 200;
+
 export default function AddMembersToGroupSheet({
   visible,
   busy,
@@ -51,8 +60,35 @@ export default function AddMembersToGroupSheet({
   onClose,
   onAdd,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardInset(0);
+      return;
+    }
+
+    const onShow = (e: KeyboardEvent) => setKeyboardInset(e.endCoordinates.height);
+    const onHide = () => setKeyboardInset(0);
+    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSub = Keyboard.addListener(showEvt, onShow);
+    const hideSub = Keyboard.addListener(hideEvt, onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [visible]);
+
+  const listMaxHeight = useMemo(() => {
+    if (keyboardInset <= 0) return LIST_MAX_HEIGHT_DEFAULT;
+    const sheetCap = WINDOW_HEIGHT * 0.88;
+    const available = sheetCap - keyboardInset - SHEET_CHROME_HEIGHT;
+    return Math.max(120, Math.min(LIST_MAX_HEIGHT_DEFAULT, available));
+  }, [keyboardInset]);
 
   const existingSet = useMemo(() => new Set(existingMemberIds), [existingMemberIds]);
 
@@ -74,9 +110,19 @@ export default function AddMembersToGroupSheet({
   };
 
   const handleClose = () => {
+    Keyboard.dismiss();
     setQuery("");
     setSelected(new Set());
+    setKeyboardInset(0);
     onClose();
+  };
+
+  const handleBackdropPress = () => {
+    if (keyboardInset > 0) {
+      Keyboard.dismiss();
+      return;
+    }
+    handleClose();
   };
 
   const handleAdd = async () => {
@@ -90,28 +136,35 @@ export default function AddMembersToGroupSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Add members</Text>
-            <CloseButton onPress={handleClose} />
-          </View>
-          <Text style={styles.subtitle}>Search friends to add to this group</Text>
-          <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={17} color={MUTED2} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search friends"
-              placeholderTextColor={MUTED2}
-              value={query}
-              onChangeText={setQuery}
-            />
-          </View>
-          <FlatList
-            data={candidates}
-            keyExtractor={(item) => item.id}
-            style={styles.list}
-            keyboardShouldPersistTaps="handled"
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleBackdropPress} />
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoid}
+          behavior="padding"
+          keyboardVerticalOffset={insets.bottom}
+        >
+          <View style={[styles.sheet, { paddingBottom: Math.max(24, insets.bottom) }]}>
+            <View style={styles.header}>
+              <Text style={styles.title}>Add members</Text>
+              <CloseButton onPress={handleClose} />
+            </View>
+            <Text style={styles.subtitle}>Search friends to add to this group</Text>
+            <View style={styles.searchBar}>
+              <Ionicons name="search-outline" size={17} color={MUTED2} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search friends"
+                placeholderTextColor={MUTED2}
+                value={query}
+                onChangeText={setQuery}
+                returnKeyType="search"
+              />
+            </View>
+            <FlatList
+              data={candidates}
+              keyExtractor={(item) => item.id}
+              style={{ maxHeight: listMaxHeight }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
             ListEmptyComponent={
               <View style={styles.empty}>
                 <Text style={styles.emptyText}>
@@ -148,19 +201,20 @@ export default function AddMembersToGroupSheet({
                 </TouchableOpacity>
               );
             }}
-          />
-          <TouchableOpacity
-            style={[styles.cta, (selected.size === 0 || busy) && styles.ctaDisabled]}
-            disabled={selected.size === 0 || busy}
-            onPress={() => void handleAdd()}
-          >
-            {busy ? (
-              <ActivityIndicator color={ON_ACCENT_TEXT} />
-            ) : (
-              <Text style={styles.ctaText}>{addMembersCtaLabel(selected.size)}</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+            />
+            <TouchableOpacity
+              style={[styles.cta, (selected.size === 0 || busy) && styles.ctaDisabled]}
+              disabled={selected.size === 0 || busy}
+              onPress={() => void handleAdd()}
+            >
+              {busy ? (
+                <ActivityIndicator color={ON_ACCENT_TEXT} />
+              ) : (
+                <Text style={styles.ctaText}>{addMembersCtaLabel(selected.size)}</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -172,14 +226,16 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.55)",
   },
-  sheet: {
+  keyboardAvoid: {
+    width: "100%",
     maxHeight: "88%",
+  },
+  sheet: {
     backgroundColor: BG,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 24,
   },
   header: {
     flexDirection: "row",
@@ -215,9 +271,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.book,
     fontSize: 16,
     paddingVertical: 0,
-  },
-  list: {
-    maxHeight: 340,
   },
   row: {
     flexDirection: "row",
