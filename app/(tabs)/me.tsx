@@ -916,7 +916,7 @@ export default function ProfileScreen() {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: headerLayout.contentPaddingTop - 10,
+            paddingTop: headerLayout.contentPaddingTop - 20,
             paddingBottom: profileScrollPaddingBottom,
           },
         ]}
