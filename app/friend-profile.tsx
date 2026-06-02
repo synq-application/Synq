@@ -1097,9 +1097,9 @@ export default function FriendProfile() {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, styles.openPlansTitle]}>Open plans</Text>
             <Text style={styles.openPlansSubtitle}>
-              {`Tap a plan to add it to your open plans and let ${
-                friend.displayName?.trim().split(/\s+/)[0] || "your friend"
-              } know you're interested.`}
+              {`Tap to add and let ${
+                friend.displayName?.trim().split(/\s+/)[0] || "them"
+              } know you're interested in joining.`}
             </Text>
 
             <MonthlyMemoReadOnly
@@ -1662,8 +1662,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     textAlign: "center",
-    fontFamily: fonts.medium,
-    lineHeight: 18,
+    fontFamily: fonts.book,
   },
 
   interestsWrapper: {
