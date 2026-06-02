@@ -109,6 +109,14 @@ function firstName(name: string): string {
   return String(name || "").trim().split(/\s+/)[0] || "Someone";
 }
 
+/** Cloud Functions mirror many notifications in both collections (same doc id). */
+function activityDeleteRefs(userId: string, notificationId: string) {
+  return [
+    doc(db, "users", userId, "notifications", notificationId),
+    doc(db, "users", userId, "notificationLocks", notificationId),
+  ];
+}
+
 function NotificationsEmptyState() {
   return (
     <View style={styles.emptyState}>
@@ -470,15 +478,18 @@ export default function NotificationsScreen() {
     setClearingAll(true);
     setShowClearConfirm(false);
 
-    const refs = feedItems.map((item) => {
+    const refByPath = new Map<string, ReturnType<typeof doc>>();
+    for (const item of feedItems) {
       if (item.kind === "friend_request") {
-        return doc(db, "users", myId, "friendRequests", item.id);
+        const ref = doc(db, "users", myId, "friendRequests", item.id);
+        refByPath.set(ref.path, ref);
+      } else {
+        for (const ref of activityDeleteRefs(myId, item.id)) {
+          refByPath.set(ref.path, ref);
+        }
       }
-      if (item.kind !== "friend_request" && item.source === "legacy") {
-        return doc(db, "users", myId, "notificationLocks", item.id);
-      }
-      return doc(db, "users", myId, "notifications", item.id);
-    });
+    }
+    const refs = Array.from(refByPath.values());
 
     const BATCH_LIMIT = 450;
     try {
@@ -501,11 +512,9 @@ export default function NotificationsScreen() {
     setDismissingKeys((prev) => new Set(prev).add(item.feedKey));
 
     try {
-      if (item.source === "legacy") {
-        await deleteDoc(doc(db, "users", myId, "notificationLocks", item.id));
-      } else {
-        await deleteDoc(doc(db, "users", myId, "notifications", item.id));
-      }
+      const batch = writeBatch(db);
+      activityDeleteRefs(myId, item.id).forEach((ref) => batch.delete(ref));
+      await batch.commit();
     } catch {
       showAlert("Error", "Could not dismiss notification. Please try again.");
     } finally {
@@ -671,15 +680,21 @@ export default function NotificationsScreen() {
           <TouchableOpacity
             onPress={() => handleRequest(item.raw as Record<string, unknown> & { id: string }, true)}
             style={styles.acceptBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Accept friend request"
           >
-            <Ionicons name="checkmark" size={22} color="black" />
+            <Ionicons name="checkmark" size={18} color="black" />
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => handleRequest(item.raw as Record<string, unknown> & { id: string }, false)}
-            style={styles.denyBtn}
+            style={styles.dismissBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Decline friend request"
           >
-            <CloseIcon size={22} />
+            <CloseIcon size={20} />
           </TouchableOpacity>
         </View>
       </View>
@@ -938,22 +953,12 @@ const styles = StyleSheet.create({
   },
   acceptBtn: {
     backgroundColor: ACCENT,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
     marginRight: SPACE_3,
-  },
-  denyBtn: {
-    backgroundColor: "#222",
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#333",
   },
   emptyIconRing: {
     width: 80,
