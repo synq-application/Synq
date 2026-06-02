@@ -57,8 +57,9 @@ import {
   friendRelationCacheByUser,
   friendsListCacheByUser,
   getCachedFriendRelationship,
-  mutualFriendsCacheByUser,
+  getCachedMutualFriends,
   setCachedOutgoingFriendRequest,
+  resolveMutualFriendsForTarget,
   warmFriendsAndConnectionsCache,
   warmOutgoingFriendRequestsCache,
 } from "../src/lib/socialCache";
@@ -116,12 +117,10 @@ export default function FriendProfile() {
       : null;
   const cachedRelationship = getCachedFriendRelationship(viewerId, friendKey);
   const cachedMutualFriends =
-    viewerId && friendKey
-      ? mutualFriendsCacheByUser[viewerId]?.[friendKey] ?? []
-      : [];
+    viewerId && friendKey ? getCachedMutualFriends(viewerId, friendKey) : undefined;
 
   const [friend, setFriend] = useState<any>(cachedFriend);
-  const [mutualFriends, setMutualFriends] = useState<any[]>(cachedMutualFriends);
+  const [mutualFriends, setMutualFriends] = useState<any[]>(cachedMutualFriends ?? []);
   const [lastSynq, setLastSynq] = useState<Date | null>(cachedLastSynq);
   const [loading, setLoading] = useState(!cachedFriend);
   const [isFriend, setIsFriend] = useState(cachedRelationship.isFriend);
@@ -347,8 +346,8 @@ export default function FriendProfile() {
         const rel = getCachedFriendRelationship(viewerId, friendKey);
         setIsFriend(rel.isFriend);
         setRequestSent(rel.requestSent);
-        const warmedMutuals = mutualFriendsCacheByUser[viewerId]?.[friendKey];
-        if (warmedMutuals?.length) {
+        const warmedMutuals = getCachedMutualFriends(viewerId, friendKey);
+        if (warmedMutuals !== undefined) {
           setMutualFriends(warmedMutuals);
         }
       });
@@ -416,81 +415,28 @@ export default function FriendProfile() {
 
   useEffect(() => {
     if (!viewerId || !friendKey) return;
-    setMutualFriends(mutualFriendsCacheByUser[viewerId]?.[friendKey] ?? []);
-  }, [viewerId, friendKey]);
 
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!friendId || !user) return;
-
-    const myId = user.uid;
-    const targetId = friendId as string;
-    const mutualCache = mutualFriendsCacheByUser[myId];
-    if (mutualCache && Object.prototype.hasOwnProperty.call(mutualCache, targetId)) {
-      setMutualFriends(mutualCache[targetId]);
+    const cached = getCachedMutualFriends(viewerId, friendKey);
+    if (cached !== undefined) {
+      setMutualFriends(cached);
       return;
     }
 
-    const fetchMutuals = async () => {
-      try {
-        const profileCache = friendProfileCacheByUser[myId] ?? {};
-        const myFriendIds = (
-          friendsListCacheByUser[myId]?.map((f) => f.id) ??
-          (
-            await getDocs(collection(db, "users", myId, "friends"))
-          ).docs.map((d) => d.id)
-        ).filter((id) => id !== targetId);
+    let cancelled = false;
 
-        const mutualIds = (
-          await Promise.all(
-            myFriendIds.map(async (fid) => {
-              try {
-                const snap = await getDoc(
-                  doc(db, "users", fid, "friends", targetId)
-                );
-                return snap.exists() ? fid : null;
-              } catch {
-                return null;
-              }
-            })
-          )
-        ).filter(Boolean) as string[];
+    void resolveMutualFriendsForTarget(viewerId, friendKey)
+      .then((list) => {
+        if (!cancelled) setMutualFriends(list);
+      })
+      .catch((e) => {
+        console.error("[FriendProfile] resolveMutualFriends failed:", e);
+        if (!cancelled) setMutualFriends([]);
+      });
 
-        const mutualData = mutualIds
-          .map((id) => {
-            const cachedProfile = profileCache[id];
-            if (cachedProfile) return cachedProfile;
-            return null;
-          })
-          .filter(Boolean) as any[];
-
-        const missingIds = mutualIds.filter((id) => !profileCache[id]);
-        if (missingIds.length > 0) {
-          const fetched = await Promise.all(
-            missingIds.map(async (id) => {
-              const snap = await getDoc(doc(db, "users", id));
-              return snap.exists() ? { id, ...snap.data() } : null;
-            })
-          );
-          mutualData.push(...fetched.filter(Boolean));
-        }
-
-        const sorted = [...mutualData].sort((a, b) =>
-          (a.displayName || "").localeCompare(b.displayName || "")
-        );
-        if (!mutualFriendsCacheByUser[myId]) {
-          mutualFriendsCacheByUser[myId] = {};
-        }
-        mutualFriendsCacheByUser[myId][targetId] = sorted;
-        setMutualFriends(sorted);
-      } catch (e) {
-        console.error("[FriendProfile] fetchMutuals failed:", e);
-        setMutualFriends([]);
-      }
+    return () => {
+      cancelled = true;
     };
-
-    void fetchMutuals();
-  }, [friendId]);
+  }, [viewerId, friendKey]);
 
   useEffect(() => {
     const user = auth.currentUser;

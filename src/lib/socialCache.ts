@@ -133,37 +133,139 @@ async function buildMutualFriendsIndex(
   profileCache: Record<string, Friend>
 ): Promise<Record<string, Friend[]>> {
   const myFriendSet = new Set(myFriendIds);
-  const byTarget = new Map<string, Map<string, Friend>>();
+  const friendsOfFriend = new Map<string, Set<string>>();
 
   await Promise.all(
     myFriendIds.map(async (fid) => {
-      const mutualProfile = profileCache[fid];
-      if (!mutualProfile) return;
       try {
         const theirFriendsSnap = await getDocs(
           collection(db, "users", fid, "friends")
         );
-        theirFriendsSnap.docs.forEach((d) => {
-          const targetId = d.id;
-          if (targetId === fid || targetId === viewerId || myFriendSet.has(targetId)) return;
-          let bucket = byTarget.get(targetId);
-          if (!bucket) {
-            bucket = new Map();
-            byTarget.set(targetId, bucket);
-          }
-          bucket.set(fid, mutualProfile);
-        });
+        friendsOfFriend.set(
+          fid,
+          new Set(theirFriendsSnap.docs.map((d) => d.id))
+        );
       } catch {
-        /* skip unreadable list */
+        friendsOfFriend.set(fid, new Set());
       }
     })
   );
 
   const index: Record<string, Friend[]> = {};
+  const byTarget = new Map<string, Map<string, Friend>>();
+
+  for (const fid of myFriendIds) {
+    const mutualProfile = profileCache[fid];
+    if (!mutualProfile) continue;
+    const theirFriends = friendsOfFriend.get(fid);
+    if (!theirFriends) continue;
+
+    theirFriends.forEach((targetId) => {
+      if (targetId === fid || targetId === viewerId) return;
+
+      if (myFriendSet.has(targetId)) {
+        return;
+      }
+
+      let bucket = byTarget.get(targetId);
+      if (!bucket) {
+        bucket = new Map();
+        byTarget.set(targetId, bucket);
+      }
+      bucket.set(fid, mutualProfile);
+    });
+  }
+
   byTarget.forEach((bucket, targetId) => {
     index[targetId] = sortFriendsByName([...bucket.values()]);
   });
+
+  for (const targetId of myFriendIds) {
+    const bucket = new Map<string, Friend>();
+    for (const fid of myFriendIds) {
+      if (fid === targetId) continue;
+      const mutualProfile = profileCache[fid];
+      if (!mutualProfile) continue;
+      if (friendsOfFriend.get(fid)?.has(targetId)) {
+        bucket.set(fid, mutualProfile);
+      }
+    }
+    index[targetId] = sortFriendsByName([...bucket.values()]);
+  }
+
   return index;
+}
+
+export function getCachedMutualFriends(
+  viewerId: string,
+  targetId: string
+): Friend[] | undefined {
+  if (!viewerId || !targetId) return undefined;
+  const cache = mutualFriendsCacheByUser[viewerId];
+  if (!cache || !Object.prototype.hasOwnProperty.call(cache, targetId)) {
+    return undefined;
+  }
+  return cache[targetId];
+}
+
+export function setCachedMutualFriends(
+  viewerId: string,
+  targetId: string,
+  list: Friend[]
+) {
+  if (!viewerId || !targetId) return;
+  if (!mutualFriendsCacheByUser[viewerId]) {
+    mutualFriendsCacheByUser[viewerId] = {};
+  }
+  mutualFriendsCacheByUser[viewerId][targetId] = list;
+  void persistSocialCache(viewerId);
+}
+
+/** Loads mutual friends for a profile; uses memory/disk cache when available. */
+export async function resolveMutualFriendsForTarget(
+  viewerId: string,
+  targetId: string
+): Promise<Friend[]> {
+  if (!viewerId || !targetId || viewerId === targetId) return [];
+
+  const cached = getCachedMutualFriends(viewerId, targetId);
+  if (cached) return cached;
+
+  const myFriendIds = (
+    friendsListCacheByUser[viewerId]?.map((f) => f.id) ??
+    (await getDocs(collection(db, "users", viewerId, "friends"))).docs.map(
+      (d) => d.id
+    )
+  ).filter((id) => id !== targetId);
+
+  const profileCache = friendProfileCacheByUser[viewerId] ?? {};
+  const mutualProfiles: Friend[] = [];
+
+  await Promise.all(
+    myFriendIds.map(async (fid) => {
+      try {
+        const snap = await getDoc(doc(db, "users", fid, "friends", targetId));
+        if (!snap.exists()) return;
+        const cachedProfile = profileCache[fid];
+        if (cachedProfile) {
+          mutualProfiles.push(cachedProfile);
+          return;
+        }
+        const userSnap = await getDoc(doc(db, "users", fid));
+        if (userSnap.exists()) {
+          const row = { id: fid, ...(userSnap.data() as object) } as Friend;
+          profileCache[fid] = row;
+          mutualProfiles.push(row);
+        }
+      } catch {
+        /* skip unreadable edge */
+      }
+    })
+  );
+
+  const sorted = sortFriendsByName(mutualProfiles);
+  setCachedMutualFriends(viewerId, targetId, sorted);
+  return sorted;
 }
 
 async function persistSocialCache(userId: string) {
@@ -309,11 +411,15 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
 
     friendsListCacheByUser[userId] = sortedFriends;
     connectionsCacheByUser[userId] = connections;
-    mutualFriendsCacheByUser[userId] = await buildMutualFriendsIndex(
+    const mutualIndex = await buildMutualFriendsIndex(
       userId,
       sortedFriends.map((f) => f.id),
       profileCache
     );
+    if (!mutualFriendsCacheByUser[userId]) {
+      mutualFriendsCacheByUser[userId] = {};
+    }
+    Object.assign(mutualFriendsCacheByUser[userId], mutualIndex);
     await persistSocialCache(userId);
   })();
 
@@ -423,8 +529,8 @@ export function resolveMutualFriendCount(
   targetId: string,
   fallback?: unknown
 ): number {
-  const cached = mutualFriendsCacheByUser[viewerId]?.[targetId];
-  if (cached) return cached.length;
+  const cached = getCachedMutualFriends(viewerId, targetId);
+  if (cached !== undefined) return cached.length;
   if (typeof fallback === "number" && Number.isFinite(fallback)) return fallback;
   return 0;
 }
@@ -433,45 +539,8 @@ export async function countMutualFriendsForTarget(
   viewerId: string,
   targetId: string
 ): Promise<number> {
-  if (!viewerId || !targetId || viewerId === targetId) return 0;
-
-  const cached = mutualFriendsCacheByUser[viewerId]?.[targetId];
-  if (cached) return cached.length;
-
-  const myFriendIds = (
-    friendsListCacheByUser[viewerId]?.map((f) => f.id) ??
-    (await getDocs(collection(db, "users", viewerId, "friends"))).docs.map((d) => d.id)
-  ).filter((id) => id !== targetId);
-
-  const profileCache = friendProfileCacheByUser[viewerId] ?? {};
-  const mutualProfiles: Friend[] = [];
-
-  await Promise.all(
-    myFriendIds.map(async (fid) => {
-      try {
-        const snap = await getDoc(doc(db, "users", fid, "friends", targetId));
-        if (!snap.exists()) return;
-        const cachedProfile = profileCache[fid];
-        if (cachedProfile) {
-          mutualProfiles.push(cachedProfile);
-          return;
-        }
-        const userSnap = await getDoc(doc(db, "users", fid));
-        if (userSnap.exists()) {
-          mutualProfiles.push({ id: fid, ...(userSnap.data() as object) } as Friend);
-        }
-      } catch {
-        /* skip unreadable edge */
-      }
-    })
-  );
-
-  const sorted = sortFriendsByName(mutualProfiles);
-  if (!mutualFriendsCacheByUser[viewerId]) {
-    mutualFriendsCacheByUser[viewerId] = {};
-  }
-  mutualFriendsCacheByUser[viewerId][targetId] = sorted;
-  return sorted.length;
+  const list = await resolveMutualFriendsForTarget(viewerId, targetId);
+  return list.length;
 }
 
 export async function hydrateMutualCountsForUsers(
