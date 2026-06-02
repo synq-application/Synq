@@ -37,8 +37,11 @@ export async function requestForegroundLocationAccess(): Promise<boolean> {
 /**
  * Reads GPS and reverse-geocodes to city/state. Requires permission already granted.
  */
+export type LocationResolvePhase = "gps" | "geocode";
+
 export async function fetchCurrentCityState(
-  stateAbbrevByRegion: Record<string, string>
+  stateAbbrevByRegion: Record<string, string>,
+  onPhase?: (phase: LocationResolvePhase) => void
 ): Promise<FetchCurrentCityStateResult> {
   const permission = await Location.getForegroundPermissionsAsync();
   if (!foregroundLocationAccessGranted(permission)) {
@@ -46,6 +49,7 @@ export async function fetchCurrentCityState(
   }
 
   try {
+    onPhase?.("gps");
     const pos = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });
@@ -53,6 +57,7 @@ export async function fetchCurrentCityState(
     const lat = pos.coords.latitude;
     const lng = pos.coords.longitude;
 
+    onPhase?.("geocode");
     const results = await Location.reverseGeocodeAsync({
       latitude: lat,
       longitude: lng,

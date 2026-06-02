@@ -1,12 +1,12 @@
 import StackScreenHeader from '@/src/components/StackScreenHeader';
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from "expo-location";
 import { router } from 'expo-router';
 import { deleteField, doc, getDoc, updateDoc } from "firebase/firestore";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
+  LayoutAnimation,
   Platform,
   StatusBar,
   SafeAreaView,
@@ -16,8 +16,15 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  UIManager,
   View
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import {
   ACCENT,
   BG,
@@ -40,8 +47,25 @@ import {
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import { filterOrReject } from "@/src/lib/contentFilter";
+import {
+  fetchCurrentCityState,
+  foregroundLocationAccessGranted,
+  getForegroundLocationPermission,
+  requestForegroundLocationAccess,
+  type LocationResolvePhase,
+  type ResolvedCityState,
+} from "@/src/lib/locationAccess";
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+type LocationAutofillState = "offered" | "locating" | "success" | "dismissed";
 
 const US_STATE_ABBREV: Record<string, string> = {
   Alabama: "AL",
@@ -106,8 +130,17 @@ export default function EditProfileScreen() {
   const [state, setState] = useState('');
 
   const [locating, setLocating] = useState(false);
-  const [locationUsed, setLocationUsed] = useState(false);
+  const [locatingPhase, setLocatingPhase] = useState<LocationResolvePhase>("gps");
+  const [locationAutofill, setLocationAutofill] =
+    useState<LocationAutofillState>("offered");
+  const [resolvedLocationPreview, setResolvedLocationPreview] = useState("");
+  const [locationPermissionPromptVisible, setLocationPermissionPromptVisible] =
+    useState(false);
+  const [locationPermissionRequesting, setLocationPermissionRequesting] =
+    useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const locationGlow = useSharedValue(0);
+  const successDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
@@ -156,6 +189,36 @@ export default function EditProfileScreen() {
     setAlertVisible(true);
   };
 
+  const locationFieldsAnimatedStyle = useAnimatedStyle(() => ({
+    borderColor: `rgba(0, 255, 133, ${0.08 + locationGlow.value * 0.42})`,
+    backgroundColor: `rgba(0, 255, 133, ${locationGlow.value * 0.05})`,
+  }));
+
+  const pulseLocationFields = () => {
+    locationGlow.value = withSequence(
+      withTiming(1, { duration: 320 }),
+      withTiming(0, { duration: 700 })
+    );
+  };
+
+  const scheduleAutofillDismiss = () => {
+    if (successDismissTimer.current) {
+      clearTimeout(successDismissTimer.current);
+    }
+    successDismissTimer.current = setTimeout(() => {
+      setLocationAutofill("dismissed");
+      successDismissTimer.current = null;
+    }, 1800);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (successDismissTimer.current) {
+        clearTimeout(successDismissTimer.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const loadUserData = async () => {
       if (!auth.currentUser) return;
@@ -186,60 +249,104 @@ export default function EditProfileScreen() {
     loadUserData();
   }, []);
 
-  const fillFromCurrentLocation = async () => {
-    try {
-      setLocationUsed(true);
-      setLocating(true);
+  const applyResolvedLocation = (data: ResolvedCityState) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCoords({ lat: data.lat, lng: data.lng });
+    setCity(data.city);
+    setState(data.stateAbbrev);
+    setResolvedLocationPreview(`${data.city}, ${data.stateAbbrev}`);
+    setLocationAutofill("success");
+    pulseLocationFields();
+    scheduleAutofillDismiss();
+  };
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
+  const resetLocationAutofill = () => {
+    if (successDismissTimer.current) {
+      clearTimeout(successDismissTimer.current);
+      successDismissTimer.current = null;
+    }
+    setLocating(false);
+    setLocatingPhase("gps");
+    setLocationAutofill("offered");
+    setResolvedLocationPreview("");
+  };
+
+  const readLocationAfterAccess = async () => {
+    setLocationAutofill("locating");
+    setLocatingPhase("gps");
+    setLocating(true);
+    try {
+      const result = await fetchCurrentCityState(US_STATE_ABBREV, (phase) => {
+        setLocatingPhase(phase);
+      });
+      if (result.ok) {
+        setLocating(false);
+        applyResolvedLocation(result.data);
+        return;
+      }
+      resetLocationAutofill();
+      if (result.reason === "denied") {
         showAlert(
-          "Enable location access to update your city and state.",
+          "Allow location access in Settings to auto-fill your city and state.",
           "Location permission needed"
         );
-        setLocationUsed(false);
-        setLocating(false);
         return;
       }
-
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      setCoords({ lat, lng });
-
-      const results = await Location.reverseGeocodeAsync({
-        latitude: lat,
-        longitude: lng,
-      });
-
-      const best = results?.[0];
-      const detectedCity =
-        (best?.city || best?.subregion || best?.district || "").trim();
-      const detectedRegion = (best?.region || "").trim();
-
-      if (!detectedCity || !detectedRegion) {
+      if (result.reason === "undetected") {
         showAlert("Please enter it manually.", "Couldn’t detect city/state");
-        setLocationUsed(false);
-        setLocating(false);
         return;
       }
-
-      const abbrev =
-        US_STATE_ABBREV[detectedRegion] ?? detectedRegion.toUpperCase().slice(0, 2);
-
-      setCity(detectedCity);
-      setState(abbrev);
-      setLocating(false);
-    } catch (e: any) {
-      console.error(e);
-      setLocationUsed(false);
-      setLocating(false);
       showAlert("Could not get your current location.", "Error");
+    } catch (e) {
+      console.error(e);
+      resetLocationAutofill();
+      showAlert("Could not get your current location.", "Error");
+    } finally {
+      setLocating(false);
     }
   };
+
+  const requestLocationAccessAndFill = async () => {
+    setLocationPermissionRequesting(true);
+    try {
+      const granted = await requestForegroundLocationAccess();
+      if (!granted) {
+        showAlert(
+          "Allow location access in Settings to auto-fill your city and state.",
+          "Location permission needed"
+        );
+        return;
+      }
+      await readLocationAfterAccess();
+    } finally {
+      setLocationPermissionRequesting(false);
+    }
+  };
+
+  const fillFromCurrentLocation = async () => {
+    if (saving || locating || removingLocation || locationPermissionRequesting) {
+      return;
+    }
+    if (locationAutofill === "success") return;
+
+    const permission = await getForegroundLocationPermission();
+    if (foregroundLocationAccessGranted(permission)) {
+      await readLocationAfterAccess();
+      return;
+    }
+
+    if (permission.status === "undetermined") {
+      setLocationPermissionPromptVisible(true);
+      return;
+    }
+
+    await requestLocationAccessAndFill();
+  };
+
+  const locatingSubtitle =
+    locatingPhase === "gps"
+      ? "Getting your position…"
+      : "Looking up city and state…";
 
   const handleSave = async () => {
     if (!auth.currentUser) return;
@@ -308,7 +415,7 @@ export default function EditProfileScreen() {
       setCity("");
       setState("");
       setCoords(null);
-      setLocationUsed(false);
+      resetLocationAutofill();
       setBaseline((prev) => ({
         ...prev,
         city: "",
@@ -357,56 +464,103 @@ export default function EditProfileScreen() {
           </View>
 
           <Text style={styles.groupTitle}>Location</Text>
-          <View style={styles.group}>
+          <Animated.View
+            style={[
+              styles.group,
+              locationFieldsAnimatedStyle,
+              locating && styles.locationFieldsLocating,
+            ]}
+          >
             <View style={styles.locationFieldsRow}>
               <TextInput
                 style={[styles.fieldInput, styles.cityInput]}
                 value={city}
-                onChangeText={setCity}
+                onChangeText={(text) => {
+                  setCity(text);
+                  if (locationAutofill === "success") {
+                    setLocationAutofill("dismissed");
+                  }
+                }}
                 placeholder="City"
                 placeholderTextColor={MUTED3}
                 autoCapitalize="words"
+                editable={!locating && !removingLocation}
               />
               <View style={styles.colDivider} />
               <TextInput
                 style={[styles.fieldInput, styles.stateInput]}
                 value={state}
-                onChangeText={setState}
+                onChangeText={(text) => {
+                  setState(text);
+                  if (locationAutofill === "success") {
+                    setLocationAutofill("dismissed");
+                  }
+                }}
                 placeholder="ST"
                 placeholderTextColor={MUTED3}
                 maxLength={2}
                 autoCapitalize="characters"
+                editable={!locating && !removingLocation}
               />
             </View>
-          </View>
+          </Animated.View>
 
-          {!locationUsed && (
+          {locationAutofill !== "dismissed" && (
             <View style={styles.group}>
               <TouchableOpacity
                 onPress={fillFromCurrentLocation}
-                disabled={saving || locating || removingLocation}
+                disabled={
+                  saving ||
+                  locating ||
+                  removingLocation ||
+                  locationPermissionRequesting ||
+                  locationAutofill === "success"
+                }
                 activeOpacity={0.75}
                 style={[
                   styles.actionRow,
-                  (saving || locating || removingLocation) && styles.disabledControl,
+                  (saving ||
+                    locating ||
+                    removingLocation ||
+                    locationPermissionRequesting) &&
+                    styles.disabledControl,
                 ]}
               >
-                <View style={styles.actionIconWrap}>
-                  {locating ? (
+                <View
+                  style={[
+                    styles.actionIconWrap,
+                    locationAutofill === "success" && styles.actionIconSuccess,
+                  ]}
+                >
+                  {locating || locationPermissionRequesting ? (
                     <ActivityIndicator size="small" color={ACCENT} />
+                  ) : locationAutofill === "success" ? (
+                    <Ionicons name="checkmark" size={20} color={ACCENT} />
                   ) : (
                     <Ionicons name="location-outline" size={20} color={ACCENT} />
                   )}
                 </View>
                 <View style={styles.actionCopy}>
                   <Text style={styles.actionTitle}>
-                    {locating ? "Using current location…" : "Use current location"}
+                    {locationAutofill === "success"
+                      ? "Location found"
+                      : locating || locationPermissionRequesting
+                        ? "Using current location…"
+                        : "Use current location"}
                   </Text>
                   <Text style={styles.actionSubtitle}>
-                    {locating ? "Finding your city and state" : "Auto-fill city and state"}
+                    {locationAutofill === "success"
+                      ? resolvedLocationPreview
+                      : locating || locationPermissionRequesting
+                        ? locatingSubtitle
+                        : "Auto-fill city and state"}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={MUTED2} />
+                {locationAutofill === "offered" &&
+                  !locating &&
+                  !locationPermissionRequesting && (
+                    <Ionicons name="chevron-forward" size={18} color={MUTED2} />
+                  )}
               </TouchableOpacity>
             </View>
           )}
@@ -484,6 +638,18 @@ export default function EditProfileScreen() {
           destructive
           onConfirm={confirmRemoveLocation}
           onCancel={() => setShowRemoveLocationConfirm(false)}
+        />
+        <ConfirmModal
+          visible={locationPermissionPromptVisible}
+          title="Location access"
+          message="Synq uses your location once to auto-fill your city and state. You can decline and enter your location manually instead."
+          confirmText="Continue"
+          cancelText="Not now"
+          onCancel={() => setLocationPermissionPromptVisible(false)}
+          onConfirm={() => {
+            setLocationPermissionPromptVisible(false);
+            void requestLocationAccessAndFill();
+          }}
         />
       </SafeAreaView>
     </TouchableWithoutFeedback>
@@ -570,6 +736,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE_4 + 2,
     gap: SPACE_3 + 2,
   },
+  locationFieldsLocating: {
+    opacity: 0.55,
+  },
   actionIconWrap: {
     width: 40,
     height: 40,
@@ -579,6 +748,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0,255,133,0.22)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  actionIconSuccess: {
+    backgroundColor: "rgba(0,255,133,0.18)",
+    borderColor: "rgba(0,255,133,0.45)",
   },
   actionCopy: { flex: 1, minWidth: 0 },
   actionTitle: {
