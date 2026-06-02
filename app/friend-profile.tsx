@@ -28,7 +28,6 @@ import {
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -72,7 +71,14 @@ import { formatLastSynq, resolveAvatar } from "./helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
 import SynqNudgeCard from "@/src/components/synq/SynqNudgeCard";
 import { computeSynqActiveFromUserData } from "@/src/lib/synqSession";
-import { sendSynqNudge, synqNudgeErrorMessage } from "@/src/lib/synqNudge";
+import {
+  nudgeCooldownRemainingMs,
+  nudgeSentStorageKey as buildNudgeSentStorageKey,
+  persistNudgeSent,
+  readNudgeSentState,
+  sendSynqNudge,
+  synqNudgeErrorMessage,
+} from "@/src/lib/synqNudge";
 import {
   addMembersToFriendGroup,
   subscribeFriendGroups,
@@ -287,7 +293,7 @@ export default function FriendProfile() {
     isFriend && !userIsBlocked && (canNudgeFriend || nudgeSent);
 
   const nudgeSentStorageKey =
-    viewerId && friendKey ? `synq-nudge-sent:${viewerId}:${friendKey}` : null;
+    viewerId && friendKey ? buildNudgeSentStorageKey(viewerId, friendKey) : null;
 
   useEffect(() => {
     if (!nudgeSentStorageKey) {
@@ -295,23 +301,36 @@ export default function FriendProfile() {
       return;
     }
     let cancelled = false;
-    AsyncStorage.getItem(nudgeSentStorageKey).then((value) => {
-      if (!cancelled) setNudgeSent(value === "1");
+    let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+
+    void readNudgeSentState(nudgeSentStorageKey).then(({ sent, sentAtMs }) => {
+      if (cancelled) return;
+      setNudgeSent(sent);
+      if (sent && sentAtMs != null) {
+        const remainingMs = nudgeCooldownRemainingMs(sentAtMs);
+        if (remainingMs > 0) {
+          expiryTimer = setTimeout(() => {
+            if (!cancelled) setNudgeSent(false);
+          }, remainingMs);
+        }
+      }
     });
+
     return () => {
       cancelled = true;
+      if (expiryTimer) clearTimeout(expiryTimer);
     };
-  }, [nudgeSentStorageKey]);
+  }, [nudgeSentStorageKey, nudgeSent]);
 
   const handleSynqNudge = async () => {
     if (!friendKey || nudgeLoading || nudgeSent || !canNudgeFriend) return;
     setNudgeLoading(true);
     try {
       await sendSynqNudge(friendKey);
-      setNudgeSent(true);
       if (nudgeSentStorageKey) {
-        await AsyncStorage.setItem(nudgeSentStorageKey, "1");
+        await persistNudgeSent(nudgeSentStorageKey);
       }
+      setNudgeSent(true);
       showAlert("Nudge sent", "They'll get a notification asking if they're free.");
     } catch (err) {
       const msg = synqNudgeErrorMessage(err);
@@ -319,8 +338,8 @@ export default function FriendProfile() {
         msg.includes("again in a few hours") &&
         nudgeSentStorageKey
       ) {
+        await persistNudgeSent(nudgeSentStorageKey);
         setNudgeSent(true);
-        await AsyncStorage.setItem(nudgeSentStorageKey, "1");
       }
       showAlert("Couldn't nudge", msg);
     } finally {
