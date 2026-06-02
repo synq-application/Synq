@@ -26,8 +26,7 @@ import {
   MUTED,
   MUTED2,
   MUTED3,
-  PRIMARY_CTA_HEIGHT,
-  PRIMARY_CTA_WIDTH,
+  ON_ACCENT_TEXT,
   RADIUS_MD,
   SPACE_3,
   SPACE_4,
@@ -610,20 +609,22 @@ const styles = StyleSheet.create({
   },
 
   saveButton: {
-    marginTop: SPACE_5 + 8,
+    marginTop: SPACE_5,
     alignSelf: "center",
-    width: PRIMARY_CTA_WIDTH,
-    height: PRIMARY_CTA_HEIGHT,
+    minWidth: 200,
+    minHeight: 48,
     backgroundColor: ACCENT,
     borderRadius: BUTTON_RADIUS,
+    paddingVertical: 12,
+    paddingHorizontal: SPACE_5,
     alignItems: "center",
     justifyContent: "center",
   },
   saveButtonText: {
-    color: "black",
-    fontSize: TYPE_BODY + 2,
+    color: ON_ACCENT_TEXT,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   cancelButton: {
     marginTop: SPACE_4,
@@ -633,7 +634,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: MUTED2,
-    fontSize: TYPE_BODY,
+    fontSize: TYPE_BODY - 1,
     fontFamily: fonts.medium,
   },
 
