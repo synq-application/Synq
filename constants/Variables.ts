@@ -292,6 +292,9 @@ export interface Friend {
   interests?: string[];
   mutualCount?: number;
 }
+/** Set true when AI place suggestions in chat are ready to ship. */
+export const AI_PLACE_SUGGESTIONS_ENABLED = false;
+
 export const aiPrompts = [
     "Let Synq pick the move",
     "Find something fun nearby",

@@ -1,6 +1,12 @@
 import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
-import { ACCENT, BG, MUTED2, ON_ACCENT_TEXT } from "@/constants/Variables";
+import {
+  ACCENT,
+  AI_PLACE_SUGGESTIONS_ENABLED,
+  BG,
+  MUTED2,
+  ON_ACCENT_TEXT,
+} from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import * as Haptics from "expo-haptics";
@@ -57,7 +63,8 @@ type Props = {
   setShowAICard: (value: boolean) => void;
   setShowOptionsList: (value: boolean) => void;
   setPendingNewChat: (value: any) => void;
-  setIsExploreVisible: (value: boolean) => void;
+  showAISuggestions: boolean;
+  onOpenAISuggestions: () => void;
   sendMessage: () => void;
   sendAISuggestionToChat: () => void;
   onMessageBubblePress: (item: { id: string; reactions?: Record<string, string> }) => void;
@@ -102,7 +109,8 @@ export default function MessagesChatPane({
   setShowAICard,
   setShowOptionsList,
   setPendingNewChat,
-  setIsExploreVisible,
+  showAISuggestions,
+  onOpenAISuggestions,
   sendMessage,
   sendAISuggestionToChat,
   onMessageBubblePress,
@@ -523,34 +531,41 @@ export default function MessagesChatPane({
       <View
         style={[
           styles.chatHeader,
-          { paddingTop: Math.max(8, insetsTop - 22) },
+          { paddingTop: Math.max(8, insetsTop - 40) },
         ]}
       >
         <View style={styles.chatHeaderMain}>
           <View style={styles.chatHeaderAvatarSlot}>
             {renderAvatarStack(activeChat?.participantImages)}
           </View>
-          <View style={styles.chatHeaderTextCol}>
+          <View
+            style={[
+              styles.chatHeaderTextCol,
+              !AI_PLACE_SUGGESTIONS_ENABLED && styles.chatHeaderTextColCompact,
+            ]}
+          >
             <Text style={styles.chatTitle} numberOfLines={1}>
               {activeChat ? getChatTitle(activeChat) : "Synq Chat"}
             </Text>
-            <TouchableOpacity
-              onPress={() => {
-                Keyboard.dismiss();
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setIsExploreVisible(true);
-              }}
-              style={styles.aiChipPremium}
-              activeOpacity={0.82}
-              accessibilityRole="button"
-              accessibilityLabel="Open Synq AI place suggestions"
-            >
-              <Ionicons name="sparkles" size={11} color={ACCENT} />
-              <Text style={styles.aiChipTextPremium} numberOfLines={1}>
-                {rotatingAIText}
-              </Text>
-              <Ionicons name="chevron-forward" size={11} color={MUTED2} />
-            </TouchableOpacity>
+            {AI_PLACE_SUGGESTIONS_ENABLED && showAISuggestions ? (
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onOpenAISuggestions();
+                }}
+                style={styles.aiChipPremium}
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                accessibilityLabel="Open Synq AI place suggestions"
+              >
+                <Ionicons name="sparkles" size={11} color={ACCENT} />
+                <Text style={styles.aiChipTextPremium} numberOfLines={1}>
+                  {rotatingAIText}
+                </Text>
+                <Ionicons name="chevron-forward" size={11} color={MUTED2} />
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
         <CloseButton
@@ -561,11 +576,9 @@ export default function MessagesChatPane({
             setShowOptionsList(false);
             setPendingNewChat(null);
           }}
-          style={{ marginTop: 2 }}
           accessibilityLabel="Close chat"
         />
       </View>
-      <View style={styles.chatHeaderDivider} />
 
       <View style={{ flex: 1, paddingBottom: keyboardInset }}>
         <View style={styles.chatBody}>
@@ -625,7 +638,7 @@ export default function MessagesChatPane({
             contentContainerStyle={listContentStyle}
           />
 
-          {showAICard && (
+          {AI_PLACE_SUGGESTIONS_ENABLED && showAICard && (
             <View style={styles.inChatAICardContainer}>
               <View style={styles.inChatAICard}>
                 <View style={styles.aiCardHeader}>

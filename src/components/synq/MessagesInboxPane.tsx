@@ -229,8 +229,6 @@ export default function MessagesInboxPane({
         </View>
       )}
 
-      <View style={styles.messagesHeaderDivider} />
-
       <FlatList
         data={allChats}
         keyExtractor={(item) => item.id}

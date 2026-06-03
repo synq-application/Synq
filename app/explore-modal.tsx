@@ -8,7 +8,6 @@ import {
 import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
-import SynqPulseStage from "@/app/synq-screens/SynqPulseStage";
 import { Image as ExpoImage } from "expo-image";
 import React, { useState } from "react";
 import {
@@ -86,11 +85,17 @@ export default function ExploreModal({
         <View style={[StyleSheet.absoluteFill, styles.overlay]}>
             {isThinking && (
                 <View style={styles.thinkingOverlay}>
-                    <SynqPulseStage title="Finding the move" />
+                    <ActivityIndicator color={ACCENT} size="large" />
+                    <Text style={styles.thinkingText}>Finding the move…</Text>
                 </View>
             )}
 
-            <TouchableWithoutFeedback onPress={onClose}>
+            <TouchableWithoutFeedback
+                onPress={() => {
+                    if (isThinking || isAILoading) return;
+                    onClose();
+                }}
+            >
                 <View style={{ flex: 1, justifyContent: "flex-end" }}>
                     <TouchableWithoutFeedback>
                         <View style={styles.panel}>
@@ -184,18 +189,26 @@ export default function ExploreModal({
                                                     )
                                                 }
                                             >
-                                                <ExpoImage
-                                                    source={{ uri: item.imageUrl }}
-                                                    style={styles.venueImage}
-                                                    contentFit="cover"
-                                                    cachePolicy="memory-disk"
-                                                    transition={0}
-                                                    recyclingKey={item.imageUrl}
-                                                />
+                                                {item.imageUrl ? (
+                                                    <ExpoImage
+                                                        source={{ uri: item.imageUrl }}
+                                                        style={styles.venueImage}
+                                                        contentFit="cover"
+                                                        cachePolicy="memory-disk"
+                                                        transition={0}
+                                                        recyclingKey={item.imageUrl}
+                                                    />
+                                                ) : (
+                                                    <View style={[styles.venueImage, styles.venueImagePlaceholder]}>
+                                                        <Ionicons name="image-outline" size={28} color="#555" />
+                                                    </View>
+                                                )}
 
                                                 <View style={{ flex: 1, marginLeft: 12 }}>
                                                     <Text style={styles.venueName}>{item.name}</Text>
-                                                    <Text style={styles.venueDesc}>{item.location}</Text>
+                                                    <Text style={styles.venueDesc} numberOfLines={2}>
+                                                        {item.address || item.location}
+                                                    </Text>
                                                 </View>
 
                                                 {selectedOption?.name === item.name && (
@@ -343,5 +356,19 @@ const styles = StyleSheet.create({
     thinkingOverlay: {
         ...StyleSheet.absoluteFillObject,
         zIndex: 2000,
+        backgroundColor: "rgba(0,0,0,0.72)",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 14,
+    },
+    thinkingText: {
+        color: "rgba(255,255,255,0.75)",
+        fontSize: 16,
+        fontFamily: fonts.medium,
+    },
+    venueImagePlaceholder: {
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#1A1A1A",
     },
 });

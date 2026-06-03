@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Asset } from "expo-asset";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
@@ -28,32 +29,29 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { initSentry } from "../src/lib/sentryInit";
-
-initSentry();
 import LocationUpdateModal from "../components/LocationUpdateModal";
 import { ACCENT, BG } from "../constants/Variables";
-import { auth, db } from "../src/lib/firebase";
+import { BlockedUsersProvider } from "../src/lib/blockedUsers";
 import {
   getPreAuthTermsAccepted,
   persistCommunityTermsAcceptance,
   userHasAcceptedCommunityTerms,
 } from "../src/lib/communityTerms";
+import { auth, db } from "../src/lib/firebase";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../src/lib/locationPromptEvents";
 import {
   hydrateOwnProfileFromDisk,
   prewarmMeTabScreen,
 } from "../src/lib/ownProfileCache";
+import { initSentry } from "../src/lib/sentryInit";
 import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
 } from "../src/lib/socialCache";
 import { SynqBootProvider } from "../src/lib/synqBootContext";
-import { BlockedUsersProvider } from "../src/lib/blockedUsers";
 import {
   computeSynqActiveFromUserData,
   readCachedSynqActive,
@@ -65,10 +63,15 @@ import {
   userHasLocation,
 } from "../src/lib/userProfile";
 
+initSentry();
+
 void SplashScreen.preventAutoHideAsync();
 
 /** Must match app.json expo.splash.backgroundColor (BG) */
 const SPLASH_LOGO = require("../assets/logo.png");
+
+/** Safety cap so the boot overlay never blocks touches indefinitely (e.g. iPad review). */
+const BOOT_SPLASH_MAX_MS = 6000;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -336,6 +339,13 @@ export default function RootLayout() {
     return () => clearTimeout(timeoutId);
   }, []);
 
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setBootSplashDismissed(true);
+    }, BOOT_SPLASH_MAX_MS);
+    return () => clearTimeout(timeoutId);
+  }, []);
+
   const hideNativeSplash = () => {
     if (nativeSplashHiddenRef.current || !assetsReady) return;
     nativeSplashHiddenRef.current = true;
@@ -508,22 +518,27 @@ export default function RootLayout() {
 
         // Returning accounts: terms were accepted at sign-up; do not re-prompt on login.
         if (hasDisplayName) {
-          await persistCommunityTermsAcceptance(user.uid);
           if (!cancelled) setCommunityTermsOk(true);
+          void persistCommunityTermsAcceptance(user.uid).catch(() => {});
           return;
         }
 
         const preAuth = await getPreAuthTermsAccepted();
         if (preAuth) {
-          await persistCommunityTermsAcceptance(user.uid);
           if (!cancelled) setCommunityTermsOk(true);
+          void persistCommunityTermsAcceptance(user.uid).catch(() => {});
           return;
         }
         if (!cancelled) setCommunityTermsOk(false);
       } catch {
         if (!cancelled) {
-          setCommunityTermsOk(false);
-          setUserProfileGate(null);
+          const fallbackGate =
+            cachedGate ??
+            (user.displayName
+              ? { hasDisplayName: true, hasLocation: false }
+              : { hasDisplayName: false, hasLocation: false });
+          setUserProfileGate(fallbackGate);
+          setCommunityTermsOk(fallbackGate.hasDisplayName ? true : false);
         }
       }
     })();
@@ -756,9 +771,7 @@ export default function RootLayout() {
   }, [shouldDismissBootSplash]);
 
   const showBootSplashOverlay =
-    !hideBootSplashDuringSignup &&
-    (holdSplashForStaleOnboarding ||
-      !bootSplashDismissed);
+    !bootSplashDismissed && !hideBootSplashDuringSignup;
 
   useEffect(() => {
     if (showBootSplashOverlay) return;

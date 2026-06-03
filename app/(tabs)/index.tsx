@@ -52,6 +52,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ACCENT,
+  AI_PLACE_SUGGESTIONS_ENABLED,
   aiPrompts,
   BG,
   BORDER,
@@ -74,7 +75,8 @@ import {
   TYPE_BODY,
 } from '../../constants/Variables';
 import { ignoreSnapshotPermissionDenied } from '@/src/lib/firestoreListeners';
-import { auth, db } from '../../src/lib/firebase';
+import { app, auth, db } from '../../src/lib/firebase';
+import { userHasLocation } from '../../src/lib/userProfile';
 import { useAuthRefresh } from '../_layout';
 import { useSynqBoot } from "../../src/lib/synqBootContext";
 import {
@@ -232,7 +234,6 @@ export default function SynqScreen() {
       : undefined;
 
   const [memo, setMemo] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
   const [synq, setSynq] = useState<SynqUi>(() => ({
     status: synqBoot?.cachedSynqActive ? "active" : "idle",
     hydrated: false,
@@ -287,6 +288,7 @@ export default function SynqScreen() {
   const [isStartingSynq, setIsStartingSynq] = useState(false);
   const [launchOverlay, setLaunchOverlay] = useState(false);
   const [contentAlertVisible, setContentAlertVisible] = useState(false);
+  const [contentAlertTitle, setContentAlertTitle] = useState("Content not allowed");
   const [contentAlertMessage, setContentAlertMessage] = useState("");
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<{
@@ -349,6 +351,7 @@ export default function SynqScreen() {
   const rejectIfObjectionable = (text: string): boolean => {
     const result = filterOrReject(text);
     if (!result.ok) {
+      setContentAlertTitle("Content not allowed");
       setContentAlertMessage(result.reason);
       setContentAlertVisible(true);
       return true;
@@ -356,7 +359,8 @@ export default function SynqScreen() {
     return false;
   };
 
-  const showActionError = (message: string) => {
+  const showActionError = (message: string, title = "Something went wrong") => {
+    setContentAlertTitle(title);
     setContentAlertMessage(message);
     setContentAlertVisible(true);
   };
@@ -418,6 +422,7 @@ export default function SynqScreen() {
   }, [isChatPaneOpen]);
 
   useEffect(() => {
+    if (!AI_PLACE_SUGGESTIONS_ENABLED) return;
     let index = 0;
 
     const interval = setInterval(() => {
@@ -869,50 +874,151 @@ export default function SynqScreen() {
     setLaunchOverlay(false);
   }, [setSynq]);
 
+  const activeParticipantIds = useMemo(() => {
+    if (pendingNewChat?.participants?.length) {
+      return pendingNewChat.participants.filter(Boolean);
+    }
+    const chat = allChats.find((c) => c.id === activeChatId);
+    return (chat?.participants ?? []).filter(Boolean);
+  }, [pendingNewChat, activeChatId, allChats]);
+
+  const [chatAiLocationReady, setChatAiLocationReady] = useState<boolean | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (messagesPane !== "chat" || activeParticipantIds.length === 0) {
+      setChatAiLocationReady(null);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const snaps = await Promise.all(
+          activeParticipantIds.map((uid: string) => getDoc(doc(db, "users", uid)))
+        );
+        if (cancelled) return;
+        const allHaveLocation = snaps.every(
+          (snap) => snap.exists() && userHasLocation(snap.data())
+        );
+        setChatAiLocationReady(allHaveLocation);
+      } catch {
+        if (!cancelled) setChatAiLocationReady(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messagesPane, activeParticipantIds]);
+
+  const showAISuggestions = chatAiLocationReady === true;
+
+  const openAISuggestions = useCallback(() => {
+    if (!showAISuggestions) return;
+    setIsExploreVisible(true);
+  }, [showAISuggestions]);
+
+  useEffect(() => {
+    if (!showAISuggestions && isExploreVisible) {
+      setIsExploreVisible(false);
+      setShowOptionsList(false);
+    }
+  }, [showAISuggestions, isExploreVisible]);
+
   const triggerAISuggestion = async (category: string) => {
-    if ((!activeChatId && !pendingNewChat) || isAILoading) return;
+    if ((!activeChatId && !pendingNewChat) || isAILoading) {
+      return;
+    }
+
     setIsAILoading(true);
     setCurrentCategory(category);
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const functions = getFunctions();
-      const getSuggestions = httpsCallable(functions, 'getSynqSuggestions');
+      const functions = getFunctions(app, "us-central1");
+      const getSuggestions = httpsCallable(functions, "getSynqSuggestions");
       const currentChat = pendingNewChat
         ? { participants: pendingNewChat.participants }
-        : visibleChats.find((c) => c.id === activeChatId);
-      if (!currentChat) return;
-      const city = userProfile?.city + ' ' + userProfile?.state;
-      const friendId = currentChat.participants.find((id: string) => id !== auth.currentUser?.uid);
-      const friendSnap = await getDoc(doc(db, 'users', friendId));
-      const friendInterests = friendSnap.exists() ? friendSnap.data()?.interests || [] : [];
-      const shared = (userProfile?.interests || []).filter((i: any) => friendInterests.includes(i));
+        : allChats.find((c) => c.id === activeChatId);
+
+      if (!currentChat) {
+        setIsExploreVisible(false);
+        showActionError("Could not find this chat. Please try again.");
+        return;
+      }
+
+      const participantSnaps = await Promise.all(
+        currentChat.participants
+          .filter(Boolean)
+          .map((uid: string) => getDoc(doc(db, "users", uid)))
+      );
+      if (
+        !participantSnaps.every(
+          (snap) => snap.exists() && userHasLocation(snap.data())
+        )
+      ) {
+        setIsExploreVisible(false);
+        return;
+      }
+
+      const city = [userProfile?.city, userProfile?.state].filter(Boolean).join(" ").trim();
+      if (!city) {
+        setIsExploreVisible(false);
+        return;
+      }
+
+      const myId = auth.currentUser?.uid;
+      const friendId = currentChat.participants.find(
+        (id: string) => id && id !== myId
+      );
+      if (!friendId) {
+        setIsExploreVisible(false);
+        showActionError("Could not load suggestions for this chat.");
+        return;
+      }
+
+      const friendSnap = participantSnaps.find((snap) => snap.id === friendId);
+      const friendInterests = friendSnap?.exists()
+        ? friendSnap.data()?.interests || []
+        : [];
+      const shared = (userProfile?.interests || []).filter((i: any) =>
+        friendInterests.includes(i)
+      );
 
       const payload = {
-        category: category,
-        shared: shared.length > 0 ? shared : ['exploring new spots'],
-        location: city
+        category,
+        shared: shared.length > 0 ? shared : ["exploring new spots"],
+        location: city,
       };
 
       const result = await getSuggestions(payload);
-      const data = result.data as any;
+      const data = result.data as { suggestions?: any[]; suggestion?: string } | null;
 
-      if (data.suggestions) {
+      if (Array.isArray(data?.suggestions) && data.suggestions.length > 0) {
         setAiOptions(data.suggestions);
         setShowOptionsList(true);
-      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else if (data?.suggestion) {
         setAiResponse(data.suggestion);
         setIsExploreVisible(false);
         setShowAICard(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setIsExploreVisible(false);
+        showActionError("No suggestions came back. Please try again.");
       }
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      showActionError("Could not load suggestions. Please try again.");
+    } catch (err: any) {
+      setIsExploreVisible(false);
+      const msg =
+        err?.message?.includes("internal") || err?.code === "functions/internal"
+          ? "Could not load suggestions. Please try again."
+          : err?.message || "Could not load suggestions. Please try again.";
+      showActionError(msg);
     } finally {
       setIsAILoading(false);
-      setIsThinking(false)
     }
   };
 
@@ -921,7 +1027,7 @@ export default function SynqScreen() {
     if (!pendingNewChat && !activeChatId) return;
 
     const textToSend = selectedOption
-      ? `${selectedOption.name}\n${selectedOption.location}`
+      ? `${selectedOption.name}\n${selectedOption.address || selectedOption.location}`
       : `✨ Synq AI Suggestion:\n\n${aiResponse}`;
 
     if (rejectIfObjectionable(textToSend)) return;
@@ -1574,7 +1680,8 @@ export default function SynqScreen() {
               setShowAICard={setShowAICard}
               setShowOptionsList={setShowOptionsList}
               setPendingNewChat={setPendingNewChat}
-              setIsExploreVisible={setIsExploreVisible}
+              showAISuggestions={showAISuggestions}
+              onOpenAISuggestions={openAISuggestions}
               sendMessage={sendMessage}
               sendAISuggestionToChat={sendAISuggestionToChat}
               setPendingScrollToMessageId={setPendingScrollToMessageId}
@@ -1594,6 +1701,7 @@ export default function SynqScreen() {
               windowWidth={windowWidth}
               currentUserId={auth.currentUser?.uid}
             />
+              {AI_PLACE_SUGGESTIONS_ENABLED && (
               <ExploreModal
               visible={isExploreVisible}
               onClose={() => {
@@ -1602,12 +1710,9 @@ export default function SynqScreen() {
               }}
               onBack={() => setShowOptionsList(false)}
               onSelectVibe={(label: string) => {
-                setIsThinking(true);
-                setTimeout(() => {
-                  triggerAISuggestion(label);
-                }, 600);
+                void triggerAISuggestion(label);
               }}
-              isThinking={isThinking}
+              isThinking={isAILoading}
               isAILoading={isAILoading}
               showOptionsList={showOptionsList}
               aiOptions={aiOptions}
@@ -1620,6 +1725,7 @@ export default function SynqScreen() {
               }}
               currentCategory={currentCategory}
               />
+              )}
             </Reanimated.View>
           )}
           </View>
@@ -1650,7 +1756,7 @@ export default function SynqScreen() {
         />
         <AlertModal
           visible={contentAlertVisible}
-          title="Content not allowed"
+          title={contentAlertTitle}
           message={contentAlertMessage}
           onClose={() => setContentAlertVisible(false)}
         />
@@ -2199,9 +2305,10 @@ const styles = StyleSheet.create({
   chatHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: 18,
-    paddingBottom: 14,
+    paddingBottom: 10,
+    overflow: 'visible',
   },
   chatHeaderMain: {
     flex: 1,
@@ -2224,11 +2331,17 @@ const styles = StyleSheet.create({
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 4,
+    overflow: 'visible',
   },
   chatHeaderTextCol: {
     flex: 1,
     minWidth: 0,
+    justifyContent: 'center',
     paddingTop: 5,
+  },
+  chatHeaderTextColCompact: {
+    paddingTop: 0,
   },
   chatTitle: {
     color: TEXT,
@@ -2563,6 +2676,9 @@ const styles = StyleSheet.create({
     borderColor: "#1C1C1E",
     gap: 4,
     maxWidth: "92%",
+  },
+  aiChipPremiumDisabled: {
+    opacity: 0.4,
   },
   aiChipText: {
     color: "#aaa",
