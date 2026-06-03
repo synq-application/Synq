@@ -292,8 +292,8 @@ export interface Friend {
   interests?: string[];
   mutualCount?: number;
 }
-/** AI place suggestions in chat — hidden until re-enabled (backend kept). */
-export const AI_PLACE_SUGGESTIONS_ENABLED = false;
+/** AI place suggestions in chat — shown when everyone in the chat has a location. */
+export const AI_PLACE_SUGGESTIONS_ENABLED = true;
 
 /** Native builds below this must update (set Firestore appConfig/global to raise). */
 export const MINIMUM_NATIVE_BUILD_NUMBER = 6;

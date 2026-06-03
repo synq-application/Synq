@@ -2,7 +2,6 @@ import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
 import {
   ACCENT,
-  AI_PLACE_SUGGESTIONS_ENABLED,
   BG,
   MUTED2,
   ON_ACCENT_TEXT,
@@ -549,13 +548,13 @@ export default function MessagesChatPane({
           <View
             style={[
               styles.chatHeaderTextCol,
-              !AI_PLACE_SUGGESTIONS_ENABLED && styles.chatHeaderTextColCompact,
+              !showAISuggestions && styles.chatHeaderTextColCompact,
             ]}
           >
             <Text style={styles.chatTitle} numberOfLines={1}>
               {activeChat ? getChatTitle(activeChat) : "Synq Chat"}
             </Text>
-            {AI_PLACE_SUGGESTIONS_ENABLED && showAISuggestions ? (
+            {showAISuggestions ? (
               <TouchableOpacity
                 onPress={() => {
                   Keyboard.dismiss();
@@ -641,7 +640,7 @@ export default function MessagesChatPane({
             contentContainerStyle={listContentStyle}
           />
 
-          {AI_PLACE_SUGGESTIONS_ENABLED && showAICard && (
+          {showAICard && (
             <View style={styles.inChatAICardContainer}>
               <View style={styles.inChatAICard}>
                 <View style={styles.aiCardHeader}>

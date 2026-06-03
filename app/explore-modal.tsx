@@ -36,6 +36,7 @@ type Props = {
     setSelectedOption: (item: any | null) => void;
     sendAISuggestionToChat: () => void;
     currentCategory: string;
+    errorMessage?: string | null;
 };
 
 export default function ExploreModal({
@@ -51,6 +52,7 @@ export default function ExploreModal({
     setSelectedOption,
     sendAISuggestionToChat,
     currentCategory,
+    errorMessage,
 }: Props) {
     const [pressed, setPressed] = useState<string | null>(null);
     const insets = useSafeAreaInsets();
@@ -99,6 +101,11 @@ export default function ExploreModal({
                 <View style={{ flex: 1, justifyContent: "flex-end" }}>
                     <TouchableWithoutFeedback>
                         <View style={styles.panel}>
+                            {errorMessage ? (
+                                <View style={styles.errorBanner}>
+                                    <Text style={styles.errorBannerText}>{errorMessage}</Text>
+                                </View>
+                            ) : null}
 
                             {!showOptionsList ? (
                                 <>
@@ -250,6 +257,24 @@ const styles = StyleSheet.create({
         backgroundColor: "#0A0A0A",
         borderTopLeftRadius: 30,
         borderTopRightRadius: 30,
+    },
+    errorBanner: {
+        marginHorizontal: 20,
+        marginTop: 16,
+        marginBottom: 4,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 14,
+        backgroundColor: "rgba(255,69,58,0.12)",
+        borderWidth: 1,
+        borderColor: "rgba(255,69,58,0.35)",
+    },
+    errorBannerText: {
+        color: "#FF8A84",
+        fontSize: 14,
+        fontFamily: fonts.medium,
+        lineHeight: 20,
+        textAlign: "center",
     },
     optionsView: {
         flex: 1,

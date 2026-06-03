@@ -21,6 +21,7 @@ import {
   selectionFromUserBroadcastFields,
   type SynqAudienceSelection,
 } from '@/src/lib/synqBroadcast';
+import { useSynqBoot } from '@/src/lib/synqBootContext';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
@@ -42,7 +43,6 @@ import {
   updateDoc,
   where
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   Animated,
@@ -99,8 +99,12 @@ import {
 import ActiveSynqSection from '../../src/components/synq/ActiveSynqSection';
 import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
 import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
-import { app, auth, db } from '../../src/lib/firebase';
-import { useSynqBoot } from "../../src/lib/synqBootContext";
+import { auth, db } from '../../src/lib/firebase';
+import {
+  callableErrorMessage,
+  fetchSynqSuggestions,
+  locationLabelFromUser,
+} from '../../src/lib/synqSuggestions';
 import {
   computeSynqActiveFromUserData,
   synqStatusStorageKey,
@@ -286,6 +290,8 @@ export default function SynqScreen() {
   const [isMergingChats, setIsMergingChats] = useState(false);
   const [inboxActionChat, setInboxActionChat] = useState<any | null>(null);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
+  const [aiExploreError, setAiExploreError] = useState<string | null>(null);
+  const activeParticipantIdsRef = useRef<string[]>([]);
   const [isStartingSynq, setIsStartingSynq] = useState(false);
   const [launchOverlay, setLaunchOverlay] = useState(false);
   const [contentAlertVisible, setContentAlertVisible] = useState(false);
@@ -842,11 +848,18 @@ export default function SynqScreen() {
   }, [messagesModalVisible, activeChatId, allChats, messagesPane, pendingNewChat]);
 
   const activeParticipantIds = useMemo(() => {
+    let ids: string[] = [];
     if (pendingNewChat?.participants?.length) {
-      return pendingNewChat.participants.filter(Boolean);
+      ids = pendingNewChat.participants.filter(Boolean);
+    } else {
+      const chat = allChats.find((c) => c.id === activeChatId);
+      ids = (chat?.participants ?? []).filter(Boolean);
     }
-    const chat = allChats.find((c) => c.id === activeChatId);
-    return (chat?.participants ?? []).filter(Boolean);
+    if (ids.length > 0) {
+      activeParticipantIdsRef.current = ids;
+      return ids;
+    }
+    return activeParticipantIdsRef.current;
   }, [pendingNewChat, activeChatId, allChats]);
 
   const activeParticipantIdsKey = activeParticipantIds.join("|");
@@ -986,19 +999,24 @@ export default function SynqScreen() {
     };
   }, [messagesPane, activeParticipantIds]);
 
-  const showAISuggestions = chatAiLocationReady === true;
+  const showAISuggestions =
+    AI_PLACE_SUGGESTIONS_ENABLED && chatAiLocationReady === true;
 
   const openAISuggestions = useCallback(() => {
     if (!showAISuggestions) return;
+    setAiExploreError(null);
+    setShowOptionsList(false);
+    setSelectedOption(null);
     setIsExploreVisible(true);
   }, [showAISuggestions]);
 
   useEffect(() => {
-    if (!showAISuggestions && isExploreVisible) {
+    if (!showAISuggestions && isExploreVisible && !isAILoading) {
       setIsExploreVisible(false);
       setShowOptionsList(false);
+      setAiExploreError(null);
     }
-  }, [showAISuggestions, isExploreVisible]);
+  }, [showAISuggestions, isExploreVisible, isAILoading]);
 
   const triggerAISuggestion = async (category: string) => {
     if ((!activeChatId && !pendingNewChat) || isAILoading) {
@@ -1007,19 +1025,19 @@ export default function SynqScreen() {
 
     setIsAILoading(true);
     setCurrentCategory(category);
+    setAiExploreError(null);
+    setShowOptionsList(false);
+    setSelectedOption(null);
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const functions = getFunctions(app, "us-central1");
-      const getSuggestions = httpsCallable(functions, "getSynqSuggestions");
       const currentChat = pendingNewChat
         ? { participants: pendingNewChat.participants }
         : allChats.find((c) => c.id === activeChatId);
 
       if (!currentChat) {
-        setIsExploreVisible(false);
-        showActionError("Could not find this chat. Please try again.");
+        setAiExploreError("Could not find this chat. Please try again.");
         return;
       }
 
@@ -1033,63 +1051,52 @@ export default function SynqScreen() {
           (snap) => snap.exists() && userHasLocation(snap.data())
         )
       ) {
-        setIsExploreVisible(false);
-        return;
-      }
-
-      const city = [userProfile?.city, userProfile?.state].filter(Boolean).join(" ").trim();
-      if (!city) {
-        setIsExploreVisible(false);
+        setAiExploreError(
+          "Everyone in this chat needs a location set to use Synq suggestions."
+        );
         return;
       }
 
       const myId = auth.currentUser?.uid;
-      const friendId = currentChat.participants.find(
-        (id: string) => id && id !== myId
-      );
-      if (!friendId) {
-        setIsExploreVisible(false);
-        showActionError("Could not load suggestions for this chat.");
+      const mySnap = participantSnaps.find((snap) => snap.id === myId);
+      const city =
+        locationLabelFromUser(mySnap?.data()) ||
+        locationLabelFromUser(userProfile);
+      if (!city) {
+        setAiExploreError("Add your city in profile to use Synq suggestions.");
         return;
       }
 
-      const friendSnap = participantSnaps.find((snap) => snap.id === friendId);
-      const friendInterests = friendSnap?.exists()
-        ? friendSnap.data()?.interests || []
-        : [];
-      const shared = (userProfile?.interests || []).filter((i: any) =>
-        friendInterests.includes(i)
-      );
+      const myInterests = Array.isArray(mySnap?.data()?.interests)
+        ? mySnap!.data()!.interests
+        : userProfile?.interests || [];
+      const sharedSet = new Set<string>();
+      for (const snap of participantSnaps) {
+        if (!snap.exists() || snap.id === myId) continue;
+        const theirInterests = snap.data()?.interests || [];
+        myInterests
+          .filter((interest: string) => theirInterests.includes(interest))
+          .forEach((interest: string) => sharedSet.add(interest));
+      }
+      const shared =
+        sharedSet.size > 0 ? [...sharedSet] : ["exploring new spots"];
 
-      const payload = {
+      const suggestions = await fetchSynqSuggestions({
         category,
-        shared: shared.length > 0 ? shared : ["exploring new spots"],
+        shared,
         location: city,
-      };
+      });
 
-      const result = await getSuggestions(payload);
-      const data = result.data as { suggestions?: any[]; suggestion?: string } | null;
-
-      if (Array.isArray(data?.suggestions) && data.suggestions.length > 0) {
-        setAiOptions(data.suggestions);
+      if (suggestions.length > 0) {
+        setAiOptions(suggestions);
         setShowOptionsList(true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else if (data?.suggestion) {
-        setAiResponse(data.suggestion);
-        setIsExploreVisible(false);
-        setShowAICard(true);
+        setAiExploreError(null);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        setIsExploreVisible(false);
-        showActionError("No suggestions came back. Please try again.");
+        setAiExploreError("No suggestions came back. Please try again.");
       }
-    } catch (err: any) {
-      setIsExploreVisible(false);
-      const msg =
-        err?.message?.includes("internal") || err?.code === "functions/internal"
-          ? "Could not load suggestions. Please try again."
-          : err?.message || "Could not load suggestions. Please try again.";
-      showActionError(msg);
+    } catch (err: unknown) {
+      setAiExploreError(callableErrorMessage(err));
     } finally {
       setIsAILoading(false);
     }
@@ -1849,14 +1856,18 @@ export default function SynqScreen() {
               windowWidth={windowWidth}
               currentUserId={auth.currentUser?.uid}
             />
-              {AI_PLACE_SUGGESTIONS_ENABLED && (
+              {(showAISuggestions || isExploreVisible) && (
               <ExploreModal
               visible={isExploreVisible}
               onClose={() => {
                 setIsExploreVisible(false);
                 setShowOptionsList(false);
+                setAiExploreError(null);
               }}
-              onBack={() => setShowOptionsList(false)}
+              onBack={() => {
+                setShowOptionsList(false);
+                setAiExploreError(null);
+              }}
               onSelectVibe={(label: string) => {
                 void triggerAISuggestion(label);
               }}
@@ -1870,13 +1881,21 @@ export default function SynqScreen() {
                 sendAISuggestionToChat();
                 setIsExploreVisible(false);
                 setShowOptionsList(false);
+                setAiExploreError(null);
               }}
               currentCategory={currentCategory}
+              errorMessage={aiExploreError}
               />
               )}
             </Reanimated.View>
           )}
           </View>
+          <AlertModal
+            visible={contentAlertVisible}
+            title={contentAlertTitle}
+            message={contentAlertMessage}
+            onClose={() => setContentAlertVisible(false)}
+          />
         </Modal>
 
         <EditSynqModal
@@ -1903,7 +1922,7 @@ export default function SynqScreen() {
           }}
         />
         <AlertModal
-          visible={contentAlertVisible}
+          visible={contentAlertVisible && !messagesModalVisible}
           title={contentAlertTitle}
           message={contentAlertMessage}
           onClose={() => setContentAlertVisible(false)}
