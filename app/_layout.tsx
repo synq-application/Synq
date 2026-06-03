@@ -33,6 +33,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import LocationUpdateModal from "../components/LocationUpdateModal";
+import RequiredUpdateBlocker from "../components/RequiredUpdateBlocker";
 import { ACCENT, BG } from "../constants/Variables";
 import { BlockedUsersProvider } from "../src/lib/blockedUsers";
 import {
@@ -41,6 +42,7 @@ import {
   userHasAcceptedCommunityTerms,
 } from "../src/lib/communityTerms";
 import { auth, db } from "../src/lib/firebase";
+import { checkAppUpdateRequired } from "../src/lib/appUpdateGate";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../src/lib/locationPromptEvents";
 import {
   hydrateOwnProfileFromDisk,
@@ -187,6 +189,11 @@ export default function RootLayout() {
   } | null>(null);
   const synqBootUidRef = useRef<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [updateRequired, setUpdateRequired] = useState<{
+    checked: boolean;
+    required: boolean;
+    storeUrl: string | null;
+  }>({ checked: false, required: false, storeUrl: null });
   const [communityTermsOk, setCommunityTermsOk] = useState<boolean | null>(null);
   const [userProfileGate, setUserProfileGate] = useState<{
     hasDisplayName: boolean;
@@ -207,6 +214,21 @@ export default function RootLayout() {
   const refreshAuth = () => {
     setUser(auth.currentUser ? ({ ...auth.currentUser } as User) : null);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    void checkAppUpdateRequired().then((result) => {
+      if (cancelled) return;
+      setUpdateRequired({
+        checked: true,
+        required: result.required,
+        storeUrl: result.storeUrl,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const captureDeepLinkFromUrl = async (url: string | null) => {
@@ -857,6 +879,14 @@ export default function RootLayout() {
         }}
       />
     ) : null;
+
+  if (updateRequired.checked && updateRequired.required) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <RequiredUpdateBlocker storeUrl={updateRequired.storeUrl} />
+      </GestureHandlerRootView>
+    );
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

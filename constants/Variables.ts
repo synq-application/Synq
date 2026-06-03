@@ -292,8 +292,11 @@ export interface Friend {
   interests?: string[];
   mutualCount?: number;
 }
-/** Set true when AI place suggestions in chat are ready to ship. */
+/** AI place suggestions in chat — hidden until re-enabled (backend kept). */
 export const AI_PLACE_SUGGESTIONS_ENABLED = false;
+
+/** Native builds below this must update (set Firestore appConfig/global to raise). */
+export const MINIMUM_NATIVE_BUILD_NUMBER = 5;
 
 export const aiPrompts = [
     "Let Synq pick the move",

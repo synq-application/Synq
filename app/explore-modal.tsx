@@ -175,7 +175,9 @@ export default function ExploreModal({
                                     <FlatList
                                         style={styles.optionsList}
                                         data={aiOptions}
-                                        keyExtractor={(item) => item.name}
+                                        keyExtractor={(item, index) =>
+                                            `${item.name}-${item.address || item.location || index}`
+                                        }
                                         contentContainerStyle={{ padding: 20, paddingBottom: 8 }}
                                         renderItem={({ item }) => (
                                             <TouchableOpacity
