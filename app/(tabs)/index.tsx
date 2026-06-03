@@ -1,3 +1,25 @@
+import ProfileTabHeaderOverlay from '@/src/components/ProfileTabHeaderOverlay';
+import { useBlockedUsers } from '@/src/lib/blockedUsers';
+import { filterOrReject } from '@/src/lib/contentFilter';
+import { ignoreSnapshotPermissionDenied } from '@/src/lib/firestoreListeners';
+import { subscribeFriendGroups, type FriendGroup } from '@/src/lib/friendGroups';
+import {
+  findChatWithParticipants,
+  mergeParticipantMaps,
+  mergeParticipantSets,
+  participantsMatch,
+} from '@/src/lib/mergeChats';
+import { friendGroupsCacheByUser, friendsListCacheByUser } from '@/src/lib/socialCache';
+import {
+  buildSynqBroadcastFirestorePayload,
+  filterActiveFriendsForInbound,
+  formatSynqAudienceLabel,
+  getMyAudienceSet,
+  loadSynqAudiencePreference,
+  saveSynqAudiencePreference,
+  selectionFromUserBroadcastFields,
+  type SynqAudienceSelection,
+} from '@/src/lib/synqBroadcast';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
@@ -22,18 +44,10 @@ import {
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import Reanimated, {
-  FadeIn,
-  FadeOut,
-  SlideInLeft,
-  SlideInRight,
-  SlideOutLeft,
-  SlideOutRight,
-} from 'react-native-reanimated';
 import {
   Animated,
-  Easing,
   DeviceEventEmitter,
+  Easing,
   FlatList,
   Keyboard,
   Modal,
@@ -43,12 +57,19 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   TouchableWithoutFeedback,
   useWindowDimensions,
   Vibration,
-  View,
+  View
 } from 'react-native';
+import Reanimated, {
+  FadeIn,
+  FadeOut,
+  SlideInLeft,
+  SlideInRight,
+  SlideOutLeft,
+  SlideOutRight,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ACCENT,
@@ -70,30 +91,23 @@ import {
   SPACE_4,
   SPACE_5,
   SURFACE,
-  TEXT,
   tabScreenMainHeaderTitle,
+  TEXT,
   TYPE_BODY,
 } from '../../constants/Variables';
-import { ignoreSnapshotPermissionDenied } from '@/src/lib/firestoreListeners';
+import ActiveSynqSection from '../../src/components/synq/ActiveSynqSection';
+import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
+import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
 import { app, auth, db } from '../../src/lib/firebase';
-import { userHasLocation } from '../../src/lib/userProfile';
-import { useAuthRefresh } from '../_layout';
 import { useSynqBoot } from "../../src/lib/synqBootContext";
 import {
   computeSynqActiveFromUserData,
   synqStatusStorageKey,
 } from "../../src/lib/synqSession";
-import ConfirmModal from '../confirm-modal';
+import { userHasLocation } from '../../src/lib/userProfile';
+import { useAuthRefresh } from '../_layout';
 import AlertModal from '../alert-modal';
-import { filterOrReject } from '@/src/lib/contentFilter';
-import {
-  findChatWithParticipants,
-  mergeParticipantMaps,
-  mergeParticipantSets,
-  participantsMatch,
-} from '@/src/lib/mergeChats';
-import { useBlockedUsers } from '@/src/lib/blockedUsers';
-import ReportModal from '../report-modal';
+import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
 import {
   getChatTitle as buildChatTitle,
@@ -101,30 +115,14 @@ import {
   isCustomAvatar,
   resolveAvatar,
   resolveChatSenderAvatar,
-  SynqStatus,
-  wrapChatTitle,
+  SynqStatus
 } from '../helpers';
 import { openInMaps } from '../map-utils';
-import ActiveSynqSection from '../../src/components/synq/ActiveSynqSection';
-import ProfileTabHeaderOverlay from '@/src/components/ProfileTabHeaderOverlay';
-import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
-import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
-import EditSynqModal from '../synq-screens/EditSynqModal';
+import ReportModal from '../report-modal';
 import ChangeSynqAudienceModal from '../synq-screens/ChangeSynqAudienceModal';
+import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
 import SynqActivatingView from '../synq-screens/SynqActivatingView';
-import {
-  buildSynqBroadcastFirestorePayload,
-  filterActiveFriendsForInbound,
-  formatSynqAudienceLabel,
-  loadSynqAudiencePreference,
-  saveSynqAudiencePreference,
-  selectionFromUserBroadcastFields,
-  type SynqAudienceSelection,
-  getMyAudienceSet,
-} from '@/src/lib/synqBroadcast';
-import { subscribeFriendGroups, type FriendGroup } from '@/src/lib/friendGroups';
-import { friendGroupsCacheByUser, friendsListCacheByUser } from '@/src/lib/socialCache';
 
 function prefetchParticipantAvatars(chat: { participantImages?: Record<string, unknown> } | null | undefined) {
   const images = chat?.participantImages || {};
@@ -889,7 +887,7 @@ export default function SynqScreen() {
     );
 
     return () => {
-      unsubs.forEach((unsub) => unsub());
+      unsubs.forEach((unsub: () => any) => unsub());
       setLiveParticipantImages({});
     };
   }, [isChatPaneOpen, activeParticipantIdsKey]);
