@@ -124,11 +124,23 @@ export default function MessagesChatPane({
   const chatSeededRef = useRef(false);
   const initialScrollDoneRef = useRef(false);
   const lastMessageCountRef = useRef(0);
+  const prevChatIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
+    const prevId = prevChatIdRef.current;
+    const nextId = activeChat?.id;
+    prevChatIdRef.current = nextId;
+
     knownMessageIdsRef.current = new Set();
     chatSeededRef.current = false;
     initialScrollDoneRef.current = false;
     lastMessageCountRef.current = 0;
+
+    const pendingToReal =
+      prevId === "__pending__" && !!nextId && nextId !== "__pending__";
+    if (pendingToReal) {
+      return;
+    }
+
     isKeyboardOpenRef.current = false;
     setKeyboardOpen(false);
     setKeyboardInset(0);
