@@ -46,6 +46,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   Animated,
+  BackHandler,
   DeviceEventEmitter,
   Easing,
   FlatList,
@@ -1332,6 +1333,41 @@ export default function SynqScreen() {
     setShowMergeConfirmModal(false);
   };
 
+  const goBackFromChat = useCallback(() => {
+    Keyboard.dismiss();
+    setMessagesPane("inbox");
+    setShowAICard(false);
+    setShowOptionsList(false);
+    setPendingNewChat(null);
+    setIsExploreVisible(false);
+  }, []);
+
+  const closeMessagesModal = useCallback(() => {
+    resetMergeSelect();
+    setInboxActionChat(null);
+    setMessagesModalVisible(false);
+    setMessagesPane("inbox");
+    setActiveChatId(null);
+    setPendingNewChat(null);
+    setMessages([]);
+    setIsExploreVisible(false);
+    setShowOptionsList(false);
+    setShowAICard(false);
+  }, []);
+
+  useEffect(() => {
+    if (!messagesModalVisible) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (messagesPane === "chat") {
+        goBackFromChat();
+        return true;
+      }
+      closeMessagesModal();
+      return true;
+    });
+    return () => sub.remove();
+  }, [messagesModalVisible, messagesPane, goBackFromChat, closeMessagesModal]);
+
   const startCombineWithChat = (chatId: string) => {
     setInboxActionChat(null);
     setMergeSelectMode(true);
@@ -1657,12 +1693,25 @@ export default function SynqScreen() {
             <SynqActivatingView onComplete={completeSynqLaunch} />
           </Reanimated.View>
         )}
-        <Modal visible={messagesModalVisible} animationType="fade" presentationStyle="pageSheet">
+        <Modal
+          visible={messagesModalVisible}
+          animationType="fade"
+          presentationStyle="pageSheet"
+          onRequestClose={() => {
+            if (messagesPane === "chat") {
+              goBackFromChat();
+              return;
+            }
+            closeMessagesModal();
+          }}
+          onDismiss={closeMessagesModal}
+        >
           <View style={styles.modalBg}>
           {messagesPane === "inbox" ? (
             <Reanimated.View
               key="messages-inbox"
               style={styles.messagesPaneFill}
+              pointerEvents={messagesPane === "inbox" ? "auto" : "none"}
               entering={SlideInLeft.duration(300)}
               exiting={SlideOutLeft.duration(280)}
             >
@@ -1673,15 +1722,7 @@ export default function SynqScreen() {
               currentUserId={auth.currentUser?.uid}
               getChatTitle={getChatTitle}
               renderAvatarStack={renderAvatarStack}
-              onCloseMessages={() => {
-                resetMergeSelect();
-                setInboxActionChat(null);
-                setMessagesModalVisible(false);
-                setMessagesPane("inbox");
-                setActiveChatId(null);
-                setPendingNewChat(null);
-                setMessages([]);
-              }}
+              onCloseMessages={closeMessagesModal}
               onOpenChat={async (item) => {
                 prefetchParticipantAvatars(item);
                 setPendingNewChat(null);
@@ -1755,6 +1796,7 @@ export default function SynqScreen() {
             <Reanimated.View
               key="messages-chat"
               style={styles.messagesPaneFill}
+              pointerEvents={messagesPane === "chat" ? "auto" : "none"}
               entering={SlideInRight.duration(300)}
               exiting={SlideOutRight.duration(280)}
             >
@@ -1774,6 +1816,7 @@ export default function SynqScreen() {
               inputText={inputText}
               setInputText={setInputText}
               setMessagesPane={setMessagesPane}
+              onBackFromChat={goBackFromChat}
               setShowAICard={setShowAICard}
               setShowOptionsList={setShowOptionsList}
               setPendingNewChat={setPendingNewChat}

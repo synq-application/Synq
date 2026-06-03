@@ -65,6 +65,7 @@ type Props = {
   inputText: string;
   setInputText: (value: string) => void;
   setMessagesPane: (value: "inbox" | "chat") => void;
+  onBackFromChat: () => void;
   setShowAICard: (value: boolean) => void;
   setShowOptionsList: (value: boolean) => void;
   setPendingNewChat: (value: any) => void;
@@ -111,6 +112,7 @@ export default function MessagesChatPane({
   inputText,
   setInputText,
   setMessagesPane,
+  onBackFromChat,
   setShowAICard,
   setShowOptionsList,
   setPendingNewChat,
@@ -575,13 +577,7 @@ export default function MessagesChatPane({
           </View>
         </View>
         <CloseButton
-          onPress={() => {
-            Keyboard.dismiss();
-            setMessagesPane("inbox");
-            setShowAICard(false);
-            setShowOptionsList(false);
-            setPendingNewChat(null);
-          }}
+          onPress={onBackFromChat}
           accessibilityLabel="Close chat"
         />
       </View>
