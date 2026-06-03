@@ -98,7 +98,9 @@ import ExploreModal from '../explore-modal';
 import {
   getChatTitle as buildChatTitle,
   getStackAvatarUris,
+  isCustomAvatar,
   resolveAvatar,
+  resolveChatSenderAvatar,
   SynqStatus,
   wrapChatTitle,
 } from '../helpers';
@@ -840,40 +842,6 @@ export default function SynqScreen() {
     }
   }, [messagesModalVisible, activeChatId, allChats, messagesPane, pendingNewChat]);
 
-  useEffect(() => {
-    if (!isChatPaneOpen) return;
-    const prefetchUri = (url: unknown) => {
-      const uri = resolveAvatar(url as string | undefined);
-      if (uri) ExpoImage.prefetch(uri).catch(() => {});
-    };
-    if (pendingNewChat) {
-      Object.values(pendingNewChat.participantImages).forEach((u) => prefetchUri(u));
-      return;
-    }
-    if (!activeChatId) return;
-    const chat = allChats.find((c: any) => c.id === activeChatId);
-    Object.values(chat?.participantImages || {}).forEach((u) => prefetchUri(u));
-    const seen = new Set<string>();
-    messages.forEach((m: any) => {
-      const url =
-        chat?.participantImages?.[m.senderId] || m.imageurl;
-      const uri = resolveAvatar(url);
-      if (uri && !seen.has(uri)) {
-        seen.add(uri);
-        ExpoImage.prefetch(uri).catch(() => {});
-      }
-      if (typeof m.venueImage === "string" && m.venueImage.startsWith("http")) {
-        ExpoImage.prefetch(m.venueImage).catch(() => {});
-      }
-    });
-  }, [activeChatId, isChatPaneOpen, pendingNewChat, allChats, messages]);
-
-  const completeSynqLaunch = useCallback(() => {
-    Vibration.vibrate(400);
-    setSynqStatus(setSynq, "active");
-    setLaunchOverlay(false);
-  }, [setSynq]);
-
   const activeParticipantIds = useMemo(() => {
     if (pendingNewChat?.participants?.length) {
       return pendingNewChat.participants.filter(Boolean);
@@ -881,6 +849,112 @@ export default function SynqScreen() {
     const chat = allChats.find((c) => c.id === activeChatId);
     return (chat?.participants ?? []).filter(Boolean);
   }, [pendingNewChat, activeChatId, allChats]);
+
+  const activeParticipantIdsKey = activeParticipantIds.join("|");
+
+  const [liveParticipantImages, setLiveParticipantImages] = useState<
+    Record<string, string>
+  >({});
+
+  useEffect(() => {
+    if (!isChatPaneOpen || activeParticipantIds.length === 0) {
+      setLiveParticipantImages({});
+      return;
+    }
+
+    const unsubs = activeParticipantIds.map((uid: string) =>
+      onSnapshot(
+        doc(db, "users", uid),
+        (snap) => {
+          if (!snap.exists()) {
+            setLiveParticipantImages((prev) => {
+              if (!(uid in prev)) return prev;
+              const next = { ...prev };
+              delete next[uid];
+              return next;
+            });
+            return;
+          }
+          const resolved = resolveAvatar(snap.data()?.imageurl);
+          setLiveParticipantImages((prev) => {
+            if (prev[uid] === resolved) return prev;
+            return { ...prev, [uid]: resolved };
+          });
+          if (isCustomAvatar(resolved)) {
+            ExpoImage.prefetch(resolved).catch(() => {});
+          }
+        },
+        ignoreSnapshotPermissionDenied
+      )
+    );
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+      setLiveParticipantImages({});
+    };
+  }, [isChatPaneOpen, activeParticipantIdsKey]);
+
+  const freshParticipantImages = useCallback(
+    (
+      base: Record<string, string>,
+      participants: string[]
+    ): Record<string, string> => {
+      const images = { ...base };
+      const myId = auth.currentUser?.uid;
+      for (const uid of participants) {
+        const resolved = resolveChatSenderAvatar(uid, {
+          participantImages: images,
+          liveImages: liveParticipantImages,
+          messageImageUrl: uid === myId ? userProfile?.imageurl : undefined,
+        });
+        if (isCustomAvatar(resolved)) {
+          images[uid] = resolved;
+        }
+      }
+      return images;
+    },
+    [liveParticipantImages, userProfile?.imageurl]
+  );
+
+  useEffect(() => {
+    if (!isChatPaneOpen) return;
+    const prefetchUri = (url: unknown) => {
+      const uri = resolveAvatar(url as string | undefined);
+      if (uri) ExpoImage.prefetch(uri).catch(() => {});
+    };
+    if (pendingNewChat) {
+      const images = freshParticipantImages(
+        pendingNewChat.participantImages,
+        pendingNewChat.participants
+      );
+      Object.values(images).forEach((u) => prefetchUri(u));
+      return;
+    }
+    if (!activeChatId) return;
+    const chat = allChats.find((c: any) => c.id === activeChatId);
+    Object.values(chat?.participantImages || {}).forEach((u) => prefetchUri(u));
+    const seen = new Set<string>();
+    messages.forEach((m: any) => {
+      const uri = resolveChatSenderAvatar(m.senderId, {
+        participantImages: chat?.participantImages,
+        messageImageUrl: m.imageurl,
+        liveImages: liveParticipantImages,
+      });
+      if (isCustomAvatar(uri) && !seen.has(uri)) {
+        seen.add(uri);
+        ExpoImage.prefetch(uri).catch(() => {});
+      }
+      if (typeof m.venueImage === "string" && m.venueImage.startsWith("http")) {
+        ExpoImage.prefetch(m.venueImage).catch(() => {});
+      }
+    });
+  }, [activeChatId, isChatPaneOpen, pendingNewChat, allChats, messages, liveParticipantImages, freshParticipantImages]);
+
+  const completeSynqLaunch = useCallback(() => {
+    Vibration.vibrate(400);
+    setSynqStatus(setSynq, "active");
+    setLaunchOverlay(false);
+  }, [setSynq]);
 
   const [chatAiLocationReady, setChatAiLocationReady] = useState<boolean | null>(
     null
@@ -1035,10 +1109,14 @@ export default function SynqScreen() {
     try {
       let chatId = activeChatId;
       if (pendingNewChat) {
+        const participantImages = freshParticipantImages(
+          pendingNewChat.participantImages,
+          pendingNewChat.participants
+        );
         const chatRef = await addDoc(collection(db, 'chats'), {
           participants: pendingNewChat.participants,
           participantNames: pendingNewChat.participantNames,
-          participantImages: pendingNewChat.participantImages,
+          participantImages,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           lastMessage: '',
@@ -1049,10 +1127,12 @@ export default function SynqScreen() {
       }
       if (!chatId) return;
 
+      const myAvatar = resolveAvatar(userProfile?.imageurl);
+
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         text: textToSend,
         senderId: auth.currentUser.uid,
-        imageurl: resolveAvatar(userProfile?.imageurl),
+        imageurl: myAvatar,
         venueImage: selectedOption?.imageUrl || selectedOption?.imageurl || null,
         createdAt: serverTimestamp()
       });
@@ -1060,7 +1140,8 @@ export default function SynqScreen() {
       await updateDoc(doc(db, 'chats', chatId), {
         lastMessage: selectedOption ? `Shared: ${selectedOption.name}` : 'AI Suggestion shared',
         lastMessageSenderId: auth.currentUser.uid,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        [`participantImages.${auth.currentUser.uid}`]: myAvatar,
       });
 
       setIsExploreVisible(false);
@@ -1186,10 +1267,14 @@ export default function SynqScreen() {
       let otherParticipants: string[];
 
       if (pendingNewChat) {
+        const participantImages = freshParticipantImages(
+          pendingNewChat.participantImages,
+          pendingNewChat.participants
+        );
         const chatRef = await addDoc(collection(db, 'chats'), {
           participants: pendingNewChat.participants,
           participantNames: pendingNewChat.participantNames,
-          participantImages: pendingNewChat.participantImages,
+          participantImages,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           lastMessage: '',
@@ -1203,17 +1288,20 @@ export default function SynqScreen() {
         otherParticipants = currentChat.participants.filter((pId: string) => pId !== myId);
       }
 
+      const myAvatar = resolveAvatar(userProfile?.imageurl);
+
       await addDoc(collection(db, 'chats', chatId!, 'messages'), {
         text,
         senderId: myId,
-        imageurl: resolveAvatar(userProfile?.imageurl),
+        imageurl: myAvatar,
         createdAt: serverTimestamp()
       });
 
       await updateDoc(doc(db, 'chats', chatId!), {
         lastMessage: text,
         lastMessageSenderId: myId,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        [`participantImages.${myId}`]: myAvatar,
       });
       otherParticipants.forEach(async (pId: string) => {
         const mySideFriendDoc = doc(db, 'users', myId, 'friends', pId);
@@ -1453,6 +1541,17 @@ export default function SynqScreen() {
       }
     : visibleChats.find((c) => c.id === activeChatId);
 
+  const activeChatResolved = useMemo(() => {
+    if (!activeChat) return activeChat;
+    return {
+      ...activeChat,
+      participantImages: freshParticipantImages(
+        activeChat.participantImages || {},
+        activeParticipantIds
+      ),
+    };
+  }, [activeChat, activeParticipantIds, freshParticipantImages]);
+
   const renderAvatarStack = (images: any) => {
     const stackUris = getStackAvatarUris(images, auth.currentUser?.uid);
 
@@ -1664,7 +1763,7 @@ export default function SynqScreen() {
               <MessagesChatPane
               styles={styles}
               insetsTop={insets.top}
-              activeChat={activeChat}
+              activeChat={activeChatResolved}
               getChatTitle={getChatTitle}
               renderAvatarStack={renderAvatarStack}
               rotatingAIText={rotatingAIText}

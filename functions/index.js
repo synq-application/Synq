@@ -779,7 +779,7 @@ function isSynqActive(userData) {
   return Date.now() - ms <= SYNQ_EXPIRATION_MS;
 }
 
-const { isRecipientInSynqVisibleTo } = require("../src/lib/synqBroadcastCore");
+const { isRecipientInSynqVisibleTo } = require("./synqBroadcastCore");
 
 const synqBroadcastClearFields = {
   synqBroadcastMode: admin.firestore.FieldValue.delete(),
@@ -1280,6 +1280,83 @@ exports.onFriendSynqActivated = onDocumentUpdated(
   }
 );
 
+const PLACES_FIELD_MASK =
+    "places.displayName,places.rating,places.photos,places.shortFormattedAddress,places.formattedAddress";
+
+async function resolvePlacePhotoUrl(photoName, googleKey) {
+    if (!photoName) return null;
+    try {
+        const res = await axios.get(
+            `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=400`,
+            {
+                headers: { "X-Goog-Api-Key": googleKey },
+                maxRedirects: 0,
+                validateStatus: (status) => status === 302 || status === 200,
+            }
+        );
+        if (res.status === 302 && res.headers.location) {
+            return res.headers.location;
+        }
+    } catch (e) {
+        logWarn("resolvePlacePhotoUrl", { message: e?.message });
+    }
+    return null;
+}
+
+async function enrichVenueFromPlaces(venue, location, googleKey) {
+    const fallbackName = String(venue?.name || "").trim();
+    const base = {
+        name: fallbackName,
+        rating: "4.0",
+        imageUrl: null,
+        location: location,
+        address: location,
+    };
+    if (!fallbackName) return base;
+
+    try {
+        const googleRes = await axios.post(
+            "https://places.googleapis.com/v1/places:searchText",
+            { textQuery: `${fallbackName}, ${location}` },
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Goog-Api-Key": googleKey,
+                    "X-Goog-FieldMask": PLACES_FIELD_MASK,
+                },
+                timeout: 12000,
+            }
+        );
+
+        const place = googleRes.data.places?.[0];
+        if (!place) return base;
+
+        const resolvedName =
+            place.displayName?.text || fallbackName;
+        const shortAddress =
+            place.shortFormattedAddress || place.formattedAddress || location;
+        const fullAddress = place.formattedAddress || shortAddress || location;
+        let imageUrl = await resolvePlacePhotoUrl(
+            place.photos?.[0]?.name,
+            googleKey
+        );
+
+        return {
+            name: resolvedName,
+            rating: place.rating ? Number(place.rating).toFixed(1) : "4.0",
+            imageUrl,
+            location: shortAddress,
+            address: fullAddress,
+        };
+    } catch (e) {
+        logWarn("enrichVenueFromPlaces", {
+            venue: fallbackName,
+            message: e?.message,
+        });
+        return base;
+    }
+}
+
 exports.getSynqSuggestions = onCall(
     {
         secrets: ["GEMINI_API_KEY", "GOOGLE_MAPS_API_KEY"],
@@ -1293,54 +1370,44 @@ exports.getSynqSuggestions = onCall(
         try {
             const geminiKey = process.env.GEMINI_API_KEY;
             const googleKey = process.env.GOOGLE_MAPS_API_KEY;
-            const { shared, location, category } = request.data;
-            const genAI = new GoogleGenerativeAI(geminiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            if (!geminiKey || !googleKey) {
+                throw new HttpsError(
+                    "failed-precondition",
+                    "Suggestion service is not configured."
+                );
+            }
 
-            const prompt = `You are a local expert in ${location}. Based on interests: ${shared.join(
+            const { shared, location, category } = request.data || {};
+            if (!location || !category) {
+                throw new HttpsError(
+                    "invalid-argument",
+                    "Location and category are required."
+                );
+            }
+
+            const interests = Array.isArray(shared) ? shared : ["exploring new spots"];
+            const genAI = new GoogleGenerativeAI(geminiKey);
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+            const prompt = `You are a local expert in ${location}. Based on interests: ${interests.join(
                 ", "
-            )}, suggest 3 ${category} venues. Return ONLY a JSON array: [{"name":"Venue Name"}]`;
+            )}, suggest 3 real, well-known ${category} venues in ${location}. Use exact business names locals would recognize. Return ONLY a JSON array: [{"name":"Venue Name"}]`;
 
             const result = await model.generateContent(prompt);
             const rawText = result?.response?.text?.() || "";
             const cleaned = rawText.replace(/```json|```/g, "").trim();
-
-            let venues = JSON.parse(cleaned);
-            const enrichedSuggestions = [];
-
-            for (const venue of venues) {
-                try {
-                    const googleRes = await axios.post(
-                        "https://places.googleapis.com/v1/places:searchText",
-                        { textQuery: `${venue.name} in ${location}` },
-                        {
-                            headers: {
-                                "Content-Type": "application/json",
-                                "X-Goog-Api-Key": googleKey,
-                                "X-Goog-FieldMask": "places.displayName,places.rating,places.photos,places.shortFormattedAddress,places.formattedAddress",
-                            },
-                        }
-                    );
-
-                    const place = googleRes.data.places?.[0];
-                    let imageUrl = "https://via.placeholder.com/150";
-
-                    if (place?.photos?.length > 0) {
-                        const photoName = place.photos[0].name;
-                        imageUrl = `https://places.googleapis.com/v1/${photoName}/media?key=${googleKey}&maxWidthPx=400`;
-                    }
-
-                    enrichedSuggestions.push({
-                        ...venue,
-                        rating: place?.rating ? Number(place.rating).toFixed(1) : "4.0",
-                        imageUrl,
-                        location: place?.shortFormattedAddress || "Location not available",
-                        address: place?.formattedAddress || "Address not available",
-                    });
-                } catch (e) {
-                    enrichedSuggestions.push({ ...venue, imageUrl: "https://via.placeholder.com/150", rating: "4.0" });
-                }
+            const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) {
+                throw new Error("Gemini returned an invalid venue list.");
             }
+
+            let venues = JSON.parse(jsonMatch[0]);
+            if (!Array.isArray(venues) || venues.length === 0) {
+                throw new Error("Gemini returned no venues.");
+            }
+            const enrichedSuggestions = await Promise.all(
+                venues.map((venue) => enrichVenueFromPlaces(venue, location, googleKey))
+            );
 
             return { suggestions: enrichedSuggestions };
         } catch (error) {

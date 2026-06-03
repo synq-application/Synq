@@ -75,6 +75,34 @@ export const resolveAvatar = (url?: any) => {
   return DEFAULT_AVATAR;
 };
 
+export function isCustomAvatar(url?: unknown): url is string {
+  return (
+    typeof url === "string" &&
+    url.trim().startsWith("http") &&
+    url.trim() !== DEFAULT_AVATAR
+  );
+}
+
+/** Prefer the newest real profile photo over stale chat snapshots or placeholders. */
+export function resolveChatSenderAvatar(
+  senderId: string,
+  opts: {
+    participantImages?: Record<string, string>;
+    messageImageUrl?: unknown;
+    liveImages?: Record<string, string>;
+  }
+): string {
+  const candidates = [
+    opts.liveImages?.[senderId],
+    opts.messageImageUrl,
+    opts.participantImages?.[senderId],
+  ];
+  for (const candidate of candidates) {
+    if (isCustomAvatar(candidate)) return candidate.trim();
+  }
+  return DEFAULT_AVATAR;
+}
+
 /** Max faces shown in inbox/chat overlapping avatar stacks (3+ person chats still show 2). */
 export const MAX_STACK_AVATARS = 2;
 

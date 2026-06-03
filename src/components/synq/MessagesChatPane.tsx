@@ -33,7 +33,12 @@ import {
 } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { formatTime, parseIdeaText, resolveAvatar } from "../../../app/helpers";
+import {
+  formatTime,
+  parseIdeaText,
+  resolveAvatar,
+  resolveChatSenderAvatar,
+} from "../../../app/helpers";
 
 const MESSAGE_ENTER = FadeInUp.duration(200);
 const COMPOSER_KEYBOARD_GAP = 14;
@@ -356,9 +361,10 @@ export default function MessagesChatPane({
       const isSystemMessage = item.type === "system";
       const isSystemIdea =
         item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
-      const senderAvatar = resolveAvatar(
-        activeChat?.participantImages?.[item.senderId] || item.imageurl
-      );
+      const senderAvatar = resolveChatSenderAvatar(item.senderId, {
+        participantImages: activeChat?.participantImages,
+        messageImageUrl: item.imageurl,
+      });
       const RowWrapper = animateEntry ? Animated.View : View;
       const rowWrapperProps = animateEntry ? { entering: MESSAGE_ENTER } : {};
 
@@ -458,7 +464,7 @@ export default function MessagesChatPane({
                   style={styles.chatAvatar}
                   cachePolicy="memory-disk"
                   transition={0}
-                  recyclingKey={senderAvatar}
+                  recyclingKey={`${item.senderId}-${senderAvatar}`}
                 />
               )}
 
@@ -579,6 +585,7 @@ export default function MessagesChatPane({
           accessibilityLabel="Close chat"
         />
       </View>
+      <View style={styles.chatHeaderDivider} />
 
       <View style={{ flex: 1, paddingBottom: keyboardInset }}>
         <View style={styles.chatBody}>
