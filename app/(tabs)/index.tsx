@@ -1,5 +1,6 @@
 import ProfileTabHeaderOverlay from '@/src/components/ProfileTabHeaderOverlay';
 import { useBlockedUsers } from '@/src/lib/blockedUsers';
+import { deleteChat } from '@/src/lib/chats';
 import { filterOrReject } from '@/src/lib/contentFilter';
 import { ignoreSnapshotPermissionDenied } from '@/src/lib/firestoreListeners';
 import { subscribeFriendGroups, type FriendGroup } from '@/src/lib/friendGroups';
@@ -30,7 +31,6 @@ import {
   arrayRemove,
   arrayUnion,
   collection,
-  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -1779,9 +1779,18 @@ export default function SynqScreen() {
                       setMessages([]);
                       setMessagesPane("inbox");
                     }
+                    if (pinnedChatIds.includes(chatId)) {
+                      setUserProfile((prev: any) => ({
+                        ...prev,
+                        pinnedChatIds: (Array.isArray(prev?.pinnedChatIds)
+                          ? prev.pinnedChatIds
+                          : []
+                        ).filter((id: string) => id !== chatId),
+                      }));
+                    }
                     setAllChats((prev) => prev.filter((c) => c.id !== chatId));
                     try {
-                      await deleteDoc(doc(db, "chats", chatId));
+                      await deleteChat(chatId);
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     } catch {
                       showActionError("Could not delete chat. Please try again.");
