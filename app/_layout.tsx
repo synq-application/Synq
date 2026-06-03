@@ -70,6 +70,10 @@ void SplashScreen.preventAutoHideAsync();
 /** Must match app.json expo.splash.backgroundColor (BG) */
 const SPLASH_LOGO = require("../assets/logo.png");
 
+/** Never block touches longer than this (App Store / slow Firestore). */
+const BOOT_SPLASH_MAX_MS = 6000;
+const PROFILE_GATE_TIMEOUT_MS = 12000;
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -336,6 +340,13 @@ export default function RootLayout() {
     return () => clearTimeout(timeoutId);
   }, []);
 
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setBootSplashDismissed(true);
+    }, BOOT_SPLASH_MAX_MS);
+    return () => clearTimeout(timeoutId);
+  }, []);
+
   const hideNativeSplash = () => {
     if (nativeSplashHiddenRef.current || !assetsReady) return;
     nativeSplashHiddenRef.current = true;
@@ -464,6 +475,29 @@ export default function RootLayout() {
     const cachedGate = profileGateFromCache(user.uid);
     if (cachedGate) setUserProfileGate(cachedGate);
 
+    const gateTimeoutId = setTimeout(() => {
+      if (cancelled) return;
+      setUserProfileGate((prev) => {
+        if (prev) return prev;
+        return (
+          cachedGate ?? {
+            hasDisplayName: !!user.displayName,
+            hasLocation: false,
+          }
+        );
+      });
+      setCommunityTermsOk((prev) => {
+        if (prev !== null) return prev;
+        return cachedGate?.hasDisplayName || !!user.displayName ? true : false;
+      });
+    }, PROFILE_GATE_TIMEOUT_MS);
+
+    const markTermsOkForReturningUser = () => {
+      if (cancelled) return;
+      setCommunityTermsOk(true);
+      void persistCommunityTermsAcceptance(user.uid).catch(() => {});
+    };
+
     (async () => {
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
@@ -508,27 +542,33 @@ export default function RootLayout() {
 
         // Returning accounts: terms were accepted at sign-up; do not re-prompt on login.
         if (hasDisplayName) {
-          await persistCommunityTermsAcceptance(user.uid);
-          if (!cancelled) setCommunityTermsOk(true);
+          markTermsOkForReturningUser();
           return;
         }
 
         const preAuth = await getPreAuthTermsAccepted();
         if (preAuth) {
-          await persistCommunityTermsAcceptance(user.uid);
-          if (!cancelled) setCommunityTermsOk(true);
+          markTermsOkForReturningUser();
           return;
         }
         if (!cancelled) setCommunityTermsOk(false);
       } catch {
         if (!cancelled) {
-          setCommunityTermsOk(false);
-          setUserProfileGate(null);
+          const fallbackGate =
+            cachedGate ??
+            (user.displayName
+              ? { hasDisplayName: true, hasLocation: false }
+              : { hasDisplayName: false, hasLocation: false });
+          setUserProfileGate(fallbackGate);
+          setCommunityTermsOk(
+            fallbackGate.hasDisplayName ? true : false
+          );
         }
       }
     })();
     return () => {
       cancelled = true;
+      clearTimeout(gateTimeoutId);
     };
   }, [user?.uid]);
 
@@ -718,8 +758,8 @@ export default function RootLayout() {
   ]);
 
   const synqBootReady = user == null || synqBoot !== null;
-  const authGateReady =
-    !user || (userProfileGate !== null && communityTermsOk !== null);
+  /** Splash only waits for profile gate; routing still waits on communityTermsOk. */
+  const authGateReady = !user || userProfileGate !== null;
   const onOnboardingScreen =
     segments[0] === "location" ||
     (segments[0] === "(auth)" && segments[1] === "location") ||
@@ -756,9 +796,7 @@ export default function RootLayout() {
   }, [shouldDismissBootSplash]);
 
   const showBootSplashOverlay =
-    !hideBootSplashDuringSignup &&
-    (holdSplashForStaleOnboarding ||
-      !bootSplashDismissed);
+    !bootSplashDismissed && !hideBootSplashDuringSignup;
 
   useEffect(() => {
     if (showBootSplashOverlay) return;
