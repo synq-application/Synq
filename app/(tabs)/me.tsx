@@ -814,29 +814,21 @@ export default function ProfileScreen() {
   }, [auth.currentUser?.uid, fetchInviteCode]);
 
   const shareProfile = async () => {
-    const fallbackUid = auth.currentUser?.uid;
-    const fallbackUrl = fallbackUid
-      ? `synq://invite?inviteFrom=${encodeURIComponent(fallbackUid)}`
-      : "";
+    if (!profileQrUrl) {
+      showAlert(
+        "Share unavailable",
+        "We couldn't generate your profile link yet. Please try again in a moment."
+      );
+      return;
+    }
+    const name = auth.currentUser?.displayName?.trim() || "me";
     try {
-      const code = await fetchInviteCode();
-      const url = `synq://invite/${encodeURIComponent(code)}`;
       await Share.share({
-        message: `Join me on Synq and let's connect: ${url}`,
-        url,
+        message: `View my Synq profile and connect: ${profileQrUrl}`,
+        url: profileQrUrl,
       });
     } catch {
-      if (!fallbackUrl) {
-        showAlert(
-          "We couldn't generate your invite link yet. Please try again in a moment.",
-          "Share unavailable"
-        );
-        return;
-      }
-      await Share.share({
-        message: `Join me on Synq and let's connect: ${fallbackUrl}`,
-        url: fallbackUrl,
-      });
+      // User dismissed the share sheet.
     }
   };
 

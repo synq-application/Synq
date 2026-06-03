@@ -134,11 +134,27 @@ const AuthContext = createContext({
 export const useAuthRefresh = () => useContext(AuthContext);
 const PENDING_INVITE_FROM_UID_KEY = "synq:pendingInviteFromUid";
 const PENDING_INVITE_CODE_KEY = "synq:pendingInviteCode";
+const PENDING_FRIEND_PROFILE_ID_KEY = "synq:pendingFriendProfileId";
 
 function cleanUid(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const v = raw.trim();
   return v ? v : null;
+}
+
+function parseFriendProfileIdFromUrl(url: string): string | null {
+  try {
+    const parsed = Linking.parse(url);
+    const path = String(parsed.path || "").trim().replace(/^\//, "");
+    const hostname = String(parsed.hostname || "").trim();
+    const isFriendProfile =
+      hostname === "friend-profile" || path === "friend-profile";
+    if (!isFriendProfile) return null;
+    const friendIdRaw = parsed.queryParams?.friendId;
+    return cleanUid(Array.isArray(friendIdRaw) ? friendIdRaw[0] : friendIdRaw);
+  } catch {
+    return null;
+  }
 }
 
 function snoozedUntilMsFromField(raw: unknown): number {
@@ -193,9 +209,15 @@ export default function RootLayout() {
   };
 
   useEffect(() => {
-    const captureInviteFromUrl = async (url: string | null) => {
+    const captureDeepLinkFromUrl = async (url: string | null) => {
       if (!url) return;
       try {
+        const friendId = parseFriendProfileIdFromUrl(url);
+        if (friendId) {
+          await AsyncStorage.setItem(PENDING_FRIEND_PROFILE_ID_KEY, friendId);
+          return;
+        }
+
         const parsed = Linking.parse(url);
         const path = String(parsed.path || "").trim();
         const fromRaw = parsed.queryParams?.from ?? parsed.queryParams?.inviteFrom;
@@ -214,9 +236,9 @@ export default function RootLayout() {
       } catch {}
     };
 
-    void Linking.getInitialURL().then(captureInviteFromUrl);
+    void Linking.getInitialURL().then(captureDeepLinkFromUrl);
     const sub = Linking.addEventListener("url", ({ url }) => {
-      void captureInviteFromUrl(url);
+      void captureDeepLinkFromUrl(url);
     });
     return () => sub.remove();
   }, []);
@@ -558,11 +580,15 @@ export default function RootLayout() {
     const onDetailsPage = segments[1] === "details";
     const onProfilePhotoCropPage = segments[0] === "profile-photo-crop";
     const onCommunityTermsPage = segments[1] === "community-terms";
+    const onFriendProfile = segments[0] === "friend-profile";
     const hasName =
       !!user?.displayName || userProfileGate?.hasDisplayName === true;
 
     if (!user) {
-      if (!inAuthGroup) router.replace("/(auth)/welcome");
+      if (!inAuthGroup) {
+        if (onFriendProfile && !authReady) return;
+        router.replace("/(auth)/welcome");
+      }
       return;
     }
 
@@ -659,6 +685,45 @@ export default function RootLayout() {
 
     void processPendingInvite();
   }, [authReady, navReady, user?.uid, user?.displayName, userProfileGate]);
+
+  useEffect(() => {
+    if (!authReady || !navReady || !assetsReady) return;
+    if (!user?.uid) return;
+    const hasName =
+      !!user.displayName || userProfileGate?.hasDisplayName === true;
+    if (!hasName) return;
+    if (synqBoot === null) return;
+
+    let cancelled = false;
+    const processPendingFriendProfile = async () => {
+      const friendId = cleanUid(
+        await AsyncStorage.getItem(PENDING_FRIEND_PROFILE_ID_KEY)
+      );
+      if (!friendId || cancelled) return;
+      await AsyncStorage.removeItem(PENDING_FRIEND_PROFILE_ID_KEY);
+      if (friendId === user.uid) return;
+      if (segments[0] === "friend-profile") return;
+      router.push({
+        pathname: "/friend-profile",
+        params: { friendId },
+      });
+    };
+
+    void processPendingFriendProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authReady,
+    navReady,
+    assetsReady,
+    user?.uid,
+    user?.displayName,
+    userProfileGate,
+    synqBoot,
+    segments,
+    router,
+  ]);
 
   useEffect(() => {
     if (!authReady || !navReady || !assetsReady) return;
