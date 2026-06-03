@@ -296,7 +296,7 @@ export interface Friend {
 export const AI_PLACE_SUGGESTIONS_ENABLED = false;
 
 /** Native builds below this must update (set Firestore appConfig/global to raise). */
-export const MINIMUM_NATIVE_BUILD_NUMBER = 5;
+export const MINIMUM_NATIVE_BUILD_NUMBER = 6;
 
 export const aiPrompts = [
     "Let Synq pick the move",
