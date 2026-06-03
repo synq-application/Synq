@@ -24,7 +24,7 @@ import {
   TAB_BAR_SCROLL_INSET,
 } from "../../../constants/Variables";
 
-/** Matches memo + audience lead icons on the active Synq screen. */
+/** Matches audience lead icon on the active Synq screen. */
 const ACTIVE_LEAD_ICON_SIZE = 20;
 /** Fade strip sitting just above the Select friends button. */
 const ACTIVE_LIST_BOTTOM_FADE_HEIGHT = 52;
@@ -33,7 +33,6 @@ const ACTIVE_CTA_BOTTOM_NUDGE = 48;
 
 type Props = {
   styles: any;
-  memo: string;
   hasUnread: boolean;
   activePulseOpacity: Animated.Value;
   activePulseScale: Animated.Value;
@@ -51,7 +50,6 @@ type Props = {
 
 export default function ActiveSynqSection({
   styles,
-  memo,
   hasUnread,
   activePulseOpacity,
   activePulseScale,
@@ -125,22 +123,6 @@ export default function ActiveSynqSection({
         ]}
       >
       <View style={styles.headerDivider} />
-
-      {memo.trim() !== "" ? (
-        <View style={styles.activeMemoRow}>
-          <View style={styles.activeMemoCard}>
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={ACTIVE_LEAD_ICON_SIZE}
-              color={ACCENT}
-              style={styles.activeSynqLeadIcon}
-            />
-            <Text style={styles.activeMemoText} numberOfLines={6}>
-              {memo.trim()}
-            </Text>
-          </View>
-        </View>
-      ) : null}
 
       <View style={styles.activeListFooterDock}>
         {audienceLabel ? (

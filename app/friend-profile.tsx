@@ -32,7 +32,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
-  InteractionManager,
   Modal,
   Pressable,
   ScrollView,
@@ -172,15 +171,12 @@ export default function FriendProfile() {
     try {
       await removeFriendMutual(friendKey);
       setIsFriend(false);
-      setRemovingFriend(false);
-      await new Promise<void>((resolve) => {
-        InteractionManager.runAfterInteractions(() => resolve());
-      });
       goBackOrHome();
     } catch (e) {
       console.error("Failed to remove friend", e);
-      setRemovingFriend(false);
       showAlert("Could not remove friend", removeFriendMutualErrorMessage(e));
+    } finally {
+      setRemovingFriend(false);
     }
   }, [friendKey, goBackOrHome]);
 

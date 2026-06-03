@@ -30,7 +30,7 @@ async function removeFriendMutualClient(uid: string, otherUid: string) {
   await pruneFriendFromAllGroups(uid, otherUid);
 }
 
-/** Removes friendship on both sides; falls back to client writes if the callable is unavailable. */
+/** Removes friendship on both sides; client writes first for speed, server callable for extra cleanup. */
 export async function removeFriendMutual(otherUid: string): Promise<void> {
   const uid = auth.currentUser?.uid;
   if (!uid || !otherUid || otherUid === uid) {
@@ -38,21 +38,21 @@ export async function removeFriendMutual(otherUid: string): Promise<void> {
   }
 
   try {
-    const fn = httpsCallable(functions, "removeFriendMutual");
-    await fn({ otherUid });
-  } catch (e: unknown) {
-    const code = String((e as { code?: string })?.code || "");
-    const canFallback =
-      code.includes("not-found") ||
-      code.includes("unavailable") ||
-      code.includes("internal");
-    if (!canFallback) {
-      throw e;
-    }
     await removeFriendMutualClient(uid, otherUid);
+    pruneRemovedFriendFromCache(uid, otherUid);
+  } catch (clientErr) {
+    try {
+      const fn = httpsCallable(functions, "removeFriendMutual");
+      await fn({ otherUid });
+      pruneRemovedFriendFromCache(uid, otherUid);
+    } catch (callableErr: unknown) {
+      throw clientErr ?? callableErr;
+    }
+    return;
   }
 
-  pruneRemovedFriendFromCache(uid, otherUid);
+  // Best-effort server cleanup the client cannot do (other user's outgoing index + group membership).
+  void httpsCallable(functions, "removeFriendMutual")({ otherUid }).catch(() => {});
 }
 
 export function removeFriendMutualErrorMessage(err: unknown): string {

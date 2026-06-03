@@ -1640,7 +1640,6 @@ export default function SynqScreen() {
             <ProfileTabHeaderOverlay variant="title" />
             <ActiveSynqSection
               styles={styles}
-              memo={memo}
               hasUnread={hasUnread}
               activePulseOpacity={activePulseOpacity}
               activePulseScale={activePulseScale}
