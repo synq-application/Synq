@@ -2617,9 +2617,9 @@ const styles = StyleSheet.create({
     borderRadius: 31,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(43,255,136,0.08)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(43,255,136,0.24)",
+    borderColor: "rgba(255,255,255,0.22)",
     marginBottom: 14,
   },
   inboxEmptyTitle: {

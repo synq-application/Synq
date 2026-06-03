@@ -1,7 +1,7 @@
 import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
 import ChatInboxActionSheet from "@/src/components/synq/ChatInboxActionSheet";
-import { ACCENT, MUTED2 } from "@/constants/Variables";
+import { MUTED2 } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React from "react";
@@ -237,7 +237,7 @@ export default function MessagesInboxPane({
         ListEmptyComponent={
           <View style={styles.inboxEmptyWrap}>
             <View style={styles.inboxEmptyIconWrap}>
-              <Ionicons name="chatbubbles-outline" size={28} color={ACCENT} />
+              <Ionicons name="chatbubbles-outline" size={28} color={MUTED2} />
             </View>
             <Text style={styles.inboxEmptyTitle}>No messages yet</Text>
             <Text style={styles.inboxEmptySub}>

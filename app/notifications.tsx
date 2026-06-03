@@ -121,7 +121,7 @@ function NotificationsEmptyState() {
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyIconRing}>
-        <Ionicons name="notifications-outline" size={34} color={ACCENT} />
+        <Ionicons name="notifications-off-outline" size={34} color={MUTED2} />
       </View>
       <Text style={styles.emptyHeadline}>No notifications</Text>
       <Text style={styles.emptyHelper}>
@@ -965,8 +965,8 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 1,
-    borderColor: "rgba(0,255,133,0.22)",
-    backgroundColor: "rgba(0,255,133,0.06)",
+    borderColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: SPACE_5,
