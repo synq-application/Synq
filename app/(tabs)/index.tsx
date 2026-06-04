@@ -72,7 +72,7 @@ import Reanimated, {
   SlideOutLeft,
   SlideOutRight,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ACCENT,
   AI_PLACE_SUGGESTIONS_ENABLED,
@@ -1791,6 +1791,7 @@ export default function SynqScreen() {
           visible={messagesModalVisible}
           animationType="fade"
           presentationStyle="pageSheet"
+          allowSwipeDismissal={false}
           onRequestClose={() => {
             if (messagesPane === "chat") {
               goBackFromChat();
@@ -1800,7 +1801,7 @@ export default function SynqScreen() {
           }}
           onDismiss={closeMessagesModal}
         >
-          <View style={styles.modalBg}>
+          <SafeAreaView style={styles.modalBg} edges={["top", "bottom"]}>
           {messagesPane === "inbox" ? (
             <Reanimated.View
               key="messages-inbox"
@@ -1978,13 +1979,13 @@ export default function SynqScreen() {
               )}
             </Reanimated.View>
           )}
-          </View>
           <AlertModal
             visible={contentAlertVisible}
             title={contentAlertTitle}
             message={contentAlertMessage}
             onClose={() => setContentAlertVisible(false)}
           />
+          </SafeAreaView>
         </Modal>
 
         <EditSynqModal
@@ -2066,7 +2067,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 10,
-    marginBottom: 14,
+    marginBottom: 8,
     paddingVertical: 6,
     paddingLeft: 14,
   },
@@ -2074,8 +2075,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-start",
     alignItems: "center",
-    marginTop: SPACE_3,
-    marginBottom: 14,
+    marginTop: 4,
+    marginBottom: 10,
   },
   activeFriendsList: { flex: 1 },
   activeListContent: { paddingHorizontal: 0 },
@@ -2524,7 +2525,7 @@ const styles = StyleSheet.create({
   },
   inboxCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
   stackedPhoto: { width: 40, height: 40, borderRadius: 20, position: 'absolute', borderWidth: 2, borderColor: 'black' },
-  msgContainer: { marginBottom: 18 },
+  msgContainer: { marginBottom: 12 },
   chatAvatar: {
     width: 34,
     height: 34,
@@ -2570,7 +2571,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 18,
-    paddingBottom: 10,
+    paddingBottom: 6,
     overflow: 'visible',
   },
   chatHeaderMain: {
@@ -2594,14 +2595,13 @@ const styles = StyleSheet.create({
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 4,
     overflow: 'visible',
   },
   chatHeaderTextCol: {
     flex: 1,
     minWidth: 0,
     justifyContent: 'center',
-    paddingTop: 5,
+    paddingTop: 2,
   },
   chatHeaderTextColCompact: {
     paddingTop: 0,
@@ -2635,7 +2635,7 @@ const styles = StyleSheet.create({
   chatListContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 6,
+    paddingBottom: 2,
   },
   chatListContentEmpty: {
     flexGrow: 1,
@@ -2646,7 +2646,7 @@ const styles = StyleSheet.create({
     borderTopColor: BORDER,
     backgroundColor: BG,
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 4,
   },
   composerShell: {
     flexDirection: 'row',
@@ -2962,7 +2962,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    marginTop: 5,
+    marginTop: 3,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,

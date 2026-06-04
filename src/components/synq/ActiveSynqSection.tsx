@@ -249,7 +249,7 @@ export default function ActiveSynqSection({
           contentContainerStyle={[
             styles.activeListContent,
             {
-              paddingTop: audienceLabel ? 8 : 12,
+              paddingTop: audienceLabel ? 4 : 8,
               paddingBottom:
                 availableFriends.length > 0
                   ? footerLayout.listBottomPad

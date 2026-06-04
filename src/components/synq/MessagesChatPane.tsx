@@ -3,10 +3,12 @@ import CloseIcon from "@/src/components/CloseIcon";
 import {
   ACCENT,
   BG,
+  HEADER_BLACK,
   MUTED2,
   ON_ACCENT_TEXT,
 } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { Image as ExpoImage } from "expo-image";
 import * as Haptics from "expo-haptics";
 import React, {
@@ -23,8 +25,11 @@ import {
   FlatList,
   Keyboard,
   type KeyboardEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   Pressable,
+  StyleSheet as RNStyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -44,8 +49,19 @@ const COMPOSER_KEYBOARD_GAP = 14;
 const LIST_SCROLL_OVERFLOW_SLACK = 4;
 /** Matches index.tsx SlideInRight on the chat pane. */
 const CHAT_PANE_ENTER_MS = 300;
-/** Long threads use an inverted list so the latest message is shown without a scroll jump. */
-const INVERTED_MESSAGE_THRESHOLD = 8;
+/** Clamp overscroll at the latest-message edge (normal list, offset at bottom). */
+const CHAT_BOTTOM_SCROLL_TOLERANCE = 2;
+/** Fade from black into the message list, starting just under the AI chip row. */
+const CHAT_HEADER_FADE_BELOW_AI = 28;
+/** Modest bump past the header fade overlap (shell uses negative margin). */
+const CHAT_LIST_HEADER_FADE_CLEARANCE = 10;
+const CHAT_HEADER_FADE_GRADIENT = [
+  HEADER_BLACK,
+  "rgba(0,0,0,0.78)",
+  "rgba(0,0,0,0.38)",
+  "rgba(9,10,11,0)",
+] as const;
+const CHAT_HEADER_FADE_LOCATIONS = [0, 0.32, 0.68, 1] as const;
 
 function getKeyboardInset(event: KeyboardEvent): number {
   const { screenY } = event.endCoordinates;
@@ -149,12 +165,7 @@ export default function MessagesChatPane({
   const prevChatIdRef = useRef<string | undefined>(undefined);
   const anchorBottomRef = useRef(true);
   const pendingNormalScrollRef = useRef(false);
-  const [invertedLayout, setInvertedLayout] = useState(false);
-
-  const listData = useMemo(
-    () => (invertedLayout ? [...messages].reverse() : messages),
-    [messages, invertedLayout]
-  );
+  const listData = messages;
 
   useEffect(() => {
     const prevId = prevChatIdRef.current;
@@ -169,9 +180,7 @@ export default function MessagesChatPane({
     }
     lastMessageCountRef.current = 0;
     anchorBottomRef.current = true;
-    setInvertedLayout((messages?.length ?? 0) >= INVERTED_MESSAGE_THRESHOLD);
-    pendingNormalScrollRef.current =
-      messages.length > 0 && messages.length < INVERTED_MESSAGE_THRESHOLD;
+    pendingNormalScrollRef.current = messages.length > 0;
 
     const pendingToReal =
       prevId === "__pending__" && !!nextId && nextId !== "__pending__";
@@ -179,12 +188,6 @@ export default function MessagesChatPane({
       isKeyboardOpenRef.current = false;
       setKeyboardOpen(false);
       setKeyboardInset(0);
-    }
-  }, [activeChat?.id, messages.length]);
-
-  useEffect(() => {
-    if (messages.length >= INVERTED_MESSAGE_THRESHOLD) {
-      setInvertedLayout(true);
     }
   }, [activeChat?.id, messages.length]);
 
@@ -223,38 +226,78 @@ export default function MessagesChatPane({
   const listScrollable =
     listHeight > 0 && contentHeight > listHeight + LIST_SCROLL_OVERFLOW_SLACK;
 
+  const maxScrollOffset = useCallback(() => {
+    const listH = listHeightRef.current;
+    const contentH = contentHeightRef.current;
+    return Math.max(0, contentH - listH);
+  }, []);
+
+  const syncAnchoredToLatest = useCallback(
+    (offsetY: number) => {
+      const maxOffset = maxScrollOffset();
+      const atLatest =
+        maxOffset <= CHAT_BOTTOM_SCROLL_TOLERANCE ||
+        offsetY >= maxOffset - CHAT_BOTTOM_SCROLL_TOLERANCE;
+      anchorBottomRef.current = atLatest;
+      return atLatest;
+    },
+    [maxScrollOffset]
+  );
+
+  const handleChatScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!listScrollable) return;
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      const maxOffset = Math.max(
+        0,
+        contentSize.height - layoutMeasurement.height
+      );
+      let y = contentOffset.y;
+      if (y > maxOffset + CHAT_BOTTOM_SCROLL_TOLERANCE) {
+        flatListRef.current?.scrollToOffset({ offset: maxOffset, animated: false });
+        y = maxOffset;
+      }
+      syncAnchoredToLatest(y);
+    },
+    [listScrollable, flatListRef, syncAnchoredToLatest]
+  );
+
+  const handleChatScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!listScrollable) return;
+      syncAnchoredToLatest(event.nativeEvent.contentOffset.y);
+    },
+    [listScrollable, syncAnchoredToLatest]
+  );
+
   const scrollToLatest = useCallback(
     (animated = false) => {
       if (messages.length === 0) return false;
 
-      if (invertedLayout) {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated });
-        return true;
-      }
-
       const listH = listHeightRef.current;
       const contentH = contentHeightRef.current;
-      if (listH <= 0 || contentH <= listH + LIST_SCROLL_OVERFLOW_SLACK) return false;
+      if (listH <= 0 || contentH <= listH + LIST_SCROLL_OVERFLOW_SLACK) {
+        syncAnchoredToLatest(0);
+        return false;
+      }
 
+      const offset = contentH - listH;
       flatListRef.current?.scrollToEnd({ animated });
-      flatListRef.current?.scrollToOffset({
-        offset: contentH - listH,
-        animated,
-      });
+      flatListRef.current?.scrollToOffset({ offset, animated });
+      syncAnchoredToLatest(offset);
       return true;
     },
-    [messages.length, invertedLayout, flatListRef]
+    [messages.length, flatListRef, syncAnchoredToLatest]
   );
 
   useLayoutEffect(() => {
-    if (invertedLayout || pendingScrollToMessageId) return;
+    if (pendingScrollToMessageId) return;
     if (!messagesReady || messages.length === 0 || !listScrollable) return;
     if (!pendingNormalScrollRef.current) return;
 
     scrollToLatest(false);
     pendingNormalScrollRef.current = false;
   }, [
-    invertedLayout,
     messagesReady,
     messages.length,
     listScrollable,
@@ -371,6 +414,10 @@ export default function MessagesChatPane({
   const listContentStyle = useMemo(
     () => [
       styles.chatListContent,
+      messages.length > 0 && {
+        paddingTop: 12 + CHAT_LIST_HEADER_FADE_CLEARANCE,
+        paddingBottom: 2,
+      },
       messagesReady && messages.length === 0 && styles.chatListContentEmpty,
     ],
     [messages.length, messagesReady, styles.chatListContent, styles.chatListContentEmpty]
@@ -556,69 +603,80 @@ export default function MessagesChatPane({
     ]
   );
 
+  const chatHeaderContentPaddingTop = 10;
+
   return (
     <View style={styles.modalBg}>
-      <View
-        style={[
-          styles.chatHeader,
-          { paddingTop: Math.max(8, insetsTop - 40) },
-        ]}
-      >
-        <View style={styles.chatHeaderMain}>
-          <View style={styles.chatHeaderAvatarSlot}>
-            {renderAvatarStack(activeChat?.participantImages)}
-          </View>
-          <View
-            style={[
-              styles.chatHeaderTextCol,
-              !showAISuggestions &&
-                !showAIUnavailableMessage &&
-                styles.chatHeaderTextColCompact,
-            ]}
-          >
-            <Text style={styles.chatTitle} numberOfLines={1}>
-              {activeChat ? getChatTitle(activeChat) : "Synq Chat"}
-            </Text>
-            {showAISuggestions ? (
-              <TouchableOpacity
-                onPress={() => {
-                  Keyboard.dismiss();
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  onOpenAISuggestions();
-                }}
-                style={styles.aiChipPremium}
-                activeOpacity={0.82}
-                accessibilityRole="button"
-                accessibilityLabel="Open Synq AI place suggestions"
-              >
-                <Ionicons name="sparkles" size={11} color={ACCENT} />
-                <Text style={styles.aiChipTextPremium} numberOfLines={1}>
-                  {rotatingAIText}
-                </Text>
-                <Ionicons name="chevron-forward" size={11} color={MUTED2} />
-              </TouchableOpacity>
-            ) : showAIUnavailableMessage ? (
-              <Text style={styles.aiUnavailableHint} numberOfLines={2}>
-                AI isn't available for this chat until everyone enters their
-                locations.
+      <View style={chatHeaderOverlayStyles.shell}>
+        <View
+          style={[
+            styles.chatHeader,
+            chatHeaderOverlayStyles.headerContent,
+            { paddingTop: chatHeaderContentPaddingTop },
+          ]}
+        >
+          <View style={styles.chatHeaderMain}>
+            <View style={styles.chatHeaderAvatarSlot}>
+              {renderAvatarStack(activeChat?.participantImages)}
+            </View>
+            <View
+              style={[
+                styles.chatHeaderTextCol,
+                !showAISuggestions &&
+                  !showAIUnavailableMessage &&
+                  styles.chatHeaderTextColCompact,
+              ]}
+            >
+              <Text style={styles.chatTitle} numberOfLines={1}>
+                {activeChat ? getChatTitle(activeChat) : "Synq Chat"}
               </Text>
-            ) : null}
+              {showAISuggestions ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    onOpenAISuggestions();
+                  }}
+                  style={styles.aiChipPremium}
+                  activeOpacity={0.82}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Synq AI place suggestions"
+                >
+                  <Ionicons name="sparkles" size={11} color={ACCENT} />
+                  <Text style={styles.aiChipTextPremium} numberOfLines={1}>
+                    {rotatingAIText}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={11} color={MUTED2} />
+                </TouchableOpacity>
+              ) : showAIUnavailableMessage ? (
+                <Text style={styles.aiUnavailableHint} numberOfLines={2}>
+                  AI isn't available for this chat until everyone enters their
+                  locations.
+                </Text>
+              ) : null}
+            </View>
           </View>
+          <CloseButton
+            onPress={onBackFromChat}
+            accessibilityLabel="Close chat"
+          />
         </View>
-        <CloseButton
-          onPress={onBackFromChat}
-          accessibilityLabel="Close chat"
+        <LinearGradient
+          pointerEvents="none"
+          colors={[...CHAT_HEADER_FADE_GRADIENT]}
+          locations={[...CHAT_HEADER_FADE_LOCATIONS]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={chatHeaderOverlayStyles.fadeBelowAi}
         />
       </View>
-      <View style={styles.chatHeaderDivider} />
 
       <View style={{ flex: 1, paddingBottom: keyboardInset }}>
         <View style={styles.chatBody}>
           <View style={styles.chatList}>
           <FlatList
-            key={`${activeChat?.id ?? "chat"}-${invertedLayout ? "inv" : "std"}`}
+            key={`${activeChat?.id ?? "chat"}-std`}
             ref={flatListRef}
-            inverted={invertedLayout}
             style={styles.chatListFill}
             data={listData}
             keyExtractor={(item) => item.id}
@@ -629,6 +687,11 @@ export default function MessagesChatPane({
             bounces={false}
             alwaysBounceVertical={false}
             overScrollMode="never"
+            maintainVisibleContentPosition={
+              messages.length > 0
+                ? { minIndexForVisible: 0, autoscrollToTopThreshold: 24 }
+                : undefined
+            }
             onLayout={(event) => {
               const height = event.nativeEvent.layout.height;
               listHeightRef.current = height;
@@ -638,21 +701,16 @@ export default function MessagesChatPane({
               contentHeightRef.current = height;
               setContentHeight(height);
 
-              const listH = listHeightRef.current;
-              if (
-                !invertedLayout &&
-                listH > 0 &&
-                height > listH + LIST_SCROLL_OVERFLOW_SLACK &&
-                messages.length >= 4
-              ) {
-                setInvertedLayout(true);
+              if (isKeyboardOpenRef.current) {
+                requestAnimationFrame(() => scrollToLatest(false));
                 return;
               }
-
-              if (isKeyboardOpenRef.current) {
+              if (anchorBottomRef.current && listScrollable) {
                 requestAnimationFrame(() => scrollToLatest(false));
               }
             }}
+            scrollEventThrottle={16}
+            onScroll={listScrollable ? handleChatScroll : undefined}
             onScrollBeginDrag={
               listScrollable
                 ? () => {
@@ -660,19 +718,8 @@ export default function MessagesChatPane({
                   }
                 : undefined
             }
-            onMomentumScrollEnd={
-              listScrollable
-                ? (event) => {
-                    const { contentOffset, contentSize, layoutMeasurement } =
-                      event.nativeEvent;
-                    const distanceFromBottom =
-                      contentSize.height -
-                      layoutMeasurement.height -
-                      contentOffset.y;
-                    anchorBottomRef.current = distanceFromBottom < 48;
-                  }
-                : undefined
-            }
+            onScrollEndDrag={listScrollable ? handleChatScrollEnd : undefined}
+            onMomentumScrollEnd={listScrollable ? handleChatScrollEnd : undefined}
             ListEmptyComponent={
               messagesReady ? (
                 <View style={styles.chatEmptyWrap}>
@@ -788,3 +835,17 @@ export default function MessagesChatPane({
     </View>
   );
 }
+
+const chatHeaderOverlayStyles = RNStyleSheet.create({
+  shell: {
+    position: "relative",
+    zIndex: 2,
+    marginBottom: -CHAT_HEADER_FADE_BELOW_AI,
+  },
+  headerContent: {
+    backgroundColor: HEADER_BLACK,
+  },
+  fadeBelowAi: {
+    height: CHAT_HEADER_FADE_BELOW_AI,
+  },
+});
