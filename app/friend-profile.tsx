@@ -1646,18 +1646,19 @@ const styles = StyleSheet.create({
 
   synqsContainer: {
     flexDirection: "row",
-    gap: 20,
+    justifyContent: "flex-start",
+    gap: 14,
   },
 
   connItem: {
     alignItems: "center",
-    width: 80,
+    width: 72,
   },
 
   imageCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 55,
+    height: 55,
+    borderRadius: 50,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.1)",
     justifyContent: "center",
@@ -1667,9 +1668,9 @@ const styles = StyleSheet.create({
   },
 
   connImg: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 55,
+    height: 55,
+    borderRadius: 50,
   },
 
   connName: {
