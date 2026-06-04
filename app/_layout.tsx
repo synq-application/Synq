@@ -56,7 +56,10 @@ import {
 import { SynqBootProvider } from "../src/lib/synqBootContext";
 import {
   computeSynqActiveFromUserData,
+  getCachedSynqActiveSync,
+  hydrateSynqStatusFromDisk,
   readCachedSynqActive,
+  writeCachedSynqActive,
 } from "../src/lib/synqSession";
 import {
   displayNameFromUserDoc,
@@ -348,23 +351,22 @@ export default function RootLayout() {
     let cancelled = false;
     if (synqBootUidRef.current !== user.uid) {
       synqBootUidRef.current = user.uid;
-      setSynqBoot({ cachedSynqActive: false });
+      setSynqBoot({ cachedSynqActive: getCachedSynqActiveSync(user.uid) });
     }
     (async () => {
-      let cachedSynqActive = false;
+      let cachedSynqActive = getCachedSynqActiveSync(user.uid);
       try {
-        const [cached, userSnap] = await Promise.all([
-          readCachedSynqActive(user.uid),
-          getDoc(doc(db, "users", user.uid)),
-        ]);
+        const userSnap = await getDoc(doc(db, "users", user.uid));
         cachedSynqActive = userSnap.exists()
           ? computeSynqActiveFromUserData(userSnap.data())
-          : cached;
+          : cachedSynqActive;
+        writeCachedSynqActive(user.uid, cachedSynqActive);
       } catch {
         try {
           cachedSynqActive = await readCachedSynqActive(user.uid);
+          writeCachedSynqActive(user.uid, cachedSynqActive);
         } catch {
-          cachedSynqActive = false;
+          cachedSynqActive = getCachedSynqActiveSync(user.uid);
         }
       }
       if (!cancelled) {
@@ -420,7 +422,9 @@ export default function RootLayout() {
         await Promise.all([
           hydrateSocialCachesFromDisk(u.uid),
           hydrateOwnProfileFromDisk(u.uid),
+          hydrateSynqStatusFromDisk(u.uid),
         ]);
+        setSynqBoot({ cachedSynqActive: getCachedSynqActiveSync(u.uid) });
         prewarmMeTabScreen(u.uid);
         const cachedGate = profileGateFromCache(u.uid);
         if (cachedGate) {

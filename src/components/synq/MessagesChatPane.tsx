@@ -21,7 +21,6 @@ import React, {
 import {
   Dimensions,
   FlatList,
-  InteractionManager,
   Keyboard,
   type KeyboardEvent,
   Platform,
@@ -42,6 +41,11 @@ import {
 
 const MESSAGE_ENTER = FadeInUp.duration(200);
 const COMPOSER_KEYBOARD_GAP = 14;
+const LIST_SCROLL_OVERFLOW_SLACK = 4;
+/** Matches index.tsx SlideInRight on the chat pane. */
+const CHAT_PANE_ENTER_MS = 300;
+/** Long threads use an inverted list so the latest message is shown without a scroll jump. */
+const INVERTED_MESSAGE_THRESHOLD = 8;
 
 function getKeyboardInset(event: KeyboardEvent): number {
   const { screenY } = event.endCoordinates;
@@ -134,14 +138,24 @@ export default function MessagesChatPane({
   const canSend = inputText.trim().length > 0;
   const listHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
+  const [listHeight, setListHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const isKeyboardOpenRef = useRef(false);
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const chatSeededRef = useRef(false);
-  const initialScrollDoneRef = useRef(false);
   const lastMessageCountRef = useRef(0);
   const prevChatIdRef = useRef<string | undefined>(undefined);
+  const anchorBottomRef = useRef(true);
+  const pendingNormalScrollRef = useRef(false);
+  const [invertedLayout, setInvertedLayout] = useState(false);
+
+  const listData = useMemo(
+    () => (invertedLayout ? [...messages].reverse() : messages),
+    [messages, invertedLayout]
+  );
+
   useEffect(() => {
     const prevId = prevChatIdRef.current;
     const nextId = activeChat?.id;
@@ -149,19 +163,30 @@ export default function MessagesChatPane({
 
     knownMessageIdsRef.current = new Set();
     chatSeededRef.current = false;
-    initialScrollDoneRef.current = false;
+    if (messages.length > 0) {
+      messages.forEach((message) => knownMessageIdsRef.current.add(message.id));
+      chatSeededRef.current = true;
+    }
     lastMessageCountRef.current = 0;
+    anchorBottomRef.current = true;
+    setInvertedLayout((messages?.length ?? 0) >= INVERTED_MESSAGE_THRESHOLD);
+    pendingNormalScrollRef.current =
+      messages.length > 0 && messages.length < INVERTED_MESSAGE_THRESHOLD;
 
     const pendingToReal =
       prevId === "__pending__" && !!nextId && nextId !== "__pending__";
-    if (pendingToReal) {
-      return;
+    if (!pendingToReal) {
+      isKeyboardOpenRef.current = false;
+      setKeyboardOpen(false);
+      setKeyboardInset(0);
     }
+  }, [activeChat?.id, messages.length]);
 
-    isKeyboardOpenRef.current = false;
-    setKeyboardOpen(false);
-    setKeyboardInset(0);
-  }, [activeChat?.id]);
+  useEffect(() => {
+    if (messages.length >= INVERTED_MESSAGE_THRESHOLD) {
+      setInvertedLayout(true);
+    }
+  }, [activeChat?.id, messages.length]);
 
   const composerBottomInset = Math.max(insets.bottom, 10) + 6;
   const composerPaddingBottom = keyboardOpen
@@ -181,69 +206,6 @@ export default function MessagesChatPane({
     }
   }, [messages, messagesReady]);
 
-  useEffect(() => {
-    if (!messagesReady || messages.length === 0) return;
-
-    if (!initialScrollDoneRef.current) {
-      initialScrollDoneRef.current = true;
-      lastMessageCountRef.current = messages.length;
-      const task = InteractionManager.runAfterInteractions(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
-      });
-      return () => task.cancel();
-    }
-
-    if (
-      messages.length > lastMessageCountRef.current &&
-      !pendingScrollToMessageId
-    ) {
-      lastMessageCountRef.current = messages.length;
-      requestAnimationFrame(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      });
-    }
-  }, [
-    messagesReady,
-    messages.length,
-    pendingScrollToMessageId,
-    flatListRef,
-  ]);
-
-  useEffect(() => {
-    if (!pendingScrollToMessageId || !messagesReady || !messages.length) return;
-
-    const targetIndex = messages.findIndex(
-      (message) => message.id === pendingScrollToMessageId
-    );
-    if (targetIndex < 0) return;
-
-    const timer = setTimeout(() => {
-      try {
-        flatListRef.current?.scrollToIndex({
-          index: targetIndex,
-          animated: true,
-          viewPosition: 0.4,
-        });
-      } catch {
-        try {
-          flatListRef.current?.scrollToIndex({
-            index: targetIndex,
-            animated: true,
-          });
-        } catch {}
-      }
-      setPendingScrollToMessageId(null);
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [
-    pendingScrollToMessageId,
-    messagesReady,
-    messages,
-    flatListRef,
-    setPendingScrollToMessageId,
-  ]);
-
   const shouldAnimateMessage = useCallback((messageId: string) => {
     if (!chatSeededRef.current || knownMessageIdsRef.current.has(messageId)) {
       return false;
@@ -258,44 +220,101 @@ export default function MessagesChatPane({
     sendMessage();
   };
 
+  const listScrollable =
+    listHeight > 0 && contentHeight > listHeight + LIST_SCROLL_OVERFLOW_SLACK;
+
   const scrollToLatest = useCallback(
     (animated = false) => {
-      if (!messagesReady || messages.length === 0) return;
+      if (messages.length === 0) return false;
 
-      const listHeight = listHeightRef.current;
-      const contentHeight = contentHeightRef.current;
-      if (listHeight > 0 && contentHeight > 0) {
-        flatListRef.current?.scrollToOffset({
-          offset: Math.max(0, contentHeight - listHeight),
-          animated,
-        });
-        return;
+      if (invertedLayout) {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated });
+        return true;
       }
 
-      const lastIndex = messages.length - 1;
-      try {
-        flatListRef.current?.scrollToIndex({
-          index: lastIndex,
-          animated,
-          viewPosition: 1,
-        });
-      } catch {
-        flatListRef.current?.scrollToEnd({ animated });
-      }
+      const listH = listHeightRef.current;
+      const contentH = contentHeightRef.current;
+      if (listH <= 0 || contentH <= listH + LIST_SCROLL_OVERFLOW_SLACK) return false;
+
+      flatListRef.current?.scrollToEnd({ animated });
+      flatListRef.current?.scrollToOffset({
+        offset: contentH - listH,
+        animated,
+      });
+      return true;
     },
-    [messagesReady, messages.length, flatListRef]
+    [messages.length, invertedLayout, flatListRef]
   );
 
-  const forceScrollToBottom = useCallback(() => {
-    if (!messagesReady || messages.length === 0) return;
+  useLayoutEffect(() => {
+    if (invertedLayout || pendingScrollToMessageId) return;
+    if (!messagesReady || messages.length === 0 || !listScrollable) return;
+    if (!pendingNormalScrollRef.current) return;
 
-    const run = () => scrollToLatest(false);
-    run();
-    requestAnimationFrame(run);
-    setTimeout(run, 50);
-    setTimeout(run, 150);
-    setTimeout(run, 300);
-  }, [messagesReady, messages.length, scrollToLatest]);
+    scrollToLatest(false);
+    pendingNormalScrollRef.current = false;
+  }, [
+    invertedLayout,
+    messagesReady,
+    messages.length,
+    listScrollable,
+    pendingScrollToMessageId,
+    scrollToLatest,
+  ]);
+
+  useEffect(() => {
+    if (!pendingScrollToMessageId || !messages.length) return;
+
+    pendingNormalScrollRef.current = false;
+    anchorBottomRef.current = false;
+    const targetIndex = listData.findIndex(
+      (message) => message.id === pendingScrollToMessageId
+    );
+    if (targetIndex < 0) return;
+
+    const timer = setTimeout(() => {
+      try {
+        flatListRef.current?.scrollToIndex({
+          index: targetIndex,
+          animated: true,
+          viewPosition: 0.4,
+        });
+      } catch {
+        scrollToLatest(false);
+      }
+      setPendingScrollToMessageId(null);
+    }, CHAT_PANE_ENTER_MS + 80);
+
+    return () => clearTimeout(timer);
+  }, [
+    pendingScrollToMessageId,
+    messages,
+    flatListRef,
+    setPendingScrollToMessageId,
+    scrollToLatest,
+  ]);
+
+  useEffect(() => {
+    if (!messagesReady || messages.length === 0) return;
+    if (pendingScrollToMessageId) return;
+
+    const prevCount = lastMessageCountRef.current;
+    lastMessageCountRef.current = messages.length;
+    if (
+      listScrollable &&
+      messages.length > prevCount &&
+      prevCount > 0 &&
+      anchorBottomRef.current
+    ) {
+      requestAnimationFrame(() => scrollToLatest(true));
+    }
+  }, [
+    messages.length,
+    messagesReady,
+    pendingScrollToMessageId,
+    listScrollable,
+    scrollToLatest,
+  ]);
 
   const setKeyboardVisible = useCallback((visible: boolean) => {
     isKeyboardOpenRef.current = visible;
@@ -309,7 +328,7 @@ export default function MessagesChatPane({
     const onShow = (event: KeyboardEvent) => {
       applyInset(event);
       setKeyboardVisible(true);
-      forceScrollToBottom();
+      scrollToLatest(false);
     };
     const onHide = () => {
       setKeyboardInset(0);
@@ -321,7 +340,7 @@ export default function MessagesChatPane({
       const showSub = Keyboard.addListener("keyboardWillShow", (event) => {
         onShow(event);
         const delay = event.duration ?? 250;
-        setTimeout(() => forceScrollToBottom(), delay);
+        setTimeout(() => scrollToLatest(false), delay);
       });
       const hideSub = Keyboard.addListener("keyboardWillHide", onHide);
       return () => {
@@ -337,23 +356,22 @@ export default function MessagesChatPane({
       showSub.remove();
       hideSub.remove();
     };
-  }, [forceScrollToBottom, setKeyboardVisible]);
+  }, [scrollToLatest, setKeyboardVisible]);
 
   useLayoutEffect(() => {
     if (keyboardOpen) {
-      forceScrollToBottom();
+      scrollToLatest(false);
     }
-  }, [keyboardOpen, forceScrollToBottom]);
+  }, [keyboardOpen, scrollToLatest]);
 
   const handleComposerFocus = useCallback(() => {
-    forceScrollToBottom();
-  }, [forceScrollToBottom]);
+    scrollToLatest(false);
+  }, [scrollToLatest]);
 
   const listContentStyle = useMemo(
     () => [
       styles.chatListContent,
       messagesReady && messages.length === 0 && styles.chatListContentEmpty,
-      messagesReady && messages.length > 0 && { flexGrow: 1 },
     ],
     [messages.length, messagesReady, styles.chatListContent, styles.chatListContentEmpty]
   );
@@ -596,29 +614,65 @@ export default function MessagesChatPane({
 
       <View style={{ flex: 1, paddingBottom: keyboardInset }}>
         <View style={styles.chatBody}>
+          <View style={styles.chatList}>
           <FlatList
-            key={activeChat?.id ?? "chat"}
+            key={`${activeChat?.id ?? "chat"}-${invertedLayout ? "inv" : "std"}`}
             ref={flatListRef}
-            style={styles.chatList}
-            data={messagesReady ? messages : []}
+            inverted={invertedLayout}
+            style={styles.chatListFill}
+            data={listData}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             removeClippedSubviews={false}
-            initialNumToRender={Math.min(messages.length || 20, 30)}
-            maxToRenderPerBatch={20}
-            windowSize={Math.min(messages.length || 10, 15)}
+            scrollEnabled={listScrollable}
+            directionalLockEnabled={listScrollable}
+            bounces={false}
+            alwaysBounceVertical={false}
+            overScrollMode="never"
             onLayout={(event) => {
-              listHeightRef.current = event.nativeEvent.layout.height;
-              if (isKeyboardOpenRef.current) {
-                scrollToLatest(false);
-              }
+              const height = event.nativeEvent.layout.height;
+              listHeightRef.current = height;
+              setListHeight(height);
             }}
             onContentSizeChange={(_width, height) => {
               contentHeightRef.current = height;
+              setContentHeight(height);
+
+              const listH = listHeightRef.current;
+              if (
+                !invertedLayout &&
+                listH > 0 &&
+                height > listH + LIST_SCROLL_OVERFLOW_SLACK &&
+                messages.length >= 4
+              ) {
+                setInvertedLayout(true);
+                return;
+              }
+
               if (isKeyboardOpenRef.current) {
-                scrollToLatest(false);
+                requestAnimationFrame(() => scrollToLatest(false));
               }
             }}
+            onScrollBeginDrag={
+              listScrollable
+                ? () => {
+                    anchorBottomRef.current = false;
+                  }
+                : undefined
+            }
+            onMomentumScrollEnd={
+              listScrollable
+                ? (event) => {
+                    const { contentOffset, contentSize, layoutMeasurement } =
+                      event.nativeEvent;
+                    const distanceFromBottom =
+                      contentSize.height -
+                      layoutMeasurement.height -
+                      contentOffset.y;
+                    anchorBottomRef.current = distanceFromBottom < 48;
+                  }
+                : undefined
+            }
             ListEmptyComponent={
               messagesReady ? (
                 <View style={styles.chatEmptyWrap}>
@@ -632,11 +686,15 @@ export default function MessagesChatPane({
                 </View>
               ) : null
             }
-            alwaysBounceVertical={Platform.OS === "ios"}
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             keyboardShouldPersistTaps="handled"
             renderItem={renderMessage}
             onScrollToIndexFailed={(info) => {
+              const delay = Math.min(
+                Math.max(info.averageItemLength || 72, 48) *
+                  Math.max(info.index, 1),
+                400
+              );
               setTimeout(() => {
                 try {
                   flatListRef.current?.scrollToIndex({
@@ -645,12 +703,13 @@ export default function MessagesChatPane({
                     viewPosition: isKeyboardOpenRef.current ? 1 : 0.4,
                   });
                 } catch {
-                  flatListRef.current?.scrollToEnd({ animated: true });
+                  scrollToLatest(false);
                 }
-              }, 100);
+              }, delay);
             }}
             contentContainerStyle={listContentStyle}
           />
+          </View>
 
           {showAICard && (
             <View style={styles.inChatAICardContainer}>
