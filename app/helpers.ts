@@ -94,8 +94,8 @@ export function resolveChatSenderAvatar(
 ): string {
   const candidates = [
     opts.liveImages?.[senderId],
-    opts.messageImageUrl,
     opts.participantImages?.[senderId],
+    opts.messageImageUrl,
   ];
   for (const candidate of candidates) {
     if (isCustomAvatar(candidate)) return candidate.trim();

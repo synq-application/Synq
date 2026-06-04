@@ -211,17 +211,19 @@ function ChatMessageBubble({
           <View
             style={[
               styles.heartReaction,
-              isMe ? { left: -4, right: undefined } : { right: -6, left: undefined },
+              isMe ? { left: -10, right: undefined } : { right: -10, left: undefined },
             ]}
           >
             {Array.from({ length: heartCount }, (_, i) => (
-              <Ionicons
+              <View
                 key={i}
-                name="heart"
-                size={14}
-                color="#FF2D55"
-                style={{ marginLeft: i > 0 ? 3 : 0 }}
-              />
+                style={[
+                  styles.heartReactionBadge,
+                  i > 0 && styles.heartReactionBadgeOverlap,
+                ]}
+              >
+                <Ionicons name="heart" size={12} color="#FF2D55" />
+              </View>
             ))}
           </View>
         ) : null}
@@ -2745,10 +2747,34 @@ const styles = StyleSheet.create({
   },
   heartReaction: {
     position: "absolute",
-    bottom: -6,
-    right: -6,
+    bottom: -10,
+    right: -10,
     flexDirection: "row",
     alignItems: "center",
+  },
+  heartReactionBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#1C1C1E",
+    opacity: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.35,
+        shadowRadius: 2,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  heartReactionBadgeOverlap: {
+    marginLeft: -5,
   },
   ideaImage: {
     width: '100%',

@@ -103,7 +103,13 @@ export default function ExploreModal({
                         <View style={styles.panel}>
                             {errorMessage ? (
                                 <View style={styles.errorBanner}>
+                                    <Ionicons name="alert-circle" size={20} color="#FF8A84" />
                                     <Text style={styles.errorBannerText}>{errorMessage}</Text>
+                                    {!isThinking && !showOptionsList ? (
+                                        <Text style={styles.errorHintText}>
+                                            Pick a vibe below to try again.
+                                        </Text>
+                                    ) : null}
                                 </View>
                             ) : null}
 
@@ -122,11 +128,13 @@ export default function ExploreModal({
 
                                         {vibes.map((item) => {
                                             const isPressed = pressed === item.label;
+                                            const vibeDisabled = isThinking || isAILoading;
 
                                             return (
                                                 <TouchableOpacity
                                                     key={item.label}
                                                     activeOpacity={0.9}
+                                                    disabled={vibeDisabled}
                                                     onPressIn={() => setPressed(item.label)}
                                                     onPressOut={() => setPressed(null)}
                                                     onPress={() => {
@@ -137,6 +145,7 @@ export default function ExploreModal({
                                                         styles.vibeCard,
                                                         isPressed && styles.vibeCardPressed,
                                                         item.special && styles.specialCard,
+                                                        vibeDisabled && styles.vibeCardDisabled,
                                                     ]}
                                                 >
                                                     <View style={{ flex: 1 }}>
@@ -157,14 +166,6 @@ export default function ExploreModal({
                                             );
                                         })}
 
-                                        {isAILoading && (
-                                            <View style={{ marginTop: 30, alignItems: "center" }}>
-                                                <ActivityIndicator color={ACCENT} />
-                                                <Text style={{ color: "#888", marginTop: 10 }}>
-                                                    Finding something good...
-                                                </Text>
-                                            </View>
-                                        )}
                                     </ScrollView>
                                 </>
                             ) : (
@@ -209,7 +210,7 @@ export default function ExploreModal({
                                                     />
                                                 ) : (
                                                     <View style={[styles.venueImage, styles.venueImagePlaceholder]}>
-                                                        <Ionicons name="image-outline" size={28} color="#555" />
+                                                        <ActivityIndicator color={ACCENT} size="small" />
                                                     </View>
                                                 )}
 
@@ -268,12 +269,20 @@ const styles = StyleSheet.create({
         backgroundColor: "rgba(255,69,58,0.12)",
         borderWidth: 1,
         borderColor: "rgba(255,69,58,0.35)",
+        alignItems: "center",
+        gap: 8,
     },
     errorBannerText: {
         color: "#FF8A84",
         fontSize: 14,
         fontFamily: fonts.medium,
         lineHeight: 20,
+        textAlign: "center",
+    },
+    errorHintText: {
+        color: "rgba(255,138,132,0.75)",
+        fontSize: 13,
+        fontFamily: fonts.medium,
         textAlign: "center",
     },
     optionsView: {
@@ -316,6 +325,10 @@ const styles = StyleSheet.create({
     vibeCardPressed: {
         transform: [{ scale: 0.97 }],
         borderColor: ACCENT,
+    },
+
+    vibeCardDisabled: {
+        opacity: 0.45,
     },
 
     specialCard: {

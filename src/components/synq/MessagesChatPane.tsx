@@ -421,13 +421,15 @@ export default function MessagesChatPane({
                     {ideaHeartCount ? (
                       <View style={styles.heartReaction}>
                         {Array.from({ length: ideaHeartCount }, (_, i) => (
-                          <Ionicons
+                          <View
                             key={i}
-                            name="heart"
-                            size={14}
-                            color="#FF2D55"
-                            style={{ marginLeft: i > 0 ? 3 : 0 }}
-                          />
+                            style={[
+                              styles.heartReactionBadge,
+                              i > 0 && styles.heartReactionBadgeOverlap,
+                            ]}
+                          >
+                            <Ionicons name="heart" size={12} color="#FF2D55" />
+                          </View>
                         ))}
                       </View>
                     ) : null}
