@@ -2,7 +2,7 @@ import StackScreenHeader from '@/src/components/StackScreenHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { deleteField, doc, getDoc, updateDoc } from "firebase/firestore";
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -140,7 +140,6 @@ export default function EditProfileScreen() {
     useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const locationGlow = useSharedValue(0);
-  const successDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
@@ -201,24 +200,6 @@ export default function EditProfileScreen() {
     );
   };
 
-  const scheduleAutofillDismiss = () => {
-    if (successDismissTimer.current) {
-      clearTimeout(successDismissTimer.current);
-    }
-    successDismissTimer.current = setTimeout(() => {
-      setLocationAutofill("dismissed");
-      successDismissTimer.current = null;
-    }, 1800);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (successDismissTimer.current) {
-        clearTimeout(successDismissTimer.current);
-      }
-    };
-  }, []);
-
   useEffect(() => {
     const loadUserData = async () => {
       if (!auth.currentUser) return;
@@ -257,14 +238,9 @@ export default function EditProfileScreen() {
     setResolvedLocationPreview(`${data.city}, ${data.stateAbbrev}`);
     setLocationAutofill("success");
     pulseLocationFields();
-    scheduleAutofillDismiss();
   };
 
   const resetLocationAutofill = () => {
-    if (successDismissTimer.current) {
-      clearTimeout(successDismissTimer.current);
-      successDismissTimer.current = null;
-    }
     setLocating(false);
     setLocatingPhase("gps");
     setLocationAutofill("offered");
