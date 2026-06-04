@@ -313,6 +313,7 @@ export default function FriendsScreen() {
   const [headerFadeTop, setHeaderFadeTop] = useState(0);
   const [listScrollY, setListScrollY] = useState(0);
   const [friendsTabMode, setFriendsTabMode] = useState<FriendsTabMode>("friends");
+  const friendsListRef = useRef<FlatList<Friend>>(null);
 
   const showAddFriendsModal = searchModalVisible;
   const headerFadeOpacity = Math.min(1, listScrollY / 28);
@@ -330,15 +331,21 @@ export default function FriendsScreen() {
     setSearchModalVisible(false);
   }, []);
 
+  const scrollFriendsListToTop = useCallback((animated = false) => {
+    friendsListRef.current?.scrollToOffset({ offset: 0, animated });
+    setListScrollY(0);
+  }, []);
+
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener(FRIENDS_TAB_PRESS, () => {
+      scrollFriendsListToTop(true);
       closeAddFriendsModal();
       if (openAddFriends === "1") {
         router.setParams({ openAddFriends: "" });
       }
     });
     return () => subscription.remove();
-  }, [closeAddFriendsModal, openAddFriends, router]);
+  }, [scrollFriendsListToTop, closeAddFriendsModal, openAddFriends, router]);
 
   useEffect(() => {
     if (openAddFriends !== "1") return;
@@ -362,11 +369,13 @@ export default function FriendsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      scrollFriendsListToTop(false);
+
       const t = setTimeout(() => {
         DeviceEventEmitter.emit(LOCATION_PROMPT_CHECK_REQUEST);
       }, 1000);
       return () => clearTimeout(t);
-    }, [])
+    }, [scrollFriendsListToTop])
   );
 
   useEffect(() => {
@@ -648,6 +657,7 @@ export default function FriendsScreen() {
         </View>
       ) : (
         <FlatList
+          ref={friendsListRef}
           style={styles.friendsList}
           scrollIndicatorInsets={{ right: 0 }}
           data={displayFriends}
