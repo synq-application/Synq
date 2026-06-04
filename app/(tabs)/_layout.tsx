@@ -3,8 +3,9 @@ import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tabs } from "expo-router";
 import React from "react";
-import { DeviceEventEmitter, Platform, StyleSheet, View } from "react-native";
+import { DeviceEventEmitter, Platform, Pressable, StyleSheet, View } from "react-native";
 import { FRIENDS_TAB_PRESS } from "../../src/lib/friendsTabEvents";
+import { SYNQ_TAB_LONG_PRESS } from "../../src/lib/synqTabEvents";
 import {
     ACCENT,
     SPACE_2,
@@ -73,6 +74,13 @@ export default function TabsLayout() {
           title: "",
           tabBarShowLabel: true,
           tabBarAccessibilityLabel: "Synq home",
+          tabBarButton: (props) => (
+            <Pressable
+              {...props}
+              onLongPress={() => DeviceEventEmitter.emit(SYNQ_TAB_LONG_PRESS)}
+              delayLongPress={400}
+            />
+          ),
           tabBarIcon: ({ focused }) => (
             <View style={[styles.synqButton, focused && styles.synqButtonActive]}>
               <View style={[styles.synqButtonInner, focused && styles.synqButtonInnerActive]}>

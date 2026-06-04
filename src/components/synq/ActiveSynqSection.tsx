@@ -13,15 +13,17 @@ import {
   type FriendsSortMode,
 } from "@/src/components/friends/FriendsSortControls";
 import { useSortedFriendsList } from "@/src/lib/useSortedFriendsList";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Animated,
+  DeviceEventEmitter,
   FlatList,
   Pressable,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SYNQ_TAB_LONG_PRESS } from "@/src/lib/synqTabEvents";
 import { friendLocationLine, resolveAvatar } from "../../../app/helpers";
 import {
   ACCENT,
@@ -77,6 +79,13 @@ export default function ActiveSynqSection({
   const [sortMode, setSortMode] = useState<FriendsSortMode>("distance");
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const headerLayout = useTabHeaderLayout();
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(SYNQ_TAB_LONG_PRESS, () => {
+      setOptionsVisible(true);
+    });
+    return () => subscription.remove();
+  }, []);
 
   const sortedAvailableFriends = useSortedFriendsList(
     availableFriends as Friend[],
