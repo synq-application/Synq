@@ -307,6 +307,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   cta: {
+    alignSelf: "center",
+    width: "62%",
     marginTop: 12,
     minHeight: 48,
     borderRadius: BUTTON_RADIUS,
