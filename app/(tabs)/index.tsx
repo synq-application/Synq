@@ -1435,6 +1435,7 @@ export default function SynqScreen() {
   const closeMessagesModal = useCallback(() => {
     resetMergeSelect();
     setInboxActionChat(null);
+    setSelectedFriends([]);
     setMessagesModalVisible(false);
     setMessagesPane("inbox");
     setActiveChatId(null);
