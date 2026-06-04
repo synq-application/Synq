@@ -2240,7 +2240,7 @@ const styles = StyleSheet.create({
   locationText: { color: MUTED2, fontSize: 12, marginTop: 2 },
   btn: {
     alignSelf: 'center',
-    width: PRIMARY_CTA_WIDTH,
+    width: '62%',
     height: PRIMARY_CTA_HEIGHT,
     backgroundColor: ACCENT,
     borderRadius: BUTTON_RADIUS,
