@@ -2058,7 +2058,7 @@ export default function SynqScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   darkFill: { flex: 1, backgroundColor: BG, justifyContent: 'center' },
-  activeSynqRoot: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
+  activeSynqRoot: { flex: 1, backgroundColor: BG, paddingHorizontal: 26 },
   activeListFooterDock: {
     flex: 1,
     minHeight: 0,
