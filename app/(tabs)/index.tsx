@@ -1709,12 +1709,13 @@ export default function SynqScreen() {
     if (stackUris.length === 1) {
       return (
         <View style={styles.inboxSingleWrap}>
-          <ExpoImage
-            source={{ uri: stackUris[0] }}
-            style={styles.inboxSinglePhoto}
-            cachePolicy="memory-disk"
-            transition={0}
-          />
+        <ExpoImage
+          source={{ uri: stackUris[0] }}
+          style={styles.inboxSinglePhoto}
+          cachePolicy="memory-disk"
+          transition={0}
+          recyclingKey={stackUris[0]}
+        />
         </View>
       );
     }
@@ -1726,12 +1727,14 @@ export default function SynqScreen() {
           style={[styles.inboxStackPhoto, styles.inboxStackPhotoBack]}
           cachePolicy="memory-disk"
           transition={0}
+          recyclingKey={stackUris[0]}
         />
         <ExpoImage
           source={{ uri: stackUris[1] }}
           style={[styles.inboxStackPhoto, styles.inboxStackPhotoFront]}
           cachePolicy="memory-disk"
           transition={0}
+          recyclingKey={stackUris[1]}
         />
       </View>
     );
@@ -1962,6 +1965,7 @@ export default function SynqScreen() {
               iMessageBubbleColumnMaxWidth={iMessageBubbleColumnMaxWidth}
               windowWidth={windowWidth}
               currentUserId={auth.currentUser?.uid}
+              liveParticipantImages={liveParticipantImages}
             />
               {(showAISuggestions || isExploreVisible) && (
               <ExploreModal

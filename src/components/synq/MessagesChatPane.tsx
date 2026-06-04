@@ -114,6 +114,8 @@ type Props = {
   iMessageBubbleColumnMaxWidth: (windowWidth: number, isOutgoing: boolean) => number;
   windowWidth: number;
   currentUserId?: string;
+  /** Live profile photos from Firestore; keeps bubbles in sync when avatars change mid-chat. */
+  liveParticipantImages?: Record<string, string>;
 };
 
 export default function MessagesChatPane({
@@ -149,6 +151,7 @@ export default function MessagesChatPane({
   iMessageBubbleColumnMaxWidth,
   windowWidth,
   currentUserId,
+  liveParticipantImages,
 }: Props) {
   const insets = useSafeAreaInsets();
   const canSend = inputText.trim().length > 0;
@@ -423,6 +426,16 @@ export default function MessagesChatPane({
     [messages.length, messagesReady, styles.chatListContent, styles.chatListContentEmpty]
   );
 
+  const listAvatarExtraData = useMemo(() => {
+    const resolved = activeChat?.participantImages ?? {};
+    const live = liveParticipantImages ?? {};
+    const ids = new Set([...Object.keys(resolved), ...Object.keys(live)]);
+    return [...ids]
+      .sort()
+      .map((uid) => `${uid}:${live[uid] ?? resolved[uid] ?? ""}`)
+      .join("|");
+  }, [activeChat?.participantImages, liveParticipantImages]);
+
   const renderMessage = useCallback(
     ({ item }: { item: any }) => {
       const animateEntry = shouldAnimateMessage(item.id);
@@ -432,6 +445,7 @@ export default function MessagesChatPane({
         item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
       const senderAvatar = resolveChatSenderAvatar(item.senderId, {
         participantImages: activeChat?.participantImages,
+        liveImages: liveParticipantImages,
         messageImageUrl: item.imageurl,
       });
       const RowWrapper = animateEntry ? Animated.View : View;
@@ -591,6 +605,7 @@ export default function MessagesChatPane({
     },
     [
       activeChat?.participantImages,
+      liveParticipantImages,
       ChatMessageBubble,
       currentUserId,
       iMessageBubbleColumnMaxWidth,
@@ -679,6 +694,7 @@ export default function MessagesChatPane({
             ref={flatListRef}
             style={styles.chatListFill}
             data={listData}
+            extraData={listAvatarExtraData}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             removeClippedSubviews={false}
