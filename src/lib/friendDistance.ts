@@ -76,6 +76,35 @@ export async function geocodePlace(query: string): Promise<{ lat: number; lng: n
   return null;
 }
 
+function formatCityStateLabel(city: string, state: string): string {
+  if (!city.trim()) return "";
+  const c = city.trim();
+  const s = state.trim();
+  return s ? `${c}, ${s}` : c;
+}
+
+export function userOriginFromProfile(
+  data: Record<string, unknown> | null | undefined
+): {
+  myCoords: { lat: number; lng: number } | null;
+  myCityLabel: string;
+} {
+  if (!data) {
+    return { myCoords: null, myCityLabel: "" };
+  }
+  const lat = typeof data.lat === "number" ? data.lat : null;
+  const lng = typeof data.lng === "number" ? data.lng : null;
+  const myCoords =
+    lat != null && lng != null ? { lat, lng } : null;
+  const city = typeof data.city === "string" ? data.city : "";
+  const state = typeof data.state === "string" ? data.state : "";
+  const myCityLabel =
+    typeof data.locationDisplay === "string" && data.locationDisplay.trim()
+      ? data.locationDisplay.trim()
+      : formatCityStateLabel(city, state);
+  return { myCoords, myCityLabel };
+}
+
 export async function resolveOriginCoords(
   myCoords: { lat: number; lng: number } | null,
   myCityLabel: string

@@ -6,6 +6,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import SynqOptionsSheet from "../../../app/synq-screens/SynqOptionsSheet";
+import type { Friend } from "@/constants/Variables";
+import {
+  FriendsSortMenu,
+  FriendsSortTrigger,
+  type FriendsSortMode,
+} from "@/src/components/friends/FriendsSortControls";
+import { useSortedFriendsList } from "@/src/lib/useSortedFriendsList";
 import React, { useMemo, useState } from "react";
 import {
   Animated,
@@ -46,6 +53,7 @@ type Props = {
   openEditModal: () => void;
   openChangeAudience?: () => void;
   audienceLabel?: string | null;
+  userProfile?: Record<string, unknown> | null;
 };
 
 export default function ActiveSynqSection({
@@ -63,9 +71,18 @@ export default function ActiveSynqSection({
   openEditModal,
   openChangeAudience,
   audienceLabel,
+  userProfile,
 }: Props) {
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [sortMode, setSortMode] = useState<FriendsSortMode>("distance");
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const headerLayout = useTabHeaderLayout();
+
+  const sortedAvailableFriends = useSortedFriendsList(
+    availableFriends as Friend[],
+    sortMode,
+    userProfile
+  );
 
   const footerLayout = useMemo(() => {
     const ctaPadTop = 12;
@@ -154,9 +171,18 @@ export default function ActiveSynqSection({
           </Pressable>
         ) : null}
 
+        {availableFriends.length > 0 ? (
+          <View style={styles.sortBar}>
+            <FriendsSortTrigger
+              sortMode={sortMode}
+              onPress={() => setSortMenuVisible(true)}
+            />
+          </View>
+        ) : null}
+
         <FlatList
           style={styles.activeFriendsList}
-          data={availableFriends}
+          data={sortedAvailableFriends}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={null}
@@ -280,6 +306,13 @@ export default function ActiveSynqSection({
         ) : null}
       </View>
       </View>
+
+      <FriendsSortMenu
+        visible={sortMenuVisible}
+        sortMode={sortMode}
+        onSelect={setSortMode}
+        onClose={() => setSortMenuVisible(false)}
+      />
 
       <SynqOptionsSheet
         visible={optionsVisible}

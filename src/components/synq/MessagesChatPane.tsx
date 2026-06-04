@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import * as Haptics from "expo-haptics";
 import React, {
+  type ComponentType,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -69,6 +70,7 @@ type Props = {
   setShowOptionsList: (value: boolean) => void;
   setPendingNewChat: (value: any) => void;
   showAISuggestions: boolean;
+  showAIUnavailableMessage?: boolean;
   onOpenAISuggestions: () => void;
   sendMessage: () => void;
   sendAISuggestionToChat: () => void;
@@ -82,7 +84,7 @@ type Props = {
     item: { id: string; reactions?: Record<string, string> },
     mapsPayload: { name: string; address: string }
   ) => void;
-  ChatMessageBubble: React.ComponentType<{
+  ChatMessageBubble: ComponentType<{
     text: string;
     bubbleCap: number;
     isMe: boolean;
@@ -116,6 +118,7 @@ export default function MessagesChatPane({
   setShowOptionsList,
   setPendingNewChat,
   showAISuggestions,
+  showAIUnavailableMessage = false,
   onOpenAISuggestions,
   sendMessage,
   sendAISuggestionToChat,
@@ -548,7 +551,9 @@ export default function MessagesChatPane({
           <View
             style={[
               styles.chatHeaderTextCol,
-              !showAISuggestions && styles.chatHeaderTextColCompact,
+              !showAISuggestions &&
+                !showAIUnavailableMessage &&
+                styles.chatHeaderTextColCompact,
             ]}
           >
             <Text style={styles.chatTitle} numberOfLines={1}>
@@ -572,6 +577,11 @@ export default function MessagesChatPane({
                 </Text>
                 <Ionicons name="chevron-forward" size={11} color={MUTED2} />
               </TouchableOpacity>
+            ) : showAIUnavailableMessage ? (
+              <Text style={styles.aiUnavailableHint} numberOfLines={2}>
+                AI isn't available for this chat until everyone enters their
+                locations.
+              </Text>
             ) : null}
           </View>
         </View>

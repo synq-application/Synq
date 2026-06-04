@@ -89,6 +89,7 @@ import {
   ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
+  SPACE_3,
   SPACE_4,
   SPACE_5,
   SURFACE,
@@ -102,6 +103,7 @@ import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
 import { auth, db } from '../../src/lib/firebase';
 import {
   callableErrorMessage,
+  enrichSynqSuggestions,
   fetchSynqSuggestions,
   locationLabelFromUser,
 } from '../../src/lib/synqSuggestions';
@@ -1001,6 +1003,8 @@ export default function SynqScreen() {
 
   const showAISuggestions =
     AI_PLACE_SUGGESTIONS_ENABLED && chatAiLocationReady === true;
+  const showAIUnavailableMessage =
+    AI_PLACE_SUGGESTIONS_ENABLED && chatAiLocationReady === false;
 
   const openAISuggestions = useCallback(() => {
     if (!showAISuggestions) return;
@@ -1011,12 +1015,12 @@ export default function SynqScreen() {
   }, [showAISuggestions]);
 
   useEffect(() => {
-    if (!showAISuggestions && isExploreVisible && !isAILoading) {
+    if (!showAISuggestions && isExploreVisible && !isAILoading && !aiExploreError) {
       setIsExploreVisible(false);
       setShowOptionsList(false);
       setAiExploreError(null);
     }
-  }, [showAISuggestions, isExploreVisible, isAILoading]);
+  }, [showAISuggestions, isExploreVisible, isAILoading, aiExploreError]);
 
   const triggerAISuggestion = async (category: string) => {
     if ((!activeChatId && !pendingNewChat) || isAILoading) {
@@ -1092,6 +1096,22 @@ export default function SynqScreen() {
         setShowOptionsList(true);
         setAiExploreError(null);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        void enrichSynqSuggestions(suggestions, city).then((enriched) => {
+          setAiOptions(enriched);
+          setSelectedOption((prev: typeof selectedOption) => {
+            if (!prev) return prev;
+            return enriched.find((row) => row.name === prev.name) || prev;
+          });
+          enriched.forEach((suggestion) => {
+            if (
+              typeof suggestion.imageUrl === "string" &&
+              suggestion.imageUrl.startsWith("http")
+            ) {
+              ExpoImage.prefetch(suggestion.imageUrl).catch(() => {});
+            }
+          });
+        });
       } else {
         setAiExploreError("No suggestions came back. Please try again.");
       }
@@ -1226,7 +1246,10 @@ export default function SynqScreen() {
 
   const executeConnection = async (participants: string[]) => {
     try {
-      const existing = allChats.find((c) => JSON.stringify(c.participants.sort()) === JSON.stringify(participants));
+      const existing = allChats.find((c) => {
+        const chatParticipants = [...(c.participants || [])].sort();
+        return JSON.stringify(chatParticipants) === JSON.stringify(participants);
+      });
       if (existing) {
         prefetchParticipantAvatars(existing);
         setPendingNewChat(null);
@@ -1663,6 +1686,7 @@ export default function SynqScreen() {
                 setMessagesPane("inbox");
               }}
               openEditModal={() => setIsEditModalVisible(true)}
+              userProfile={userProfile}
             />
           </Reanimated.View>
         )}
@@ -1786,18 +1810,17 @@ export default function SynqScreen() {
                       setMessages([]);
                       setMessagesPane("inbox");
                     }
-                    if (pinnedChatIds.includes(chatId)) {
-                      setUserProfile((prev: any) => ({
-                        ...prev,
-                        pinnedChatIds: (Array.isArray(prev?.pinnedChatIds)
-                          ? prev.pinnedChatIds
-                          : []
-                        ).filter((id: string) => id !== chatId),
-                      }));
-                    }
-                    setAllChats((prev) => prev.filter((c) => c.id !== chatId));
                     try {
                       await deleteChat(chatId);
+                      if (pinnedChatIds.includes(chatId)) {
+                        setUserProfile((prev: any) => ({
+                          ...prev,
+                          pinnedChatIds: (Array.isArray(prev?.pinnedChatIds)
+                            ? prev.pinnedChatIds
+                            : []
+                          ).filter((id: string) => id !== chatId),
+                        }));
+                      }
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     } catch {
                       showActionError("Could not delete chat. Please try again.");
@@ -1836,6 +1859,7 @@ export default function SynqScreen() {
               setShowOptionsList={setShowOptionsList}
               setPendingNewChat={setPendingNewChat}
               showAISuggestions={showAISuggestions}
+              showAIUnavailableMessage={showAIUnavailableMessage}
               onOpenAISuggestions={openAISuggestions}
               sendMessage={sendMessage}
               sendAISuggestionToChat={sendAISuggestionToChat}
@@ -1980,6 +2004,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingVertical: 6,
     paddingLeft: 14,
+  },
+  sortBar: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    marginTop: SPACE_3,
+    marginBottom: 14,
   },
   activeFriendsList: { flex: 1 },
   activeListContent: { paddingHorizontal: 0 },
@@ -2859,6 +2890,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: fonts.medium,
     letterSpacing: 0.1,
+  },
+  aiUnavailableHint: {
+    color: MUTED2,
+    fontSize: 12,
+    fontFamily: fonts.book,
+    lineHeight: 16,
+    marginTop: 4,
+    paddingRight: 8,
   },
   suggestionSectionTitle: {
     color: "rgba(255,255,255,0.55)",

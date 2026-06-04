@@ -32,12 +32,12 @@ import {
   TYPE_CAPTION,
 } from "@/constants/Variables";
 import { useBlockedUsers } from "@/src/lib/blockedUsers";
+import { useSortedFriendsList } from "@/src/lib/useSortedFriendsList";
 import {
-  buildFriendDistanceMap,
-  resolveOriginCoords,
-  sortFriendsByDistanceKm,
-  sortFriendsByNameWithNoLocationLast,
-} from "@/src/lib/friendDistance";
+  FriendsSortMenu,
+  FriendsSortTrigger,
+  type FriendsSortMode,
+} from "@/src/components/friends/FriendsSortControls";
 import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
 import ProfileTabHeaderOverlay, {
@@ -135,13 +135,6 @@ import { friendLocationLine, resolveAvatar } from "../helpers";
 
 const { width } = Dimensions.get("window");
 
-type FriendsSortMode = "alphabetical" | "distance";
-
-const FRIENDS_SORT_LABELS: Record<FriendsSortMode, string> = {
-  alphabetical: "Alphabetical",
-  distance: "Distance",
-};
-
 const sortFriendsByName = (list: Friend[]) =>
   [...list].sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
 
@@ -215,128 +208,6 @@ function FriendsHeaderAddButton({
         <Ionicons name="person-add-outline" size={22} color="rgba(0,255,133,0.88)" />
       </Animated.View>
     </TouchableOpacity>
-  );
-}
-
-const SORT_MENU_FADE_MS = 280;
-
-function FriendsSortTrigger({
-  sortMode,
-  onPress,
-}: {
-  sortMode: FriendsSortMode;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={styles.sortBarBtn}
-      onPress={() => {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-      activeOpacity={0.82}
-      accessibilityRole="button"
-      accessibilityLabel={`Sort by, ${FRIENDS_SORT_LABELS[sortMode]}`}
-      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-    >
-      <Text style={styles.sortBarLabel}>Sort by</Text>
-      <Ionicons name="chevron-down" size={12} color={MUTED2} style={styles.sortBarChevron} />
-    </TouchableOpacity>
-  );
-}
-
-function FriendsSortMenu({
-  visible,
-  sortMode,
-  onSelect,
-  onClose,
-}: {
-  visible: boolean;
-  sortMode: FriendsSortMode;
-  onSelect: (mode: FriendsSortMode) => void;
-  onClose: () => void;
-}) {
-  const reduced = useReducedMotion();
-  const [modalVisible, setModalVisible] = useState(false);
-  const opacity = useSharedValue(0);
-
-  const options: { mode: FriendsSortMode; label: string }[] = [
-    { mode: "alphabetical", label: "Alphabetical" },
-    { mode: "distance", label: "Distance" },
-  ];
-
-  const finishClose = useCallback(() => {
-    setModalVisible(false);
-    onClose();
-  }, [onClose]);
-
-  const dismiss = useCallback(() => {
-    if (reduced) {
-      finishClose();
-      return;
-    }
-    opacity.value = withTiming(
-      0,
-      { duration: SORT_MENU_FADE_MS, easing: Easing.in(Easing.cubic) },
-      (done) => {
-        if (done) runOnJS(finishClose)();
-      }
-    );
-  }, [reduced, finishClose, opacity]);
-
-  useEffect(() => {
-    if (!visible) return;
-    setModalVisible(true);
-    opacity.value = reduced
-      ? 1
-      : withTiming(1, { duration: SORT_MENU_FADE_MS, easing: Easing.out(Easing.cubic) });
-  }, [visible, reduced, opacity]);
-
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
-  if (!modalVisible) return null;
-
-  return (
-    <Modal visible transparent animationType="none" onRequestClose={dismiss}>
-      <Animated.View style={[styles.sortMenuOverlay, overlayStyle]}>
-        <Pressable style={styles.sortMenuBackdrop} onPress={dismiss} accessibilityRole="button" accessibilityLabel="Dismiss sort menu" />
-        <Pressable style={styles.sortMenuSheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.sortMenuHandle} />
-          <Text style={styles.sortMenuTitle}>Sort by</Text>
-          {options.map((option, index) => {
-            const selected = sortMode === option.mode;
-            return (
-              <View key={option.mode}>
-                {index > 0 ? <View style={styles.sortMenuSeparator} /> : null}
-                <TouchableOpacity
-                  style={styles.sortMenuOption}
-                  onPress={() => {
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    onSelect(option.mode);
-                    dismiss();
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Text
-                    style={[
-                      styles.sortMenuOptionLabel,
-                      selected && styles.sortMenuOptionLabelSelected,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                  {selected ? (
-                    <Ionicons name="checkmark" size={18} color={ACCENT} />
-                  ) : null}
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-        </Pressable>
-      </Animated.View>
-    </Modal>
   );
 }
 
@@ -439,8 +310,6 @@ export default function FriendsScreen() {
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [myCoords, setMyCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [myCityLabel, setMyCityLabel] = useState("");
-  const [friendDistancesKm, setFriendDistancesKm] = useState<Record<string, number>>({});
-  const [distanceSortReady, setDistanceSortReady] = useState(sortMode !== "distance");
   const [headerFadeTop, setHeaderFadeTop] = useState(0);
   const [listScrollY, setListScrollY] = useState(0);
   const [friendsTabMode, setFriendsTabMode] = useState<FriendsTabMode>("friends");
@@ -597,49 +466,27 @@ export default function FriendsScreen() {
 
   const { isBlocked } = useBlockedUsers();
 
-  useEffect(() => {
-    if (sortMode !== "distance") {
-      setDistanceSortReady(true);
-      return;
-    }
+  const userProfileForSort = useMemo(
+    () =>
+      ({
+        ...(myCoords ? { lat: myCoords.lat, lng: myCoords.lng } : {}),
+        ...(myCityLabel ? { locationDisplay: myCityLabel } : {}),
+      }) as Record<string, unknown>,
+    [myCoords, myCityLabel]
+  );
 
-    let cancelled = false;
-    setDistanceSortReady(false);
+  const filteredFriends = useMemo(
+    () =>
+      friends.filter((f) => {
+        if (isBlocked(f.id)) return false;
+        return (f.displayName || "")
+          .toLowerCase()
+          .includes(searchText.toLowerCase());
+      }),
+    [friends, searchText, isBlocked]
+  );
 
-    (async () => {
-      const origin = await resolveOriginCoords(myCoords, myCityLabel);
-      if (cancelled) return;
-
-      if (!origin || friends.length === 0) {
-        setFriendDistancesKm({});
-        setDistanceSortReady(true);
-        return;
-      }
-
-      const map = await buildFriendDistanceMap(friends, origin);
-      if (!cancelled) {
-        setFriendDistancesKm(map);
-        setDistanceSortReady(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sortMode, friends, myCoords, myCityLabel]);
-
-  const displayFriends = useMemo(() => {
-    const filtered = friends.filter((f) => {
-      if (isBlocked(f.id)) return false;
-      return (f.displayName || "")
-        .toLowerCase()
-        .includes(searchText.toLowerCase());
-    });
-    if (sortMode === "distance" && distanceSortReady) {
-      return sortFriendsByDistanceKm(filtered, friendDistancesKm);
-    }
-    return sortFriendsByNameWithNoLocationLast(filtered);
-  }, [friends, searchText, sortMode, distanceSortReady, friendDistancesKm, isBlocked]);
+  const displayFriends = useSortedFriendsList(filteredFriends, sortMode, userProfileForSort);
 
   const showFriendSearch =
     friendsTabMode === "friends" && friends.length > 0 && !isFriendsInitialLoading;
@@ -2075,85 +1922,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: SPACE_3,
     marginBottom: 14,
-  },
-  sortBarBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    minHeight: 32,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: BUTTON_RADIUS,
-    backgroundColor: FRIENDS_SURFACE,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: FRIENDS_SEARCH_BORDER,
-  },
-  sortBarLabel: {
-    color: "rgba(255,255,255,0.52)",
-    fontSize: TYPE_CAPTION,
-    fontFamily: fonts.medium,
-    letterSpacing: 0.22,
-  },
-  sortBarChevron: {
-    marginTop: 1,
-    opacity: 0.9,
-  },
-  sortMenuOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.78)",
-    justifyContent: "flex-end",
-  },
-  sortMenuBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  sortMenuSheet: {
-    backgroundColor: BG,
-    borderTopLeftRadius: RADIUS_LG,
-    borderTopRightRadius: RADIUS_LG,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255,255,255,0.06)",
-    paddingTop: 10,
-    paddingBottom: 44,
-  },
-  sortMenuHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    alignSelf: "center",
-    marginBottom: 18,
-  },
-  sortMenuTitle: {
-    color: MUTED3,
-    fontSize: 13,
-    fontFamily: fonts.book,
-    letterSpacing: 0.15,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    includeFontPadding: false,
-  },
-  sortMenuSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    marginLeft: 20,
-  },
-  sortMenuOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-  },
-  sortMenuOptionLabel: {
-    flex: 1,
-    color: MUTED2,
-    fontSize: 17,
-    fontFamily: fonts.book,
-    letterSpacing: 0.02,
-    paddingRight: 12,
-  },
-  sortMenuOptionLabelSelected: {
-    color: TEXT,
-    fontFamily: fonts.medium,
   },
   friendCountPill: {
     minWidth: 0,
