@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.medium,
-    fontSize: 18,
+    fontSize: 20,
     color: TEXT,
   },
   subtitle: {
