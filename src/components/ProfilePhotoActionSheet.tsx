@@ -1,5 +1,4 @@
 import {
-  BG,
   BORDER,
   BUTTON_RADIUS,
   DESTRUCTIVE,
@@ -80,16 +79,17 @@ export default function ProfilePhotoActionSheet({
               </TouchableOpacity>
             </>
           ) : null}
+          <View style={styles.dividerFull} />
+          <TouchableOpacity
+            style={styles.cancelOption}
+            onPress={onClose}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+          >
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.cancelBtn}
-          onPress={onClose}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel"
-        >
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -137,12 +137,11 @@ const styles = StyleSheet.create({
     backgroundColor: BORDER,
     marginLeft: 54,
   },
-  cancelBtn: {
-    marginTop: 10,
-    backgroundColor: BG,
-    borderRadius: BUTTON_RADIUS + 4,
-    borderWidth: 1,
-    borderColor: BORDER,
+  dividerFull: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: BORDER,
+  },
+  cancelOption: {
     paddingVertical: 16,
     alignItems: "center",
   },
