@@ -7,6 +7,7 @@ import {
 } from "@/constants/Variables";
 import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
+import SynqThinkingOverlay from "@/src/components/synq/SynqThinkingOverlay";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import React, { useState } from "react";
@@ -85,12 +86,7 @@ export default function ExploreModal({
 
     return (
         <View style={[StyleSheet.absoluteFill, styles.overlay]}>
-            {isThinking && (
-                <View style={styles.thinkingOverlay}>
-                    <ActivityIndicator color={ACCENT} size="large" />
-                    <Text style={styles.thinkingText}>Finding the move…</Text>
-                </View>
-            )}
+            <SynqThinkingOverlay visible={isThinking} />
 
             <TouchableWithoutFeedback
                 onPress={() => {
@@ -393,19 +389,6 @@ const styles = StyleSheet.create({
         fontFamily: fonts.medium,
     },
 
-    thinkingOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        zIndex: 2000,
-        backgroundColor: "rgba(0,0,0,0.72)",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 14,
-    },
-    thinkingText: {
-        color: "rgba(255,255,255,0.75)",
-        fontSize: 16,
-        fontFamily: fonts.medium,
-    },
     venueImagePlaceholder: {
         alignItems: "center",
         justifyContent: "center",

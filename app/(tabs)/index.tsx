@@ -103,10 +103,13 @@ import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
 import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
 import { auth, db } from '../../src/lib/firebase';
 import {
+  assessChatParticipantsForAi,
+  type ChatAiLocationStatus,
+} from "../../src/lib/chatAiLocation";
+import {
   callableErrorMessage,
   enrichSynqSuggestions,
   fetchSynqSuggestions,
-  locationLabelFromUser,
 } from '../../src/lib/synqSuggestions';
 import {
   computeSynqActiveFromUserData,
@@ -114,7 +117,6 @@ import {
   writeCachedSynqActive,
 } from "../../src/lib/synqSession";
 import { getCachedOwnProfile } from "../../src/lib/ownProfileCache";
-import { userHasLocation } from '../../src/lib/userProfile';
 import { useAuthRefresh } from '../_layout';
 import AlertModal from '../alert-modal';
 import ConfirmModal from '../confirm-modal';
@@ -1029,29 +1031,37 @@ export default function SynqScreen() {
     setLaunchOverlay(false);
   }, [setSynq]);
 
-  const [chatAiLocationReady, setChatAiLocationReady] = useState<boolean | null>(
-    null
-  );
+  const [chatAiLocationStatus, setChatAiLocationStatus] =
+    useState<ChatAiLocationStatus>("loading");
+  const [chatAiLocationPrompt, setChatAiLocationPrompt] = useState("");
 
   useEffect(() => {
     if (messagesPane !== "chat" || activeParticipantIds.length === 0) {
-      setChatAiLocationReady(null);
+      setChatAiLocationStatus("loading");
+      setChatAiLocationPrompt("");
       return;
     }
 
     let cancelled = false;
+    setChatAiLocationStatus("loading");
     void (async () => {
       try {
         const snaps = await Promise.all(
           activeParticipantIds.map((uid: string) => getDoc(doc(db, "users", uid)))
         );
         if (cancelled) return;
-        const allHaveLocation = snaps.every(
-          (snap) => snap.exists() && userHasLocation(snap.data())
-        );
-        setChatAiLocationReady(allHaveLocation);
+        const participantData = snaps
+          .filter((snap) => snap.exists())
+          .map((snap) => snap.data() as Record<string, unknown>);
+        const assessment = await assessChatParticipantsForAi(participantData);
+        if (cancelled) return;
+        setChatAiLocationStatus(assessment.status);
+        setChatAiLocationPrompt(assessment.locationPrompt);
       } catch {
-        if (!cancelled) setChatAiLocationReady(false);
+        if (!cancelled) {
+          setChatAiLocationStatus("missing_location");
+          setChatAiLocationPrompt("");
+        }
       }
     })();
 
@@ -1061,9 +1071,9 @@ export default function SynqScreen() {
   }, [messagesPane, activeParticipantIds]);
 
   const showAISuggestions =
-    AI_PLACE_SUGGESTIONS_ENABLED && chatAiLocationReady === true;
+    AI_PLACE_SUGGESTIONS_ENABLED && chatAiLocationStatus === "available";
   const showAIUnavailableMessage =
-    AI_PLACE_SUGGESTIONS_ENABLED && chatAiLocationReady === false;
+    AI_PLACE_SUGGESTIONS_ENABLED && chatAiLocationStatus === "missing_location";
 
   const openAISuggestions = useCallback(() => {
     if (!showAISuggestions) return;
@@ -1109,26 +1119,32 @@ export default function SynqScreen() {
           .filter(Boolean)
           .map((uid: string) => getDoc(doc(db, "users", uid)))
       );
-      if (
-        !participantSnaps.every(
-          (snap) => snap.exists() && userHasLocation(snap.data())
-        )
-      ) {
+      const participantData = participantSnaps
+        .filter((snap) => snap.exists())
+        .map((snap) => snap.data() as Record<string, unknown>);
+      const assessment = await assessChatParticipantsForAi(participantData);
+      if (assessment.status === "missing_location") {
         setAiExploreError(
           "Everyone in this chat needs a location set to use Synq suggestions."
         );
         return;
       }
+      if (assessment.status === "too_far") {
+        setAiExploreError(
+          "Synq suggestions are only available when everyone is within about 20 miles."
+        );
+        return;
+      }
 
-      const myId = auth.currentUser?.uid;
-      const mySnap = participantSnaps.find((snap) => snap.id === myId);
-      const city =
-        locationLabelFromUser(mySnap?.data()) ||
-        locationLabelFromUser(userProfile);
-      if (!city) {
+      const locationPrompt =
+        assessment.locationPrompt || chatAiLocationPrompt;
+      if (!locationPrompt) {
         setAiExploreError("Add your city in profile to use Synq suggestions.");
         return;
       }
+
+      const myId = auth.currentUser?.uid;
+      const mySnap = participantSnaps.find((snap) => snap.id === myId);
 
       const myInterests = Array.isArray(mySnap?.data()?.interests)
         ? mySnap!.data()!.interests
@@ -1147,7 +1163,7 @@ export default function SynqScreen() {
       const suggestions = await fetchSynqSuggestions({
         category,
         shared,
-        location: city,
+        location: locationPrompt,
       });
 
       if (suggestions.length > 0) {
@@ -1156,7 +1172,7 @@ export default function SynqScreen() {
         setAiExploreError(null);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-        void enrichSynqSuggestions(suggestions, city).then((enriched) => {
+        void enrichSynqSuggestions(suggestions, locationPrompt).then((enriched) => {
           setAiOptions(enriched);
           setSelectedOption((prev: typeof selectedOption) => {
             if (!prev) return prev;
