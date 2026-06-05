@@ -7,12 +7,10 @@ import {
 } from "@/constants/Variables";
 import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
-import SynqThinkingOverlay from "@/src/components/synq/SynqThinkingOverlay";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
     FlatList,
     Keyboard,
     ScrollView,
@@ -29,7 +27,6 @@ type Props = {
     onClose: () => void;
     onBack: () => void;
     onSelectVibe: (label: string) => void;
-    isThinking: boolean;
     isAILoading: boolean;
     showOptionsList: boolean;
     aiOptions: any[];
@@ -45,7 +42,6 @@ export default function ExploreModal({
     onClose,
     onBack,
     onSelectVibe,
-    isThinking,
     isAILoading,
     showOptionsList,
     aiOptions,
@@ -56,41 +52,63 @@ export default function ExploreModal({
     errorMessage,
 }: Props) {
     const [pressed, setPressed] = useState<string | null>(null);
+    const [failedImageUrls, setFailedImageUrls] = useState<Set<string>>(
+        () => new Set()
+    );
     const insets = useSafeAreaInsets();
+
+    useEffect(() => {
+        setFailedImageUrls(new Set());
+    }, [aiOptions, showOptionsList]);
+
+    const visibleOptions = useMemo(
+        () =>
+            aiOptions.filter((item) => {
+                const imageUrl =
+                    typeof item?.imageUrl === "string" ? item.imageUrl.trim() : "";
+                return imageUrl.startsWith("http") && !failedImageUrls.has(imageUrl);
+            }),
+        [aiOptions, failedImageUrls]
+    );
+
+    useEffect(() => {
+        if (!selectedOption?.imageUrl) return;
+        if (failedImageUrls.has(selectedOption.imageUrl)) {
+            setSelectedOption(null);
+        }
+    }, [failedImageUrls, selectedOption, setSelectedOption]);
 
     if (!visible) return null;
 
     const vibes = [
         {
-            label: "Night Out",
-            desc: "Drinks, dancing, late nights",
+            label: "Drinks",
+            desc: "Bars, cocktails & happy hour",
         },
         {
             label: "Dinner",
-            desc: "Good food & conversation",
+            desc: "Restaurants worth the trip",
         },
         {
-            label: "Chill",
-            desc: "Low-key and relaxing",
+            label: "Coffee Spots",
+            desc: "Cafes, pastries & slow mornings",
         },
         {
             label: "Outdoors",
-            desc: "Fresh air & open space",
+            desc: "Parks, trails & fresh air",
         },
         {
             label: "Surprise Me",
-            desc: "We’ll pick something for you",
+            desc: "We'll pick something for you",
             special: true,
         },
     ];
 
     return (
         <View style={[StyleSheet.absoluteFill, styles.overlay]}>
-            <SynqThinkingOverlay visible={isThinking} />
-
             <TouchableWithoutFeedback
                 onPress={() => {
-                    if (isThinking || isAILoading) return;
+                    if (isAILoading) return;
                     onClose();
                 }}
             >
@@ -101,7 +119,7 @@ export default function ExploreModal({
                                 <View style={styles.errorBanner}>
                                     <Ionicons name="alert-circle" size={20} color="#FF8A84" />
                                     <Text style={styles.errorBannerText}>{errorMessage}</Text>
-                                    {!isThinking && !showOptionsList ? (
+                                    {!isAILoading && !showOptionsList ? (
                                         <Text style={styles.errorHintText}>
                                             Pick a vibe below to try again.
                                         </Text>
@@ -124,7 +142,7 @@ export default function ExploreModal({
 
                                         {vibes.map((item) => {
                                             const isPressed = pressed === item.label;
-                                            const vibeDisabled = isThinking || isAILoading;
+                                            const vibeDisabled = isAILoading;
 
                                             return (
                                                 <TouchableOpacity
@@ -176,26 +194,32 @@ export default function ExploreModal({
                                         <CloseButton onPress={onClose} />
                                     </View>
 
-                                    <FlatList
-                                        style={styles.optionsList}
-                                        data={aiOptions}
-                                        keyExtractor={(item, index) =>
-                                            `${item.name}-${item.address || item.location || index}`
-                                        }
-                                        contentContainerStyle={{ padding: 20, paddingBottom: 8 }}
-                                        renderItem={({ item }) => (
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.venueCard,
-                                                    selectedOption?.name === item.name && styles.selectedCard,
-                                                ]}
-                                                onPress={() =>
-                                                    setSelectedOption(
-                                                        selectedOption?.name === item.name ? null : item
-                                                    )
-                                                }
-                                            >
-                                                {item.imageUrl ? (
+                                    {visibleOptions.length === 0 ? (
+                                        <View style={styles.emptyOptions}>
+                                            <Text style={styles.emptyOptionsText}>
+                                                Could not load photos for these spots. Try another vibe.
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        <FlatList
+                                            style={styles.optionsList}
+                                            data={visibleOptions}
+                                            keyExtractor={(item, index) =>
+                                                `${item.name}-${item.address || item.location || index}`
+                                            }
+                                            contentContainerStyle={{ padding: 20, paddingBottom: 8 }}
+                                            renderItem={({ item }) => (
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.venueCard,
+                                                        selectedOption?.name === item.name && styles.selectedCard,
+                                                    ]}
+                                                    onPress={() =>
+                                                        setSelectedOption(
+                                                            selectedOption?.name === item.name ? null : item
+                                                        )
+                                                    }
+                                                >
                                                     <ExpoImage
                                                         source={{ uri: item.imageUrl }}
                                                         style={styles.venueImage}
@@ -203,26 +227,29 @@ export default function ExploreModal({
                                                         cachePolicy="memory-disk"
                                                         transition={0}
                                                         recyclingKey={item.imageUrl}
+                                                        onError={() => {
+                                                            setFailedImageUrls((prev) => {
+                                                                const next = new Set(prev);
+                                                                next.add(item.imageUrl);
+                                                                return next;
+                                                            });
+                                                        }}
                                                     />
-                                                ) : (
-                                                    <View style={[styles.venueImage, styles.venueImagePlaceholder]}>
-                                                        <ActivityIndicator color={ACCENT} size="small" />
+
+                                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                                        <Text style={styles.venueName}>{item.name}</Text>
+                                                        <Text style={styles.venueDesc} numberOfLines={2}>
+                                                            {item.address || item.location}
+                                                        </Text>
                                                     </View>
-                                                )}
 
-                                                <View style={{ flex: 1, marginLeft: 12 }}>
-                                                    <Text style={styles.venueName}>{item.name}</Text>
-                                                    <Text style={styles.venueDesc} numberOfLines={2}>
-                                                        {item.address || item.location}
-                                                    </Text>
-                                                </View>
-
-                                                {selectedOption?.name === item.name && (
-                                                    <Ionicons name="checkmark-circle" size={24} color={ACCENT} />
-                                                )}
-                                            </TouchableOpacity>
-                                        )}
-                                    />
+                                                    {selectedOption?.name === item.name && (
+                                                        <Ionicons name="checkmark-circle" size={24} color={ACCENT} />
+                                                    )}
+                                                </TouchableOpacity>
+                                            )}
+                                        />
+                                    )}
 
                                     <View style={[styles.sendFooter, { paddingBottom: Math.max(insets.bottom, 16) + 4 }]}>
                                         <TouchableOpacity
@@ -389,9 +416,17 @@ const styles = StyleSheet.create({
         fontFamily: fonts.medium,
     },
 
-    venueImagePlaceholder: {
+    emptyOptions: {
+        flex: 1,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#1A1A1A",
+        paddingHorizontal: 32,
+    },
+    emptyOptionsText: {
+        color: "#888",
+        fontSize: 15,
+        fontFamily: fonts.medium,
+        textAlign: "center",
+        lineHeight: 22,
     },
 });

@@ -116,10 +116,11 @@ import {
   type ChatAiLocationStatus,
 } from "../../src/lib/chatAiLocation";
 import {
-  callableErrorMessage,
-  enrichSynqSuggestions,
-  fetchSynqSuggestions,
-} from '../../src/lib/synqSuggestions';
+  cachedImageLoads,
+  getCachedCitySuggestions,
+  hasCachedCitySuggestions,
+} from "../../src/lib/citySuggestions";
+import type { SynqSuggestion } from "../../src/lib/synqSuggestions";
 import {
   computeSynqActiveFromUserData,
   getCachedSynqActiveSync,
@@ -1189,55 +1190,51 @@ export default function SynqScreen() {
         return;
       }
 
-      const myId = auth.currentUser?.uid;
-      const mySnap = participantSnaps.find((snap) => snap.id === myId);
+      const suggestions: SynqSuggestion[] = [];
+      const triedNames = new Set<string>();
 
-      const myInterests = Array.isArray(mySnap?.data()?.interests)
-        ? mySnap!.data()!.interests
-        : userProfile?.interests || [];
-      const sharedSet = new Set<string>();
-      for (const snap of participantSnaps) {
-        if (!snap.exists() || snap.id === myId) continue;
-        const theirInterests = snap.data()?.interests || [];
-        myInterests
-          .filter((interest: string) => theirInterests.includes(interest))
-          .forEach((interest: string) => sharedSet.add(interest));
+      while (suggestions.length < 3) {
+        const batch = getCachedCitySuggestions(locationPrompt, category, [
+          ...triedNames,
+        ]);
+        if (!batch || batch.length === 0) break;
+
+        let addedFromBatch = false;
+        for (const suggestion of batch) {
+          triedNames.add(suggestion.name);
+          const imageUrl = suggestion.imageUrl?.trim();
+          if (!imageUrl?.startsWith("http")) continue;
+
+          const imageLoads = await cachedImageLoads(imageUrl);
+          if (!imageLoads) continue;
+
+          suggestions.push({ ...suggestion, imageUrl });
+          addedFromBatch = true;
+          if (suggestions.length >= 3) break;
+          ExpoImage.prefetch(imageUrl).catch(() => {});
+        }
+
+        if (!addedFromBatch) break;
       }
-      const shared =
-        sharedSet.size > 0 ? [...sharedSet] : ["exploring new spots"];
-
-      const suggestions = await fetchSynqSuggestions({
-        category,
-        shared,
-        location: locationPrompt,
-      });
 
       if (suggestions.length > 0) {
         setAiOptions(suggestions);
         setShowOptionsList(true);
         setAiExploreError(null);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-        void enrichSynqSuggestions(suggestions, locationPrompt).then((enriched) => {
-          setAiOptions(enriched);
-          setSelectedOption((prev: typeof selectedOption) => {
-            if (!prev) return prev;
-            return enriched.find((row) => row.name === prev.name) || prev;
-          });
-          enriched.forEach((suggestion) => {
-            if (
-              typeof suggestion.imageUrl === "string" &&
-              suggestion.imageUrl.startsWith("http")
-            ) {
-              ExpoImage.prefetch(suggestion.imageUrl).catch(() => {});
-            }
-          });
-        });
       } else {
-        setAiExploreError("No suggestions came back. Please try again.");
+        setAiExploreError(
+          hasCachedCitySuggestions(locationPrompt)
+            ? "Could not load photos for these spots. Try another vibe."
+            : "Synq suggestions aren't available for your area yet. We're starting with Washington, DC!"
+        );
       }
     } catch (err: unknown) {
-      setAiExploreError(callableErrorMessage(err));
+      setAiExploreError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not load suggestions. Please try again."
+      );
     } finally {
       setIsAILoading(false);
     }
@@ -2062,7 +2059,6 @@ export default function SynqScreen() {
               onSelectVibe={(label: string) => {
                 void triggerAISuggestion(label);
               }}
-              isThinking={isAILoading}
               isAILoading={isAILoading}
               showOptionsList={showOptionsList}
               aiOptions={aiOptions}
