@@ -238,6 +238,11 @@ export default function OpenPlans({
 
   const dismissPickers = () => setActivePicker(null);
 
+  const togglePicker = (picker: "date" | "time") => {
+    Keyboard.dismiss();
+    setActivePicker((p) => (p === picker ? null : picker));
+  };
+
   const popupScrollMaxHeight = useMemo(() => {
     const windowH = Dimensions.get("window").height;
     if (activePicker === "date" || activePicker === "time") {
@@ -503,6 +508,7 @@ export default function OpenPlans({
                         selected={isToday}
                         accentColor={ACCENT}
                         onPress={() => {
+                          Keyboard.dismiss();
                           setActivePicker(null);
                           setDate(new Date());
                         }}
@@ -512,6 +518,7 @@ export default function OpenPlans({
                         selected={isTomorrow}
                         accentColor={ACCENT}
                         onPress={() => {
+                          Keyboard.dismiss();
                           setActivePicker(null);
                           setDate(new Date(Date.now() + 86400000));
                         }}
@@ -520,9 +527,7 @@ export default function OpenPlans({
                         label="Other"
                         selected={isCustomDate}
                         accentColor={ACCENT}
-                        onPress={() =>
-                          setActivePicker((p) => (p === "date" ? null : "date"))
-                        }
+                        onPress={() => togglePicker("date")}
                       />
                     </View>
 
@@ -532,9 +537,7 @@ export default function OpenPlans({
                           styles.dateTimeField,
                           activePicker === "date" && styles.dateTimeFieldActive,
                         ]}
-                        onPress={() =>
-                          setActivePicker((p) => (p === "date" ? null : "date"))
-                        }
+                        onPress={() => togglePicker("date")}
                       >
                         <Ionicons
                           name="calendar-outline"
@@ -553,9 +556,7 @@ export default function OpenPlans({
                           styles.dateTimeField,
                           activePicker === "time" && styles.dateTimeFieldActive,
                         ]}
-                        onPress={() =>
-                          setActivePicker((p) => (p === "time" ? null : "time"))
-                        }
+                        onPress={() => togglePicker("time")}
                       >
                         <Ionicons
                           name="time-outline"
