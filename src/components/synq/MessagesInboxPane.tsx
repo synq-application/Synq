@@ -65,8 +65,8 @@ export default function MessagesInboxPane({
   onDeleteFromAction,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const inboxHeaderPaddingTop = Math.max(insets.top, 20);
-  const inboxMergeHeaderPaddingTop = Math.max(insets.top, 16);
+  const inboxHeaderPaddingTop = Math.max(insets.top, 20) + 6;
+  const inboxMergeHeaderPaddingTop = Math.max(insets.top, 16) + 6;
   const canCombine = allChats.length >= 2;
   const mergeReady = selectedMergeChatIds.length === 2;
   const pinnedSet = new Set(pinnedChatIds);

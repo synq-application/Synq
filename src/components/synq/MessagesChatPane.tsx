@@ -47,8 +47,10 @@ import {
 const MESSAGE_ENTER = FadeInUp.duration(200);
 const COMPOSER_KEYBOARD_GAP = 14;
 const LIST_SCROLL_OVERFLOW_SLACK = 4;
-/** Matches index.tsx SlideInRight on the chat pane. */
-const CHAT_PANE_ENTER_MS = 300;
+import { MESSAGES_STACK_DURATION_MS } from "./MessagesModalStack";
+
+/** Matches MessagesModalStack push/pop timing. */
+const CHAT_PANE_ENTER_MS = MESSAGES_STACK_DURATION_MS;
 /** Clamp overscroll at the latest-message edge (normal list, offset at bottom). */
 const CHAT_BOTTOM_SCROLL_TOLERANCE = 2;
 /** Fade from black into the message list, starting just under the AI chip row. */
@@ -72,7 +74,8 @@ type Props = {
   styles: any;
   insetsTop: number;
   activeChat: any;
-  getChatTitle: (chat: any) => string;
+  chatTitle: string;
+  reserveAiSubtitleSlot?: boolean;
   renderAvatarStack: (images: Record<string, string> | undefined) => React.ReactNode;
   rotatingAIText: string;
   pendingScrollToMessageId: string | null;
@@ -119,11 +122,14 @@ type Props = {
   liveParticipantImages?: Record<string, string>;
 };
 
+const CHAT_AI_SUBTITLE_SLOT_HEIGHT = 26;
+
 export default function MessagesChatPane({
   styles,
   insetsTop,
   activeChat,
-  getChatTitle,
+  chatTitle,
+  reserveAiSubtitleSlot = false,
   renderAvatarStack,
   rotatingAIText,
   pendingScrollToMessageId,
@@ -159,11 +165,16 @@ export default function MessagesChatPane({
   const canSend = inputText.trim().length > 0;
   const listHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
-  const [listHeight, setListHeight] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
+  const listScrollableRef = useRef(false);
+  const scrollRafRef = useRef<number | null>(null);
+  const [listScrollable, setListScrollable] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const isKeyboardOpenRef = useRef(false);
+  const activeChatRef = useRef(activeChat);
+  activeChatRef.current = activeChat;
+  const liveImagesRef = useRef(liveParticipantImages);
+  liveImagesRef.current = liveParticipantImages;
   const knownMessageIdsRef = useRef<Set<string>>(new Set());
   const chatSeededRef = useRef(false);
   const lastMessageCountRef = useRef(0);
@@ -247,9 +258,28 @@ export default function MessagesChatPane({
     sendMessage();
   };
 
-  const listScrollable =
-    listHeight > 0 && contentHeight > listHeight + LIST_SCROLL_OVERFLOW_SLACK;
-  /** Keep scroll view active while keyboard is open so drags stay in-thread. */
+  const syncListScrollable = useCallback(() => {
+    const listH = listHeightRef.current;
+    const contentH = contentHeightRef.current;
+    const scrollable =
+      listH > 0 && contentH > listH + LIST_SCROLL_OVERFLOW_SLACK;
+    if (scrollable !== listScrollableRef.current) {
+      listScrollableRef.current = scrollable;
+      setListScrollable(scrollable);
+    }
+    return scrollable;
+  }, []);
+
+  /** Coalesce scroll-to-bottom work to one frame (avoids jank on long threads). */
+  const scrollToLatestRef = useRef<(animated?: boolean) => boolean>(() => false);
+  const scheduleScrollToLatest = useCallback((animated = false) => {
+    if (scrollRafRef.current != null) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      scrollToLatestRef.current(animated);
+    });
+  }, []);
+
   const listPanActive = listScrollable || keyboardOpen;
 
   const maxScrollOffset = useCallback(() => {
@@ -272,7 +302,7 @@ export default function MessagesChatPane({
 
   const handleChatScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (!listScrollable) return;
+      if (!listScrollableRef.current) return;
       const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
       const maxOffset = Math.max(
         0,
@@ -285,15 +315,15 @@ export default function MessagesChatPane({
       }
       syncAnchoredToLatest(y);
     },
-    [listScrollable, flatListRef, syncAnchoredToLatest]
+    [flatListRef, syncAnchoredToLatest]
   );
 
   const handleChatScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (!listScrollable) return;
+      if (!listScrollableRef.current) return;
       syncAnchoredToLatest(event.nativeEvent.contentOffset.y);
     },
-    [listScrollable, syncAnchoredToLatest]
+    [syncAnchoredToLatest]
   );
 
   const scrollToLatest = useCallback(
@@ -316,19 +346,21 @@ export default function MessagesChatPane({
     [messages.length, flatListRef, syncAnchoredToLatest]
   );
 
+  scrollToLatestRef.current = scrollToLatest;
+
   useLayoutEffect(() => {
     if (pendingScrollToMessageId) return;
     if (!messagesReady || messages.length === 0 || !listScrollable) return;
     if (!pendingNormalScrollRef.current) return;
 
-    scrollToLatest(false);
+    scheduleScrollToLatest(false);
     pendingNormalScrollRef.current = false;
   }, [
     messagesReady,
     messages.length,
     listScrollable,
     pendingScrollToMessageId,
-    scrollToLatest,
+    scheduleScrollToLatest,
   ]);
 
   useEffect(() => {
@@ -360,7 +392,7 @@ export default function MessagesChatPane({
     messages,
     flatListRef,
     setPendingScrollToMessageId,
-    scrollToLatest,
+    scheduleScrollToLatest,
   ]);
 
   useEffect(() => {
@@ -375,14 +407,14 @@ export default function MessagesChatPane({
       prevCount > 0 &&
       anchorBottomRef.current
     ) {
-      requestAnimationFrame(() => scrollToLatest(true));
+      requestAnimationFrame(() => scheduleScrollToLatest(true));
     }
   }, [
     messages.length,
     messagesReady,
     pendingScrollToMessageId,
     listScrollable,
-    scrollToLatest,
+    scheduleScrollToLatest,
   ]);
 
   const setKeyboardVisible = useCallback((visible: boolean) => {
@@ -397,7 +429,7 @@ export default function MessagesChatPane({
     const onShow = (event: KeyboardEvent) => {
       applyInset(event);
       setKeyboardVisible(true);
-      scrollToLatest(false);
+      scheduleScrollToLatest(false);
     };
     const onHide = () => {
       setKeyboardInset(0);
@@ -409,7 +441,7 @@ export default function MessagesChatPane({
       const showSub = Keyboard.addListener("keyboardWillShow", (event) => {
         onShow(event);
         const delay = event.duration ?? 250;
-        setTimeout(() => scrollToLatest(false), delay);
+        setTimeout(() => scheduleScrollToLatest(false), delay);
       });
       const hideSub = Keyboard.addListener("keyboardWillHide", onHide);
       return () => {
@@ -425,17 +457,25 @@ export default function MessagesChatPane({
       showSub.remove();
       hideSub.remove();
     };
-  }, [scrollToLatest, setKeyboardVisible]);
+  }, [scheduleScrollToLatest, setKeyboardVisible]);
 
   useLayoutEffect(() => {
     if (keyboardOpen) {
-      scrollToLatest(false);
+      scheduleScrollToLatest(false);
     }
-  }, [keyboardOpen, scrollToLatest]);
+  }, [keyboardOpen, scheduleScrollToLatest]);
 
   const handleComposerFocus = useCallback(() => {
-    scrollToLatest(false);
-  }, [scrollToLatest]);
+    scheduleScrollToLatest(false);
+  }, [scheduleScrollToLatest]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollRafRef.current != null) {
+        cancelAnimationFrame(scrollRafRef.current);
+      }
+    };
+  }, []);
 
   const listContentStyle = useMemo(
     () => [
@@ -449,15 +489,36 @@ export default function MessagesChatPane({
     [messages.length, messagesReady, styles.chatListContent, styles.chatListContentEmpty]
   );
 
-  const listAvatarExtraData = useMemo(() => {
-    const resolved = activeChat?.participantImages ?? {};
+  const listContentExtraData = useMemo(
+    () =>
+      messages
+        .map((message) => {
+          const heartCount =
+            message.reactions &&
+            Object.values(message.reactions).filter((v) => v === "heart").length;
+          return `${message.id}:${message.text}:${heartCount || 0}`;
+        })
+        .join("\n"),
+    [messages]
+  );
+
+  const listAvatarRevision = useMemo(() => {
     const live = liveParticipantImages ?? {};
-    const ids = new Set([...Object.keys(resolved), ...Object.keys(live)]);
-    return [...ids]
+    return Object.keys(live)
       .sort()
-      .map((uid) => `${uid}:${live[uid] ?? resolved[uid] ?? ""}`)
+      .map((uid) => `${uid}:${live[uid] ?? ""}`)
       .join("|");
-  }, [activeChat?.participantImages, liveParticipantImages]);
+  }, [liveParticipantImages]);
+
+  const listExtraData = useMemo(
+    () => `${listContentExtraData}\n${listAvatarRevision}`,
+    [listContentExtraData, listAvatarRevision]
+  );
+
+  const headerAvatar = useMemo(
+    () => renderAvatarStack(activeChat?.participantImages),
+    [activeChat?.participantImages, renderAvatarStack]
+  );
 
   const renderMessage = useCallback(
     ({ item }: { item: any }) => {
@@ -466,9 +527,10 @@ export default function MessagesChatPane({
       const isSystemMessage = item.type === "system";
       const isSystemIdea =
         item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
+      const chat = activeChatRef.current;
       const senderAvatar = resolveChatSenderAvatar(item.senderId, {
-        participantImages: activeChat?.participantImages,
-        liveImages: liveParticipantImages,
+        participantImages: chat?.participantImages,
+        liveImages: liveImagesRef.current,
         messageImageUrl: item.imageurl,
       });
       const RowWrapper = animateEntry ? Animated.View : View;
@@ -634,8 +696,6 @@ export default function MessagesChatPane({
       );
     },
     [
-      activeChat?.participantImages,
-      liveParticipantImages,
       ChatMessageBubble,
       currentUserId,
       iMessageBubbleColumnMaxWidth,
@@ -649,7 +709,7 @@ export default function MessagesChatPane({
     ]
   );
 
-  const chatHeaderContentPaddingTop = Math.max(insets.top, insetsTop, 10);
+  const chatHeaderContentPaddingTop = Math.max(insets.top, insetsTop, 10) + 6;
 
   return (
     <View style={styles.modalBg}>
@@ -669,47 +729,48 @@ export default function MessagesChatPane({
                   accessibilityRole="button"
                   accessibilityLabel="View profile"
                 >
-                  {renderAvatarStack(activeChat?.participantImages)}
+                  {headerAvatar}
                 </Pressable>
               ) : (
-                renderAvatarStack(activeChat?.participantImages)
+                headerAvatar
               )}
             </View>
-            <View
-              style={[
-                styles.chatHeaderTextCol,
-                !showAISuggestions &&
-                  !showAIUnavailableMessage &&
-                  styles.chatHeaderTextColCompact,
-              ]}
-            >
+            <View style={styles.chatHeaderTextCol}>
               <Text style={styles.chatTitle} numberOfLines={1}>
-                {activeChat ? getChatTitle(activeChat) : "Synq Chat"}
+                {chatTitle}
               </Text>
-              {showAISuggestions ? (
-                <TouchableOpacity
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    onOpenAISuggestions();
-                  }}
-                  style={styles.aiChipPremium}
-                  activeOpacity={0.82}
-                  accessibilityRole="button"
-                  accessibilityLabel="Open Synq AI place suggestions"
-                >
-                  <Ionicons name="sparkles" size={11} color={ACCENT} />
-                  <Text style={styles.aiChipTextPremium} numberOfLines={1}>
-                    {rotatingAIText}
+              <View
+                style={
+                  reserveAiSubtitleSlot
+                    ? chatHeaderOverlayStyles.aiSubtitleSlot
+                    : undefined
+                }
+              >
+                {showAISuggestions ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      onOpenAISuggestions();
+                    }}
+                    style={styles.aiChipPremium}
+                    activeOpacity={0.82}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open Synq AI place suggestions"
+                  >
+                    <Ionicons name="sparkles" size={11} color={ACCENT} />
+                    <Text style={styles.aiChipTextPremium} numberOfLines={1}>
+                      {rotatingAIText}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={11} color={MUTED2} />
+                  </TouchableOpacity>
+                ) : showAIUnavailableMessage ? (
+                  <Text style={styles.aiUnavailableHint} numberOfLines={2}>
+                    AI isn't available for this chat until everyone enters their
+                    locations.
                   </Text>
-                  <Ionicons name="chevron-forward" size={11} color={MUTED2} />
-                </TouchableOpacity>
-              ) : showAIUnavailableMessage ? (
-                <Text style={styles.aiUnavailableHint} numberOfLines={2}>
-                  AI isn't available for this chat until everyone enters their
-                  locations.
-                </Text>
-              ) : null}
+                ) : null}
+              </View>
             </View>
           </View>
           <CloseButton
@@ -735,10 +796,14 @@ export default function MessagesChatPane({
             ref={flatListRef}
             style={styles.chatListFill}
             data={listData}
-            extraData={listAvatarExtraData}
+            extraData={listExtraData}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
-            removeClippedSubviews={false}
+            removeClippedSubviews={Platform.OS === "android"}
+            initialNumToRender={14}
+            maxToRenderPerBatch={8}
+            windowSize={9}
+            updateCellsBatchingPeriod={40}
             scrollEnabled={listPanActive}
             directionalLockEnabled={listPanActive}
             bounces={keyboardOpen}
@@ -750,20 +815,19 @@ export default function MessagesChatPane({
                 : undefined
             }
             onLayout={(event) => {
-              const height = event.nativeEvent.layout.height;
-              listHeightRef.current = height;
-              setListHeight(height);
+              listHeightRef.current = event.nativeEvent.layout.height;
+              syncListScrollable();
             }}
             onContentSizeChange={(_width, height) => {
               contentHeightRef.current = height;
-              setContentHeight(height);
+              const scrollable = syncListScrollable();
 
               if (isKeyboardOpenRef.current) {
-                requestAnimationFrame(() => scrollToLatest(false));
+                scheduleScrollToLatest(false);
                 return;
               }
-              if (anchorBottomRef.current && listScrollable) {
-                requestAnimationFrame(() => scrollToLatest(false));
+              if (anchorBottomRef.current && scrollable) {
+                scheduleScrollToLatest(false);
               }
             }}
             scrollEventThrottle={16}
@@ -904,5 +968,9 @@ const chatHeaderOverlayStyles = RNStyleSheet.create({
   },
   fadeBelowAi: {
     height: CHAT_HEADER_FADE_BELOW_AI,
+  },
+  aiSubtitleSlot: {
+    minHeight: CHAT_AI_SUBTITLE_SLOT_HEIGHT,
+    justifyContent: "center",
   },
 });
