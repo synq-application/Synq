@@ -7,6 +7,7 @@ import * as Haptics from "expo-haptics";
 import React from "react";
 import { FlatList, Text, TouchableOpacity, View } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   styles: any;
@@ -63,6 +64,9 @@ export default function MessagesInboxPane({
   onCombineChat,
   onDeleteFromAction,
 }: Props) {
+  const insets = useSafeAreaInsets();
+  const inboxHeaderPaddingTop = Math.max(insets.top, 20);
+  const inboxMergeHeaderPaddingTop = Math.max(insets.top, 16);
   const canCombine = allChats.length >= 2;
   const mergeReady = selectedMergeChatIds.length === 2;
   const pinnedSet = new Set(pinnedChatIds);
@@ -206,7 +210,7 @@ export default function MessagesInboxPane({
     <View style={styles.modalBg}>
       {mergeSelectMode ? (
         <>
-          <View style={styles.inboxMergeHeader}>
+          <View style={[styles.inboxMergeHeader, { paddingTop: inboxMergeHeaderPaddingTop }]}>
             <BackButton
               onPress={onCancelMergeMode}
               style={styles.inboxMergeBackBtn}
@@ -220,7 +224,7 @@ export default function MessagesInboxPane({
           <Text style={styles.inboxMergeSubtitle}>{mergeSubtitle}</Text>
         </>
       ) : (
-        <View style={styles.inboxHeaderRow}>
+        <View style={[styles.inboxHeaderRow, { paddingTop: inboxHeaderPaddingTop }]}>
           <Text style={styles.messagesInboxTitle}>Messages</Text>
           <CloseButton
             onPress={onCloseMessages}

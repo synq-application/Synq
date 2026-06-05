@@ -649,7 +649,7 @@ export default function MessagesChatPane({
     ]
   );
 
-  const chatHeaderContentPaddingTop = 10;
+  const chatHeaderContentPaddingTop = Math.max(insets.top, insetsTop, 10);
 
   return (
     <View style={styles.modalBg}>

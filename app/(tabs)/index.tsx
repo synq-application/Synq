@@ -112,10 +112,13 @@ import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
 import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
 import { auth, db } from '../../src/lib/firebase';
 import {
-  assessChatParticipantsForAi,
+  buildLocationPrompt,
+  formatUserLocationLabel,
+  uniqueLocationLabels,
   type ChatAiLocationStatus,
 } from "../../src/lib/chatAiLocation";
 import {
+  allParticipantsHaveCachedCitySuggestions,
   cachedImageLoads,
   getCachedCitySuggestions,
   hasCachedCitySuggestions,
@@ -127,6 +130,7 @@ import {
   writeCachedSynqActive,
 } from "../../src/lib/synqSession";
 import { getCachedOwnProfile } from "../../src/lib/ownProfileCache";
+import { userHasLocation } from "../../src/lib/userProfile";
 import { useAuthRefresh } from '../_layout';
 import AlertModal from '../alert-modal';
 import ConfirmModal from '../confirm-modal';
@@ -913,7 +917,17 @@ export default function SynqScreen() {
   }, [status, user?.uid]);
 
   useEffect(() => {
-    if (!activeChatId || !isChatPaneOpen) {
+    if (!isChatPaneOpen) {
+      return;
+    }
+
+    if (pendingNewChat) {
+      setMessages([]);
+      setMessagesReady(true);
+      return;
+    }
+
+    if (!activeChatId) {
       return;
     }
 
@@ -944,7 +958,7 @@ export default function SynqScreen() {
         navigateMessagesPane("inbox");
       }
     );
-  }, [activeChatId, isChatPaneOpen, navigateMessagesPane]);
+  }, [activeChatId, isChatPaneOpen, pendingNewChat, navigateMessagesPane]);
 
   useEffect(() => {
     if (!messagesModalVisible || pendingNewChat) return;
@@ -1081,16 +1095,20 @@ export default function SynqScreen() {
   const [chatAiLocationStatus, setChatAiLocationStatus] =
     useState<ChatAiLocationStatus>("loading");
   const [chatAiLocationPrompt, setChatAiLocationPrompt] = useState("");
+  const [chatParticipantsHaveCachedCity, setChatParticipantsHaveCachedCity] =
+    useState(false);
 
   useEffect(() => {
     if (messagesPane !== "chat" || activeParticipantIds.length === 0) {
       setChatAiLocationStatus("loading");
       setChatAiLocationPrompt("");
+      setChatParticipantsHaveCachedCity(false);
       return;
     }
 
     let cancelled = false;
     setChatAiLocationStatus("loading");
+    setChatParticipantsHaveCachedCity(false);
     void (async () => {
       try {
         const snaps = await Promise.all(
@@ -1100,14 +1118,25 @@ export default function SynqScreen() {
         const participantData = snaps
           .filter((snap) => snap.exists())
           .map((snap) => snap.data() as Record<string, unknown>);
-        const assessment = await assessChatParticipantsForAi(participantData);
-        if (cancelled) return;
-        setChatAiLocationStatus(assessment.status);
-        setChatAiLocationPrompt(assessment.locationPrompt);
+        const allHaveCachedCity =
+          allParticipantsHaveCachedCitySuggestions(participantData);
+        setChatParticipantsHaveCachedCity(allHaveCachedCity);
+
+        if (!participantData.every((data) => userHasLocation(data))) {
+          setChatAiLocationStatus("missing_location");
+          setChatAiLocationPrompt("");
+          return;
+        }
+
+        setChatAiLocationStatus("available");
+        setChatAiLocationPrompt(
+          buildLocationPrompt(uniqueLocationLabels(participantData))
+        );
       } catch {
         if (!cancelled) {
           setChatAiLocationStatus("missing_location");
           setChatAiLocationPrompt("");
+          setChatParticipantsHaveCachedCity(false);
         }
       }
     })();
@@ -1118,9 +1147,14 @@ export default function SynqScreen() {
   }, [messagesPane, activeParticipantIds]);
 
   const showAISuggestions =
-    AI_PLACE_SUGGESTIONS_ENABLED && chatAiLocationStatus === "available";
+    AI_PLACE_SUGGESTIONS_ENABLED &&
+    chatParticipantsHaveCachedCity &&
+    chatAiLocationStatus !== "loading" &&
+    chatAiLocationStatus !== "missing_location";
   const showAIUnavailableMessage =
-    AI_PLACE_SUGGESTIONS_ENABLED && chatAiLocationStatus === "missing_location";
+    AI_PLACE_SUGGESTIONS_ENABLED &&
+    chatParticipantsHaveCachedCity &&
+    chatAiLocationStatus === "missing_location";
 
   const openAISuggestions = useCallback(() => {
     if (!showAISuggestions) return;
@@ -1169,24 +1203,26 @@ export default function SynqScreen() {
       const participantData = participantSnaps
         .filter((snap) => snap.exists())
         .map((snap) => snap.data() as Record<string, unknown>);
-      const assessment = await assessChatParticipantsForAi(participantData);
-      if (assessment.status === "missing_location") {
-        setAiExploreError(
-          "Everyone in this chat needs a location set to use Synq suggestions."
-        );
-        return;
-      }
-      if (assessment.status === "too_far") {
-        setAiExploreError(
-          "Synq suggestions are only available when everyone is within about 20 miles."
-        );
-        return;
-      }
 
-      const locationPrompt =
-        assessment.locationPrompt || chatAiLocationPrompt;
-      if (!locationPrompt) {
+      const myId = auth.currentUser?.uid;
+      const mySnap = participantSnaps.find((snap) => snap.id === myId);
+      const senderLocationLabel = formatUserLocationLabel(
+        mySnap?.exists()
+          ? (mySnap.data() as Record<string, unknown>)
+          : userProfile
+      );
+      if (!senderLocationLabel) {
         setAiExploreError("Add your city in profile to use Synq suggestions.");
+        return;
+      }
+      if (!hasCachedCitySuggestions(senderLocationLabel)) {
+        setAiExploreError("Synq suggestions aren't available for your city yet.");
+        return;
+      }
+      if (!allParticipantsHaveCachedCitySuggestions(participantData)) {
+        setAiExploreError(
+          "Synq suggestions are only available when everyone in the chat is in a supported city."
+        );
         return;
       }
 
@@ -1194,7 +1230,7 @@ export default function SynqScreen() {
       const triedNames = new Set<string>();
 
       while (suggestions.length < 3) {
-        const batch = getCachedCitySuggestions(locationPrompt, category, [
+        const batch = getCachedCitySuggestions(senderLocationLabel, category, [
           ...triedNames,
         ]);
         if (!batch || batch.length === 0) break;
@@ -1224,9 +1260,9 @@ export default function SynqScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
         setAiExploreError(
-          hasCachedCitySuggestions(locationPrompt)
+          hasCachedCitySuggestions(senderLocationLabel)
             ? "Could not load photos for these spots. Try another vibe."
-            : "Synq suggestions aren't available for your area yet. We're starting with Washington, DC!"
+            : "Synq suggestions aren't available for your city yet."
         );
       }
     } catch (err: unknown) {
@@ -1884,7 +1920,7 @@ export default function SynqScreen() {
           }}
           onDismiss={closeMessagesModal}
         >
-          <SafeAreaView style={styles.modalBg} edges={["top", "bottom"]}>
+          <SafeAreaView style={styles.modalBg} edges={["bottom"]}>
           {messagesPane === "inbox" ? (
             <Reanimated.View
               key="messages-inbox"

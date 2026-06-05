@@ -5,13 +5,13 @@ import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from "react-
 const PLAN_PILL_LAYOUT: ViewStyle = {
   marginLeft: "auto",
   minWidth: 88,
-  height: 32,
+  minHeight: 32,
   borderRadius: 12,
   borderWidth: 1,
   paddingHorizontal: 10,
+  paddingVertical: 6,
   alignItems: "center",
   justifyContent: "center",
-  overflow: "hidden",
 };
 
 type EventItem = {
@@ -276,9 +276,7 @@ const styles = StyleSheet.create({
   },
   interestText: {
     fontSize: 12,
-    lineHeight: 32,
     textAlign: "center",
-    textAlignVertical: "center",
     includeFontPadding: false,
   },
 });

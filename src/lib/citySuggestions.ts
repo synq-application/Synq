@@ -4,6 +4,7 @@ import { bostonMaSuggestions } from "../data/citySuggestions/boston-ma";
 import { chicagoIlSuggestions } from "../data/citySuggestions/chicago-il";
 import { deweyBeachDeSuggestions } from "../data/citySuggestions/dewey-beach-de";
 import { newYorkNySuggestions } from "../data/citySuggestions/new-york-ny";
+import { potomacMdSuggestions } from "../data/citySuggestions/potomac-md";
 import { sanDiegoCaSuggestions } from "../data/citySuggestions/san-diego-ca";
 import { seattleWaSuggestions } from "../data/citySuggestions/seattle-wa";
 import { washingtonDcSuggestions } from "../data/citySuggestions/washington-dc";
@@ -20,6 +21,7 @@ import {
   matchesChicagoIl,
   matchesDeweyBeachDe,
   matchesNewYorkCity,
+  matchesPotomacMd,
   matchesSanDiegoCa,
   matchesSeattleWa,
   matchesWashingtonDcMetro,
@@ -52,6 +54,10 @@ const cityRegistry = [
     match: matchesNewYorkCity,
   },
   {
+    cityId: potomacMdSuggestions.cityId,
+    match: matchesPotomacMd,
+  },
+  {
     cityId: sanDiegoCaSuggestions.cityId,
     match: matchesSanDiegoCa,
   },
@@ -72,6 +78,7 @@ const cityDataById = {
   [chicagoIlSuggestions.cityId]: chicagoIlSuggestions,
   [deweyBeachDeSuggestions.cityId]: deweyBeachDeSuggestions,
   [newYorkNySuggestions.cityId]: newYorkNySuggestions,
+  [potomacMdSuggestions.cityId]: potomacMdSuggestions,
   [sanDiegoCaSuggestions.cityId]: sanDiegoCaSuggestions,
   [seattleWaSuggestions.cityId]: seattleWaSuggestions,
   [washingtonDcSuggestions.cityId]: washingtonDcSuggestions,
