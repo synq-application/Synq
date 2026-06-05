@@ -84,22 +84,27 @@ export default function ExploreModal({
         {
             label: "Drinks",
             desc: "Bars, cocktails & happy hour",
+            emoji: "🍸",
         },
         {
             label: "Dinner",
             desc: "Restaurants worth the trip",
+            emoji: "🍽️",
         },
         {
             label: "Coffee Spots",
             desc: "Cafes, pastries & slow mornings",
+            emoji: "☕",
         },
         {
             label: "Outdoors",
             desc: "Parks, trails & fresh air",
+            emoji: "🌳",
         },
         {
             label: "Surprise Me",
             desc: "We'll pick something for you",
+            emoji: "✨",
             special: true,
         },
     ];
@@ -162,7 +167,9 @@ export default function ExploreModal({
                                                         vibeDisabled && styles.vibeCardDisabled,
                                                     ]}
                                                 >
-                                                    <View style={{ flex: 1 }}>
+                                                    <Text style={styles.vibeEmoji}>{item.emoji}</Text>
+
+                                                    <View style={styles.vibeTextWrap}>
                                                         <Text style={styles.vibeTitle}>
                                                             {item.label}
                                                         </Text>
@@ -356,6 +363,16 @@ const styles = StyleSheet.create({
 
     specialCard: {
         borderColor: "#2A2A2A",
+    },
+
+    vibeEmoji: {
+        fontSize: 28,
+        marginRight: 14,
+    },
+
+    vibeTextWrap: {
+        flex: 1,
+        marginRight: 8,
     },
 
     vibeTitle: {
