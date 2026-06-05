@@ -92,6 +92,7 @@ type Props = {
   showAISuggestions: boolean;
   showAIUnavailableMessage?: boolean;
   onOpenAISuggestions: () => void;
+  onOpenFriendProfile?: (friendId: string) => void;
   sendMessage: () => void;
   sendAISuggestionToChat: () => void;
   onMessageBubblePress: (item: { id: string; reactions?: Record<string, string> }) => void;
@@ -142,6 +143,7 @@ export default function MessagesChatPane({
   showAISuggestions,
   showAIUnavailableMessage = false,
   onOpenAISuggestions,
+  onOpenFriendProfile,
   sendMessage,
   sendAISuggestionToChat,
   onMessageBubblePress,
@@ -169,6 +171,25 @@ export default function MessagesChatPane({
   const anchorBottomRef = useRef(true);
   const pendingNormalScrollRef = useRef(false);
   const listData = messages;
+
+  const headerProfileFriendId = useMemo(() => {
+    const participantIds = activeChat?.participants?.length
+      ? activeChat.participants
+      : Object.keys(activeChat?.participantImages ?? {});
+    const otherIds = participantIds.filter(
+      (id: string) => id && id !== currentUserId
+    );
+    return otherIds.length === 1 ? otherIds[0] : null;
+  }, [activeChat?.participants, activeChat?.participantImages, currentUserId]);
+
+  const handleOpenFriendProfile = useCallback(
+    (friendId: string) => {
+      if (!friendId || friendId === currentUserId) return;
+      Keyboard.dismiss();
+      onOpenFriendProfile?.(friendId);
+    },
+    [currentUserId, onOpenFriendProfile]
+  );
 
   useEffect(() => {
     const prevId = prevChatIdRef.current;
@@ -546,13 +567,20 @@ export default function MessagesChatPane({
               }}
             >
               {!isMe && (
-                <ExpoImage
-                  source={{ uri: senderAvatar }}
-                  style={styles.chatAvatar}
-                  cachePolicy="memory-disk"
-                  transition={0}
-                  recyclingKey={`${item.senderId}-${senderAvatar}`}
-                />
+                <Pressable
+                  onPress={() => handleOpenFriendProfile(item.senderId)}
+                  accessibilityRole="button"
+                  accessibilityLabel="View profile"
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <ExpoImage
+                    source={{ uri: senderAvatar }}
+                    style={styles.chatAvatar}
+                    cachePolicy="memory-disk"
+                    transition={0}
+                    recyclingKey={`${item.senderId}-${senderAvatar}`}
+                  />
+                </Pressable>
               )}
 
               <View
@@ -611,6 +639,7 @@ export default function MessagesChatPane({
       ChatMessageBubble,
       currentUserId,
       iMessageBubbleColumnMaxWidth,
+      handleOpenFriendProfile,
       onIdeaBubblePress,
       onMessageBubblePress,
       onMessageLongPress,
@@ -634,7 +663,17 @@ export default function MessagesChatPane({
         >
           <View style={styles.chatHeaderMain}>
             <View style={styles.chatHeaderAvatarSlot}>
-              {renderAvatarStack(activeChat?.participantImages)}
+              {headerProfileFriendId && onOpenFriendProfile ? (
+                <Pressable
+                  onPress={() => handleOpenFriendProfile(headerProfileFriendId)}
+                  accessibilityRole="button"
+                  accessibilityLabel="View profile"
+                >
+                  {renderAvatarStack(activeChat?.participantImages)}
+                </Pressable>
+              ) : (
+                renderAvatarStack(activeChat?.participantImages)
+              )}
             </View>
             <View
               style={[

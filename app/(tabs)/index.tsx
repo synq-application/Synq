@@ -73,6 +73,15 @@ import Reanimated, {
   SlideOutRight,
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
+type MessagesPane = "inbox" | "chat" | "profile";
+const MESSAGES_PANE_DEPTH: Record<MessagesPane, number> = {
+  inbox: 0,
+  chat: 1,
+  profile: 2,
+};
+const MESSAGES_PANE_ENTER_MS = 300;
+const MESSAGES_PANE_EXIT_MS = 280;
 import {
   ACCENT,
   AI_PLACE_SUGGESTIONS_ENABLED,
@@ -121,6 +130,7 @@ import { useAuthRefresh } from '../_layout';
 import AlertModal from '../alert-modal';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
+import FriendProfile from '../friend-profile';
 import {
   getChatTitle as buildChatTitle,
   getStackAvatarUris,
@@ -262,7 +272,12 @@ export default function SynqScreen() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [messagesModalVisible, setMessagesModalVisible] = useState(false);
-  const [messagesPane, setMessagesPane] = useState<"inbox" | "chat">("inbox");
+  const [messagesPane, setMessagesPane] = useState<MessagesPane>("inbox");
+  const [messagesNavDirection, setMessagesNavDirection] = useState<
+    "forward" | "back"
+  >("forward");
+  const messagesPaneRef = useRef<MessagesPane>("inbox");
+  const [profileFriendId, setProfileFriendId] = useState<string | null>(null);
   const isChatPaneOpen = messagesModalVisible && messagesPane === "chat";
   const [isExploreVisible, setIsExploreVisible] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -321,6 +336,37 @@ export default function SynqScreen() {
   const activePulseOpacity = useRef(new Animated.Value(1)).current;
   const activePulseScale = useRef(new Animated.Value(1)).current;
 
+  useEffect(() => {
+    messagesPaneRef.current = messagesPane;
+  }, [messagesPane]);
+
+  const navigateMessagesPane = useCallback((next: MessagesPane) => {
+    const current = messagesPaneRef.current;
+    if (next === current) return;
+    setMessagesNavDirection(
+      MESSAGES_PANE_DEPTH[next] > MESSAGES_PANE_DEPTH[current]
+        ? "forward"
+        : "back"
+    );
+    setMessagesPane(next);
+  }, []);
+
+  const messagesPaneEnter = useMemo(
+    () =>
+      messagesNavDirection === "forward"
+        ? SlideInRight.duration(MESSAGES_PANE_ENTER_MS)
+        : SlideInLeft.duration(MESSAGES_PANE_ENTER_MS),
+    [messagesNavDirection]
+  );
+
+  const messagesPaneExit = useMemo(
+    () =>
+      messagesNavDirection === "forward"
+        ? SlideOutLeft.duration(MESSAGES_PANE_EXIT_MS)
+        : SlideOutRight.duration(MESSAGES_PANE_EXIT_MS),
+    [messagesNavDirection]
+  );
+
   const visibleChats = useMemo(() => {
     const myId = auth.currentUser?.uid;
     if (!myId) return allChats;
@@ -364,10 +410,10 @@ export default function SynqScreen() {
     ) {
       setActiveChatId(null);
       setMessages([]);
-      setMessagesPane("inbox");
+      navigateMessagesPane("inbox");
       setPendingNewChat(null);
     }
-  }, [activeChatId, allChats, isBlocked]);
+  }, [activeChatId, allChats, isBlocked, navigateMessagesPane]);
 
   const rejectIfObjectionable = (text: string): boolean => {
     const result = filterOrReject(text);
@@ -436,14 +482,14 @@ export default function SynqScreen() {
       await hydrateChatMessages(chatId);
       setActiveChatId(chatId);
       setMessagesModalVisible(true);
-      setMessagesPane("chat");
+      navigateMessagesPane("chat");
       const mid = opts?.messageId;
       setPendingScrollToMessageId(
         typeof mid === "string" && mid.trim() ? mid.trim() : null
       );
       await markChatRead(chatId);
     },
-    [hydrateChatMessages]
+    [hydrateChatMessages, navigateMessagesPane]
   );
 
   const DOUBLE_TAP_MS = 320;
@@ -894,10 +940,10 @@ export default function SynqScreen() {
         setMessages([]);
         setMessagesReady(false);
         setActiveChatId(null);
-        setMessagesPane("inbox");
+        navigateMessagesPane("inbox");
       }
     );
-  }, [activeChatId, isChatPaneOpen]);
+  }, [activeChatId, isChatPaneOpen, navigateMessagesPane]);
 
   useEffect(() => {
     if (!messagesModalVisible || pendingNewChat) return;
@@ -906,9 +952,9 @@ export default function SynqScreen() {
     if (activeChatMissing || (allChats.length === 0 && messagesPane === "chat")) {
       setActiveChatId(null);
       setMessages([]);
-      setMessagesPane("inbox");
+      navigateMessagesPane("inbox");
     }
-  }, [messagesModalVisible, activeChatId, allChats, messagesPane, pendingNewChat]);
+  }, [messagesModalVisible, activeChatId, allChats, messagesPane, pendingNewChat, navigateMessagesPane]);
 
   const activeParticipantIds = useMemo(() => {
     let ids: string[] = [];
@@ -1350,7 +1396,7 @@ export default function SynqScreen() {
         setMessages([]);
       }
       setMessagesModalVisible(true);
-      setMessagesPane("chat");
+      navigateMessagesPane("chat");
       setSelectedFriends([]);
     } catch {
       showActionError("Could not open chat. Please try again.");
@@ -1441,12 +1487,24 @@ export default function SynqScreen() {
 
   const goBackFromChat = useCallback(() => {
     Keyboard.dismiss();
-    setMessagesPane("inbox");
+    navigateMessagesPane("inbox");
     setShowAICard(false);
     setShowOptionsList(false);
     setPendingNewChat(null);
     setIsExploreVisible(false);
-  }, []);
+  }, [navigateMessagesPane]);
+
+  const openFriendProfileFromChat = useCallback((friendId: string) => {
+    if (!friendId || friendId === auth.currentUser?.uid) return;
+    Keyboard.dismiss();
+    setProfileFriendId(friendId);
+    navigateMessagesPane("profile");
+  }, [navigateMessagesPane]);
+
+  const closeProfileFromChat = useCallback(() => {
+    navigateMessagesPane("chat");
+    setProfileFriendId(null);
+  }, [navigateMessagesPane]);
 
   const closeMessagesModal = useCallback(() => {
     resetMergeSelect();
@@ -1454,6 +1512,8 @@ export default function SynqScreen() {
     setSelectedFriends([]);
     setMessagesModalVisible(false);
     setMessagesPane("inbox");
+    setProfileFriendId(null);
+    setMessagesNavDirection("forward");
     setActiveChatId(null);
     setPendingNewChat(null);
     setMessages([]);
@@ -1465,6 +1525,10 @@ export default function SynqScreen() {
   useEffect(() => {
     if (!messagesModalVisible) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (messagesPane === "profile") {
+        closeProfileFromChat();
+        return true;
+      }
       if (messagesPane === "chat") {
         Keyboard.dismiss();
         return true;
@@ -1473,7 +1537,7 @@ export default function SynqScreen() {
       return true;
     });
     return () => sub.remove();
-  }, [messagesModalVisible, messagesPane, closeMessagesModal]);
+  }, [messagesModalVisible, messagesPane, closeMessagesModal, closeProfileFromChat]);
 
   const startCombineWithChat = (chatId: string) => {
     setInboxActionChat(null);
@@ -1578,7 +1642,7 @@ export default function SynqScreen() {
         setPendingNewChat(null);
         await hydrateChatMessages(existing.id);
         setActiveChatId(existing.id);
-        setMessagesPane("chat");
+        navigateMessagesPane("chat");
         await markChatRead(existing.id);
         return;
       }
@@ -1630,7 +1694,7 @@ export default function SynqScreen() {
       setPendingNewChat(null);
       await hydrateChatMessages(chatRef.id);
       setActiveChatId(chatRef.id);
-      setMessagesPane("chat");
+      navigateMessagesPane("chat");
       await markChatRead(chatRef.id);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
@@ -1767,7 +1831,6 @@ export default function SynqScreen() {
               openChangeAudience={() => setChangeAudienceVisible(true)}
               openMessagesInbox={() => {
                 setMessagesModalVisible(true);
-                setMessagesPane("inbox");
               }}
               openEditModal={() => setIsEditModalVisible(true)}
               userProfile={userProfile}
@@ -1810,10 +1873,14 @@ export default function SynqScreen() {
         <Modal
           visible={messagesModalVisible}
           animationType="fade"
-          presentationStyle={messagesPane === "chat" ? "fullScreen" : "pageSheet"}
+          presentationStyle={
+            messagesPane === "chat" || messagesPane === "profile"
+              ? "fullScreen"
+              : "pageSheet"
+          }
           allowSwipeDismissal={false}
           onRequestClose={() => {
-            if (messagesPane === "chat") {
+            if (messagesPane === "chat" || messagesPane === "profile") {
               return;
             }
             closeMessagesModal();
@@ -1826,8 +1893,8 @@ export default function SynqScreen() {
               key="messages-inbox"
               style={styles.messagesPaneFill}
               pointerEvents={messagesPane === "inbox" ? "auto" : "none"}
-              entering={SlideInLeft.duration(300)}
-              exiting={SlideOutLeft.duration(280)}
+              entering={messagesPaneEnter}
+              exiting={messagesPaneExit}
             >
             <MessagesInboxPane
               styles={styles}
@@ -1842,7 +1909,7 @@ export default function SynqScreen() {
                 setPendingNewChat(null);
                 await hydrateChatMessages(item.id);
                 setActiveChatId(item.id);
-                setMessagesPane("chat");
+                navigateMessagesPane("chat");
                 await markChatRead(item.id);
               }}
               onDeleteChat={handleDeleteChat}
@@ -1893,7 +1960,7 @@ export default function SynqScreen() {
                       setActiveChatId(null);
                       setPendingNewChat(null);
                       setMessages([]);
-                      setMessagesPane("inbox");
+                      navigateMessagesPane("inbox");
                     }
                     try {
                       await deleteChat(chatId);
@@ -1915,13 +1982,26 @@ export default function SynqScreen() {
               }
             />
             </Reanimated.View>
+          ) : messagesPane === "profile" && profileFriendId ? (
+            <Reanimated.View
+              key="messages-profile"
+              style={styles.messagesPaneFill}
+              pointerEvents="auto"
+              entering={messagesPaneEnter}
+              exiting={messagesPaneExit}
+            >
+              <FriendProfile
+                embeddedFriendId={profileFriendId}
+                onEmbeddedBack={closeProfileFromChat}
+              />
+            </Reanimated.View>
           ) : (
             <Reanimated.View
               key="messages-chat"
               style={styles.messagesPaneFill}
               pointerEvents={messagesPane === "chat" ? "auto" : "none"}
-              entering={SlideInRight.duration(300)}
-              exiting={SlideOutRight.duration(280)}
+              entering={messagesPaneEnter}
+              exiting={messagesPaneExit}
             >
               <MessagesChatPane
               styles={styles}
@@ -1946,6 +2026,7 @@ export default function SynqScreen() {
               showAISuggestions={showAISuggestions}
               showAIUnavailableMessage={showAIUnavailableMessage}
               onOpenAISuggestions={openAISuggestions}
+              onOpenFriendProfile={openFriendProfileFromChat}
               sendMessage={sendMessage}
               sendAISuggestionToChat={sendAISuggestionToChat}
               setPendingScrollToMessageId={setPendingScrollToMessageId}

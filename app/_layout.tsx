@@ -908,10 +908,14 @@ export default function RootLayout() {
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen
                     name="friend-profile"
-                    options={{
-                      animation: "slide_from_right",
+                    options={({ route }) => ({
+                      animation:
+                        (route.params as { from?: string } | undefined)?.from ===
+                        "chat"
+                          ? "none"
+                          : "slide_from_right",
                       gestureEnabled: true,
-                    }}
+                    })}
                   />
                   <Stack.Screen
                     name="friend-group/[id]"

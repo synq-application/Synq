@@ -89,7 +89,15 @@ import {
   removeFriendMutualErrorMessage,
 } from "@/src/lib/friends";
 
-export default function FriendProfile() {
+type FriendProfileProps = {
+  embeddedFriendId?: string;
+  onEmbeddedBack?: () => void;
+};
+
+export default function FriendProfile({
+  embeddedFriendId,
+  onEmbeddedBack,
+}: FriendProfileProps = {}) {
   const { friendId, from } = useLocalSearchParams<{
     friendId?: string | string[];
     from?: string;
@@ -97,21 +105,24 @@ export default function FriendProfile() {
   const router = useRouter();
 
   const goBackOrHome = useCallback(() => {
+    if (onEmbeddedBack) {
+      onEmbeddedBack();
+      return;
+    }
     if (router.canGoBack()) {
       router.back();
       return;
     }
     router.replace("/(tabs)/friends");
-  }, [router]);
+  }, [router, onEmbeddedBack]);
 
   const handleBack = () => {
     goBackOrHome();
   };
 
   const viewerId = auth.currentUser?.uid ?? "";
-  const friendKey = String(
-    Array.isArray(friendId) ? friendId[0] : friendId || ""
-  );
+  const routeFriendId = Array.isArray(friendId) ? friendId[0] : friendId || "";
+  const friendKey = String(embeddedFriendId || routeFriendId);
   const cachedFriend =
     viewerId && friendKey
       ? friendProfileCacheByUser[viewerId]?.[friendKey] ?? null
@@ -1366,7 +1377,6 @@ export default function FriendProfile() {
       </Modal>
     </SafeAreaView>
   );
-
 }
 
 const PROFILE_SURFACE = "#0A0B0D";
