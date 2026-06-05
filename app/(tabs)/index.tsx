@@ -1466,14 +1466,14 @@ export default function SynqScreen() {
     if (!messagesModalVisible) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (messagesPane === "chat") {
-        goBackFromChat();
+        Keyboard.dismiss();
         return true;
       }
       closeMessagesModal();
       return true;
     });
     return () => sub.remove();
-  }, [messagesModalVisible, messagesPane, goBackFromChat, closeMessagesModal]);
+  }, [messagesModalVisible, messagesPane, closeMessagesModal]);
 
   const startCombineWithChat = (chatId: string) => {
     setInboxActionChat(null);
@@ -1810,11 +1810,10 @@ export default function SynqScreen() {
         <Modal
           visible={messagesModalVisible}
           animationType="fade"
-          presentationStyle="pageSheet"
+          presentationStyle={messagesPane === "chat" ? "fullScreen" : "pageSheet"}
           allowSwipeDismissal={false}
           onRequestClose={() => {
             if (messagesPane === "chat") {
-              goBackFromChat();
               return;
             }
             closeMessagesModal();

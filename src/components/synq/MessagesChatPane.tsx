@@ -228,6 +228,8 @@ export default function MessagesChatPane({
 
   const listScrollable =
     listHeight > 0 && contentHeight > listHeight + LIST_SCROLL_OVERFLOW_SLACK;
+  /** Keep scroll view active while keyboard is open so drags stay in-thread. */
+  const listPanActive = listScrollable || keyboardOpen;
 
   const maxScrollOffset = useCallback(() => {
     const listH = listHeightRef.current;
@@ -698,11 +700,11 @@ export default function MessagesChatPane({
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             removeClippedSubviews={false}
-            scrollEnabled={listScrollable}
-            directionalLockEnabled={listScrollable}
-            bounces={false}
-            alwaysBounceVertical={false}
-            overScrollMode="never"
+            scrollEnabled={listPanActive}
+            directionalLockEnabled={listPanActive}
+            bounces={keyboardOpen}
+            alwaysBounceVertical={keyboardOpen}
+            overScrollMode={keyboardOpen ? "always" : "never"}
             maintainVisibleContentPosition={
               messages.length > 0
                 ? { minIndexForVisible: 0, autoscrollToTopThreshold: 24 }
@@ -726,16 +728,16 @@ export default function MessagesChatPane({
               }
             }}
             scrollEventThrottle={16}
-            onScroll={listScrollable ? handleChatScroll : undefined}
+            onScroll={listPanActive ? handleChatScroll : undefined}
             onScrollBeginDrag={
-              listScrollable
+              listPanActive
                 ? () => {
                     anchorBottomRef.current = false;
                   }
                 : undefined
             }
-            onScrollEndDrag={listScrollable ? handleChatScrollEnd : undefined}
-            onMomentumScrollEnd={listScrollable ? handleChatScrollEnd : undefined}
+            onScrollEndDrag={listPanActive ? handleChatScrollEnd : undefined}
+            onMomentumScrollEnd={listPanActive ? handleChatScrollEnd : undefined}
             ListEmptyComponent={
               messagesReady ? (
                 <View style={styles.chatEmptyWrap}>
@@ -749,7 +751,7 @@ export default function MessagesChatPane({
                 </View>
               ) : null
             }
-            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             renderItem={renderMessage}
             onScrollToIndexFailed={(info) => {
