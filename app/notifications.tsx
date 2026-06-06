@@ -628,7 +628,7 @@ export default function NotificationsScreen() {
     }
 
     if (item.kind === "friend_synq_active" || item.kind === "synq_nudge") {
-      router.push("/(tabs)/index");
+      router.push("/(tabs)");
     }
   }, []);
 
