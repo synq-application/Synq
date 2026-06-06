@@ -6,6 +6,7 @@ import {
   HEADER_BLACK,
   MUTED2,
   ON_ACCENT_TEXT,
+  PROFILE_HEADER_TOP_OFFSET,
 } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -39,11 +40,13 @@ import Animated, { FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   formatTime,
-  formatVenueAddressDisplay,
+  isAiSuggestionMessage,
+  isLegacyAiSuggestionText,
   parseIdeaText,
   resolveAvatar,
   resolveChatSenderAvatar,
 } from "../../../app/helpers";
+import AISuggestionBubble from "./AISuggestionBubble";
 
 const MESSAGE_ENTER = FadeInUp.duration(200);
 const COMPOSER_KEYBOARD_GAP = 14;
@@ -524,8 +527,7 @@ export default function MessagesChatPane({
       const animateEntry = shouldAnimateMessage(item.id);
       const isMe = item.senderId === currentUserId;
       const isSystemMessage = item.type === "system";
-      const isSystemIdea =
-        item.text.includes("✨ Synq AI Suggestion") || item.venueImage;
+      const isSystemIdea = isAiSuggestionMessage(item);
       const chat = activeChatRef.current;
       const senderAvatar = resolveChatSenderAvatar(item.senderId, {
         participantImages: chat?.participantImages,
@@ -548,7 +550,7 @@ export default function MessagesChatPane({
 
       if (isSystemIdea) {
         const { name, address } = parseIdeaText(item.text);
-        const isLegacyAiSuggestion = item.text.includes("✨ Synq AI Suggestion");
+        const isLegacyAiSuggestion = isLegacyAiSuggestionText(item.text);
         const ideaHeartCount =
           item.reactions &&
           Object.values(item.reactions).filter((v) => v === "heart").length;
@@ -556,60 +558,20 @@ export default function MessagesChatPane({
         return (
           <RowWrapper {...rowWrapperProps}>
             <View style={styles.centeredIdeaContainer}>
-              <View style={{ width: "85%", alignSelf: "center" }}>
-                <Pressable
+              <View style={styles.ideaCardSlot}>
+                <AISuggestionBubble
+                  text={item.text}
+                  isLegacy={isLegacyAiSuggestion}
+                  name={name}
+                  address={address}
+                  heartCount={ideaHeartCount || 0}
                   onPress={() =>
                     onIdeaBubblePress(
                       { id: item.id, reactions: item.reactions },
                       { name, address }
                     )
                   }
-                >
-                  <View
-                    style={[
-                      styles.ideaBubble,
-                      { width: "100%", position: "relative", overflow: "visible" },
-                    ]}
-                  >
-                    {isLegacyAiSuggestion ? (
-                      <Text style={styles.ideaText}>{item.text}</Text>
-                    ) : (
-                      <>
-                        {name ? (
-                          <Text style={styles.ideaName}>{name}</Text>
-                        ) : null}
-                        {address ? (
-                          <View style={styles.ideaAddressRow}>
-                            <Ionicons
-                              name="location-outline"
-                              size={14}
-                              color={MUTED2}
-                              style={styles.ideaAddressIcon}
-                            />
-                            <Text style={styles.ideaAddress} numberOfLines={2}>
-                              {formatVenueAddressDisplay(address)}
-                            </Text>
-                          </View>
-                        ) : null}
-                      </>
-                    )}
-                    {ideaHeartCount ? (
-                      <View style={styles.heartReaction}>
-                        {Array.from({ length: ideaHeartCount }, (_, i) => (
-                          <View
-                            key={i}
-                            style={[
-                              styles.heartReactionBadge,
-                              i > 0 && styles.heartReactionBadgeOverlap,
-                            ]}
-                          >
-                            <Ionicons name="heart" size={12} color="#FF2D55" />
-                          </View>
-                        ))}
-                      </View>
-                    ) : null}
-                  </View>
-                </Pressable>
+                />
               </View>
 
               <Text style={styles.timestampCentered}>{formatTime(item.createdAt)}</Text>
@@ -720,7 +682,8 @@ export default function MessagesChatPane({
     ]
   );
 
-  const chatHeaderContentPaddingTop = Math.max(insets.top, insetsTop, 10) + 6;
+  const chatHeaderContentPaddingTop =
+    Math.max(insets.top, insetsTop, 10) + PROFILE_HEADER_TOP_OFFSET + 4;
   const compactChatHeader = !showAISuggestions;
 
   return (
@@ -900,13 +863,6 @@ export default function MessagesChatPane({
             <View style={styles.inChatAICardContainer}>
               <View style={styles.inChatAICard}>
                 <View style={styles.aiCardHeader}>
-                  <Ionicons
-                    name="sparkles"
-                    size={16}
-                    color={ACCENT}
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text style={styles.aiCardTitleSmall}>Synq Suggestion</Text>
                   <TouchableOpacity
                     style={{ marginLeft: "auto" }}
                     onPress={() => setShowAICard(false)}

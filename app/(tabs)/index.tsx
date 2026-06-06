@@ -298,7 +298,6 @@ export default function SynqScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [pendingScrollToMessageId, setPendingScrollToMessageId] = useState<string | null>(null);
   const lastTapRef = useRef<{ [key: string]: number }>({});
-  const ideaMapOpenTimerRef = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
   const [hasUnread, setHasUnread] = useState(false);
   const [showEndSynqModal, setShowEndSynqModal] = useState(false);
   const [friendGroups, setFriendGroups] = useState<FriendGroup[]>([]);
@@ -487,31 +486,15 @@ export default function SynqScreen() {
     const now = Date.now();
     const last = lastTapRef.current[item.id] ?? 0;
     if (now - last < DOUBLE_TAP_MS) {
-      const pending = ideaMapOpenTimerRef.current[item.id];
-      if (pending) clearTimeout(pending);
-      delete ideaMapOpenTimerRef.current[item.id];
       lastTapRef.current[item.id] = 0;
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       void toggleHeartReaction(item.id, item.reactions);
       return;
     }
     lastTapRef.current[item.id] = now;
-    const prev = ideaMapOpenTimerRef.current[item.id];
-    if (prev) clearTimeout(prev);
-    ideaMapOpenTimerRef.current[item.id] = setTimeout(() => {
-      delete ideaMapOpenTimerRef.current[item.id];
-      lastTapRef.current[item.id] = 0;
-      openInMaps(mapsPayload);
-    }, DOUBLE_TAP_MS);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    openInMaps(mapsPayload);
   };
-
-  useEffect(() => {
-    if (isChatPaneOpen) return;
-    Object.values(ideaMapOpenTimerRef.current).forEach((t) => {
-      if (t) clearTimeout(t);
-    });
-    ideaMapOpenTimerRef.current = {};
-  }, [isChatPaneOpen]);
 
   useEffect(() => {
     if (!AI_PLACE_SUGGESTIONS_ENABLED) return;
@@ -1277,6 +1260,7 @@ export default function SynqScreen() {
 
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         text: textToSend,
+        type: 'aiSuggestion',
         senderId: auth.currentUser.uid,
         imageurl: myAvatar,
         createdAt: serverTimestamp()
@@ -2909,19 +2893,9 @@ const styles = StyleSheet.create({
     marginVertical: 15,
     width: '100%',
   },
-  ideaBubble: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: ACCENT,
-    padding: 14,
-    alignItems: 'stretch',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    overflow: "hidden",
+  ideaCardSlot: {
+    width: '88%',
+    alignSelf: 'center',
   },
   heartReaction: {
     position: "absolute",
@@ -2953,35 +2927,6 @@ const styles = StyleSheet.create({
   },
   heartReactionBadgeOverlap: {
     marginLeft: -5,
-  },
-  ideaName: {
-    color: 'white',
-    fontSize: 17,
-    fontFamily: 'Avenir-Heavy',
-    lineHeight: 22,
-    marginBottom: 6,
-  },
-  ideaAddressRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  ideaAddressIcon: {
-    marginTop: 2,
-    marginRight: 4,
-  },
-  ideaAddress: {
-    flex: 1,
-    color: MUTED2,
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: fonts.book,
-  },
-  ideaText: {
-    color: 'white',
-    fontSize: 15,
-    textAlign: 'left',
-    fontWeight: '500',
-    lineHeight: 20,
   },
   locationRow: {
     flexDirection: "row",
