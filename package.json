@@ -1,7 +1,7 @@
 {
   "name": "synq",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "scripts": {
     "postinstall": "node scripts/ensure-content-filter.mjs",
     "sync:content-filter": "node scripts/ensure-content-filter.mjs",
