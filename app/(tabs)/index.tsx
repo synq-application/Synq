@@ -109,7 +109,6 @@ import {
 } from "../../src/lib/chatAiLocation";
 import {
   allParticipantsHaveCachedCitySuggestions,
-  cachedImageLoads,
   getCachedCitySuggestions,
   hasCachedCitySuggestions,
 } from "../../src/lib/citySuggestions";
@@ -1051,9 +1050,6 @@ export default function SynqScreen() {
         seen.add(uri);
         ExpoImage.prefetch(uri).catch(() => {});
       }
-      if (typeof m.venueImage === "string" && m.venueImage.startsWith("http")) {
-        ExpoImage.prefetch(m.venueImage).catch(() => {});
-      }
     });
   }, [activeChatId, isChatPaneOpen, pendingNewChat, allChats, messages, liveParticipantImages, freshParticipantImages]);
 
@@ -1215,16 +1211,9 @@ export default function SynqScreen() {
         let addedFromBatch = false;
         for (const suggestion of batch) {
           triedNames.add(suggestion.name);
-          const imageUrl = suggestion.imageUrl?.trim();
-          if (!imageUrl?.startsWith("http")) continue;
-
-          const imageLoads = await cachedImageLoads(imageUrl);
-          if (!imageLoads) continue;
-
-          suggestions.push({ ...suggestion, imageUrl });
+          suggestions.push(suggestion);
           addedFromBatch = true;
           if (suggestions.length >= 3) break;
-          ExpoImage.prefetch(imageUrl).catch(() => {});
         }
 
         if (!addedFromBatch) break;
@@ -1238,7 +1227,7 @@ export default function SynqScreen() {
       } else {
         setAiExploreError(
           hasCachedCitySuggestions(senderLocationLabel)
-            ? "Could not load photos for these spots. Try another vibe."
+            ? "No spots found for this vibe. Try another."
             : "Synq suggestions aren't available for your city yet."
         );
       }
@@ -1290,7 +1279,6 @@ export default function SynqScreen() {
         text: textToSend,
         senderId: auth.currentUser.uid,
         imageurl: myAvatar,
-        venueImage: selectedOption?.imageUrl || selectedOption?.imageurl || null,
         createdAt: serverTimestamp()
       });
 
@@ -2926,7 +2914,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: ACCENT,
-    padding: 12,
+    padding: 14,
     alignItems: 'stretch',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -2966,16 +2954,32 @@ const styles = StyleSheet.create({
   heartReactionBadgeOverlap: {
     marginLeft: -5,
   },
-  ideaImage: {
-    width: '100%',
-    height: 150,
-    borderRadius: 12,
-    marginBottom: 10,
+  ideaName: {
+    color: 'white',
+    fontSize: 17,
+    fontFamily: 'Avenir-Heavy',
+    lineHeight: 22,
+    marginBottom: 6,
+  },
+  ideaAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  ideaAddressIcon: {
+    marginTop: 2,
+    marginRight: 4,
+  },
+  ideaAddress: {
+    flex: 1,
+    color: MUTED2,
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: fonts.book,
   },
   ideaText: {
     color: 'white',
     fontSize: 15,
-    textAlign: 'center',
+    textAlign: 'left',
     fontWeight: '500',
     lineHeight: 20,
   },

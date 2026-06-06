@@ -39,6 +39,7 @@ import Animated, { FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   formatTime,
+  formatVenueAddressDisplay,
   parseIdeaText,
   resolveAvatar,
   resolveChatSenderAvatar,
@@ -547,6 +548,7 @@ export default function MessagesChatPane({
 
       if (isSystemIdea) {
         const { name, address } = parseIdeaText(item.text);
+        const isLegacyAiSuggestion = item.text.includes("✨ Synq AI Suggestion");
         const ideaHeartCount =
           item.reactions &&
           Object.values(item.reactions).filter((v) => v === "heart").length;
@@ -569,17 +571,28 @@ export default function MessagesChatPane({
                       { width: "100%", position: "relative", overflow: "visible" },
                     ]}
                   >
-                    {item.venueImage ? (
-                      <ExpoImage
-                        source={{ uri: item.venueImage }}
-                        style={styles.ideaImage}
-                        contentFit="cover"
-                        cachePolicy="memory-disk"
-                        transition={0}
-                        recyclingKey={item.venueImage}
-                      />
-                    ) : null}
-                    <Text style={styles.ideaText}>{item.text}</Text>
+                    {isLegacyAiSuggestion ? (
+                      <Text style={styles.ideaText}>{item.text}</Text>
+                    ) : (
+                      <>
+                        {name ? (
+                          <Text style={styles.ideaName}>{name}</Text>
+                        ) : null}
+                        {address ? (
+                          <View style={styles.ideaAddressRow}>
+                            <Ionicons
+                              name="location-outline"
+                              size={14}
+                              color={MUTED2}
+                              style={styles.ideaAddressIcon}
+                            />
+                            <Text style={styles.ideaAddress} numberOfLines={2}>
+                              {formatVenueAddressDisplay(address)}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </>
+                    )}
                     {ideaHeartCount ? (
                       <View style={styles.heartReaction}>
                         {Array.from({ length: ideaHeartCount }, (_, i) => (

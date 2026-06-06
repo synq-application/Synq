@@ -108,12 +108,3 @@ export function allParticipantsHaveCachedCitySuggestions(
   const labels = participantData.map((data) => formatUserLocationLabel(data));
   return allParticipantsHaveCachedCitySuggestionsCore(labels, cityRegistry);
 }
-
-export async function cachedImageLoads(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url);
-    return res.ok;
-  } catch {
-    return false;
-  }
-}

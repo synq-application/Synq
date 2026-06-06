@@ -7,9 +7,9 @@ import {
 } from "@/constants/Variables";
 import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
+import { formatVenueAddressDisplay } from "@/app/helpers";
 import { Ionicons } from "@expo/vector-icons";
-import { Image as ExpoImage } from "expo-image";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
     FlatList,
     Keyboard,
@@ -21,6 +21,14 @@ import {
     View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const CATEGORY_EMOJI: Record<string, string> = {
+    Drinks: "🍸",
+    Dinner: "🍽️",
+    "Coffee Spots": "☕",
+    Outdoors: "🌳",
+    "Surprise Me": "✨",
+};
 
 type Props = {
     visible: boolean;
@@ -52,31 +60,8 @@ export default function ExploreModal({
     errorMessage,
 }: Props) {
     const [pressed, setPressed] = useState<string | null>(null);
-    const [failedImageUrls, setFailedImageUrls] = useState<Set<string>>(
-        () => new Set()
-    );
     const insets = useSafeAreaInsets();
-
-    useEffect(() => {
-        setFailedImageUrls(new Set());
-    }, [aiOptions, showOptionsList]);
-
-    const visibleOptions = useMemo(
-        () =>
-            aiOptions.filter((item) => {
-                const imageUrl =
-                    typeof item?.imageUrl === "string" ? item.imageUrl.trim() : "";
-                return imageUrl.startsWith("http") && !failedImageUrls.has(imageUrl);
-            }),
-        [aiOptions, failedImageUrls]
-    );
-
-    useEffect(() => {
-        if (!selectedOption?.imageUrl) return;
-        if (failedImageUrls.has(selectedOption.imageUrl)) {
-            setSelectedOption(null);
-        }
-    }, [failedImageUrls, selectedOption, setSelectedOption]);
+    const categoryEmoji = CATEGORY_EMOJI[currentCategory] || "✨";
 
     if (!visible) return null;
 
@@ -201,60 +186,64 @@ export default function ExploreModal({
                                         <CloseButton onPress={onClose} />
                                     </View>
 
-                                    {visibleOptions.length === 0 ? (
+                                    {aiOptions.length === 0 ? (
                                         <View style={styles.emptyOptions}>
                                             <Text style={styles.emptyOptionsText}>
-                                                Could not load photos for these spots. Try another vibe.
+                                                No spots found for this vibe. Try another.
                                             </Text>
                                         </View>
                                     ) : (
                                         <FlatList
                                             style={styles.optionsList}
-                                            data={visibleOptions}
+                                            data={aiOptions}
                                             keyExtractor={(item, index) =>
                                                 `${item.name}-${item.address || item.location || index}`
                                             }
                                             contentContainerStyle={{ padding: 20, paddingBottom: 8 }}
-                                            renderItem={({ item }) => (
-                                                <TouchableOpacity
-                                                    style={[
-                                                        styles.venueCard,
-                                                        selectedOption?.name === item.name && styles.selectedCard,
-                                                    ]}
-                                                    onPress={() =>
-                                                        setSelectedOption(
-                                                            selectedOption?.name === item.name ? null : item
-                                                        )
-                                                    }
-                                                >
-                                                    <ExpoImage
-                                                        source={{ uri: item.imageUrl }}
-                                                        style={styles.venueImage}
-                                                        contentFit="cover"
-                                                        cachePolicy="memory-disk"
-                                                        transition={0}
-                                                        recyclingKey={item.imageUrl}
-                                                        onError={() => {
-                                                            setFailedImageUrls((prev) => {
-                                                                const next = new Set(prev);
-                                                                next.add(item.imageUrl);
-                                                                return next;
-                                                            });
-                                                        }}
-                                                    />
+                                            renderItem={({ item }) => {
+                                                const isSelected =
+                                                    selectedOption?.name === item.name;
 
-                                                    <View style={{ flex: 1, marginLeft: 12 }}>
-                                                        <Text style={styles.venueName}>{item.name}</Text>
-                                                        <Text style={styles.venueDesc} numberOfLines={2}>
-                                                            {item.address || item.location}
+                                                return (
+                                                    <TouchableOpacity
+                                                        style={[
+                                                            styles.venueCard,
+                                                            isSelected && styles.selectedCard,
+                                                        ]}
+                                                        onPress={() =>
+                                                            setSelectedOption(
+                                                                isSelected ? null : item
+                                                            )
+                                                        }
+                                                    >
+                                                        <Text style={styles.vibeEmoji}>
+                                                            {categoryEmoji}
                                                         </Text>
-                                                    </View>
 
-                                                    {selectedOption?.name === item.name && (
-                                                        <Ionicons name="checkmark-circle" size={24} color={ACCENT} />
-                                                    )}
-                                                </TouchableOpacity>
-                                            )}
+                                                        <View style={styles.vibeTextWrap}>
+                                                            <Text style={styles.venueName}>
+                                                                {item.name}
+                                                            </Text>
+                                                            <Text
+                                                                style={styles.venueDesc}
+                                                                numberOfLines={2}
+                                                            >
+                                                                {formatVenueAddressDisplay(
+                                                                    item.address || item.location || ""
+                                                                )}
+                                                            </Text>
+                                                        </View>
+
+                                                        {isSelected ? (
+                                                            <Ionicons
+                                                                name="checkmark-circle"
+                                                                size={24}
+                                                                color={ACCENT}
+                                                            />
+                                                        ) : null}
+                                                    </TouchableOpacity>
+                                                );
+                                            }}
                                         />
                                     )}
 
@@ -391,27 +380,24 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: "#111",
-        padding: 12,
-        borderRadius: 18,
+        padding: 18,
+        borderRadius: 20,
         marginBottom: 12,
         borderWidth: 1,
-        borderColor: "#222",
+        borderColor: "#1A1A1A",
     },
     selectedCard: {
         borderColor: ACCENT,
     },
-    venueImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 12,
-    },
     venueName: {
         color: "white",
-        fontSize: 16,
+        fontSize: 18,
+        fontFamily: "Avenir-Heavy",
     },
     venueDesc: {
-        color: "#888",
+        color: "#777",
         fontSize: 13,
+        marginTop: 4,
     },
 
     sendFooter: {

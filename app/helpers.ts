@@ -68,6 +68,13 @@ export const parseIdeaText = (text: string) => {
   return { name, address };
 };
 
+/** Strip trailing US zip codes for shorter venue address display. */
+export function formatVenueAddressDisplay(address: string): string {
+  return String(address || "")
+    .trim()
+    .replace(/\s+\d{5}(-\d{4})?\s*$/, "");
+}
+
 export const resolveAvatar = (url?: any) => {
   if (typeof url === "string" && url.trim().startsWith("http")) {
     return url;
