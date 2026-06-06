@@ -39,6 +39,7 @@ import {
 import { friendsListCacheByUser } from "@/src/lib/socialCache";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { Image as ExpoImage } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { onSnapshot } from "firebase/firestore";
@@ -80,6 +81,18 @@ function removedFromGroupSuccessMessage(displayName: string, groupName: string):
   const group = groupName.trim() || "the group";
   return `You successfully removed ${name} from ${group}`;
 }
+
+const ADD_MEMBERS_FOOTER_FADE_HEIGHT = 56;
+const ADD_MEMBERS_FOOTER_FADE_GRADIENT = [
+  "rgba(0,0,0,0)",
+  "rgba(0,0,0,0.45)",
+  "#000000",
+  "#000000",
+] as const;
+const ADD_MEMBERS_FOOTER_FADE_LOCATIONS = [0, 0.28, 0.48, 1] as const;
+/** Fade zone + button row + bottom inset. */
+const ADD_MEMBERS_FOOTER_HEIGHT =
+  ADD_MEMBERS_FOOTER_FADE_HEIGHT + SPACE_3 + 40 + SPACE_6;
 
 export default function FriendGroupDetailScreen() {
   const router = useRouter();
@@ -279,7 +292,7 @@ export default function FriendGroupDetailScreen() {
           <Text style={styles.errorText}>This group no longer exists.</Text>
         </View>
       ) : (
-        <>
+        <View style={styles.membersPane}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Members</Text>
             <Text style={styles.sectionMeta}>{memberLabel}</Text>
@@ -289,7 +302,10 @@ export default function FriendGroupDetailScreen() {
             data={memberRows}
             keyExtractor={(item) => item.id}
             style={styles.list}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: ADD_MEMBERS_FOOTER_HEIGHT },
+            ]}
             ListEmptyComponent={
               <Text style={styles.emptyMembers}>No members yet. Add friends below.</Text>
             }
@@ -330,7 +346,16 @@ export default function FriendGroupDetailScreen() {
             ItemSeparatorComponent={() => <View style={styles.separator} />}
           />
 
-          <View style={styles.footer}>
+          <LinearGradient
+            colors={[...ADD_MEMBERS_FOOTER_FADE_GRADIENT]}
+            locations={[...ADD_MEMBERS_FOOTER_FADE_LOCATIONS]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={[
+              styles.addMembersFooter,
+              { height: ADD_MEMBERS_FOOTER_HEIGHT },
+            ]}
+          >
             <TouchableOpacity
               style={[synqOutlineAddBtnCompact, styles.addMembersBtn]}
               onPress={() => setAddSheetVisible(true)}
@@ -339,8 +364,8 @@ export default function FriendGroupDetailScreen() {
               <Ionicons name="person-add-outline" size={18} color={ACCENT} />
               <Text style={synqOutlineAddBtnText}>Add members</Text>
             </TouchableOpacity>
-          </View>
-        </>
+          </LinearGradient>
+        </View>
       )}
 
       <AddMembersToGroupSheet
@@ -472,6 +497,10 @@ const styles = StyleSheet.create({
     fontSize: TYPE_CAPTION,
     color: MUTED2,
   },
+  membersPane: {
+    flex: 1,
+    position: "relative",
+  },
   list: {
     flex: 1,
   },
@@ -539,13 +568,17 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.05)",
     marginLeft: 48 + 12 + SPACE_5,
   },
-  footer: {
+  addMembersFooter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: SPACE_5,
-    paddingTop: SPACE_3,
     paddingBottom: SPACE_6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: BORDER,
+    paddingTop: SPACE_3,
+    justifyContent: "flex-end",
     alignItems: "center",
+    zIndex: 2,
   },
   addMembersBtn: {
     flexDirection: "row",
