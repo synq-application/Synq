@@ -28,7 +28,14 @@ import {
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -40,7 +47,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { MESSAGES_STACK_DURATION_MS } from "@/src/components/synq/MessagesModalStack";
 import BackButton from "@/src/components/BackButton";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -94,6 +105,26 @@ type FriendProfileProps = {
   onEmbeddedBack?: () => void;
 };
 
+function ProfileShell({
+  embedded,
+  children,
+}: {
+  embedded: boolean;
+  children: React.ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  if (embedded) {
+    return (
+      <View
+        style={[styles.safeArea, { paddingTop: Math.max(insets.top, 10) }]}
+      >
+        {children}
+      </View>
+    );
+  }
+  return <SafeAreaView style={styles.safeArea}>{children}</SafeAreaView>;
+}
+
 export default function FriendProfile({
   embeddedFriendId,
   onEmbeddedBack,
@@ -123,6 +154,26 @@ export default function FriendProfile({
   const viewerId = auth.currentUser?.uid ?? "";
   const routeFriendId = Array.isArray(friendId) ? friendId[0] : friendId || "";
   const friendKey = String(embeddedFriendId || routeFriendId);
+  const isEmbedded = Boolean(embeddedFriendId);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const resetEmbeddedScroll = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isEmbedded || !friendKey) return;
+    resetEmbeddedScroll();
+    const frame = requestAnimationFrame(resetEmbeddedScroll);
+    const timer = setTimeout(
+      resetEmbeddedScroll,
+      MESSAGES_STACK_DURATION_MS + 48
+    );
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, [isEmbedded, friendKey, resetEmbeddedScroll]);
   const cachedFriend =
     viewerId && friendKey
       ? friendProfileCacheByUser[viewerId]?.[friendKey] ?? null
@@ -519,22 +570,22 @@ export default function FriendProfile({
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <ProfileShell embedded={isEmbedded}>
         <View style={styles.center}>
           <ActivityIndicator color={ACCENT} />
         </View>
-      </SafeAreaView>
+      </ProfileShell>
     );
   }
 
   if (!friend) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <ProfileShell embedded={isEmbedded}>
         <View style={styles.center}>
           <BackButton onPress={handleBack} />
           <Text style={styles.emptyProfileText}>Could not load this profile.</Text>
         </View>
-      </SafeAreaView>
+      </ProfileShell>
     );
   }
 
@@ -938,11 +989,14 @@ export default function FriendProfile({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <ProfileShell embedded={isEmbedded}>
       <ScrollView
+        ref={scrollRef}
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior={isEmbedded ? "never" : "automatic"}
+        onLayout={isEmbedded ? resetEmbeddedScroll : undefined}
       >
         <View style={styles.topBar}>
           <BackButton onPress={handleBack} />
@@ -1375,7 +1429,7 @@ export default function FriendProfile({
           />
         </Pressable>
       </Modal>
-    </SafeAreaView>
+    </ProfileShell>
   );
 }
 
