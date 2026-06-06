@@ -75,7 +75,6 @@ type Props = {
   insetsTop: number;
   activeChat: any;
   chatTitle: string;
-  reserveAiSubtitleSlot?: boolean;
   renderAvatarStack: (images: Record<string, string> | undefined) => React.ReactNode;
   rotatingAIText: string;
   pendingScrollToMessageId: string | null;
@@ -129,7 +128,6 @@ export default function MessagesChatPane({
   insetsTop,
   activeChat,
   chatTitle,
-  reserveAiSubtitleSlot = false,
   renderAvatarStack,
   rotatingAIText,
   pendingScrollToMessageId,
@@ -710,6 +708,7 @@ export default function MessagesChatPane({
   );
 
   const chatHeaderContentPaddingTop = Math.max(insets.top, insetsTop, 10) + 6;
+  const compactChatHeader = !showAISuggestions;
 
   return (
     <View style={styles.modalBg}>
@@ -722,56 +721,61 @@ export default function MessagesChatPane({
           ]}
         >
           <View style={styles.chatHeaderMain}>
-            <View style={styles.chatHeaderAvatarSlot}>
-              {headerProfileFriendId && onOpenFriendProfile ? (
-                <Pressable
-                  onPress={() => handleOpenFriendProfile(headerProfileFriendId)}
-                  accessibilityRole="button"
-                  accessibilityLabel="View profile"
-                >
-                  {headerAvatar}
-                </Pressable>
-              ) : (
-                headerAvatar
-              )}
-            </View>
-            <View style={styles.chatHeaderTextCol}>
-              <Text style={styles.chatTitle} numberOfLines={1}>
-                {chatTitle}
-              </Text>
-              <View
-                style={
-                  reserveAiSubtitleSlot
-                    ? chatHeaderOverlayStyles.aiSubtitleSlot
-                    : undefined
-                }
-              >
-                {showAISuggestions ? (
-                  <TouchableOpacity
-                    onPress={() => {
-                      Keyboard.dismiss();
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      onOpenAISuggestions();
-                    }}
-                    style={styles.aiChipPremium}
-                    activeOpacity={0.82}
+            <View style={styles.chatHeaderIdentityRow}>
+              <View style={styles.chatHeaderAvatarSlot}>
+                {headerProfileFriendId && onOpenFriendProfile ? (
+                  <Pressable
+                    onPress={() => handleOpenFriendProfile(headerProfileFriendId)}
                     accessibilityRole="button"
-                    accessibilityLabel="Open Synq AI place suggestions"
+                    accessibilityLabel="View profile"
                   >
-                    <Ionicons name="sparkles" size={11} color={ACCENT} />
-                    <Text style={styles.aiChipTextPremium} numberOfLines={1}>
-                      {rotatingAIText}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={11} color={MUTED2} />
-                  </TouchableOpacity>
-                ) : showAIUnavailableMessage ? (
-                  <Text style={styles.aiUnavailableHint} numberOfLines={2}>
-                    AI isn't available for this chat until everyone enters their
-                    locations.
-                  </Text>
+                    {headerAvatar}
+                  </Pressable>
+                ) : (
+                  headerAvatar
+                )}
+              </View>
+              <View
+                style={[
+                  styles.chatHeaderTextCol,
+                  compactChatHeader && styles.chatHeaderTextColCompact,
+                ]}
+              >
+                <Text style={styles.chatTitle} numberOfLines={1}>
+                  {chatTitle}
+                </Text>
+                {showAISuggestions ? (
+                  <View style={chatHeaderOverlayStyles.aiSubtitleSlot}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        onOpenAISuggestions();
+                      }}
+                      style={styles.aiChipPremium}
+                      activeOpacity={0.82}
+                      accessibilityRole="button"
+                      accessibilityLabel="Open Synq AI place suggestions"
+                    >
+                      <Ionicons name="sparkles" size={11} color={ACCENT} />
+                      <Text style={styles.aiChipTextPremium} numberOfLines={1}>
+                        {rotatingAIText}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={11} color={MUTED2} />
+                    </TouchableOpacity>
+                  </View>
                 ) : null}
               </View>
             </View>
+            {showAIUnavailableMessage ? (
+              <Text
+                style={[styles.aiUnavailableHint, styles.chatHeaderUnavailableHint]}
+                numberOfLines={2}
+              >
+                AI isn't available for this chat until everyone enters their
+                locations.
+              </Text>
+            ) : null}
           </View>
           <CloseButton
             onPress={onBackFromChat}
