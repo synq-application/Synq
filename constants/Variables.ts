@@ -295,8 +295,12 @@ export interface Friend {
 /** AI place suggestions in chat — shown when everyone in the chat has a location. */
 export const AI_PLACE_SUGGESTIONS_ENABLED = true;
 
-/** Native builds below this must update (set Firestore appConfig/global to raise). */
+/** Native builds below this must update (also set Firestore appConfig/global via scripts/set-app-config.mjs). Raise after the new version is live on the App Store. */
 export const MINIMUM_NATIVE_BUILD_NUMBER = 6;
+export const IOS_APP_STORE_URL =
+  "https://apps.apple.com/us/app/synq-see-whos-free/id6757319173";
+export const ANDROID_PLAY_STORE_URL =
+  "https://play.google.com/store/search?q=Synq&c=apps";
 
 export const aiPrompts = [
     "Let Synq pick the move",

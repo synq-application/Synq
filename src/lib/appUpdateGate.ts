@@ -2,7 +2,7 @@ import Constants from "expo-constants";
 import { doc, getDoc } from "firebase/firestore";
 import { Linking, Platform } from "react-native";
 
-import { MINIMUM_NATIVE_BUILD_NUMBER } from "@/constants/Variables";
+import { MINIMUM_NATIVE_BUILD_NUMBER, IOS_APP_STORE_URL, ANDROID_PLAY_STORE_URL } from "@/constants/Variables";
 import { db } from "./firebase";
 
 export function getNativeBuildNumber(): number {
@@ -17,9 +17,9 @@ export function getNativeBuildNumber(): number {
 
 function defaultStoreUrl(): string {
   if (Platform.OS === "ios") {
-    return "https://apps.apple.com/us/search?term=Synq";
+    return IOS_APP_STORE_URL;
   }
-  return "https://play.google.com/store/search?q=Synq&c=apps";
+  return ANDROID_PLAY_STORE_URL;
 }
 
 export async function checkAppUpdateRequired(): Promise<{

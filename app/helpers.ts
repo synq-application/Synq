@@ -68,6 +68,43 @@ export const parseIdeaText = (text: string) => {
   return { name, address };
 };
 
+const LEGACY_AI_PREFIX = /^✨\s*Synq AI Suggestion:?$/i;
+
+/** True when a chat message should render as a Synq AI suggestion card. */
+export function isAiSuggestionMessage(item: {
+  text?: string;
+  type?: string;
+  venueImage?: string;
+}): boolean {
+  if (item.type === "aiSuggestion") return true;
+  if (item.venueImage) return true;
+
+  const text = String(item.text || "");
+  if (text.includes("✨ Synq AI Suggestion")) return true;
+
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 2 || lines.length > 3) return false;
+  if (LEGACY_AI_PREFIX.test(lines[0])) return false;
+
+  const addressLine = lines.slice(1).join(" ");
+  return /\d/.test(addressLine) && /[,]/.test(addressLine);
+}
+
+export function isLegacyAiSuggestionText(text: string): boolean {
+  return String(text || "").includes("✨ Synq AI Suggestion");
+}
+
+export function stripLegacyAiPrefix(text: string): string {
+  const lines = String(text || "").split("\n");
+  if (LEGACY_AI_PREFIX.test(lines[0]?.trim() || "")) {
+    return lines.slice(1).join("\n").trim();
+  }
+  return text.replace(/^✨\s*Synq AI Suggestion:?\s*/i, "").trim();
+}
+
 /** Strip trailing US zip codes for shorter venue address display. */
 export function formatVenueAddressDisplay(address: string): string {
   return String(address || "")
