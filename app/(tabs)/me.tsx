@@ -1222,14 +1222,12 @@ export default function ProfileScreen() {
           </SafeAreaView>
         </SafeAreaProvider>
       </Modal>
-      <ConfirmModal
+      <AlertModal
         visible={photoPermissionPromptVisible}
         title="Photo library access"
         message="Synq needs access to your photo library so you can choose a profile photo."
-        confirmText="Continue"
-        cancelText="Not now"
-        onCancel={() => setPhotoPermissionPromptVisible(false)}
-        onConfirm={() => {
+        buttonText="Continue"
+        onClose={() => {
           setPhotoPermissionPromptVisible(false);
           void (async () => {
             setIsPickingImage(true);

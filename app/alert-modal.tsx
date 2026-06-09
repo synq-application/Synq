@@ -33,7 +33,12 @@ export default function AlertModal({
   onClose,
 }: Props) {
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <View style={styles.container}>
           {title && <Text style={styles.title}>{title}</Text>}

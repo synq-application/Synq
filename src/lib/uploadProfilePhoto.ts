@@ -1,4 +1,4 @@
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { auth, db, storage } from "./firebase";
 
@@ -11,7 +11,7 @@ export async function uploadProfilePhoto(localUri: string): Promise<string> {
   const storageRef = ref(storage, `profiles/${user.uid}`);
   await uploadBytesResumable(storageRef, blob);
   const url = await getDownloadURL(storageRef);
-  await updateDoc(doc(db, "users", user.uid), { imageurl: url });
+  await setDoc(doc(db, "users", user.uid), { imageurl: url }, { merge: true });
   return url;
 }
 

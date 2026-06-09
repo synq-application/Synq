@@ -8,7 +8,6 @@ import { Image as ExpoImage } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import { updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -39,13 +38,13 @@ import {
   TEXT,
   fonts,
 } from "../../constants/Variables";
-import { auth, db, storage } from "../../src/lib/firebase";
+import { auth, db } from "../../src/lib/firebase";
 import {
   consumePendingProfilePhoto,
   setPendingProfilePhotoSource,
 } from "@/src/lib/pendingProfilePhoto";
+import { uploadProfilePhoto } from "@/src/lib/uploadProfilePhoto";
 import AlertModal from "../alert-modal";
-import ConfirmModal from "../confirm-modal";
 
 export default function Details() {
   const router = useRouter();
@@ -128,20 +127,9 @@ export default function Details() {
 
     setIsUploading(true);
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const storageRef = ref(storage, `profiles/${auth.currentUser.uid}`);
-      const uploadTask = await uploadBytesResumable(storageRef, blob);
-      const url = await getDownloadURL(uploadTask.ref);
-
-      await setDoc(
-        doc(db, "users", auth.currentUser.uid),
-        { imageurl: url },
-        { merge: true }
-      );
-
+      const url = await uploadProfilePhoto(uri);
       setImage(url);
-    } catch (e) {
+    } catch {
       showAlert("Could not upload image.", "Error");
     } finally {
       setIsUploading(false);
@@ -294,14 +282,12 @@ export default function Details() {
             message={alertMessage}
             onClose={() => setAlertVisible(false)}
           />
-          <ConfirmModal
+          <AlertModal
             visible={photoPermissionPromptVisible}
             title="Photo library access"
-            message="Synq needs access to your photo library so you can choose an optional profile photo. You can decline and continue without a photo."
-            confirmText="Continue"
-            cancelText="Not now"
-            onCancel={() => setPhotoPermissionPromptVisible(false)}
-            onConfirm={() => {
+            message="Synq needs access to your photo library so you can choose an optional profile photo."
+            buttonText="Continue"
+            onClose={() => {
               setPhotoPermissionPromptVisible(false);
               void requestPhotoAccessAndPick();
             }}

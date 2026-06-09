@@ -615,14 +615,12 @@ export default function EditProfileScreen() {
           onConfirm={confirmRemoveLocation}
           onCancel={() => setShowRemoveLocationConfirm(false)}
         />
-        <ConfirmModal
+        <AlertModal
           visible={locationPermissionPromptVisible}
           title="Location access"
-          message="Synq uses your location once to auto-fill your city and state. You can decline and enter your location manually instead."
-          confirmText="Continue"
-          cancelText="Not now"
-          onCancel={() => setLocationPermissionPromptVisible(false)}
-          onConfirm={() => {
+          message="Synq uses your location once to auto-fill your city and state."
+          buttonText="Continue"
+          onClose={() => {
             setLocationPermissionPromptVisible(false);
             void requestLocationAccessAndFill();
           }}
