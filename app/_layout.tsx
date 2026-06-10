@@ -997,7 +997,9 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   bootSplashLogo: {
-    width: 300,
-    height: 220,
+    width: 150,
+    height: 150,
+    maxWidth: "42%",
+    maxHeight: "22%",
   },
 });

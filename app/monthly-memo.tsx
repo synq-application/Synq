@@ -46,6 +46,7 @@ type EventItem = {
   time?: string;
   location?: string;
   joinedFromId?: string;
+  joinedFromIds?: string[];
   joinedFromName?: string;
   joinedFromNames?: string[];
   planHostUid?: string;
@@ -130,9 +131,37 @@ export default function OpenPlans({
       if (!hostFn) hostFn = "Friend";
     }
 
-    const othersFirsts = hostFn && !hostIsViewer
-      ? nameFirsts.filter((n) => n !== hostFn)
-      : nameFirsts.filter((n) => n !== viewerFn);
+    const excludeUids = new Set(
+      [viewerUid, hostUid].map((id) => String(id || "").trim()).filter(Boolean)
+    );
+    const joinedIds = Array.from(
+      new Set(
+        [
+          ...(Array.isArray(event.joinedFromIds) ? event.joinedFromIds : []),
+          event.joinedFromId,
+        ]
+          .map((id) => String(id || "").trim())
+          .filter(Boolean)
+      )
+    );
+
+    let othersFirsts: string[];
+    if (joinedIds.length > 0) {
+      othersFirsts = Array.from(
+        new Set(
+          joinedIds
+            .filter((id) => !excludeUids.has(id))
+            .map((id) => firstName(hostDisplayNameByUid[id] || ""))
+            .filter(Boolean)
+        )
+      );
+    } else {
+      othersFirsts = nameFirsts.filter((n) => {
+        if (viewerFn && n === viewerFn) return false;
+        if (hostFn && n === hostFn) return false;
+        return true;
+      });
+    }
 
     const primary =
       hostIsViewer || !hostUid
