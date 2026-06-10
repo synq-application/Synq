@@ -302,6 +302,9 @@ export const IOS_APP_STORE_URL =
 export const ANDROID_PLAY_STORE_URL =
   "https://play.google.com/store/search?q=Synq&c=apps";
 
+/** Hosted open page — tries synq:// then redirects to the app store. Deploy via Firebase Hosting. */
+export const SYNQ_OPEN_WEB_BASE = "https://new-synq-main.firebaseapp.com/open";
+
 export const aiPrompts = [
     "Let Synq pick the move",
     "Find something fun nearby",

@@ -42,7 +42,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
-import * as Linking from "expo-linking";
+import { buildProfileShareWebUrl } from "@/src/lib/profileShareUrl";
 import { router, useLocalSearchParams } from "expo-router";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -773,9 +773,7 @@ export default function ProfileScreen() {
   const profileQrUrl = useMemo(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return "";
-    return Linking.createURL("/friend-profile", {
-      queryParams: { friendId: uid },
-    });
+    return buildProfileShareWebUrl(uid);
   }, [auth.currentUser?.uid]);
   const inviteShareUrl = useMemo(() => {
     if (!inviteCode) return "";

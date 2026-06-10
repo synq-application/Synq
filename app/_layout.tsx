@@ -154,7 +154,8 @@ function parseFriendProfileIdFromUrl(url: string): string | null {
     const hostname = String(parsed.hostname || "").trim();
     const isFriendProfile =
       hostname === "friend-profile" || path === "friend-profile";
-    if (!isFriendProfile) return null;
+    const isOpenPage = path === "open" || path.endsWith("/open");
+    if (!isFriendProfile && !isOpenPage) return null;
     const friendIdRaw = parsed.queryParams?.friendId;
     return cleanUid(Array.isArray(friendIdRaw) ? friendIdRaw[0] : friendIdRaw);
   } catch {
