@@ -1,3 +1,4 @@
+import { formatVenueAddressDisplay } from "@/app/helpers";
 import {
     ACCENT,
     BUTTON_RADIUS,
@@ -7,7 +8,6 @@ import {
 } from "@/constants/Variables";
 import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
-import { formatVenueAddressDisplay } from "@/app/helpers";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {

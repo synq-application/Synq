@@ -335,6 +335,11 @@ export default function RootLayout() {
         });
         return;
       }
+
+      if (type === "plan_invite") {
+        setPendingNotificationTap({ kind: "notifications" });
+        return;
+      }
     };
 
     const sub = Notifications.addNotificationResponseReceivedListener(

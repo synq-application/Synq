@@ -1069,6 +1069,7 @@ export default function ProfileScreen() {
           viewerUid={myId}
           hostDisplayNameByUid={hostDisplayNameByUid}
           highlightEventId={planHighlightId}
+          friends={friendsForHostNames}
         />
       </View>
       <View style={styles.section}>

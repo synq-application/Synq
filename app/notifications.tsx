@@ -48,6 +48,7 @@ import {
   TYPE_CAPTION,
   TYPE_SECTION,
 } from "../constants/Variables";
+import { acceptPlanInvite, acceptPlanInviteErrorMessage } from "../src/lib/planInvite";
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
@@ -66,6 +67,7 @@ const BACKGROUND = BG;
 type ActivityType =
   | "friend_accepted"
   | "open_plan_interest"
+  | "plan_invite"
   | "friend_synq_active"
   | "synq_nudge";
 
@@ -222,6 +224,10 @@ export default function NotificationsScreen() {
         body = planTitle
           ? `${firstName(actorName)} is interested in your plan ${planTitle}`
           : `${firstName(actorName)} is interested in your plan`;
+      } else if (type === "plan_invite") {
+        body = planTitle
+          ? `${firstName(actorName)} wants you to join their plan ${planTitle}`
+          : `${firstName(actorName)} wants you to join their plan`;
       } else if (type === "friend_synq_active") {
         body = `${firstName(actorName)} just activated Synq.`;
       } else if (type === "synq_nudge") {
@@ -241,6 +247,8 @@ export default function NotificationsScreen() {
           ? "Request accepted"
           : type === "open_plan_interest"
             ? "Open plan"
+            : type === "plan_invite"
+              ? "Plan invite"
             : type === "synq_nudge"
               ? "Are you free?"
               : "Friend active on Synq"),
@@ -435,9 +443,13 @@ export default function NotificationsScreen() {
 
     const activity: FeedItem[] = mergedActivity
       .filter((a) =>
-        ["friend_accepted", "open_plan_interest", "friend_synq_active", "synq_nudge"].includes(
-          a.type
-        )
+        [
+          "friend_accepted",
+          "open_plan_interest",
+          "plan_invite",
+          "friend_synq_active",
+          "synq_nudge",
+        ].includes(a.type)
       )
       .map((a) => ({
         feedKey: `act_${a.id}`,
@@ -603,8 +615,35 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handlePlanInvite = async (
+    item: Extract<FeedItem, { kind: "plan_invite" }>,
+    accept: boolean
+  ) => {
+    if (!auth.currentUser || dismissingKeys.has(item.feedKey)) return;
+
+    if (!accept) {
+      await dismissActivity(item);
+      return;
+    }
+
+    setDismissingKeys((prev) => new Set(prev).add(item.feedKey));
+    try {
+      await acceptPlanInvite(item.id);
+      showAlert("Added", "Plan added to your open plans.");
+      router.push("/(tabs)/me");
+    } catch (err) {
+      showAlert("Error", acceptPlanInviteErrorMessage(err));
+    } finally {
+      setDismissingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(item.feedKey);
+        return next;
+      });
+    }
+  };
+
   const handleActivityPress = useCallback(async (item: FeedItem) => {
-    if (item.kind === "friend_request") return;
+    if (item.kind === "friend_request" || item.kind === "plan_invite") return;
 
     if (item.kind === "friend_synq_active" || item.kind === "synq_nudge") {
       void dismissActivity(item);
@@ -641,6 +680,8 @@ export default function NotificationsScreen() {
         return "Request accepted";
       case "open_plan_interest":
         return "Plan interest";
+      case "plan_invite":
+        return "Plan invite";
       case "friend_synq_active":
         return "Synq active";
       case "synq_nudge":
@@ -694,6 +735,62 @@ export default function NotificationsScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel="Decline friend request"
+          >
+            <CloseIcon size={20} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const PlanInviteRow = ({ item }: { item: Extract<FeedItem, { kind: "plan_invite" }> }) => {
+    const avatarUri = resolveAvatar(item.actorImageUrl);
+    const isDismissing = dismissingKeys.has(item.feedKey);
+
+    return (
+      <View style={styles.row}>
+        <View style={styles.rowLeft}>
+          <View style={styles.avatar}>
+            <ExpoImage
+              source={{ uri: avatarUri }}
+              style={styles.avatarImg}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={0}
+              recyclingKey={avatarUri}
+              priority="high"
+            />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowKicker}>{kickerFor(item.kind)}</Text>
+            <Text style={styles.rowText}>{item.body}</Text>
+          </View>
+        </View>
+
+        <View style={styles.rowRight}>
+          <TouchableOpacity
+            onPress={() => void handlePlanInvite(item, true)}
+            style={styles.acceptBtn}
+            disabled={isDismissing}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Accept plan invite"
+          >
+            {isDismissing ? (
+              <ActivityIndicator size="small" color="black" />
+            ) : (
+              <Ionicons name="checkmark" size={18} color="black" />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => void handlePlanInvite(item, false)}
+            style={styles.dismissBtn}
+            disabled={isDismissing}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Decline plan invite"
           >
             <CloseIcon size={20} />
           </TouchableOpacity>
@@ -759,6 +856,8 @@ export default function NotificationsScreen() {
     <View style={styles.group}>
       {item.kind === "friend_request" ? (
         <FriendRequestRow item={item} />
+      ) : item.kind === "plan_invite" ? (
+        <PlanInviteRow item={item} />
       ) : (
         <ActivityRow item={item} />
       )}

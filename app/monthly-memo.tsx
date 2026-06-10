@@ -33,7 +33,11 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import PlanInviteFriendsSheet, {
+  type PlanInviteFriend,
+} from "@/src/components/plans/PlanInviteFriendsSheet";
 import ConfirmModal from "./confirm-modal";
+import AlertModal from "./alert-modal";
 
 type EventItem = {
   id: string;
@@ -63,6 +67,7 @@ type Props = {
   viewerUid?: string;
   hostDisplayNameByUid?: Record<string, string>;
   highlightEventId?: string | null;
+  friends?: PlanInviteFriend[];
 };
 
 const getInitialDate = () => {
@@ -85,6 +90,7 @@ export default function OpenPlans({
   viewerUid = "",
   hostDisplayNameByUid = {},
   highlightEventId = null,
+  friends = [],
 }: Props) {
   const firstName = (name: string) => String(name || "").trim().split(/\s+/)[0] || "";
 
@@ -144,7 +150,16 @@ export default function OpenPlans({
   const [activePicker, setActivePicker] = useState<"date" | "time" | null>(null);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<EventItem | null>(null);
+  const [inviteSheetVisible, setInviteSheetVisible] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
   const isEditing = !!editingEvent;
+  const canInviteToPlan =
+    isEditing &&
+    !!editingEvent?.id &&
+    canEditOpenPlan(editingEvent, viewerUid) &&
+    friends.length > 0;
   const [keyboardInset, setKeyboardInset] = useState(0);
   const planScrollRef = useRef<ScrollView>(null);
   const locationInputRef = useRef<TextInput>(null);
@@ -216,13 +231,28 @@ export default function OpenPlans({
   };
 
   const closeModal = () => {
+    if (inviteSheetVisible) {
+      setInviteSheetVisible(false);
+      return;
+    }
     Keyboard.dismiss();
     setActivePicker(null);
     setEditingEvent(null);
+    setInviteSheetVisible(false);
     setShowEventModal(false);
   };
 
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+
   const handleBackdropPress = () => {
+    if (inviteSheetVisible) {
+      setInviteSheetVisible(false);
+      return;
+    }
     if (keyboardInset > 0) {
       Keyboard.dismiss();
       return;
@@ -452,7 +482,7 @@ export default function OpenPlans({
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.popupAvoid}
           >
-            <View style={styles.popupCard}>
+            <Pressable style={styles.popupCard} onPress={() => {}}>
               <View style={styles.popupTitleRow}>
                 <Text style={styles.popupTitle}>
                   {isEditing ? "Edit plan" : "Add a plan"}
@@ -609,6 +639,22 @@ export default function OpenPlans({
                 />
               </View>
 
+              {canInviteToPlan ? (
+                <TouchableOpacity
+                  style={styles.inviteFriendsBtn}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setActivePicker(null);
+                    setInviteSheetVisible(true);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Invite friends to this plan"
+                >
+                  <Ionicons name="person-add-outline" size={18} color={ACCENT} />
+                  <Text style={styles.inviteFriendsBtnText}>Invite friends</Text>
+                </TouchableOpacity>
+              ) : null}
+
               <TouchableOpacity
                 style={[styles.popupPostBtn, !canPost && styles.popupPostBtnDisabled]}
                 disabled={!canPost}
@@ -618,10 +664,34 @@ export default function OpenPlans({
                   {isEditing ? "Save" : "Post"}
                 </Text>
               </TouchableOpacity>
-            </View>
+            </Pressable>
           </KeyboardAvoidingView>
+
+          <PlanInviteFriendsSheet
+            embedded
+            visible={inviteSheetVisible}
+            friends={friends}
+            eventId={editingEvent?.id || ""}
+            planTitle={editingEvent?.title || newEvent.title}
+            onClose={() => setInviteSheetVisible(false)}
+            onInvited={(friendId) => {
+              const name =
+                friends.find((f) => f.id === friendId)?.displayName?.trim().split(/\s+/)[0] ||
+                "Friend";
+              showAlert("Invite sent", `${name} will get a notification to join your plan.`);
+            }}
+            onError={(message) => showAlert("Could not invite", message)}
+          />
         </Pressable>
       </Modal>
+
+      <AlertModal
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
+
       <ConfirmModal
         visible={!!pendingDeleteEvent}
         title={
@@ -859,6 +929,26 @@ const styles = StyleSheet.create({
   },
   locationFieldWrap: {
     marginTop: 10,
+  },
+  inviteFriendsBtn: {
+    marginTop: 12,
+    marginBottom: 4,
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
+    height: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: BUTTON_RADIUS,
+    borderWidth: 1,
+    borderColor: "rgba(43,255,136,0.35)",
+    backgroundColor: "rgba(43,255,136,0.08)",
+  },
+  inviteFriendsBtnText: {
+    color: ACCENT,
+    fontSize: 16,
+    fontFamily: fonts.heavy,
   },
   planInputSecondary: {
     backgroundColor: "#0c0c0c",
