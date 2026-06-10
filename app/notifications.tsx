@@ -606,6 +606,12 @@ export default function NotificationsScreen() {
   const handleActivityPress = useCallback(async (item: FeedItem) => {
     if (item.kind === "friend_request") return;
 
+    if (item.kind === "friend_synq_active" || item.kind === "synq_nudge") {
+      void dismissActivity(item);
+      router.push("/(tabs)");
+      return;
+    }
+
     void markActivityRead(item);
 
     if (item.kind === "friend_accepted" && item.fromUserId) {
@@ -624,11 +630,6 @@ export default function NotificationsScreen() {
       } else {
         router.push("/(tabs)/me");
       }
-      return;
-    }
-
-    if (item.kind === "friend_synq_active" || item.kind === "synq_nudge") {
-      router.push("/(tabs)");
     }
   }, []);
 

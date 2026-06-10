@@ -12,7 +12,8 @@
     "web": "expo start --web",
     "test": "firebase emulators:exec --only firestore --project demo-synq-rules \"node ./node_modules/jest/bin/jest.js --runInBand\"",
     "test:jest": "node ./node_modules/jest/bin/jest.js --runInBand",
-    "verify:ios-pod-network": "node scripts/verify-ios-pod-network.mjs"
+    "verify:ios-pod-network": "node scripts/verify-ios-pod-network.mjs",
+    "set-app-config": "node scripts/set-app-config.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

@@ -13,6 +13,10 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 import { onAuthStateChanged, signOut, updateProfile, User } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import {
+  activityNotificationId,
+  dismissActivityNotification,
+} from "@/src/lib/activityNotifications";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, {
   createContext,
@@ -210,7 +214,11 @@ export default function RootLayout() {
     | { kind: "chat"; chatId: string; messageId?: string }
     | { kind: "notifications" }
     | { kind: "friend_profile"; friendId: string }
-    | { kind: "synq_home" }
+    | {
+        kind: "synq_home";
+        fromUserId?: string;
+        notificationType?: "friend_synq_active" | "synq_nudge";
+      }
     | { kind: "me"; focusEventId?: string }
     | null
   >(null);
@@ -312,7 +320,11 @@ export default function RootLayout() {
       }
 
       if (type === "friend_synq_active" || type === "synq_nudge") {
-        setPendingNotificationTap({ kind: "synq_home" });
+        setPendingNotificationTap({
+          kind: "synq_home",
+          fromUserId: str(data.fromUserId),
+          notificationType: type,
+        });
         return;
       }
 
@@ -775,6 +787,14 @@ export default function RootLayout() {
     }
 
     if (pending.kind === "synq_home") {
+      const fromUserId = pending.fromUserId;
+      const notificationType = pending.notificationType;
+      if (fromUserId && notificationType) {
+        void dismissActivityNotification(
+          user.uid,
+          activityNotificationId(notificationType, fromUserId, user.uid)
+        ).catch(() => {});
+      }
       router.push("/(tabs)");
       return;
     }

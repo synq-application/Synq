@@ -88,6 +88,7 @@ import {
   readNudgeSentState,
   sendSynqNudge,
   synqNudgeErrorMessage,
+  warmSynqNudgeClient,
 } from "@/src/lib/synqNudge";
 import {
   addMembersToFriendGroup,
@@ -378,7 +379,12 @@ export default function FriendProfile({
       cancelled = true;
       if (expiryTimer) clearTimeout(expiryTimer);
     };
-  }, [nudgeSentStorageKey, nudgeSent]);
+  }, [nudgeSentStorageKey]);
+
+  useEffect(() => {
+    if (!showNudgeCard || nudgeSent) return;
+    warmSynqNudgeClient();
+  }, [showNudgeCard, nudgeSent]);
 
   const handleSynqNudge = async () => {
     if (!friendKey || nudgeLoading || nudgeSent || !canNudgeFriend) return;
@@ -392,14 +398,12 @@ export default function FriendProfile({
       showAlert("Nudge sent", "They'll get a notification asking if they're free.");
     } catch (err) {
       const msg = synqNudgeErrorMessage(err);
-      if (
-        msg.includes("again in a few hours") &&
-        nudgeSentStorageKey
-      ) {
+      if (msg.includes("again in a few hours") && nudgeSentStorageKey) {
         await persistNudgeSent(nudgeSentStorageKey);
         setNudgeSent(true);
+      } else {
+        showAlert("Couldn't nudge", msg);
       }
-      showAlert("Couldn't nudge", msg);
     } finally {
       setNudgeLoading(false);
     }
