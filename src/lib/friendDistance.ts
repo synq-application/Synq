@@ -146,13 +146,10 @@ export async function buildFriendDistanceMap(
   return Object.fromEntries(entries);
 }
 
-export function sortFriendsByNameWithNoLocationLast(list: Friend[]): Friend[] {
-  return [...list].sort((a, b) => {
-    const aHas = friendHasLocation(a);
-    const bHas = friendHasLocation(b);
-    if (aHas !== bHas) return aHas ? -1 : 1;
-    return (a.displayName || "").localeCompare(b.displayName || "");
-  });
+export function sortFriendsByName(list: Friend[]): Friend[] {
+  return [...list].sort((a, b) =>
+    (a.displayName || "").localeCompare(b.displayName || "")
+  );
 }
 
 export function sortFriendsByDistanceKm(

@@ -4,7 +4,7 @@ import {
   buildFriendDistanceMap,
   resolveOriginCoords,
   sortFriendsByDistanceKm,
-  sortFriendsByNameWithNoLocationLast,
+  sortFriendsByName,
   userOriginFromProfile,
 } from "@/src/lib/friendDistance";
 import { useEffect, useMemo, useState } from "react";
@@ -56,6 +56,6 @@ export function useSortedFriendsList(
     if (sortMode === "distance" && distanceSortReady) {
       return sortFriendsByDistanceKm(friends, friendDistancesKm);
     }
-    return sortFriendsByNameWithNoLocationLast(friends);
+    return sortFriendsByName(friends);
   }, [friends, sortMode, distanceSortReady, friendDistancesKm]);
 }
