@@ -76,6 +76,24 @@ export function filterOutPastOpenPlans<T extends { date?: string }>(
   return events.filter((e) => !isOpenPlanDatePast(String(e?.date || "")));
 }
 
+/** Friend UIDs who expressed interest on the host's plan (excludes the host). */
+export function collectPlanInterestedFriendIds(
+  event: any,
+  hostUid?: string
+): string[] {
+  const host = String(hostUid || event?.planHostUid || "").trim();
+  const ids = new Set<string>();
+  if (Array.isArray(event?.joinedFromIds)) {
+    event.joinedFromIds.forEach((id: unknown) => {
+      const s = String(id || "").trim();
+      if (s && s !== host) ids.add(s);
+    });
+  }
+  const joinedFromId = String(event?.joinedFromId || "").trim();
+  if (joinedFromId && joinedFromId !== host) ids.add(joinedFromId);
+  return [...ids];
+}
+
 /** True when the viewer created this plan (not a copy joined from a friend). */
 export function canEditOpenPlan(event: any, viewerUid: string): boolean {
   const viewer = String(viewerUid || "").trim();

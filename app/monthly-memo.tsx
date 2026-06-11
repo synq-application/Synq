@@ -12,16 +12,21 @@ import {
 import PlanDateCalendar from "@/src/components/PlanDateCalendar";
 import PlanTimePicker from "@/src/components/PlanTimePicker";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
-import { canEditOpenPlan, filterOutPastOpenPlans } from "@/src/lib/planEvents";
+import {
+  canEditOpenPlan,
+  collectPlanInterestedFriendIds,
+  filterOutPastOpenPlans,
+} from "@/src/lib/planEvents";
 import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
+  InteractionManager,
   Keyboard,
   type KeyboardEvent,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -33,6 +38,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PlanInviteFriendsSheet, {
   type PlanInviteFriend,
 } from "@/src/components/plans/PlanInviteFriendsSheet";
@@ -50,6 +56,7 @@ type EventItem = {
   joinedFromName?: string;
   joinedFromNames?: string[];
   planHostUid?: string;
+  planInvitedIds?: string[];
 };
 
 type Props = {
@@ -69,6 +76,7 @@ type Props = {
   hostDisplayNameByUid?: Record<string, string>;
   highlightEventId?: string | null;
   friends?: PlanInviteFriend[];
+  onPlanInvited?: (eventId: string, friendIds: string[]) => void;
 };
 
 const getInitialDate = () => {
@@ -92,7 +100,14 @@ export default function OpenPlans({
   hostDisplayNameByUid = {},
   highlightEventId = null,
   friends = [],
+  onPlanInvited,
 }: Props) {
+  const insets = useSafeAreaInsets();
+  const modalMaxHeight = useMemo(() => {
+    const windowH = Dimensions.get("window").height;
+    return windowH - insets.top - insets.bottom - 24;
+  }, [insets.top, insets.bottom]);
+
   const firstName = (name: string) => String(name || "").trim().split(/\s+/)[0] || "";
 
   const formatOthersInterestedLine = (names: string[]) => {
@@ -189,9 +204,21 @@ export default function OpenPlans({
     !!editingEvent?.id &&
     canEditOpenPlan(editingEvent, viewerUid) &&
     friends.length > 0;
+  const planInvitedIds = useMemo(() => {
+    if (!editingEvent?.id) return editingEvent?.planInvitedIds;
+    return events.find((e) => e.id === editingEvent.id)?.planInvitedIds ?? editingEvent.planInvitedIds;
+  }, [events, editingEvent]);
+  const planInterestedIds = useMemo(() => {
+    const event = editingEvent?.id
+      ? events.find((e) => e.id === editingEvent.id) ?? editingEvent
+      : editingEvent;
+    if (!event) return [];
+    return collectPlanInterestedFriendIds(event, viewerUid);
+  }, [events, editingEvent, viewerUid]);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const planScrollRef = useRef<ScrollView>(null);
   const locationInputRef = useRef<TextInput>(null);
+  const inviteAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const minimumSelectableDate = useMemo(() => {
     const d = new Date();
@@ -240,15 +267,22 @@ export default function OpenPlans({
     setEditingEvent(null);
     setSelectedDate(getInitialDate());
     setActivePicker(null);
+    setInviteSheetVisible(false);
     setNewEvent({ title: "", date: "", time: "", location: "" });
     setKeyboardInset(0);
     setShowEventModal(true);
   };
 
   const openEditModal = (event: EventItem) => {
+    if (inviteAlertTimerRef.current) {
+      clearTimeout(inviteAlertTimerRef.current);
+      inviteAlertTimerRef.current = null;
+    }
+    setAlertVisible(false);
     setEditingEvent(event);
     setSelectedDate(parseTimeToDate(event.date, event.time));
     setActivePicker(null);
+    setInviteSheetVisible(false);
     setNewEvent({
       title: event.title,
       date: event.date,
@@ -259,22 +293,83 @@ export default function OpenPlans({
     setShowEventModal(true);
   };
 
-  const closeModal = () => {
-    if (inviteSheetVisible) {
-      setInviteSheetVisible(false);
-      return;
+  const resetPlanEditorState = useCallback(() => {
+    if (inviteAlertTimerRef.current) {
+      clearTimeout(inviteAlertTimerRef.current);
+      inviteAlertTimerRef.current = null;
     }
     Keyboard.dismiss();
     setActivePicker(null);
     setEditingEvent(null);
     setInviteSheetVisible(false);
+    setKeyboardInset(0);
+    setAlertVisible(false);
     setShowEventModal(false);
+  }, [setShowEventModal]);
+
+  useEffect(() => {
+    if (showEventModal) return;
+    setInviteSheetVisible(false);
+    setActivePicker(null);
+    setEditingEvent(null);
+    setKeyboardInset(0);
+  }, [showEventModal]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        resetPlanEditorState();
+      };
+    }, [resetPlanEditorState])
+  );
+
+  useEffect(() => {
+    return () => {
+      if (inviteAlertTimerRef.current) {
+        clearTimeout(inviteAlertTimerRef.current);
+        inviteAlertTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const closeModal = () => {
+    if (inviteSheetVisible) {
+      setInviteSheetVisible(false);
+      return;
+    }
+    resetPlanEditorState();
   };
 
   const showAlert = (title: string, message: string) => {
     setAlertTitle(title);
     setAlertMessage(message);
     setAlertVisible(true);
+  };
+
+  const scheduleInviteAlert = useCallback((title: string, message: string) => {
+    if (inviteAlertTimerRef.current) {
+      clearTimeout(inviteAlertTimerRef.current);
+    }
+    InteractionManager.runAfterInteractions(() => {
+      inviteAlertTimerRef.current = setTimeout(() => {
+        inviteAlertTimerRef.current = null;
+        showAlert(title, message);
+      }, 400);
+    });
+  }, []);
+
+  const handlePlanInvited = useCallback(
+    (friendIds: string[]) => {
+      const eventId = editingEvent?.id;
+      if (!eventId || friendIds.length === 0) return;
+      onPlanInvited?.(eventId, friendIds);
+      resetPlanEditorState();
+    },
+    [editingEvent?.id, onPlanInvited, resetPlanEditorState]
+  );
+
+  const handleInviteError = (message: string) => {
+    scheduleInviteAlert("Could not invite", message);
   };
 
   const handleBackdropPress = () => {
@@ -293,6 +388,13 @@ export default function OpenPlans({
     closeModal();
   };
 
+  const openInviteSheet = () => {
+    Keyboard.dismiss();
+    setActivePicker(null);
+    setKeyboardInset(0);
+    setInviteSheetVisible(true);
+  };
+
   const canPost = newEvent.title.trim().length > 0;
 
   const dismissPickers = () => setActivePicker(null);
@@ -301,14 +403,6 @@ export default function OpenPlans({
     Keyboard.dismiss();
     setActivePicker((p) => (p === picker ? null : picker));
   };
-
-  const popupScrollMaxHeight = useMemo(() => {
-    const windowH = Dimensions.get("window").height;
-    if (activePicker === "date" || activePicker === "time") {
-      return Math.min(200, windowH * 0.26);
-    }
-    return Math.min(420, windowH * 0.48);
-  }, [activePicker]);
 
   const collapseActivePicker = () => {
     if (activePicker) setActivePicker(null);
@@ -377,8 +471,7 @@ export default function OpenPlans({
       saveEvent(payload);
     }
 
-    setEditingEvent(null);
-    setShowEventModal(false);
+    resetPlanEditorState();
   };
 
   const handleDelete = (event: EventItem) => {
@@ -441,7 +534,10 @@ export default function OpenPlans({
                 isHighlighted && { borderColor: ACCENT, borderWidth: 2 },
                 isLast && { marginBottom: 0 },
               ]}
-              onPress={canEdit ? () => openEditModal(p) : undefined}
+              onPress={() => {
+                if (canEdit) openEditModal(p);
+              }}
+              disabled={!canEdit}
               onLongPress={() => handleDelete(p)}
               delayLongPress={400}
             >
@@ -500,18 +596,37 @@ export default function OpenPlans({
         />
       </View>
 
+      {showEventModal ? (
       <Modal
-        visible={showEventModal}
+        visible
         transparent
         animationType="fade"
         onRequestClose={closeModal}
       >
-        <Pressable style={styles.popupOverlay} onPress={handleBackdropPress}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.popupAvoid}
+        <View
+          style={[
+            styles.popupOverlay,
+            {
+              paddingTop: insets.top + 12,
+              paddingBottom: Math.max(insets.bottom, 12),
+            },
+          ]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleBackdropPress}
+            accessibilityRole="button"
+            accessibilityLabel="Close plan editor"
+          />
+          <View
+            style={[
+              styles.popupAvoid,
+              { maxHeight: modalMaxHeight },
+              keyboardInset > 0 ? { marginBottom: keyboardInset } : null,
+            ]}
+            pointerEvents={inviteSheetVisible ? "none" : "box-none"}
           >
-            <Pressable style={styles.popupCard} onPress={() => {}}>
+            <View style={[styles.popupCard, { maxHeight: modalMaxHeight }]}>
               <View style={styles.popupTitleRow}>
                 <Text style={styles.popupTitle}>
                   {isEditing ? "Edit plan" : "Add a plan"}
@@ -519,31 +634,22 @@ export default function OpenPlans({
                 <CloseButton onPress={closeModal} accessibilityLabel="Close" />
               </View>
 
-              <TouchableWithoutFeedback
-                onPress={Keyboard.dismiss}
-                accessible={false}
-              >
-                <View>
-                  <Text style={styles.sheetSub}>
-                    {isEditing
-                      ? "Update your plan details."
-                      : "Tell friends what you're doing, they can join."}
-                  </Text>
-                </View>
-              </TouchableWithoutFeedback>
+              <Text style={styles.sheetSub}>
+                {isEditing
+                  ? "Update your plan details."
+                  : "Tell friends what you're doing, they can join."}
+              </Text>
 
               <ScrollView
                 ref={planScrollRef}
-                style={{ maxHeight: popupScrollMaxHeight }}
-                contentContainerStyle={[
-                  styles.popupScrollContent,
-                  keyboardInset > 0 ? { paddingBottom: 16 } : null,
-                ]}
+                style={styles.popupScroll}
+                contentContainerStyle={styles.popupScrollContent}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="interactive"
                 onScrollBeginDrag={Keyboard.dismiss}
                 showsVerticalScrollIndicator={false}
                 bounces={false}
+                nestedScrollEnabled
               >
               <TextInput
                 placeholder="What's the plan?"
@@ -632,7 +738,6 @@ export default function OpenPlans({
                   </View>
                 </TouchableWithoutFeedback>
               </View>
-              </ScrollView>
 
               {activePicker === "date" ? (
                 <View style={styles.calendarWrap}>
@@ -671,11 +776,7 @@ export default function OpenPlans({
               {canInviteToPlan ? (
                 <TouchableOpacity
                   style={styles.inviteFriendsBtn}
-                  onPress={() => {
-                    Keyboard.dismiss();
-                    setActivePicker(null);
-                    setInviteSheetVisible(true);
-                  }}
+                  onPress={openInviteSheet}
                   accessibilityRole="button"
                   accessibilityLabel="Invite friends to this plan"
                 >
@@ -693,36 +794,40 @@ export default function OpenPlans({
                   {isEditing ? "Save" : "Post"}
                 </Text>
               </TouchableOpacity>
-            </Pressable>
-          </KeyboardAvoidingView>
+              </ScrollView>
+            </View>
+          </View>
 
-          <PlanInviteFriendsSheet
-            embedded
-            visible={inviteSheetVisible}
-            friends={friends}
-            eventId={editingEvent?.id || ""}
-            planTitle={editingEvent?.title || newEvent.title}
-            onClose={() => setInviteSheetVisible(false)}
-            onInvited={(friendId) => {
-              const name =
-                friends.find((f) => f.id === friendId)?.displayName?.trim().split(/\s+/)[0] ||
-                "Friend";
-              showAlert("Invite sent", `${name} will get a notification to join your plan.`);
-            }}
-            onError={(message) => showAlert("Could not invite", message)}
-          />
-        </Pressable>
+          {inviteSheetVisible ? (
+            <PlanInviteFriendsSheet
+              embedded
+              visible
+              friends={friends}
+              eventId={editingEvent?.id || ""}
+              planTitle={editingEvent?.title || newEvent.title}
+              alreadyInvitedIds={planInvitedIds}
+              alreadyInterestedIds={planInterestedIds}
+              onClose={() => setInviteSheetVisible(false)}
+              onInvited={handlePlanInvited}
+              onError={handleInviteError}
+            />
+          ) : null}
+        </View>
       </Modal>
+      ) : null}
 
-      <AlertModal
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        onClose={() => setAlertVisible(false)}
-      />
+      {alertVisible ? (
+        <AlertModal
+          visible
+          title={alertTitle}
+          message={alertMessage}
+          onClose={() => setAlertVisible(false)}
+        />
+      ) : null}
 
+      {pendingDeleteEvent ? (
       <ConfirmModal
-        visible={!!pendingDeleteEvent}
+        visible
         title={
           pendingDeleteEvent?.planHostUid &&
           viewerUid &&
@@ -751,6 +856,7 @@ export default function OpenPlans({
           setPendingDeleteEvent(null);
         }}
       />
+      ) : null}
     </View>
   );
 }
@@ -881,7 +987,7 @@ const styles = StyleSheet.create({
   popupOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.78)",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingHorizontal: 20,
   },
@@ -897,7 +1003,11 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
     paddingHorizontal: 20,
     paddingTop: 18,
-    paddingBottom: 18,
+    paddingBottom: 12,
+  },
+  popupScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   popupTitleRow: {
     flexDirection: "row",

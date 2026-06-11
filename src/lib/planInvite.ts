@@ -6,7 +6,7 @@ const functions = getFunctions(app, "us-central1");
 
 const sendPlanInviteFn = httpsCallable<
   { toUserId: string; eventId: string },
-  { ok: boolean }
+  { ok: boolean; alreadyInvited?: boolean }
 >(functions, "sendPlanInvite");
 
 const acceptPlanInviteFn = httpsCallable<
@@ -64,8 +64,45 @@ export function acceptPlanInviteErrorMessage(err: unknown): string {
 export async function sendPlanInvite(
   toUserId: string,
   eventId: string
-): Promise<void> {
-  await sendPlanInviteFn({ toUserId, eventId });
+): Promise<{ alreadyInvited: boolean }> {
+  const result = await sendPlanInviteFn({ toUserId, eventId });
+  return { alreadyInvited: !!result.data?.alreadyInvited };
+}
+
+export async function sendPlanInvites(
+  toUserIds: string[],
+  eventId: string
+): Promise<{ invitedIds: string[]; alreadyInvitedIds: string[]; errors: string[] }> {
+  const invitedIds: string[] = [];
+  const alreadyInvitedIds: string[] = [];
+  const errors: string[] = [];
+
+  const ids = toUserIds
+    .map((toUserId) => String(toUserId || "").trim())
+    .filter(Boolean);
+
+  const results = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const { alreadyInvited } = await sendPlanInvite(id, eventId);
+        return { id, alreadyInvited, error: null as string | null };
+      } catch (err) {
+        return { id, alreadyInvited: false, error: planInviteErrorMessage(err) };
+      }
+    })
+  );
+
+  for (const result of results) {
+    if (result.error) {
+      errors.push(result.error);
+    } else if (result.alreadyInvited) {
+      alreadyInvitedIds.push(result.id);
+    } else {
+      invitedIds.push(result.id);
+    }
+  }
+
+  return { invitedIds, alreadyInvitedIds, errors };
 }
 
 export async function acceptPlanInvite(notificationId: string): Promise<void> {

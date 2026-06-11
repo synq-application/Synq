@@ -238,6 +238,7 @@ export default function ProfileScreen() {
     joinedFromName?: string;
     joinedFromNames?: string[];
     joinedFromFriendUid?: string;
+    planInvitedIds?: string[];
   };
 
   const [events, setEvents] = useState<OpenPlanEvent[]>(
@@ -469,6 +470,24 @@ export default function ProfileScreen() {
       otherAttendeeIds.map((uid) => removeFromUserCalendar(uid))
     );
   };
+
+  const markPlanInvited = useCallback((eventId: string, friendIds: string[]) => {
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.id !== eventId) return e;
+        const invited = new Set(
+          (Array.isArray(e.planInvitedIds) ? e.planInvitedIds : [])
+            .map((id) => String(id || "").trim())
+            .filter(Boolean)
+        );
+        friendIds.forEach((id) => {
+          const uid = String(id || "").trim();
+          if (uid) invited.add(uid);
+        });
+        return { ...e, planInvitedIds: [...invited] };
+      })
+    );
+  }, []);
 
   useEffect(() => {
     if (!myId) return;
@@ -1070,6 +1089,7 @@ export default function ProfileScreen() {
           hostDisplayNameByUid={hostDisplayNameByUid}
           highlightEventId={planHighlightId}
           friends={friendsForHostNames}
+          onPlanInvited={markPlanInvited}
         />
       </View>
       <View style={styles.section}>
