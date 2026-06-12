@@ -60,9 +60,12 @@ export default function CreateGroupModal({
     setName(initialName);
   }, [visible, initialName]);
 
+  const trimmed = name.trim();
+  const isDirty = trimmed !== initialName.trim();
+  const canSubmit = trimmed.length > 0 && isDirty && !busy;
+
   const handleCreate = async () => {
-    const trimmed = name.trim();
-    if (!trimmed || busy) return;
+    if (!canSubmit) return;
     Keyboard.dismiss();
     await onCreate(trimmed);
   };
@@ -103,8 +106,8 @@ export default function CreateGroupModal({
             />
             <View style={[styles.ctaRow, compact && styles.ctaRowCompact]}>
               <TouchableOpacity
-                style={[styles.cta, (!name.trim() || busy) && styles.ctaDisabled]}
-                disabled={!name.trim() || busy}
+                style={[styles.cta, !canSubmit && styles.ctaDisabled]}
+                disabled={!canSubmit}
                 onPress={() => void handleCreate()}
                 accessibilityRole="button"
                 accessibilityLabel={submitLabel}

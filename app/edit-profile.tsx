@@ -325,7 +325,7 @@ export default function EditProfileScreen() {
       : "Looking up city and state…";
 
   const handleSave = async () => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !isDirty || saving || removingLocation) return;
     const nameCheck = filterOrReject(displayName.trim());
     if (!nameCheck.ok) {
       showAlert(nameCheck.reason, "Content not allowed");
@@ -554,12 +554,15 @@ export default function EditProfileScreen() {
 
           <TouchableOpacity
             onPress={handleSave}
-            disabled={saving || removingLocation}
+            disabled={!isDirty || saving || removingLocation}
             style={[
               styles.saveButton,
-              (saving || removingLocation) && styles.disabledControl,
+              (!isDirty || saving || removingLocation) && styles.saveButtonDisabled,
             ]}
-            activeOpacity={0.9}
+            activeOpacity={isDirty && !saving && !removingLocation ? 0.9 : 1}
+            accessibilityRole="button"
+            accessibilityLabel="Save profile"
+            accessibilityState={{ disabled: !isDirty || saving || removingLocation }}
           >
             {saving ? (
               <ActivityIndicator size="small" color="black" />
@@ -766,6 +769,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE_5,
     alignItems: "center",
     justifyContent: "center",
+  },
+  saveButtonDisabled: {
+    opacity: 0.45,
   },
   saveButtonText: {
     color: ON_ACCENT_TEXT,

@@ -395,8 +395,6 @@ export default function OpenPlans({
     setInviteSheetVisible(true);
   };
 
-  const canPost = newEvent.title.trim().length > 0;
-
   const dismissPickers = () => setActivePicker(null);
 
   const togglePicker = (picker: "date" | "time") => {
@@ -419,6 +417,23 @@ export default function OpenPlans({
 
   const formatTime = (d: Date) =>
     d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+  const isPlanDirty = useMemo(() => {
+    if (!isEditing || !editingEvent) return true;
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(selectedDate.getDate()).padStart(2, "0");
+    const localDate = `${year}-${month}-${day}`;
+    return (
+      newEvent.title.trim() !== editingEvent.title.trim() ||
+      localDate !== editingEvent.date ||
+      formatTime(selectedDate) !== (editingEvent.time || "") ||
+      (newEvent.location || "").trim() !== (editingEvent.location || "").trim()
+    );
+  }, [isEditing, editingEvent, newEvent, selectedDate]);
+
+  const canPost =
+    newEvent.title.trim().length > 0 && (!isEditing || isPlanDirty);
 
   const parseDate = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);

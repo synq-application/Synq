@@ -4,13 +4,14 @@ import {
   BORDER,
   BUTTON_RADIUS,
   fonts,
+  MUTED2,
   SPACE_3,
   SPACE_4,
   TEXT,
 } from "@/constants/Variables";
 import type { FriendGroup } from "@/src/lib/friendGroups";
 import type { SynqAudienceSelection } from "@/src/lib/synqBroadcast";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -26,6 +27,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /** Opaque panel fill — matches SynqOptionsSheet / SynqAudienceSheet. */
 const SHEET_SURFACE = "#141414";
+
+function audienceSelectionEqual(
+  a: SynqAudienceSelection,
+  b: SynqAudienceSelection
+): boolean {
+  if (a.mode !== b.mode) return false;
+  if (a.mode === "all") return true;
+  const idsA = [...a.groupIds].sort();
+  const idsB = [...b.groupIds].sort();
+  if (idsA.length !== idsB.length) return false;
+  return idsA.every((id, index) => id === idsB[index]);
+}
 
 type Props = {
   visible: boolean;
@@ -50,7 +63,13 @@ export default function ChangeSynqAudienceModal({
     if (visible) setSelection(initialSelection);
   }, [visible, initialSelection]);
 
+  const selectionDirty = useMemo(
+    () => !audienceSelectionEqual(selection, initialSelection),
+    [initialSelection, selection]
+  );
+
   const handleSave = async () => {
+    if (!selectionDirty || saving) return;
     setSaving(true);
     try {
       await onSave(selection);
@@ -75,16 +94,24 @@ export default function ChangeSynqAudienceModal({
               <TouchableOpacity
                 style={styles.saveBtn}
                 onPress={() => void handleSave()}
-                disabled={saving}
-                activeOpacity={0.75}
+                disabled={!selectionDirty || saving}
+                activeOpacity={selectionDirty && !saving ? 0.75 : 1}
                 accessibilityRole="button"
                 accessibilityLabel="Save audience"
+                accessibilityState={{ disabled: !selectionDirty || saving }}
                 hitSlop={8}
               >
                 {saving ? (
                   <ActivityIndicator color={ACCENT} size="small" />
                 ) : (
-                  <Text style={styles.saveBtnText}>Save</Text>
+                  <Text
+                    style={[
+                      styles.saveBtnText,
+                      !selectionDirty && styles.saveBtnTextDisabled,
+                    ]}
+                  >
+                    Save
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -157,6 +184,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fonts.heavy,
     letterSpacing: 0.1,
+  },
+  saveBtnTextDisabled: {
+    color: MUTED2,
   },
   scroll: {
     flexGrow: 0,

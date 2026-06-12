@@ -778,16 +778,28 @@ export default function ProfileScreen() {
   };
 
   const saveInterests = async () => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !interestsDirty) return;
     try {
       await updateDoc(doc(db, "users", auth.currentUser.uid), {
         interests: selectedInterests,
       });
+      setInterests([...selectedInterests]);
       setShowInputModal(false);
     } catch (e) {
       showAlert("Error", "Could not save interests.");
     }
   };
+
+  const interestsDirty = useMemo(() => {
+    if (selectedInterests.length !== interests.length) return true;
+    const saved = new Set(interests);
+    return selectedInterests.some((interest) => !saved.has(interest));
+  }, [interests, selectedInterests]);
+
+  const openInterestsModal = useCallback(() => {
+    setSelectedInterests([...interests]);
+    setShowInputModal(true);
+  }, [interests]);
 
   const profileQrUrl = useMemo(() => {
     const uid = auth.currentUser?.uid;
@@ -1100,7 +1112,7 @@ export default function ProfileScreen() {
               Add a few interests so friends know what you are into.
             </Text>
             <SynqPlusAddButton
-              onPress={() => setShowInputModal(true)}
+              onPress={openInterestsModal}
               accessibilityLabel="Add interests"
               style={styles.interestsAddPlanBtnSpacing}
             />
@@ -1121,7 +1133,7 @@ export default function ProfileScreen() {
               ))}
             </View>
             <SynqPlusAddButton
-              onPress={() => setShowInputModal(true)}
+              onPress={openInterestsModal}
               accessibilityLabel="Add more interests"
               style={styles.interestsAddBelow}
             />
@@ -1195,7 +1207,10 @@ export default function ProfileScreen() {
               <View style={styles.interestHeader}>
                 <Text style={styles.interestTitle}>What are you into?</Text>
                 <CloseButton
-                  onPress={() => setShowInputModal(false)}
+                  onPress={() => {
+                    setSelectedInterests([...interests]);
+                    setShowInputModal(false);
+                  }}
                   accessibilityLabel="Close interests"
                 />
               </View>
@@ -1234,7 +1249,18 @@ export default function ProfileScreen() {
               </ScrollView>
             </View>
 
-            <TouchableOpacity onPress={saveInterests} style={styles.interestSaveBtn}>
+            <TouchableOpacity
+              onPress={saveInterests}
+              disabled={!interestsDirty}
+              style={[
+                styles.interestSaveBtn,
+                !interestsDirty && styles.interestSaveBtnDisabled,
+              ]}
+              activeOpacity={interestsDirty ? 0.85 : 1}
+              accessibilityRole="button"
+              accessibilityLabel="Save interests"
+              accessibilityState={{ disabled: !interestsDirty }}
+            >
               <Text style={styles.interestSaveBtnText}>Save</Text>
             </TouchableOpacity>
           </View>
@@ -1600,6 +1626,9 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_RADIUS,
     alignItems: "center",
     justifyContent: "center",
+  },
+  interestSaveBtnDisabled: {
+    opacity: 0.45,
   },
   interestSaveBtnText: {
     color: "black",
