@@ -18,6 +18,8 @@ import {
 
   ON_ACCENT_TEXT,
 
+  PRIMARY_CTA_WIDTH,
+
   synqOutlineAddBtnCompact,
 
   synqOutlineAddBtnDisabled,
@@ -764,7 +766,9 @@ const styles = StyleSheet.create({
 
     marginTop: 12,
 
-    marginHorizontal: 20,
+    alignSelf: "center",
+
+    width: PRIMARY_CTA_WIDTH,
 
     height: 50,
 

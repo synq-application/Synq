@@ -207,24 +207,28 @@ export default function MessagesChatPane({
   useEffect(() => {
     const prevId = prevChatIdRef.current;
     const nextId = activeChat?.id;
+    const chatChanged = prevId !== nextId;
     prevChatIdRef.current = nextId;
 
-    knownMessageIdsRef.current = new Set();
-    chatSeededRef.current = false;
-    if (messages.length > 0) {
+    if (chatChanged) {
+      knownMessageIdsRef.current = new Set();
+      chatSeededRef.current = false;
+      lastMessageCountRef.current = 0;
+      anchorBottomRef.current = true;
+      pendingNormalScrollRef.current = messages.length > 0;
+
+      const pendingToReal =
+        prevId === "__pending__" && !!nextId && nextId !== "__pending__";
+      if (!pendingToReal) {
+        isKeyboardOpenRef.current = false;
+        setKeyboardOpen(false);
+        setKeyboardInset(0);
+      }
+    }
+
+    if (messages.length > 0 && !chatSeededRef.current) {
       messages.forEach((message) => knownMessageIdsRef.current.add(message.id));
       chatSeededRef.current = true;
-    }
-    lastMessageCountRef.current = 0;
-    anchorBottomRef.current = true;
-    pendingNormalScrollRef.current = messages.length > 0;
-
-    const pendingToReal =
-      prevId === "__pending__" && !!nextId && nextId !== "__pending__";
-    if (!pendingToReal) {
-      isKeyboardOpenRef.current = false;
-      setKeyboardOpen(false);
-      setKeyboardInset(0);
     }
   }, [activeChat?.id, messages.length]);
 
