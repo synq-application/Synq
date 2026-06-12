@@ -1235,7 +1235,7 @@ export default function ProfileScreen() {
             </View>
 
             <TouchableOpacity onPress={saveInterests} style={styles.interestSaveBtn}>
-              <Text style={styles.interestSaveBtnText}>Save Changes</Text>
+              <Text style={styles.interestSaveBtnText}>Save</Text>
             </TouchableOpacity>
           </View>
           </SafeAreaView>

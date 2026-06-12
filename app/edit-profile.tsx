@@ -564,7 +564,7 @@ export default function EditProfileScreen() {
             {saving ? (
               <ActivityIndicator size="small" color="black" />
             ) : (
-              <Text style={styles.saveButtonText}>Save changes</Text>
+              <Text style={styles.saveButtonText}>Save</Text>
             )}
           </TouchableOpacity>
 
