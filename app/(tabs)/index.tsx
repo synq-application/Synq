@@ -158,10 +158,11 @@ const IMESSAGE_REF_SCREEN_WIDTH = 375;
 const IMESSAGE_BUBBLE_MAX_WIDTH_PT = 252;
 const IMESSAGE_BUBBLE_FONT_SIZE = 17;
 const IMESSAGE_BUBBLE_LINE_HEIGHT = 22;
-const IMESSAGE_BUBBLE_PADDING_H = 9;
-const IMESSAGE_BUBBLE_PADDING_V = 8;
+/** MessageKit / Messages.app label insets (top/bottom). */
+const IMESSAGE_BUBBLE_PADDING_V = 7;
+/** Horizontal inset inside the bubble (symmetric; tail space not needed in flat bubbles). */
+const IMESSAGE_BUBBLE_PADDING_H = 10;
 const IMESSAGE_BUBBLE_CORNER_RADIUS = 18;
-const MESSAGE_BUBBLE_MIN_HEIGHT = 36;
 const IMESSAGE_CHAT_HORIZONTAL_INSET = 8;
 const IMESSAGE_BUBBLE_OUTER_MARGIN = 6;
 const IMESSAGE_INCOMING_AVATAR_BLOCK = 34 + 7;
@@ -189,9 +190,12 @@ function ChatMessageBubble({
   heartCount: number;
 }) {
   const fontScale = PixelRatio.getFontScale();
-  const padH = Math.round(IMESSAGE_BUBBLE_PADDING_H * fontScale);
+  const fontSize = IMESSAGE_BUBBLE_FONT_SIZE * fontScale;
+  const lineHeight = IMESSAGE_BUBBLE_LINE_HEIGHT * fontScale;
   const padV = Math.round(IMESSAGE_BUBBLE_PADDING_V * fontScale);
-  const innerMax = bubbleCap - 2 * padH;
+  const padH = Math.round(IMESSAGE_BUBBLE_PADDING_H * fontScale);
+  const minHeight = padV * 2 + lineHeight;
+  const innerMax = bubbleCap - padH * 2;
 
   return (
     <Pressable onPress={onPress}>
@@ -199,8 +203,14 @@ function ChatMessageBubble({
         style={[
           styles.bubble,
           isMe ? styles.myBubble : styles.theirBubble,
-          { paddingHorizontal: padH, paddingVertical: padV },
-          { maxWidth: bubbleCap, alignSelf: "flex-start" },
+          {
+            paddingTop: padV,
+            paddingBottom: padV,
+            paddingHorizontal: padH,
+            minHeight,
+            maxWidth: bubbleCap,
+            alignSelf: "flex-start",
+          },
           { position: "relative", overflow: "visible" },
         ]}
       >
@@ -209,6 +219,8 @@ function ChatMessageBubble({
             styles.bubbleText,
             {
               color: isMe ? "black" : "white",
+              fontSize,
+              lineHeight,
               maxWidth: innerMax,
               textAlign: "left",
             },
@@ -2625,15 +2637,17 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   bubble: {
-    minHeight: MESSAGE_BUBBLE_MIN_HEIGHT,
-    paddingVertical: IMESSAGE_BUBBLE_PADDING_V,
-    paddingHorizontal: IMESSAGE_BUBBLE_PADDING_H,
     borderRadius: IMESSAGE_BUBBLE_CORNER_RADIUS,
   },
   bubbleText: {
     fontSize: IMESSAGE_BUBBLE_FONT_SIZE,
     lineHeight: IMESSAGE_BUBBLE_LINE_HEIGHT,
     textAlign: "left",
+    letterSpacing: 0,
+    ...Platform.select({
+      ios: { fontFamily: "System" },
+      android: { fontFamily: "sans-serif", includeFontPadding: false },
+    }),
   },
   myBubble: {
     backgroundColor: ACCENT,

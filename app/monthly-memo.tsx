@@ -397,13 +397,18 @@ export default function OpenPlans({
 
   const dismissPickers = () => setActivePicker(null);
 
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+  }, []);
+
+  const collapseActivePicker = () => {
+    Keyboard.dismiss();
+    if (activePicker) setActivePicker(null);
+  };
+
   const togglePicker = (picker: "date" | "time") => {
     Keyboard.dismiss();
     setActivePicker((p) => (p === picker ? null : picker));
-  };
-
-  const collapseActivePicker = () => {
-    if (activePicker) setActivePicker(null);
   };
 
   const handleCalendarSelect = (d: Date) => {
@@ -642,18 +647,25 @@ export default function OpenPlans({
             pointerEvents={inviteSheetVisible ? "none" : "box-none"}
           >
             <View style={[styles.popupCard, { maxHeight: modalMaxHeight }]}>
-              <View style={styles.popupTitleRow}>
-                <Text style={styles.popupTitle}>
-                  {isEditing ? "Edit plan" : "Add a plan"}
-                </Text>
-                <CloseButton onPress={closeModal} accessibilityLabel="Close" />
-              </View>
+              <TouchableWithoutFeedback
+                onPress={dismissKeyboard}
+                accessible={false}
+              >
+                <View>
+                  <View style={styles.popupTitleRow}>
+                    <Text style={styles.popupTitle}>
+                      {isEditing ? "Edit plan" : "Add a plan"}
+                    </Text>
+                    <CloseButton onPress={closeModal} accessibilityLabel="Close" />
+                  </View>
 
-              <Text style={styles.sheetSub}>
-                {isEditing
-                  ? "Update your plan details."
-                  : "Tell friends what you're doing, they can join."}
-              </Text>
+                  {!isEditing ? (
+                    <Text style={styles.sheetSub}>
+                      Tell friends what you're doing, they can join.
+                    </Text>
+                  ) : null}
+                </View>
+              </TouchableWithoutFeedback>
 
               <ScrollView
                 ref={planScrollRef}
@@ -666,6 +678,11 @@ export default function OpenPlans({
                 bounces={false}
                 nestedScrollEnabled
               >
+              <TouchableWithoutFeedback
+                onPress={dismissKeyboard}
+                accessible={false}
+              >
+              <View>
               <TextInput
                 placeholder="What's the plan?"
                 placeholderTextColor="#555"
@@ -809,6 +826,8 @@ export default function OpenPlans({
                   {isEditing ? "Save" : "Post"}
                 </Text>
               </TouchableOpacity>
+              </View>
+              </TouchableWithoutFeedback>
               </ScrollView>
             </View>
           </View>
