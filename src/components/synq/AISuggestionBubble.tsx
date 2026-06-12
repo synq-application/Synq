@@ -1,14 +1,13 @@
 import {
-  ACCENT,
   BORDER,
   fonts,
   MUTED2,
   MUTED3,
+  SURFACE,
   TEXT,
 } from "@/constants/Variables";
 import { formatVenueAddressDisplay, stripLegacyAiPrefix } from "@/app/helpers";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import {
   Platform,
@@ -18,12 +17,7 @@ import {
   View,
 } from "react-native";
 
-const CARD_RADIUS = 22;
-const BORDER_GRADIENT = [
-  "rgba(0,255,133,0.42)",
-  "rgba(0,255,133,0.14)",
-  "rgba(0,255,133,0.06)",
-] as const;
+const CARD_RADIUS = 16;
 
 type Props = {
   text: string;
@@ -58,54 +52,39 @@ export default function AISuggestionBubble({
       }
       style={({ pressed }) => [styles.pressable, pressed && styles.pressablePressed]}
     >
-      <LinearGradient
-        colors={[...BORDER_GRADIENT]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.borderShell}
-      >
-        <View style={styles.card}>
-          <LinearGradient
-            colors={["rgba(0,255,133,0.07)", "rgba(0,255,133,0)", "rgba(0,0,0,0)"]}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={styles.topGlow}
-            pointerEvents="none"
-          />
-
-          <View style={styles.body}>
-            {showVenue ? (
-              <>
-                {displayName ? (
-                  <Text style={styles.venueName} numberOfLines={2}>
-                    {displayName}
+      <View style={styles.card}>
+        <View style={styles.body}>
+          {showVenue ? (
+            <>
+              {displayName ? (
+                <Text style={styles.venueName} numberOfLines={2}>
+                  {displayName}
+                </Text>
+              ) : null}
+              {displayAddress ? (
+                <View style={styles.addressRow}>
+                  <Ionicons
+                    name="location-outline"
+                    size={13}
+                    color={MUTED2}
+                    style={styles.addressIcon}
+                  />
+                  <Text style={styles.addressText} numberOfLines={2}>
+                    {displayAddress}
                   </Text>
-                ) : null}
-                {displayAddress ? (
-                  <View style={styles.addressRow}>
-                    <Ionicons
-                      name="location-outline"
-                      size={13}
-                      color={MUTED2}
-                      style={styles.addressIcon}
-                    />
-                    <Text style={styles.addressText} numberOfLines={2}>
-                      {displayAddress}
-                    </Text>
-                  </View>
-                ) : null}
-              </>
-            ) : (
-              <Text style={styles.legacyBody}>{legacyBody || text}</Text>
-            )}
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerHint}>View on map</Text>
-            <Ionicons name="chevron-forward" size={12} color={MUTED3} />
-          </View>
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <Text style={styles.legacyBody}>{legacyBody || text}</Text>
+          )}
         </View>
-      </LinearGradient>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerHint}>View on map</Text>
+          <Ionicons name="chevron-forward" size={12} color={MUTED3} />
+        </View>
+      </View>
 
       {heartCount > 0 ? (
         <View style={styles.heartReaction}>
@@ -131,34 +110,13 @@ const styles = StyleSheet.create({
   },
   pressablePressed: {
     opacity: 0.92,
-    transform: [{ scale: 0.985 }],
-  },
-  borderShell: {
-    borderRadius: CARD_RADIUS,
-    padding: 1,
-    ...Platform.select({
-      ios: {
-        shadowColor: ACCENT,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.14,
-        shadowRadius: 12,
-      },
-      android: { elevation: 4 },
-    }),
   },
   card: {
-    borderRadius: CARD_RADIUS - 1,
-    backgroundColor: "#101112",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderRadius: CARD_RADIUS,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
     overflow: "hidden",
-  },
-  topGlow: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 72,
   },
   body: {
     paddingHorizontal: 16,
@@ -202,7 +160,6 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.02)",
   },
   footerHint: {
     color: MUTED3,
