@@ -887,7 +887,7 @@ export default function FriendProfile({
       const existingEvents = Array.isArray(meData?.events) ? meData.events : [];
       const myEvent = existingEvents.find((e: any) => matchesPlanEvent(e, event, existingEvents));
       if (!myEvent || !isInSharedPlanWithFriend(myEvent, user.uid, friendKey)) {
-        showAlert("Not in this plan", "You aren't showing interest in this plan together.");
+        showAlert("Not in this plan", "You aren't going to this plan together.");
         return;
       }
 
@@ -986,7 +986,7 @@ export default function FriendProfile({
       await updateDoc(meRef, { events: nextEvents });
 
       setJoinedKeysForEvent(event, false);
-      showAlert("Removed", "You're no longer interested in this plan together.");
+      showAlert("Removed", "You're no longer going to this plan together.");
     } catch (e: any) {
       showAlert("Error", e?.message || "Could not remove this plan.");
     }
@@ -1183,7 +1183,7 @@ export default function FriendProfile({
             <Text style={styles.openPlansSubtitle}>
               {`Tap to add and let ${
                 friend.displayName?.trim().split(/\s+/)[0] || "them"
-              } know you're interested in joining.`}
+              } know you're going.`}
             </Text>
 
             <MonthlyMemoReadOnly
@@ -1390,7 +1390,7 @@ export default function FriendProfile({
       <ConfirmModal
         visible={showUnjoinModal}
         title="Remove this plan?"
-        message="This removes it from your open plans and updates interest for this friend."
+        message="This removes it from your open plans and updates this for your friend."
         confirmText="Remove"
         destructive
         onCancel={() => {

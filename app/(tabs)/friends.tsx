@@ -10,13 +10,12 @@ import {
   MUTED2,
   MUTED3,
   profileScreenSectionTitle,
-  RADIUS_LG,
   RADIUS_MD,
-  SPACE_2,
   SPACE_3,
   SPACE_4,
   SPACE_5,
   SPACE_6,
+  stackScreenHeaderTitle,
   SURFACE,
   synqOutlineAddBtn,
   synqOutlineAddBtnCompact,
@@ -24,26 +23,36 @@ import {
   synqOutlineAddBtnText,
   synqOutlineAddBtnTextCompact,
   synqOutlineAddBtnTextDisabled,
-  stackScreenHeaderTitle,
-  tabScreenMainHeaderTitle,
   TAB_BAR_SCROLL_INSET,
+  tabScreenMainHeaderTitle,
   TEXT,
   TYPE_BODY,
-  TYPE_CAPTION,
+  TYPE_CAPTION
 } from "@/constants/Variables";
-import { useBlockedUsers } from "@/src/lib/blockedUsers";
-import { useSortedFriendsList } from "@/src/lib/useSortedFriendsList";
+import CloseButton from "@/src/components/CloseButton";
+import CloseIcon from "@/src/components/CloseIcon";
+import FriendsGroupsHeaderTitle, {
+  type FriendsTabMode,
+} from "@/src/components/friends/FriendsGroupsSegment";
 import {
   FriendsSortMenu,
   FriendsSortTrigger,
   type FriendsSortMode,
 } from "@/src/components/friends/FriendsSortControls";
-import CloseButton from "@/src/components/CloseButton";
-import CloseIcon from "@/src/components/CloseIcon";
+import GroupsListPane from "@/src/components/friends/GroupsListPane";
 import ProfileTabHeaderOverlay, {
   useTabHeaderLayout,
 } from "@/src/components/ProfileTabHeaderOverlay";
+import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import TabHeaderIconRow from "@/src/components/TabHeaderIconRow";
+import { useBlockedUsers } from "@/src/lib/blockedUsers";
+import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
+import { createFriendGroup } from "@/src/lib/friendGroups";
+import {
+  fetchSuggestedFriends,
+  searchUsersForFriend,
+} from "@/src/lib/userSearch";
+import { useSortedFriendsList } from "@/src/lib/useSortedFriendsList";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
@@ -74,10 +83,9 @@ import {
   DeviceEventEmitter,
   Dimensions,
   FlatList,
-  Platform,
   Keyboard,
-  Modal,
-  Pressable,
+  Platform,
+  RefreshControl,
   SectionList,
   StatusBar,
   StyleSheet,
@@ -89,7 +97,7 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-  type ViewStyle,
+  type ViewStyle
 } from "react-native";
 import Animated, {
   cancelAnimation,
@@ -106,14 +114,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
-import { createFriendGroup } from "@/src/lib/friendGroups";
-import FriendsGroupsHeaderTitle, {
-  type FriendsTabMode,
-} from "@/src/components/friends/FriendsGroupsSegment";
-import GroupsListPane from "@/src/components/friends/GroupsListPane";
 import { auth, db } from "../../src/lib/firebase";
-import { useAuthRefresh } from "../_layout";
 import { FRIENDS_TAB_PRESS } from "../../src/lib/friendsTabEvents";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
 import {
@@ -128,9 +129,9 @@ import {
   warmOutgoingFriendRequestsCache,
   warmSuggestedCache,
 } from "../../src/lib/socialCache";
+import { useAuthRefresh } from "../_layout";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
-import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import { friendLocationLine, resolveAvatar } from "../helpers";
 
 const { width } = Dimensions.get("window");
@@ -305,6 +306,7 @@ export default function FriendsScreen() {
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [friendsLoadError, setFriendsLoadError] = useState(false);
+  const [refreshingFriends, setRefreshingFriends] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [sortMode, setSortMode] = useState<FriendsSortMode>("alphabetical");
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
@@ -473,6 +475,19 @@ export default function FriendsScreen() {
     };
   }, [myId]);
 
+  const refreshFriends = useCallback(async () => {
+    if (!myId) return;
+    setRefreshingFriends(true);
+    setFriendsLoadError(false);
+    try {
+      await warmFriendsAndConnectionsCache(myId);
+    } catch {
+      setFriendsLoadError(true);
+    } finally {
+      setRefreshingFriends(false);
+    }
+  }, [myId]);
+
   const { isBlocked } = useBlockedUsers();
 
   const userProfileForSort = useMemo(
@@ -534,6 +549,8 @@ export default function FriendsScreen() {
     <TouchableOpacity
       style={styles.friendRow}
       activeOpacity={0.82}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${item.displayName || "friend"} profile`}
       onPress={() => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
@@ -632,8 +649,15 @@ export default function FriendsScreen() {
       {friendsLoadError && !isFriendsInitialLoading ? (
         <View style={styles.friendsLoadErrorWrap}>
           <Text style={styles.friendsLoadErrorText}>
-            Could not load friends. Pull to refresh or try again later.
+            Could not load friends.
           </Text>
+          <TouchableOpacity
+            onPress={() => void refreshFriends()}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading friends"
+          >
+            <Text style={styles.friendsLoadErrorRetry}>Tap to retry</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
 
@@ -660,6 +684,18 @@ export default function FriendsScreen() {
           ref={friendsListRef}
           style={styles.friendsList}
           scrollIndicatorInsets={{ right: 0 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshingFriends}
+              tintColor={ACCENT}
+              colors={[ACCENT]}
+              progressBackgroundColor={BG}
+              titleColor={MUTED2}
+              title={refreshingFriends ? "Refreshing…" : undefined}
+              onRefresh={() => void refreshFriends()}
+              enabled={!isFriendsInitialLoading}
+            />
+          }
           data={displayFriends}
           keyExtractor={(item) => item.id}
           renderItem={renderFriendRow}
@@ -957,6 +993,16 @@ function SearchModal({
       if (cached.length > 0) {
         applySuggested(cached);
       }
+
+      void fetchSuggestedFriends()
+        .then((serverList) => {
+          if (!auth.currentUser || auth.currentUser.uid !== myId) return;
+          if (serverList.length > 0) {
+            suggestedCacheByUser[myId] = serverList;
+            applySuggested(serverList);
+          }
+        })
+        .catch(() => {});
 
       void warmSuggestedCache(myId)
         .then(() => {
@@ -1297,29 +1343,7 @@ function SearchModal({
       setIsSearching(true);
 
       try {
-        const usersRef = collection(db, "users");
-        const snap = await getDocs(usersRef);
-
-        const mapped = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
-
-        const normalize = (str: string) =>
-          str.toLowerCase().trim().replace(/\s+/g, " ");
-
-        const search = normalize(val);
-
-        const filtered = mapped.filter((u) => {
-          const displayName = normalize(u.displayName || "");
-          const fullName = normalize(`${u.firstName || ""} ${u.lastName || ""}`);
-          const email = normalize(u.email || "");
-
-          const matches =
-            displayName.includes(search) ||
-            fullName.includes(search) ||
-            email.includes(search);
-
-          return u.id !== auth.currentUser?.uid && matches;
-        });
-
+        const filtered = await searchUsersForFriend(val);
         setResults(filtered);
         hydratePendingForUsers(filtered.map((u) => u.id));
         hydrateIncomingForUsers(filtered.map((u) => u.id));
@@ -2042,6 +2066,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: TYPE_BODY,
     textAlign: "center",
+  },
+  friendsLoadErrorRetry: {
+    color: ACCENT,
+    fontFamily: fonts.heavy,
+    fontSize: TYPE_BODY,
+    textAlign: "center",
+    marginTop: 8,
   },
   friendsList: { flex: 1, width: "100%" },
   friendsListContent: { paddingBottom: TAB_BAR_SCROLL_INSET },

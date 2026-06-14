@@ -222,8 +222,8 @@ export default function NotificationsScreen() {
         body = `${actorName} accepted your friend request.`;
       } else if (type === "open_plan_interest") {
         body = planTitle
-          ? `${firstName(actorName)} is interested in your plan ${planTitle}`
-          : `${firstName(actorName)} is interested in your plan`;
+          ? `${firstName(actorName)} is going to ${planTitle}`
+          : `${firstName(actorName)} is going to your plan`;
       } else if (type === "plan_invite") {
         body = planTitle
           ? `${firstName(actorName)} wants you to join their plan ${planTitle}`
@@ -679,7 +679,7 @@ export default function NotificationsScreen() {
       case "friend_accepted":
         return "Request accepted";
       case "open_plan_interest":
-        return "Plan interest";
+        return "Friend going";
       case "plan_invite":
         return "Plan invite";
       case "friend_synq_active":

@@ -36,7 +36,7 @@ import {
 
 import CloseButton from "@/src/components/CloseButton";
 
-import { planInviteErrorMessage, sendPlanInvites } from "@/src/lib/planInvite";
+import { planInviteErrorMessage, revokePlanInvite, revokePlanInviteErrorMessage, sendPlanInvites } from "@/src/lib/planInvite";
 
 import { Ionicons } from "@expo/vector-icons";
 
@@ -100,7 +100,13 @@ type Props = {
 
   onInvited?: (friendIds: string[]) => void;
 
+  onUninvited?: (friendId: string) => void;
+
   onError?: (message: string) => void;
+
+  /** When true, selection is stored locally until the plan is saved (create flow). */
+
+  deferInviteSend?: boolean;
 
   /** Use inside another modal — avoids a second RN Modal stacking behind the parent. */
 
@@ -140,7 +146,11 @@ export default function PlanInviteFriendsSheet({
 
   onInvited,
 
+  onUninvited,
+
   onError,
+
+  deferInviteSend = false,
 
   embedded = false,
 
@@ -158,6 +168,8 @@ export default function PlanInviteFriendsSheet({
 
   const [inviting, setInviting] = useState(false);
 
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+
   const [sessionInvitedIds, setSessionInvitedIds] = useState<Set<string>>(() => new Set());
 
 
@@ -169,6 +181,8 @@ export default function PlanInviteFriendsSheet({
     setSelected(new Set());
 
     setInviting(false);
+
+    setRevokingId(null);
 
     setSessionInvitedIds(new Set());
 
@@ -244,6 +258,8 @@ export default function PlanInviteFriendsSheet({
 
     setInviting(false);
 
+    setRevokingId(null);
+
     setSelected(new Set());
 
     onClose();
@@ -254,7 +270,7 @@ export default function PlanInviteFriendsSheet({
 
   const toggleFriend = (friendId: string) => {
 
-    if (invitedSet.has(friendId) || interestedSet.has(friendId) || inviting) return;
+    if (invitedSet.has(friendId) || interestedSet.has(friendId) || inviting || revokingId) return;
 
     setSelected((prev) => {
 
@@ -277,6 +293,18 @@ export default function PlanInviteFriendsSheet({
     if (inviting || selected.size === 0 || !eventId) return;
 
     const ids = [...selected];
+
+    if (deferInviteSend) {
+
+      onInvited?.(ids);
+
+      setSelected(new Set());
+
+      handleClose();
+
+      return;
+
+    }
 
     setInviting(true);
 
@@ -345,6 +373,50 @@ export default function PlanInviteFriendsSheet({
     } finally {
 
       setInviting(false);
+
+    }
+
+  };
+
+
+
+  const unsendInvite = async (friendId: string) => {
+
+    if (!friendId || !eventId || inviting || revokingId) return;
+
+    if (deferInviteSend) {
+
+      onUninvited?.(friendId);
+
+      return;
+
+    }
+
+    setRevokingId(friendId);
+
+    try {
+
+      await revokePlanInvite(friendId, eventId);
+
+      setSessionInvitedIds((prev) => {
+
+        const next = new Set(prev);
+
+        next.delete(friendId);
+
+        return next;
+
+      });
+
+      onUninvited?.(friendId);
+
+    } catch (err) {
+
+      onError?.(revokePlanInviteErrorMessage(err));
+
+    } finally {
+
+      setRevokingId(null);
 
     }
 
@@ -428,17 +500,19 @@ export default function PlanInviteFriendsSheet({
 
                 const checked = selected.has(item.id);
 
+                const isRevoking = revokingId === item.id;
+
 
 
                 return (
 
                   <TouchableOpacity
 
-                    style={[styles.row, unavailable && styles.rowInvited]}
+                    style={[styles.row, interested && styles.rowInvited]}
 
                     onPress={() => toggleFriend(item.id)}
 
-                    disabled={unavailable || inviting}
+                    disabled={unavailable || inviting || !!revokingId}
 
                     accessibilityRole={unavailable ? "text" : "checkbox"}
 
@@ -448,11 +522,11 @@ export default function PlanInviteFriendsSheet({
 
                       interested
 
-                        ? `${firstName} already interested`
+                        ? `${firstName} already going`
 
                         : invited
 
-                          ? `${firstName} already invited`
+                          ? `${firstName} invited`
 
                           : `${firstName}, ${checked ? "selected" : "not selected"}`
 
@@ -488,7 +562,7 @@ export default function PlanInviteFriendsSheet({
 
 
 
-                    {unavailable ? (
+                    {interested ? (
 
                       <View
 
@@ -504,11 +578,39 @@ export default function PlanInviteFriendsSheet({
 
                         >
 
-                          {interested ? "Interested" : "Invited"}
+                          Going
 
                         </Text>
 
                       </View>
+
+                    ) : invited ? (
+
+                      <TouchableOpacity
+
+                        style={styles.unsendBtn}
+
+                        onPress={() => void unsendInvite(item.id)}
+
+                        disabled={!!revokingId}
+
+                        accessibilityRole="button"
+
+                        accessibilityLabel={`Unsend invite to ${firstName}`}
+
+                      >
+
+                        {isRevoking ? (
+
+                          <ActivityIndicator size="small" color={ACCENT} />
+
+                        ) : (
+
+                          <Text style={styles.unsendBtnText}>Unsend</Text>
+
+                        )}
+
+                      </TouchableOpacity>
 
                     ) : (
 
@@ -795,6 +897,38 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heavy,
 
     fontSize: 16,
+
+  },
+
+  unsendBtn: {
+
+    minWidth: 72,
+
+    minHeight: 32,
+
+    borderRadius: 12,
+
+    borderWidth: 1,
+
+    borderColor: ACCENT,
+
+    paddingHorizontal: 10,
+
+    paddingVertical: 6,
+
+    alignItems: "center",
+
+    justifyContent: "center",
+
+  },
+
+  unsendBtnText: {
+
+    color: ACCENT,
+
+    fontFamily: fonts.medium,
+
+    fontSize: 13,
 
   },
 

@@ -2,7 +2,7 @@ import BackButton from "@/src/components/BackButton";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { PhoneAuthProvider, signInWithCredential } from "firebase/auth";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -55,6 +55,12 @@ export default function Verify() {
     [verificationId, code, loading]
   );
 
+  useEffect(() => {
+    if (!verificationId) {
+      router.replace("/(auth)/phone");
+    }
+  }, [verificationId]);
+
   const verify = async () => {
     if (!verificationId) return;
 
@@ -63,7 +69,7 @@ export default function Verify() {
       const credential = PhoneAuthProvider.credential(verificationId, code);
       await signInWithCredential(auth, credential);
 
-      router.replace("/(tabs)");
+      router.replace("/(auth)/getting-started");
     } catch (err: any) {
       if (__DEV__) {
         console.error("verify error", err);

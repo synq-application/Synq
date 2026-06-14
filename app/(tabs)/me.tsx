@@ -84,7 +84,8 @@ import {
   topSynqRowsToCache,
   type TopSynqRow,
 } from "../../src/lib/ownProfileCache";
-import { filterOutPastOpenPlans, matchesPlanEvent } from "../../src/lib/planEvents";
+import { filterOutPastOpenPlans, matchesPlanEvent, sortOpenPlansByDateTime } from "../../src/lib/planEvents";
+import { sendPlanInvites } from "../../src/lib/planInvite";
 import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
   friendRelationCacheByUser,
@@ -293,6 +294,39 @@ export default function ProfileScreen() {
     setAlertVisible(true);
   };
 
+  const markPlanInvited = useCallback((eventId: string, friendIds: string[]) => {
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.id !== eventId) return e;
+        const invited = new Set(
+          (Array.isArray(e.planInvitedIds) ? e.planInvitedIds : [])
+            .map((id) => String(id || "").trim())
+            .filter(Boolean)
+        );
+        friendIds.forEach((id) => {
+          const uid = String(id || "").trim();
+          if (uid) invited.add(uid);
+        });
+        return { ...e, planInvitedIds: [...invited] };
+      })
+    );
+  }, []);
+
+  const unmarkPlanInvited = useCallback((eventId: string, friendId: string) => {
+    const uid = String(friendId || "").trim();
+    if (!uid) return;
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.id !== eventId) return e;
+        const invited = (Array.isArray(e.planInvitedIds) ? e.planInvitedIds : [])
+          .map((id) => String(id || "").trim())
+          .filter(Boolean)
+          .filter((id) => id !== uid);
+        return { ...e, planInvitedIds: invited };
+      })
+    );
+  }, []);
+
   const signOut = async () => {
     try {
       await clearPushTokenOnSignOut();
@@ -323,13 +357,19 @@ export default function ProfileScreen() {
     }
 
     const newItem = {
-      id: Date.now().toString(),
+      id: String(eventToSave.id || Date.now().toString()),
       date: eventToSave.date,
       title: eventToSave.title,
       time: eventToSave.time || "",
       location: eventToSave.location || "",
       planHostUid: auth.currentUser.uid,
     };
+
+    const inviteFriendIds = Array.isArray(eventToSave.inviteFriendIds)
+      ? eventToSave.inviteFriendIds
+          .map((id: unknown) => String(id || "").trim())
+          .filter(Boolean)
+      : [];
 
     const ref = doc(db, "users", auth.currentUser.uid);
     try {
@@ -338,11 +378,37 @@ export default function ProfileScreen() {
         ? (snap.data() as { events?: unknown }).events
         : undefined;
       const existing = Array.isArray(raw) ? (raw as OpenPlanEvent[]) : [];
-      const updatedEvents = [...existing, newItem];
+      const updatedEvents = sortOpenPlansByDateTime([...existing, newItem]);
 
       await updateDoc(ref, {
         events: updatedEvents,
       });
+
+      if (inviteFriendIds.length > 0) {
+        try {
+          const { invitedIds, alreadyInvitedIds, errors } = await sendPlanInvites(
+            inviteFriendIds,
+            newItem.id
+          );
+          const sent = [...invitedIds, ...alreadyInvitedIds];
+          if (sent.length > 0) {
+            markPlanInvited(newItem.id, sent);
+          }
+          if (errors.length > 0) {
+            showAlert(
+              "Some invites failed",
+              sent.length > 0
+                ? "Your plan was posted, but some invites could not be sent."
+                : errors[0] || "Your plan was posted, but invites could not be sent."
+            );
+          }
+        } catch {
+          showAlert(
+            "Invites not sent",
+            "Your plan was posted, but invites could not be sent. Try again from Edit plan."
+          );
+        }
+      }
 
       setShowEventModal(false);
       setNewEvent({ title: "", date: "", time: "", location: "" });
@@ -414,7 +480,8 @@ export default function ProfileScreen() {
         changed = true;
         return { ...e, ...updatedPayload };
       });
-      if (changed) await updateDoc(ref, { events: next });
+      const toWrite = uid === myUid ? sortOpenPlansByDateTime(next) : next;
+      if (changed) await updateDoc(ref, { events: toWrite });
     };
 
     try {
@@ -472,24 +539,6 @@ export default function ProfileScreen() {
       otherAttendeeIds.map((uid) => removeFromUserCalendar(uid))
     );
   };
-
-  const markPlanInvited = useCallback((eventId: string, friendIds: string[]) => {
-    setEvents((prev) =>
-      prev.map((e) => {
-        if (e.id !== eventId) return e;
-        const invited = new Set(
-          (Array.isArray(e.planInvitedIds) ? e.planInvitedIds : [])
-            .map((id) => String(id || "").trim())
-            .filter(Boolean)
-        );
-        friendIds.forEach((id) => {
-          const uid = String(id || "").trim();
-          if (uid) invited.add(uid);
-        });
-        return { ...e, planInvitedIds: [...invited] };
-      })
-    );
-  }, []);
 
   useEffect(() => {
     if (!myId) return;
@@ -1104,6 +1153,7 @@ export default function ProfileScreen() {
           highlightEventId={planHighlightId}
           friends={friendsForHostNames}
           onPlanInvited={markPlanInvited}
+          onPlanUninvited={unmarkPlanInvited}
         />
       </View>
       <View style={styles.section}>

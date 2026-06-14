@@ -1,4 +1,4 @@
-import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
+import { filterOutPastOpenPlans, sortOpenPlansByDateTime } from "@/src/lib/planEvents";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from "react-native";
 
@@ -47,7 +47,10 @@ export default function FriendOpenPlans({
   hostDisplayNameByUid,
   profileFallbackFirstName,
 }: Props) {
-  const visibleEvents = useMemo(() => filterOutPastOpenPlans(events), [events]);
+  const visibleEvents = useMemo(
+    () => sortOpenPlansByDateTime(filterOutPastOpenPlans(events)),
+    [events]
+  );
 
   const parseDate = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);
