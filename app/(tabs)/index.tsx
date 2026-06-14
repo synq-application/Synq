@@ -1,4 +1,9 @@
 import ProfileTabHeaderOverlay from '@/src/components/ProfileTabHeaderOverlay';
+import { useChatMessages } from '@/src/hooks/useChatMessages';
+import { useSendMessage } from '@/src/hooks/useSendMessage';
+import { useTypingIndicator } from '@/src/hooks/useTypingIndicator';
+import { mergeMessages, pendingMatchesServer } from '@/src/lib/chatMessages';
+import { trackEvent } from '@/src/lib/analytics';
 import { useBlockedUsers } from '@/src/lib/blockedUsers';
 import { deleteChat } from '@/src/lib/chats';
 import { filterOrReject } from '@/src/lib/contentFilter';
@@ -26,7 +31,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from "expo-image";
-import * as Notifications from "expo-notifications";
 import {
   addDoc,
   arrayRemove,
@@ -35,8 +39,6 @@ import {
   deleteField,
   doc,
   getDoc,
-  getDocs,
-  increment,
   onSnapshot,
   orderBy,
   query,
@@ -47,6 +49,7 @@ import {
 import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   Animated,
+  ActivityIndicator,
   BackHandler,
   DeviceEventEmitter,
   Easing,
@@ -182,12 +185,14 @@ function ChatMessageBubble({
   isMe,
   onPress,
   heartCount,
+  sendStatus,
 }: {
   text: string;
   bubbleCap: number;
   isMe: boolean;
   onPress: () => void;
   heartCount: number;
+  sendStatus?: "sending" | "failed";
 }) {
   const fontScale = PixelRatio.getFontScale();
   const fontSize = IMESSAGE_BUBBLE_FONT_SIZE * fontScale;
@@ -224,6 +229,7 @@ function ChatMessageBubble({
               maxWidth: innerMax,
               textAlign: "left",
             },
+            sendStatus === "failed" && { color: isMe ? "#8B0000" : "#FFB4B4" },
           ]}
           {...Platform.select({
             ios: { lineBreakStrategyIOS: "standard" as const },
@@ -232,6 +238,9 @@ function ChatMessageBubble({
         >
           {text}
         </Text>
+        {sendStatus === "failed" ? (
+          <Text style={styles.failedMessageHint}>Tap to retry</Text>
+        ) : null}
         {heartCount > 0 ? (
           <View
             style={[
@@ -290,15 +299,16 @@ export default function SynqScreen() {
   const isChatPaneOpen = messagesModalVisible && messagesPane === "chat";
   const [isExploreVisible, setIsExploreVisible] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [chatOpenAnchorKey, setChatOpenAnchorKey] = useState(0);
+  const bumpChatOpenAnchor = useCallback(() => {
+    setChatOpenAnchorKey((key) => key + 1);
+  }, []);
   const [pendingNewChat, setPendingNewChat] = useState<{
     participants: string[];
     participantNames: Record<string, string>;
     participantImages: Record<string, string>;
   } | null>(null);
   const [allChats, setAllChats] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [messagesReady, setMessagesReady] = useState(false);
-  const messagesCacheByChatIdRef = useRef<Record<string, any[]>>({});
   const [inputText, setInputText] = useState('');
   const [isAILoading, setIsAILoading] = useState(false);
   const [showAICard, setShowAICard] = useState(false);
@@ -395,7 +405,7 @@ export default function SynqScreen() {
       )
     ) {
       setActiveChatId(null);
-      setMessages([]);
+      clearMessages();
       navigateMessagesPane("inbox");
       setPendingNewChat(null);
     }
@@ -412,44 +422,172 @@ export default function SynqScreen() {
     return false;
   };
 
-  const showActionError = (message: string, title = "Something went wrong") => {
+  const showActionError = useCallback((message: string, title = "Something went wrong") => {
     setContentAlertTitle(title);
     setContentAlertMessage(message);
     setContentAlertVisible(true);
-  };
-  const markChatRead = async (chatId: string) => {
-    if (!auth.currentUser) return;
-    const myId = auth.currentUser.uid;
-
-    try {
-      await updateDoc(doc(db, 'chats', chatId), {
-        [`lastReadBy.${myId}`]: serverTimestamp(),
-      });
-    } catch {}
-  };
-
-  const hydrateChatMessages = useCallback(async (chatId: string) => {
-    const cached = messagesCacheByChatIdRef.current[chatId];
-    if (cached) {
-      setMessages(cached);
-      setMessagesReady(true);
-      return;
-    }
-    try {
-      const q = query(
-        collection(db, "chats", chatId, "messages"),
-        orderBy("createdAt", "asc")
-      );
-      const snap = await getDocs(q);
-      const newMessages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      messagesCacheByChatIdRef.current[chatId] = newMessages;
-      setMessages(newMessages);
-      setMessagesReady(true);
-    } catch {
-      setMessages([]);
-      setMessagesReady(false);
-    }
   }, []);
+
+  const {
+    serverMessages,
+    messagesReady,
+    listenerError,
+    hasEarlierMessages,
+    loadingEarlier,
+    messagesCacheByChatIdRef,
+    prepareChatSync,
+    hydrateChatMessages,
+    loadEarlierMessages,
+    markChatRead,
+    retryListener,
+    clearMessages,
+  } = useChatMessages({
+    activeChatId,
+    isChatPaneOpen,
+    pendingNewChat,
+  });
+
+  const moderationTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const serverMessagesRef = useRef<ReturnType<typeof useChatMessages>["serverMessages"]>([]);
+  const onMessageDeliveredRef = useRef<
+    (clientId: string, meta: { text: string; senderId: string; sentAt: number }) => void
+  >(() => {});
+
+  const {
+    pendingMessages,
+    sendMessage: sendMessageCore,
+    retryFailedMessage,
+    clearPendingMessages,
+    recentlySentRef,
+    sendOrderByServerIdRef,
+  } = useSendMessage({
+    activeChatId,
+    pendingNewChat,
+    allChats,
+    serverMessages,
+    setActiveChatId,
+    setPendingNewChat,
+    resolveAvatar,
+    userAvatar: userProfile?.imageurl,
+    rejectIfObjectionable,
+    onSendError: (msg) => showActionError(msg),
+    onMessageDelivered: (clientId, meta) => onMessageDeliveredRef.current(clientId, meta),
+  });
+
+  const messages = useMemo(() => {
+    const merged = mergeMessages(serverMessages, pendingMessages);
+    const orderHints = sendOrderByServerIdRef.current;
+    if (orderHints.size === 0) return merged;
+    return merged.map((message) => {
+      if (typeof message.sendOrder === "number") return message;
+      const sendOrder = orderHints.get(message.id);
+      return sendOrder != null ? { ...message, sendOrder } : message;
+    });
+  }, [serverMessages, pendingMessages]);
+
+  serverMessagesRef.current = serverMessages;
+
+  onMessageDeliveredRef.current = (clientId, meta) => {
+    const existing = moderationTimersRef.current.get(clientId);
+    if (existing) clearTimeout(existing);
+
+    const timer = setTimeout(() => {
+      moderationTimersRef.current.delete(clientId);
+      if (!recentlySentRef.current.has(clientId)) return;
+
+      const matched = serverMessagesRef.current.some((m) =>
+        pendingMatchesServer(
+          {
+            id: clientId,
+            clientId,
+            text: meta.text,
+            senderId: meta.senderId,
+            sendStatus: "sending",
+            createdAt: meta.sentAt,
+          },
+          m
+        )
+      );
+      recentlySentRef.current.delete(clientId);
+      if (!matched) {
+        showActionError(
+          "This message was removed because it isn't allowed on Synq.",
+          "Message removed"
+        );
+      }
+    }, 12_000);
+
+    moderationTimersRef.current.set(clientId, timer);
+  };
+
+  useEffect(() => {
+    if (!messagesReady || recentlySentRef.current.size === 0) return;
+
+    for (const [clientId, meta] of [...recentlySentRef.current.entries()]) {
+      const matched = serverMessages.some((m) =>
+        pendingMatchesServer(
+          {
+            id: clientId,
+            clientId,
+            text: meta.text,
+            senderId: meta.senderId,
+            sendStatus: "sending",
+            createdAt: meta.sentAt,
+          },
+          m
+        )
+      );
+      if (matched) {
+        recentlySentRef.current.delete(clientId);
+        const pendingTimer = moderationTimersRef.current.get(clientId);
+        if (pendingTimer) clearTimeout(pendingTimer);
+        moderationTimersRef.current.delete(clientId);
+      }
+    }
+  }, [serverMessages, messagesReady, recentlySentRef]);
+
+  useEffect(() => {
+    return () => {
+      moderationTimersRef.current.forEach((timer) => clearTimeout(timer));
+      moderationTimersRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!messagesModalVisible) return;
+    for (const chat of inboxChats) {
+      if (messagesCacheByChatIdRef.current[chat.id]) continue;
+      void hydrateChatMessages(chat.id);
+    }
+  }, [messagesModalVisible, inboxChats, hydrateChatMessages]);
+
+  const prefetchChatOnPress = useCallback(
+    (chatId: string) => {
+      const chat = allChats.find((c) => c.id === chatId);
+      if (chat) prefetchParticipantAvatars(chat);
+      if (!messagesCacheByChatIdRef.current[chatId]) {
+        void hydrateChatMessages(chatId);
+      }
+    },
+    [allChats, hydrateChatMessages, messagesCacheByChatIdRef]
+  );
+
+  const beginOpeningChat = useCallback(
+    (chatId: string) => {
+      setPendingNewChat(null);
+      prepareChatSync(chatId);
+      setActiveChatId(chatId);
+      bumpChatOpenAnchor();
+      navigateMessagesPane("chat");
+      void markChatRead(chatId);
+    },
+    [
+      prepareChatSync,
+      bumpChatOpenAnchor,
+      navigateMessagesPane,
+      markChatRead,
+    ]
+  );
 
   const openChatById = useCallback(
     async (
@@ -465,21 +603,30 @@ export default function SynqScreen() {
         } catch {}
       }
       setPendingNewChat(null);
-      await hydrateChatMessages(chatId);
-      setActiveChatId(chatId);
+      beginOpeningChat(chatId);
       setMessagesModalVisible(true);
-      navigateMessagesPane("chat");
       const mid = opts?.messageId;
       setPendingScrollToMessageId(
         typeof mid === "string" && mid.trim() ? mid.trim() : null
       );
-      await markChatRead(chatId);
     },
-    [hydrateChatMessages, navigateMessagesPane]
+    [beginOpeningChat]
   );
 
   const DOUBLE_TAP_MS = 320;
-  const onMessageBubblePress = (item: { id: string; reactions?: Record<string, string> }) => {
+  const onMessageBubblePress = (item: {
+    id: string;
+    text?: string;
+    clientId?: string;
+    sendStatus?: "sending" | "failed";
+    reactions?: Record<string, string>;
+  }) => {
+    if (item.sendStatus === "failed" && item.text) {
+      void retryFailedMessage(item.clientId || item.id, item.text);
+      return;
+    }
+    if (item.id.startsWith("pending-")) return;
+
     const now = Date.now();
     const last = lastTapRef.current[item.id] ?? 0;
     if (now - last < DOUBLE_TAP_MS) {
@@ -570,43 +717,6 @@ export default function SynqScreen() {
       }
     });
     return () => subscription.remove();
-  }, [openChatById]);
-
-  useEffect(() => {
-    const openFromNotificationData = async (data: Record<string, unknown> | undefined) => {
-      if (!data) return;
-      const rawChatId = data.chatId;
-      const chatId =
-        typeof rawChatId === "string"
-          ? rawChatId.trim()
-          : rawChatId != null
-            ? String(rawChatId).trim()
-            : "";
-      if (!chatId) return;
-      const rawMid = data.messageId;
-      const mid =
-        typeof rawMid === "string" && rawMid.trim()
-          ? rawMid.trim()
-          : rawMid != null
-            ? String(rawMid).trim() || null
-            : null;
-      await openChatById(chatId, { messageId: mid, prefetchChatDoc: true });
-    };
-
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      openFromNotificationData(
-        response.notification.request.content.data as Record<string, unknown> | undefined
-      );
-    });
-
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (!response) return;
-      openFromNotificationData(
-        response.notification.request.content.data as Record<string, unknown> | undefined
-      );
-    });
-
-    return () => sub.remove();
   }, [openChatById]);
 
   useEffect(() => {
@@ -882,59 +992,15 @@ export default function SynqScreen() {
   }, [status, user?.uid]);
 
   useEffect(() => {
-    if (!isChatPaneOpen) {
-      return;
-    }
-
-    if (pendingNewChat) {
-      setMessages([]);
-      setMessagesReady(true);
-      return;
-    }
-
-    if (!activeChatId) {
-      return;
-    }
-
-    const cached = messagesCacheByChatIdRef.current[activeChatId];
-    if (cached) {
-      setMessages(cached);
-      setMessagesReady(true);
-    } else {
-      setMessages([]);
-      setMessagesReady(false);
-    }
-
-    const q = query(collection(db, 'chats', activeChatId, 'messages'), orderBy('createdAt', 'asc'));
-
-    return onSnapshot(
-      q,
-      (snap) => {
-        const newMessages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        messagesCacheByChatIdRef.current[activeChatId] = newMessages;
-        setMessages(newMessages);
-        setMessagesReady(true);
-      },
-      (error) => {
-        ignoreSnapshotPermissionDenied(error);
-        setMessages([]);
-        setMessagesReady(false);
-        setActiveChatId(null);
-        navigateMessagesPane("inbox");
-      }
-    );
-  }, [activeChatId, isChatPaneOpen, pendingNewChat, navigateMessagesPane]);
-
-  useEffect(() => {
     if (!messagesModalVisible || pendingNewChat) return;
     const activeChatMissing =
-      !!activeChatId && !allChats.some((c) => c.id === activeChatId);
-    if (activeChatMissing || (allChats.length === 0 && messagesPane === "chat")) {
+      !!activeChatId && allChats.length > 0 && !allChats.some((c) => c.id === activeChatId);
+    if (activeChatMissing) {
       setActiveChatId(null);
-      setMessages([]);
+      clearMessages();
       navigateMessagesPane("inbox");
     }
-  }, [messagesModalVisible, activeChatId, allChats, messagesPane, pendingNewChat, navigateMessagesPane]);
+  }, [messagesModalVisible, activeChatId, allChats, pendingNewChat, navigateMessagesPane, clearMessages]);
 
   const activeParticipantIds = useMemo(() => {
     let ids: string[] = [];
@@ -952,6 +1018,22 @@ export default function SynqScreen() {
   }, [pendingNewChat, activeChatId, allChats]);
 
   const activeParticipantIdsKey = activeParticipantIds.join("|");
+
+  const {
+    typingUserIds,
+    notifyInputChange,
+    stopTyping,
+    ingestChatTypingSnapshot,
+  } = useTypingIndicator({
+    chatId: activeChatId,
+    enabled: isChatPaneOpen && !pendingNewChat,
+    participantIds: activeParticipantIds,
+  });
+
+  useEffect(() => {
+    const chat = allChats.find((c) => c.id === activeChatId);
+    ingestChatTypingSnapshot(chat?.typingBy as Record<string, unknown> | undefined);
+  }, [allChats, activeChatId, ingestChatTypingSnapshot]);
 
   const [liveParticipantImages, setLiveParticipantImages] = useState<
     Record<string, string>
@@ -1342,6 +1424,7 @@ export default function SynqScreen() {
       );
       setLaunchOverlay(true);
       setSynqStatus(setSynq, "activating");
+      trackEvent("synq_started");
     } catch {
       showActionError("Could not start Synq. Check your connection and try again.");
     } finally {
@@ -1368,8 +1451,9 @@ export default function SynqScreen() {
       if (existing) {
         prefetchParticipantAvatars(existing);
         setPendingNewChat(null);
-        await hydrateChatMessages(existing.id);
+        prepareChatSync(existing.id);
         setActiveChatId(existing.id);
+        void markChatRead(existing.id);
       } else {
         const nameMap: Record<string, string> = {};
         const imgMap: Record<string, string> = {};
@@ -1387,8 +1471,9 @@ export default function SynqScreen() {
           participantImages: imgMap,
         });
         setActiveChatId(null);
-        setMessages([]);
+        clearMessages();
       }
+      bumpChatOpenAnchor();
       setMessagesModalVisible(true);
       navigateMessagesPane("chat");
       setSelectedFriends([]);
@@ -1399,73 +1484,19 @@ export default function SynqScreen() {
 
   const sendMessage = async () => {
     if (!inputText.trim() || !auth.currentUser) return;
-    if (!pendingNewChat && (!activeChatId || !allChats.find((c) => c.id === activeChatId))) return;
+    if (
+      !pendingNewChat &&
+      (!activeChatId || !allChats.find((c) => c.id === activeChatId))
+    ) {
+      return;
+    }
 
     const text = inputText.trim();
     if (rejectIfObjectionable(text)) return;
 
-    const myId = auth.currentUser.uid;
-    setInputText('');
-
-    try {
-      let chatId = activeChatId;
-      let otherParticipants: string[];
-
-      if (pendingNewChat) {
-        const participantImages = freshParticipantImages(
-          pendingNewChat.participantImages,
-          pendingNewChat.participants
-        );
-        const chatRef = await addDoc(collection(db, 'chats'), {
-          participants: pendingNewChat.participants,
-          participantNames: pendingNewChat.participantNames,
-          participantImages,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          lastMessage: '',
-        });
-        chatId = chatRef.id;
-        otherParticipants = pendingNewChat.participants.filter((pId: string) => pId !== myId);
-        setActiveChatId(chatId);
-        setPendingNewChat(null);
-      } else {
-        const currentChat = allChats.find((c) => c.id === activeChatId)!;
-        otherParticipants = currentChat.participants.filter((pId: string) => pId !== myId);
-      }
-
-      const myAvatar = resolveAvatar(userProfile?.imageurl);
-
-      await addDoc(collection(db, 'chats', chatId!, 'messages'), {
-        text,
-        senderId: myId,
-        imageurl: myAvatar,
-        createdAt: serverTimestamp()
-      });
-
-      await updateDoc(doc(db, 'chats', chatId!), {
-        lastMessage: text,
-        lastMessageSenderId: myId,
-        updatedAt: serverTimestamp(),
-        [`participantImages.${myId}`]: myAvatar,
-      });
-      otherParticipants.forEach(async (pId: string) => {
-        const mySideFriendDoc = doc(db, 'users', myId, 'friends', pId);
-        const theirSideFriendDoc = doc(db, 'users', pId, 'friends', myId);
-
-        await updateDoc(mySideFriendDoc, {
-          synqCount: increment(1),
-          lastSynqAt: serverTimestamp(),
-        }).catch(() => { });
-
-        await updateDoc(theirSideFriendDoc, {
-          synqCount: increment(1),
-          lastSynqAt: serverTimestamp(),
-        }).catch(() => { });
-      });
-    } catch {
-      setInputText(text);
-      showActionError("Message could not be sent. Please try again.");
-    }
+    setInputText("");
+    stopTyping();
+    await sendMessageCore(text);
   };
 
   const handleDeleteChat = async (chatId: string) => {
@@ -1509,11 +1540,12 @@ export default function SynqScreen() {
     setProfileFriendId(null);
     setActiveChatId(null);
     setPendingNewChat(null);
-    setMessages([]);
+    clearMessages();
+    clearPendingMessages();
     setIsExploreVisible(false);
     setShowOptionsList(false);
     setShowAICard(false);
-  }, []);
+  }, [clearMessages, clearPendingMessages]);
 
   useEffect(() => {
     if (!messagesModalVisible) return;
@@ -1523,14 +1555,14 @@ export default function SynqScreen() {
         return true;
       }
       if (messagesPane === "chat") {
-        Keyboard.dismiss();
+        goBackFromChat();
         return true;
       }
       closeMessagesModal();
       return true;
     });
     return () => sub.remove();
-  }, [messagesModalVisible, messagesPane, closeMessagesModal, closeProfileFromChat]);
+  }, [messagesModalVisible, messagesPane, closeMessagesModal, closeProfileFromChat, goBackFromChat]);
 
   const startCombineWithChat = (chatId: string) => {
     setInboxActionChat(null);
@@ -1633,10 +1665,11 @@ export default function SynqScreen() {
         resetMergeSelect();
         prefetchParticipantAvatars(existing);
         setPendingNewChat(null);
-        await hydrateChatMessages(existing.id);
+        prepareChatSync(existing.id);
         setActiveChatId(existing.id);
+        bumpChatOpenAnchor();
         navigateMessagesPane("chat");
-        await markChatRead(existing.id);
+        void markChatRead(existing.id);
         return;
       }
 
@@ -1685,10 +1718,11 @@ export default function SynqScreen() {
       resetMergeSelect();
       prefetchParticipantAvatars({ participantImages });
       setPendingNewChat(null);
-      await hydrateChatMessages(chatRef.id);
+      prepareChatSync(chatRef.id);
       setActiveChatId(chatRef.id);
+      bumpChatOpenAnchor();
       navigateMessagesPane("chat");
-      await markChatRead(chatRef.id);
+      void markChatRead(chatRef.id);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       showActionError("Could not create group chat. Please try again.");
@@ -1699,7 +1733,7 @@ export default function SynqScreen() {
   };
 
   const toggleHeartReaction = async (messageId: string, currentReactions: any) => {
-    if (!auth.currentUser || !activeChatId) return;
+    if (!auth.currentUser || !activeChatId || messageId.startsWith("pending-")) return;
 
     const userId = auth.currentUser.uid;
     const messageRef = doc(db, "chats", activeChatId, "messages", messageId);
@@ -1814,7 +1848,13 @@ export default function SynqScreen() {
   const bootActive =
     synqBoot?.cachedSynqActive === true ||
     (uid ? getCachedSynqActiveSync(uid) : false);
-  if (!hydrated && !bootActive) return <View style={styles.darkFill} />;
+  if (!hydrated && !bootActive) {
+    return (
+      <View style={[styles.darkFill, styles.bootLoading]}>
+        <ActivityIndicator size="large" color={ACCENT} accessibilityLabel="Loading Synq" />
+      </View>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -1883,7 +1923,12 @@ export default function SynqScreen() {
           presentationStyle="fullScreen"
           allowSwipeDismissal={false}
           onRequestClose={() => {
-            if (messagesPane === "chat" || messagesPane === "profile") {
+            if (messagesPane === "profile") {
+              closeProfileFromChat();
+              return;
+            }
+            if (messagesPane === "chat") {
+              goBackFromChat();
               return;
             }
             closeMessagesModal();
@@ -1906,12 +1951,9 @@ export default function SynqScreen() {
                 onCloseMessages={closeMessagesModal}
                 onOpenChat={async (item) => {
                   prefetchParticipantAvatars(item);
-                  setPendingNewChat(null);
-                  await hydrateChatMessages(item.id);
-                  setActiveChatId(item.id);
-                  navigateMessagesPane("chat");
-                  await markChatRead(item.id);
+                  beginOpeningChat(item.id);
                 }}
+                onPrepareChatPress={(chatId) => prefetchChatOnPress(chatId)}
                 onDeleteChat={handleDeleteChat}
                 onChatLongPress={(chat) => setInboxActionChat(chat)}
                 mergeSelectMode={mergeSelectMode}
@@ -1959,7 +2001,7 @@ export default function SynqScreen() {
                       if (activeChatId === chatId) {
                         setActiveChatId(null);
                         setPendingNewChat(null);
-                        setMessages([]);
+                        clearMessages();
                         navigateMessagesPane("inbox");
                       }
                       try {
@@ -1995,6 +2037,16 @@ export default function SynqScreen() {
                   flatListRef={flatListRef}
                   messages={messages}
                   messagesReady={messagesReady}
+                  listenerError={listenerError}
+                  onRetryMessages={retryListener}
+                  hasEarlierMessages={hasEarlierMessages}
+                  loadingEarlier={loadingEarlier}
+                  onLoadEarlier={loadEarlierMessages}
+                  typingUserIds={typingUserIds}
+                  onComposerChange={(text) => {
+                    setInputText(text);
+                    notifyInputChange();
+                  }}
                   showAICard={showAICard}
                   aiResponse={aiResponse}
                   inputText={inputText}
@@ -2014,6 +2066,7 @@ export default function SynqScreen() {
                   onMessageBubblePress={onMessageBubblePress}
                   onMessageLongPress={(item) => {
                     if (item.senderId === auth.currentUser?.uid) return;
+                    if (item.id.startsWith("pending-")) return;
                     setReportTarget({
                       reportedUserId: item.senderId,
                       messageId: item.id,
@@ -2027,6 +2080,7 @@ export default function SynqScreen() {
                   windowWidth={windowWidth}
                   currentUserId={auth.currentUser?.uid}
                   liveParticipantImages={liveParticipantImages}
+                  chatOpenAnchorKey={chatOpenAnchorKey}
                 />
                 {(showAISuggestions || isExploreVisible) && (
                   <ExploreModal
@@ -2155,6 +2209,7 @@ export default function SynqScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   darkFill: { flex: 1, backgroundColor: BG, justifyContent: 'center' },
+  bootLoading: { alignItems: 'center' },
   activeSynqRoot: { flex: 1, backgroundColor: BG, paddingHorizontal: 26 },
   activeListFooterDock: {
     flex: 1,
@@ -2573,11 +2628,6 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT,
     borderColor: ACCENT,
   },
-  inboxSelectBadgeText: {
-    color: ON_ACCENT_TEXT,
-    fontFamily: fonts.heavy,
-    fontSize: 13,
-  },
   messagesHeaderDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: "rgba(255,255,255,0.16)",
@@ -2647,6 +2697,15 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: { fontFamily: "System" },
       android: { fontFamily: "sans-serif", includeFontPadding: false },
+    }),
+  },
+  failedMessageHint: {
+    marginTop: 4,
+    fontSize: 11,
+    opacity: 0.85,
+    ...Platform.select({
+      ios: { fontFamily: "System" },
+      android: { fontFamily: "sans-serif" },
     }),
   },
   myBubble: {

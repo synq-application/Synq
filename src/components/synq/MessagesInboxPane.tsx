@@ -73,11 +73,12 @@ export default function MessagesInboxPane({
   const mergeReady = selectedMergeChatIds.length === 2;
   const pinnedSet = new Set(pinnedChatIds);
 
-  const mergeSubtitle = mergeReady
-    ? "Ready to create your group chat"
-    : selectedMergeChatIds.length === 1 && mergeAnchorTitle
+  const mergeSubtitle =
+    selectedMergeChatIds.length === 1 && mergeAnchorTitle
       ? `Pick one more to combine with ${mergeAnchorTitle}`
-      : `Pick two conversations · ${selectedMergeChatIds.length}/2 selected`;
+      : !mergeReady
+        ? "Pick two conversations"
+        : "";
 
   const renderChatRow = (item: any, index: number) => {
     const updatedAtMs = item.updatedAt?.toMillis?.() ?? 0;
@@ -92,9 +93,6 @@ export default function MessagesInboxPane({
       updatedAtMs > lastReadMs;
     const isSelected = selectedMergeChatIds.includes(item.id);
     const isPinned = pinnedSet.has(item.id);
-    const selectionOrder = isSelected
-      ? selectedMergeChatIds.indexOf(item.id) + 1
-      : 0;
 
     const rowContent = (
       <TouchableOpacity
@@ -138,7 +136,7 @@ export default function MessagesInboxPane({
               ]}
             >
               {isSelected ? (
-                <Text style={styles.inboxSelectBadgeText}>{selectionOrder}</Text>
+                <Ionicons name="checkmark" size={15} color="white" />
               ) : null}
             </View>
           ) : null}
@@ -227,7 +225,9 @@ export default function MessagesInboxPane({
             </Text>
             <View style={styles.inboxMergeHeaderSide} />
           </View>
-          <Text style={styles.inboxMergeSubtitle}>{mergeSubtitle}</Text>
+          {mergeSubtitle ? (
+            <Text style={styles.inboxMergeSubtitle}>{mergeSubtitle}</Text>
+          ) : null}
         </>
       ) : (
         <View style={[styles.inboxHeaderRow, { paddingTop: inboxHeaderPaddingTop }]}>
