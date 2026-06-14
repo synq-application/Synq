@@ -119,6 +119,7 @@ import { FRIENDS_TAB_PRESS } from "../../src/lib/friendsTabEvents";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
 import {
   friendProfileCacheByUser,
+  friendIdsKey,
   friendsListCacheByUser,
   hydrateMutualCountsForUsers,
   resolveMutualFriendCount,
@@ -317,6 +318,7 @@ export default function FriendsScreen() {
   const [friendsTabMode, setFriendsTabMode] = useState<FriendsTabMode>("friends");
   const friendsListRef = useRef<FlatList<Friend>>(null);
   const friendsRefreshInFlightRef = useRef(false);
+  const lastFriendsIdsKeyRef = useRef("");
 
   const showAddFriendsModal = searchModalVisible;
   const headerFadeOpacity = Math.min(1, listScrollY / 28);
@@ -441,7 +443,13 @@ export default function FriendsScreen() {
           setIsFriendsInitialLoading(true);
         }
         void warmOutgoingFriendRequestsCache(myId);
-        await warmFriendsAndConnectionsCache(myId);
+        const idsKey = friendIdsKey(friendIds);
+        const friendsChanged = idsKey !== lastFriendsIdsKeyRef.current;
+        lastFriendsIdsKeyRef.current = idsKey;
+        await warmFriendsAndConnectionsCache(myId, {
+          friendIds,
+          force: friendsChanged,
+        });
         const fetchedFriends: Friend[] = friendIds.map(
           (friendId) =>
             profileCache[friendId] ??
@@ -484,7 +492,7 @@ export default function FriendsScreen() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const startedAt = Date.now();
     try {
-      await warmFriendsAndConnectionsCache(myId);
+      await warmFriendsAndConnectionsCache(myId, { force: true });
       const nextFriends = sortFriendsByName(friendsListCacheByUser[myId] ?? []);
       setFriends(nextFriends);
     } catch {

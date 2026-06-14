@@ -16,7 +16,12 @@ import {
   participantsMatch,
   uniqueChatIds,
 } from '@/src/lib/mergeChats';
-import { friendGroupsCacheByUser, friendsListCacheByUser } from '@/src/lib/socialCache';
+import {
+  friendGroupsCacheByUser,
+  friendsListCacheByUser,
+  pollSynqActiveFriends,
+  SYNQ_FRIEND_POLL_TTL_MS,
+} from '@/src/lib/socialCache';
 import {
   buildSynqBroadcastFirestorePayload,
   filterActiveFriendsForInbound,
@@ -932,76 +937,33 @@ export default function SynqScreen() {
 
   useEffect(() => {
     const myId = user?.uid;
-    if (!myId || status !== 'active') {
+    if (!myId || status !== "active") {
       setAvailableFriends([]);
       return;
     }
-    const friendsRef = collection(db, 'users', myId, 'friends');
-    const friendUnsubs = new Map<string, () => void>();
-    const friendState = new Map<string, any>();
 
-    const emit = () => {
-      setAvailableFriends(Array.from(friendState.values()));
+    const friendIds = resolvedFriendIds;
+    if (!friendIds.length) {
+      setAvailableFriends([]);
+      return;
+    }
+
+    let cancelled = false;
+    const refreshAvailable = async (force = false) => {
+      const next = await pollSynqActiveFriends(myId, friendIds, { force });
+      if (!cancelled) setAvailableFriends(next);
     };
 
-    const friendsUnsub = onSnapshot(
-      friendsRef,
-      (friendsSnap) => {
-      const friendIds = new Set(friendsSnap.docs.map((d) => d.id));
-
-      for (const [fid, unsub] of friendUnsubs.entries()) {
-        if (!friendIds.has(fid)) {
-          unsub();
-          friendUnsubs.delete(fid);
-          friendState.delete(fid);
-        }
-      }
-
-      friendsSnap.docs.forEach((fDoc) => {
-        const fid = fDoc.id;
-        if (friendUnsubs.has(fid)) return;
-
-        const uRef = doc(db, 'users', fid);
-        const uUnsub = onSnapshot(
-          uRef,
-          (uSnap) => {
-            if (!uSnap.exists()) {
-              friendState.delete(fid);
-              emit();
-              return;
-            }
-
-            const data = uSnap.data();
-
-            if (computeSynqActiveFromUserData(data)) {
-              friendState.set(fid, { id: fid, ...data });
-              const uri = resolveAvatar(data?.imageurl);
-              if (uri) {
-                ExpoImage.prefetch(uri).catch(() => {});
-              }
-            } else {
-              friendState.delete(fid);
-            }
-
-            emit();
-          },
-          ignoreSnapshotPermissionDenied
-        );
-
-        friendUnsubs.set(fid, uUnsub);
-      });
-      emit();
-    },
-      ignoreSnapshotPermissionDenied
-    );
+    void refreshAvailable(true);
+    const interval = setInterval(() => {
+      void refreshAvailable(false);
+    }, SYNQ_FRIEND_POLL_TTL_MS);
 
     return () => {
-      friendsUnsub();
-      friendUnsubs.forEach((unsub) => unsub());
-      friendUnsubs.clear();
-      friendState.clear();
+      cancelled = true;
+      clearInterval(interval);
     };
-  }, [status, user?.uid]);
+  }, [status, user?.uid, resolvedFriendIds]);
 
   useEffect(() => {
     if (activeChatId) {

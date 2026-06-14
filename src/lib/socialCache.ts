@@ -5,6 +5,7 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 
 import { db } from "./firebase";
 import type { FriendGroup } from "./friendGroups";
+import { computeSynqActiveFromUserData } from "./synqSession";
 
 export type Connection = {
   id: string;
@@ -29,8 +30,57 @@ const warmFriendsInFlight: Record<string, Promise<void> | undefined> = {};
 const warmOutgoingInFlight: Record<string, Promise<void> | undefined> = {};
 const warmSuggestedInFlight: Record<string, Promise<void> | undefined> = {};
 const hydrateInFlight: Record<string, Promise<void> | undefined> = {};
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 const socialCacheKey = (userId: string) => `social-cache:${CACHE_VERSION}:${userId}`;
+
+/** How long before re-fetching a friend's full profile during warm. */
+export const FRIEND_PROFILE_TTL_MS = 30 * 60 * 1000;
+/** How long before rebuilding the mutual-friends index. */
+export const MUTUAL_INDEX_TTL_MS = 60 * 60 * 1000;
+/** How long before repeating a full friends warm when friend ids are unchanged. */
+export const FRIENDS_WARM_TTL_MS = 5 * 60 * 1000;
+/** How long before refreshing suggested friends. */
+export const SUGGESTED_CACHE_TTL_MS = 30 * 60 * 1000;
+/** How long before re-reading a friend's friends subcollection. */
+export const FRIENDS_OF_FRIEND_TTL_MS = 60 * 60 * 1000;
+/** Poll interval for Synq-active friend availability (replaces per-friend listeners). */
+export const SYNQ_FRIEND_POLL_TTL_MS = 45 * 1000;
+
+type SocialWarmMeta = {
+  friendIdsKey: string;
+  warmedAt: number;
+  mutualIndexKey: string;
+  mutualIndexAt: number;
+  suggestedAt: number;
+};
+
+const socialWarmMetaByUser: Record<string, SocialWarmMeta> = {};
+const friendProfileFetchedAtByUser: Record<string, Record<string, number>> = {};
+const friendsOfFriendIdsByUser: Record<
+  string,
+  Record<string, { ids: string[]; fetchedAt: number }>
+> = {};
+const synqActiveFriendsPollCache: Record<
+  string,
+  { fetchedAt: number; friendIdsKey: string; friends: Friend[] }
+> = {};
+
+export type WarmFriendsOptions = {
+  /** Bypass TTL and refresh profiles / mutual index. */
+  force?: boolean;
+  /** Friend ids already known (skips reading the friends subcollection). */
+  friendIds?: string[];
+};
+
+export function friendIdsKey(ids: string[]): string {
+  return [...new Set(ids.map((id) => String(id || "").trim()).filter(Boolean))].sort().join("|");
+}
+
+export function invalidateSocialWarmCache(userId: string) {
+  if (!userId) return;
+  delete socialWarmMetaByUser[userId];
+  delete synqActiveFriendsPollCache[userId];
+}
 
 const isRemoteImageUri = (value: unknown): value is string =>
   typeof value === "string" && /^https?:\/\//i.test(value);
@@ -52,6 +102,7 @@ type PersistedSocialCache = {
   suggested: any[];
   mutualFriends: Record<string, Friend[]>;
   outgoingFriendRequestIds: string[];
+  cacheMeta?: Partial<SocialWarmMeta>;
 };
 
 export function getCachedFriendRelationship(
@@ -127,27 +178,60 @@ export function pruneSocialCachesToFriendIds(userId: string, friendIds: Set<stri
   void persistSocialCache(userId);
 }
 
+function getWarmMeta(userId: string): SocialWarmMeta {
+  return (
+    socialWarmMetaByUser[userId] ?? {
+      friendIdsKey: "",
+      warmedAt: 0,
+      mutualIndexKey: "",
+      mutualIndexAt: 0,
+      suggestedAt: 0,
+    }
+  );
+}
+
+function setWarmMeta(userId: string, patch: Partial<SocialWarmMeta>) {
+  socialWarmMetaByUser[userId] = { ...getWarmMeta(userId), ...patch };
+}
+
+async function loadFriendsOfFriendSet(
+  viewerId: string,
+  fid: string,
+  force = false
+): Promise<Set<string>> {
+  if (!friendsOfFriendIdsByUser[viewerId]) {
+    friendsOfFriendIdsByUser[viewerId] = {};
+  }
+  const bucket = friendsOfFriendIdsByUser[viewerId];
+  const cached = bucket[fid];
+  const now = Date.now();
+  if (!force && cached && now - cached.fetchedAt < FRIENDS_OF_FRIEND_TTL_MS) {
+    return new Set(cached.ids);
+  }
+
+  try {
+    const theirFriendsSnap = await getDocs(collection(db, "users", fid, "friends"));
+    const ids = theirFriendsSnap.docs.map((d) => d.id);
+    bucket[fid] = { ids, fetchedAt: now };
+    return new Set(ids);
+  } catch {
+    bucket[fid] = { ids: [], fetchedAt: now };
+    return new Set();
+  }
+}
+
 async function buildMutualFriendsIndex(
   viewerId: string,
   myFriendIds: string[],
-  profileCache: Record<string, Friend>
+  profileCache: Record<string, Friend>,
+  force = false
 ): Promise<Record<string, Friend[]>> {
   const myFriendSet = new Set(myFriendIds);
   const friendsOfFriend = new Map<string, Set<string>>();
 
   await Promise.all(
     myFriendIds.map(async (fid) => {
-      try {
-        const theirFriendsSnap = await getDocs(
-          collection(db, "users", fid, "friends")
-        );
-        friendsOfFriend.set(
-          fid,
-          new Set(theirFriendsSnap.docs.map((d) => d.id))
-        );
-      } catch {
-        friendsOfFriend.set(fid, new Set());
-      }
+      friendsOfFriend.set(fid, await loadFriendsOfFriendSet(viewerId, fid, force));
     })
   );
 
@@ -229,13 +313,13 @@ export async function resolveMutualFriendsForTarget(
   if (!viewerId || !targetId || viewerId === targetId) return [];
 
   const cached = getCachedMutualFriends(viewerId, targetId);
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   const myFriendIds = (
     friendsListCacheByUser[viewerId]?.map((f) => f.id) ??
-    (await getDocs(collection(db, "users", viewerId, "friends"))).docs.map(
-      (d) => d.id
-    )
+    (
+      await getDocs(collection(db, "users", viewerId, "friends"))
+    ).docs.map((d) => d.id)
   ).filter((id) => id !== targetId);
 
   const profileCache = friendProfileCacheByUser[viewerId] ?? {};
@@ -280,6 +364,7 @@ async function persistSocialCache(userId: string) {
     outgoingFriendRequestIds: [
       ...Array.from(outgoingFriendRequestIdsCacheByUser[userId] ?? []),
     ],
+    cacheMeta: getWarmMeta(userId),
   };
   try {
     await AsyncStorage.setItem(socialCacheKey(userId), JSON.stringify(payload));
@@ -308,6 +393,12 @@ export async function hydrateSocialCachesFromDisk(userId: string): Promise<void>
       outgoingFriendRequestIdsCacheByUser[userId] = new Set(
         parsed.outgoingFriendRequestIds ?? []
       );
+      if (parsed.cacheMeta) {
+        socialWarmMetaByUser[userId] = {
+          ...getWarmMeta(userId),
+          ...parsed.cacheMeta,
+        };
+      }
 
       Object.values(friendProfileCacheByUser[userId]).forEach((friend: any) => {
         prefetchImage(friend?.imageurl);
@@ -326,7 +417,10 @@ export async function hydrateSocialCachesFromDisk(userId: string): Promise<void>
   }
 }
 
-export async function warmFriendsAndConnectionsCache(userId: string): Promise<void> {
+export async function warmFriendsAndConnectionsCache(
+  userId: string,
+  options: WarmFriendsOptions = {}
+): Promise<void> {
   if (!userId) return;
   if (warmFriendsInFlight[userId]) {
     await warmFriendsInFlight[userId];
@@ -334,11 +428,48 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
   }
 
   warmFriendsInFlight[userId] = (async () => {
-    const friendsSnap = await getDocs(collection(db, "users", userId, "friends"));
-    const friendDocs = friendsSnap.docs.map((d) => ({
-      id: d.id,
-      synqCount: d.data().synqCount || 0,
-    }));
+    const force = !!options.force;
+    const now = Date.now();
+    const meta = getWarmMeta(userId);
+
+    let friendDocs: { id: string; synqCount: number }[];
+    let friendsSnapDocs: { id: string; data: () => Record<string, unknown> }[] = [];
+
+    if (options.friendIds?.length) {
+      friendDocs = options.friendIds.map((id) => ({
+        id,
+        synqCount: friendRelationCacheByUser[userId]?.[id]?.synqCount ?? 0,
+      }));
+    } else {
+      const friendsSnap = await getDocs(collection(db, "users", userId, "friends"));
+      friendsSnapDocs = friendsSnap.docs;
+      friendDocs = friendsSnap.docs.map((d) => ({
+        id: d.id,
+        synqCount: (d.data().synqCount as number) || 0,
+      }));
+    }
+
+    const idsKey = friendIdsKey(friendDocs.map((d) => d.id));
+    const cachedList = friendsListCacheByUser[userId] ?? [];
+    const profilesComplete =
+      friendDocs.length > 0 &&
+      friendDocs.every((d) => !!friendProfileCacheByUser[userId]?.[d.id]);
+
+    if (
+      !force &&
+      meta.friendIdsKey === idsKey &&
+      now - meta.warmedAt < FRIENDS_WARM_TTL_MS &&
+      cachedList.length === friendDocs.length &&
+      profilesComplete
+    ) {
+      return;
+    }
+
+    if (meta.friendIdsKey !== idsKey) {
+      delete friendsOfFriendIdsByUser[userId];
+      delete synqActiveFriendsPollCache[userId];
+      setWarmMeta(userId, { mutualIndexKey: "", mutualIndexAt: 0 });
+    }
 
     pruneSocialCachesToFriendIds(userId, new Set(friendDocs.map((d) => d.id)));
 
@@ -351,18 +482,27 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
     if (!friendRelationCacheByUser[userId]) {
       friendRelationCacheByUser[userId] = {};
     }
+    if (!friendProfileFetchedAtByUser[userId]) {
+      friendProfileFetchedAtByUser[userId] = {};
+    }
 
     const profileCache = friendProfileCacheByUser[userId];
     const connectionCache = connectionProfileCacheByUser[userId];
     const relationCache = friendRelationCacheByUser[userId];
+    const fetchedAtMap = friendProfileFetchedAtByUser[userId];
 
     const fetchedFriends: Friend[] = await Promise.all(
       friendDocs.map(async ({ id }) => {
+        const cachedProfile = profileCache[id];
+        const fetchedAt = fetchedAtMap[id] ?? 0;
+        if (!force && cachedProfile && now - fetchedAt < FRIEND_PROFILE_TTL_MS) {
+          return cachedProfile;
+        }
+
         const uSnap = await getDoc(doc(db, "users", id));
-        const fallback = profileCache[id];
         if (!uSnap.exists()) {
           return (
-            fallback ??
+            cachedProfile ??
             ({
               id,
               displayName: "Unknown",
@@ -371,12 +511,14 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
           );
         }
 
-        const data = uSnap.data() as any;
+        const data = uSnap.data() as Record<string, unknown>;
         const friendObj = {
           id,
-          ...(data as any),
-          location: data.city && data.state ? `${data.city}, ${data.state}` : "",
+          ...(data as object),
+          location:
+            data.city && data.state ? `${String(data.city)}, ${String(data.state)}` : "",
         } as Friend;
+        fetchedAtMap[id] = now;
         return friendObj;
       })
     );
@@ -384,7 +526,7 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
     const sortedFriends = sortFriendsByName(fetchedFriends);
     sortedFriends.forEach((friend) => {
       profileCache[friend.id] = friend;
-      const imageUrl = (friend as any)?.imageurl || null;
+      const imageUrl = (friend as { imageurl?: string }).imageurl || null;
       prefetchImage(imageUrl);
       connectionCache[friend.id] = {
         id: friend.id,
@@ -395,7 +537,10 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
       if (relationDoc) {
         relationCache[friend.id] = {
           synqCount: relationDoc.synqCount || 0,
-          lastSynqAt: (friendsSnap.docs.find((d) => d.id === friend.id)?.data() as any)?.lastSynqAt,
+          lastSynqAt: friendsSnapDocs.length
+            ? (friendsSnapDocs.find((d) => d.id === friend.id)?.data() as { lastSynqAt?: unknown })
+                ?.lastSynqAt
+            : relationCache[friend.id]?.lastSynqAt,
         };
       }
     });
@@ -411,15 +556,33 @@ export async function warmFriendsAndConnectionsCache(userId: string): Promise<vo
 
     friendsListCacheByUser[userId] = sortedFriends;
     connectionsCacheByUser[userId] = connections;
-    const mutualIndex = await buildMutualFriendsIndex(
-      userId,
-      sortedFriends.map((f) => f.id),
-      profileCache
-    );
-    if (!mutualFriendsCacheByUser[userId]) {
-      mutualFriendsCacheByUser[userId] = {};
+
+    const mutualKey = idsKey;
+    const hasMutualIndex =
+      !!mutualFriendsCacheByUser[userId] &&
+      Object.keys(mutualFriendsCacheByUser[userId]).length > 0;
+    const mutualFresh =
+      !force &&
+      meta.mutualIndexKey === mutualKey &&
+      now - meta.mutualIndexAt < MUTUAL_INDEX_TTL_MS &&
+      hasMutualIndex;
+
+    if (!mutualFresh) {
+      const mutualIndex = await buildMutualFriendsIndex(
+        userId,
+        sortedFriends.map((f) => f.id),
+        profileCache,
+        force
+      );
+      if (!mutualFriendsCacheByUser[userId]) {
+        mutualFriendsCacheByUser[userId] = {};
+      }
+      Object.assign(mutualFriendsCacheByUser[userId], mutualIndex);
+      setWarmMeta(userId, { mutualIndexKey: mutualKey, mutualIndexAt: now });
     }
-    Object.assign(mutualFriendsCacheByUser[userId], mutualIndex);
+
+    setWarmMeta(userId, { friendIdsKey: idsKey, warmedAt: now });
+    delete synqActiveFriendsPollCache[userId];
     await persistSocialCache(userId);
   })();
 
@@ -458,7 +621,10 @@ export async function warmOutgoingFriendRequestsCache(userId: string): Promise<v
   }
 }
 
-export async function warmSuggestedCache(userId: string): Promise<void> {
+export async function warmSuggestedCache(
+  userId: string,
+  options: { force?: boolean } = {}
+): Promise<void> {
   if (!userId) return;
   if (warmSuggestedInFlight[userId]) {
     await warmSuggestedInFlight[userId];
@@ -467,51 +633,56 @@ export async function warmSuggestedCache(userId: string): Promise<void> {
 
   warmSuggestedInFlight[userId] = (async () => {
     try {
-    const myFriendsSnap = await getDocs(collection(db, "users", userId, "friends"));
-    const myFriendIds = myFriendsSnap.docs.map((d) => d.id);
-    const exclude = new Set([userId, ...myFriendIds]);
-    const mutualCounts = new Map<string, number>();
+      const force = !!options.force;
+      const now = Date.now();
+      const meta = getWarmMeta(userId);
+      if (
+        !force &&
+        (suggestedCacheByUser[userId]?.length ?? 0) > 0 &&
+        now - meta.suggestedAt < SUGGESTED_CACHE_TTL_MS
+      ) {
+        return;
+      }
 
-    // Only read friends-of-friends through your friends' lists (allowed by rules).
-    await Promise.all(
-      myFriendIds.map(async (friendId) => {
-        try {
-          const theirFriendsSnap = await getDocs(
-            collection(db, "users", friendId, "friends")
-          );
-          theirFriendsSnap.docs.forEach((d) => {
-            const candidateId = d.id;
+      const myFriendIds =
+        friendsListCacheByUser[userId]?.map((f) => f.id) ??
+        (await getDocs(collection(db, "users", userId, "friends"))).docs.map((d) => d.id);
+      const exclude = new Set([userId, ...myFriendIds]);
+      const mutualCounts = new Map<string, number>();
+
+      await Promise.all(
+        myFriendIds.map(async (friendId) => {
+          const theirFriends = await loadFriendsOfFriendSet(userId, friendId, force);
+          theirFriends.forEach((candidateId) => {
             if (exclude.has(candidateId)) return;
             mutualCounts.set(candidateId, (mutualCounts.get(candidateId) || 0) + 1);
           });
+        })
+      );
+
+      const ranked = [...mutualCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+
+      const nextSuggested: Record<string, unknown>[] = [];
+      for (const [candidateId, mutualCount] of ranked) {
+        try {
+          const profileSnap = await getDoc(doc(db, "users", candidateId));
+          if (!profileSnap.exists()) continue;
+          nextSuggested.push({
+            id: candidateId,
+            ...(profileSnap.data() as object),
+            mutualCount,
+          });
         } catch {
-          // Skip if this friend's list is not readable.
+          // Profile not readable — skip.
         }
-      })
-    );
-
-    const ranked = [...mutualCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8);
-
-    const nextSuggested: any[] = [];
-    for (const [candidateId, mutualCount] of ranked) {
-      try {
-        const profileSnap = await getDoc(doc(db, "users", candidateId));
-        if (!profileSnap.exists()) continue;
-        nextSuggested.push({
-          id: candidateId,
-          ...(profileSnap.data() as object),
-          mutualCount,
-        });
-      } catch {
-        // Profile not readable — skip.
       }
-    }
 
-    nextSuggested.forEach((user) => prefetchImage(user?.imageurl));
-    suggestedCacheByUser[userId] = nextSuggested;
-    await persistSocialCache(userId);
+      nextSuggested.forEach((user) => prefetchImage((user as { imageurl?: string }).imageurl));
+      suggestedCacheByUser[userId] = nextSuggested;
+      setWarmMeta(userId, { suggestedAt: now });
+      await persistSocialCache(userId);
     } catch (err) {
       console.error("[warmSuggestedCache] failed:", err);
     }
@@ -549,12 +720,89 @@ export async function hydrateMutualCountsForUsers(
 ): Promise<Record<string, number>> {
   const uniqueIds = [...new Set(targetIds.filter(Boolean))];
   const counts: Record<string, number> = {};
+  const missing: string[] = [];
+
+  for (const targetId of uniqueIds) {
+    const cached = getCachedMutualFriends(viewerId, targetId);
+    if (cached !== undefined) {
+      counts[targetId] = cached.length;
+    } else {
+      missing.push(targetId);
+    }
+  }
+
+  if (missing.length === 0) return counts;
+
   await Promise.all(
-    uniqueIds.map(async (targetId) => {
-      counts[targetId] = await countMutualFriendsForTarget(viewerId, targetId);
+    missing.map(async (targetId) => {
+      counts[targetId] = (await resolveMutualFriendsForTarget(viewerId, targetId)).length;
     })
   );
   return counts;
+}
+
+/** Poll Synq-active friends without per-friend realtime listeners. */
+export async function pollSynqActiveFriends(
+  viewerId: string,
+  friendIds: string[],
+  options: { force?: boolean } = {}
+): Promise<Friend[]> {
+  if (!viewerId || friendIds.length === 0) return [];
+
+  const force = !!options.force;
+  const now = Date.now();
+  const pollKey = friendIdsKey(friendIds);
+  const cached = synqActiveFriendsPollCache[viewerId];
+  if (
+    !force &&
+    cached &&
+    now - cached.fetchedAt < SYNQ_FRIEND_POLL_TTL_MS &&
+    cached.friendIdsKey === pollKey
+  ) {
+    return cached.friends;
+  }
+
+  const profileCache = friendProfileCacheByUser[viewerId] ?? {};
+  const fetchedAtMap = friendProfileFetchedAtByUser[viewerId] ?? {};
+  const active: Friend[] = [];
+
+  await Promise.all(
+    friendIds.map(async (fid) => {
+      const cachedProfile = profileCache[fid];
+      const profileAge = fetchedAtMap[fid] ?? 0;
+      const profileFresh = cachedProfile && now - profileAge < SYNQ_FRIEND_POLL_TTL_MS;
+
+      let data: Record<string, unknown> | undefined;
+      if (profileFresh) {
+        data = cachedProfile as unknown as Record<string, unknown>;
+      } else {
+        try {
+          const snap = await getDoc(doc(db, "users", fid));
+          if (!snap.exists()) return;
+          data = snap.data() as Record<string, unknown>;
+          profileCache[fid] = { id: fid, ...(data as object) } as Friend;
+          if (!friendProfileFetchedAtByUser[viewerId]) {
+            friendProfileFetchedAtByUser[viewerId] = {};
+          }
+          friendProfileFetchedAtByUser[viewerId][fid] = now;
+        } catch {
+          return;
+        }
+      }
+
+      if (!computeSynqActiveFromUserData(data)) return;
+      active.push({ id: fid, ...(data as object) } as Friend);
+      prefetchImage((data as { imageurl?: string }).imageurl);
+    })
+  );
+
+  const sorted = sortFriendsByName(active);
+  synqActiveFriendsPollCache[viewerId] = {
+    fetchedAt: now,
+    friendIdsKey: pollKey,
+    friends: sorted,
+  };
+  return sorted;
 }
 
 export function warmSocialCachesInBackground(userId: string) {
