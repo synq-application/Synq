@@ -1,5 +1,3 @@
-import CloseButton from "@/src/components/CloseButton";
-import CloseIcon from "@/src/components/CloseIcon";
 import {
   ACCENT,
   BG,
@@ -9,10 +7,12 @@ import {
   PROFILE_HEADER_TOP_OFFSET,
   TEXT,
 } from "@/constants/Variables";
+import CloseButton from "@/src/components/CloseButton";
+import CloseIcon from "@/src/components/CloseIcon";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { Image as ExpoImage } from "expo-image";
 import * as Haptics from "expo-haptics";
+import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import React, {
   type ComponentType,
   useCallback,
@@ -23,8 +23,8 @@ import React, {
   useState,
 } from "react";
 import {
-  Dimensions,
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Keyboard,
   type KeyboardEvent,
@@ -45,25 +45,21 @@ import {
   isAiSuggestionMessage,
   isLegacyAiSuggestionText,
   parseIdeaText,
-  resolveAvatar,
-  resolveChatSenderAvatar,
+  resolveChatSenderAvatar
 } from "../../../app/helpers";
 import AISuggestionBubble from "./AISuggestionBubble";
+import { MESSAGES_STACK_DURATION_MS } from "./MessagesModalStack";
 
 const MESSAGE_ENTER = FadeInUp.duration(200);
 const COMPOSER_KEYBOARD_GAP = 14;
 const LIST_SCROLL_OVERFLOW_SLACK = 4;
-import { MESSAGES_STACK_DURATION_MS } from "./MessagesModalStack";
 
 /** Matches MessagesModalStack push/pop timing. */
 const CHAT_PANE_ENTER_MS = MESSAGES_STACK_DURATION_MS;
 /** Clamp overscroll at the latest-message edge (normal list, offset at bottom). */
 const CHAT_BOTTOM_SCROLL_TOLERANCE = 2;
 /** Skip follow-up scroll-to-bottom while the list lays out after chat open. */
-const CHAT_OPEN_INITIAL_SCROLL_MIN_MESSAGES = 8;
 const CHAT_OPEN_LAYOUT_SETTLE_MS = 450;
-/** Rough row height for initialScrollIndex when opening a cached long thread. */
-const ESTIMATED_MESSAGE_ROW_HEIGHT = 68;
 /** Fade from black into the message list, starting just under the AI chip row. */
 const CHAT_HEADER_FADE_BELOW_AI = 28;
 /** Modest bump past the header fade overlap (shell uses negative margin). */
@@ -115,7 +111,13 @@ type Props = {
   onOpenFriendProfile?: (friendId: string) => void;
   sendMessage: () => void;
   sendAISuggestionToChat: () => void;
-  onMessageBubblePress: (item: { id: string; reactions?: Record<string, string> }) => void;
+  onMessageBubblePress: (item: {
+    id: string;
+    text?: string;
+    clientId?: string;
+    sendStatus?: "sending" | "failed";
+    reactions?: Record<string, string>;
+  }) => void;
   onMessageLongPress?: (item: {
     id: string;
     senderId: string;
@@ -140,7 +142,6 @@ type Props = {
   liveParticipantImages?: Record<string, string>;
   /** Bumped each time a chat is opened from inbox / notification (not profile back). */
   chatOpenAnchorKey?: number;
-  chatOpenedFromCache?: boolean;
 };
 
 const CHAT_AI_SUBTITLE_SLOT_HEIGHT = 26;
@@ -188,12 +189,12 @@ export default function MessagesChatPane({
   currentUserId,
   liveParticipantImages,
   chatOpenAnchorKey = 0,
-  chatOpenedFromCache = false,
 }: Props) {
   const insets = useSafeAreaInsets();
   const canSend = inputText.trim().length > 0;
   const listHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
+  const scrollOffsetRef = useRef(0);
   const listScrollableRef = useRef(false);
   const scrollRafRef = useRef<number | null>(null);
   const [listScrollable, setListScrollable] = useState(false);
@@ -211,20 +212,25 @@ export default function MessagesChatPane({
   const pendingNormalScrollRef = useRef(false);
   const prevAnchorKeyRef = useRef(chatOpenAnchorKey);
   const prevMessagesLenByChatRef = useRef<Record<string, number>>({});
-  const openScrollIndexRef = useRef<number | undefined>(undefined);
+  const prevHasEarlierRef = useRef(hasEarlierMessages);
   const layoutSettlingRef = useRef(false);
   const openSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listData = messages;
 
   const scheduleOpenAnchor = useCallback((messageCount: number) => {
-    if (openSettleTimerRef.current) {
-      clearTimeout(openSettleTimerRef.current);
-      openSettleTimerRef.current = null;
-    }
-
     if (messageCount <= 0) {
       pendingNormalScrollRef.current = false;
       layoutSettlingRef.current = false;
+      if (openSettleTimerRef.current) {
+        clearTimeout(openSettleTimerRef.current);
+        openSettleTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Already anchoring this open — avoid resetting the settle window (double-fire flicker).
+    if (pendingNormalScrollRef.current || layoutSettlingRef.current) {
+      anchorBottomRef.current = true;
       return;
     }
 
@@ -234,20 +240,9 @@ export default function MessagesChatPane({
     openSettleTimerRef.current = setTimeout(() => {
       layoutSettlingRef.current = false;
       openSettleTimerRef.current = null;
+      setListScrollable(listScrollableRef.current);
     }, CHAT_OPEN_LAYOUT_SETTLE_MS);
   }, []);
-
-  const openInitialScrollIndex =
-    openScrollIndexRef.current != null ? openScrollIndexRef.current : undefined;
-
-  const getEstimatedItemLayout = useCallback(
-    (_data: ArrayLike<unknown> | null | undefined, index: number) => ({
-      length: ESTIMATED_MESSAGE_ROW_HEIGHT,
-      offset: ESTIMATED_MESSAGE_ROW_HEIGHT * index,
-      index,
-    }),
-    []
-  );
 
   const headerProfileFriendId = useMemo(() => {
     const participantIds = activeChat?.participants?.length
@@ -275,19 +270,11 @@ export default function MessagesChatPane({
     prevChatIdRef.current = nextId;
 
     if (chatChanged) {
+      scrollOffsetRef.current = 0;
+      prevHasEarlierRef.current = hasEarlierMessages;
       if (nextId) {
         prevMessagesLenByChatRef.current[nextId] = messages.length;
-        if (
-          chatOpenedFromCache &&
-          messages.length >= CHAT_OPEN_INITIAL_SCROLL_MIN_MESSAGES
-        ) {
-          openScrollIndexRef.current = messages.length - 1;
-        } else {
-          openScrollIndexRef.current = undefined;
-        }
         scheduleOpenAnchor(messages.length);
-      } else {
-        openScrollIndexRef.current = undefined;
       }
       if (messages.length > 0) {
         messages.forEach((message) => knownMessageIdsRef.current.add(message.id));
@@ -314,7 +301,7 @@ export default function MessagesChatPane({
   }, [
     activeChat?.id,
     messages.length,
-    chatOpenedFromCache,
+    hasEarlierMessages,
     scheduleOpenAnchor,
   ]);
 
@@ -414,7 +401,9 @@ export default function MessagesChatPane({
       listH > 0 && contentH > listH + LIST_SCROLL_OVERFLOW_SLACK;
     if (scrollable !== listScrollableRef.current) {
       listScrollableRef.current = scrollable;
-      setListScrollable(scrollable);
+      if (!layoutSettlingRef.current) {
+        setListScrollable(scrollable);
+      }
     }
     return scrollable;
   }, []);
@@ -462,6 +451,7 @@ export default function MessagesChatPane({
         flatListRef.current?.scrollToOffset({ offset: maxOffset, animated: false });
         y = maxOffset;
       }
+      scrollOffsetRef.current = y;
       syncAnchoredToLatest(y);
     },
     [flatListRef, syncAnchoredToLatest]
@@ -487,7 +477,15 @@ export default function MessagesChatPane({
       }
 
       const offset = contentH - listH;
+      if (
+        Math.abs(scrollOffsetRef.current - offset) <= CHAT_BOTTOM_SCROLL_TOLERANCE
+      ) {
+        syncAnchoredToLatest(offset);
+        return false;
+      }
+
       flatListRef.current?.scrollToOffset({ offset, animated });
+      scrollOffsetRef.current = offset;
       syncAnchoredToLatest(offset);
       return true;
     },
@@ -506,22 +504,39 @@ export default function MessagesChatPane({
     const scrollable = contentH > listH + LIST_SCROLL_OVERFLOW_SLACK;
     if (scrollable !== listScrollableRef.current) {
       listScrollableRef.current = scrollable;
-      setListScrollable(scrollable);
+      if (!layoutSettlingRef.current) {
+        setListScrollable(scrollable);
+      }
     }
 
     if (!scrollable) {
       pendingNormalScrollRef.current = false;
       anchorBottomRef.current = true;
+      scrollOffsetRef.current = 0;
       return true;
     }
 
     const offset = contentH - listH;
     flatListRef.current?.scrollToOffset({ offset, animated: false });
+    scrollOffsetRef.current = offset;
     anchorBottomRef.current = true;
     syncAnchoredToLatest(offset);
     pendingNormalScrollRef.current = false;
     return true;
   }, [flatListRef, pendingScrollToMessageId, syncAnchoredToLatest]);
+
+  useLayoutEffect(() => {
+    const wasEarlier = prevHasEarlierRef.current;
+    prevHasEarlierRef.current = hasEarlierMessages;
+    if (
+      !wasEarlier &&
+      hasEarlierMessages &&
+      anchorBottomRef.current &&
+      !pendingScrollToMessageId
+    ) {
+      pendingNormalScrollRef.current = true;
+    }
+  }, [hasEarlierMessages, pendingScrollToMessageId]);
 
   useLayoutEffect(() => {
     if (pendingScrollToMessageId) return;
@@ -950,12 +965,6 @@ export default function MessagesChatPane({
             style={styles.chatListFill}
             data={listData}
             extraData={listExtraData}
-            {...(openInitialScrollIndex != null
-              ? {
-                  getItemLayout: getEstimatedItemLayout,
-                  initialScrollIndex: openInitialScrollIndex,
-                }
-              : null)}
             keyExtractor={(item, index) => {
               const key = item?.clientId ?? item?.id;
               return key ? String(key) : `message-${index}`;
