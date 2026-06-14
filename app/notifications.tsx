@@ -55,7 +55,7 @@ import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
 import { prefetchResolvedAvatar, resolveAvatar } from "./helpers";
 
-function prefetchActorAvatars(items: FeedItem[]) {
+function prefetchActorAvatars(items: { actorImageUrl: string | null }[]) {
   items.forEach((item) => {
     if (item.actorImageUrl) prefetchResolvedAvatar(item.actorImageUrl);
   });
@@ -64,40 +64,69 @@ function prefetchActorAvatars(items: FeedItem[]) {
 const SURFACE = "rgba(255,255,255,0.06)";
 const BACKGROUND = BG;
 
-type ActivityType =
+type ActivityFeedKind =
   | "friend_accepted"
   | "open_plan_interest"
-  | "plan_invite"
   | "friend_synq_active"
   | "synq_nudge";
 
-type FeedItem =
-  | {
-      feedKey: string;
-      kind: "friend_request";
-      id: string;
-      fromUserId: string;
-      actorName: string;
-      actorImageUrl: string | null;
-      sortMs: number;
-      raw: Record<string, unknown>;
-    }
-  | {
-      feedKey: string;
-      kind: ActivityType;
-      id: string;
-      source: "notifications" | "legacy";
-      fromUserId: string | null;
-      actorName: string;
-      actorImageUrl: string | null;
-      title: string;
-      body: string;
-      sortMs: number;
-      read: boolean;
-      eventId?: string | null;
-      planHostUid?: string | null;
-      raw: Record<string, unknown>;
-    };
+type ActivityFeedSource = "notifications" | "legacy";
+
+type FriendRequestFeedItem = {
+  feedKey: string;
+  kind: "friend_request";
+  id: string;
+  fromUserId: string;
+  actorName: string;
+  actorImageUrl: string | null;
+  sortMs: number;
+  raw: Record<string, unknown>;
+};
+
+type PlanInviteFeedItem = {
+  feedKey: string;
+  kind: "plan_invite";
+  id: string;
+  source: ActivityFeedSource;
+  fromUserId: string | null;
+  actorName: string;
+  actorImageUrl: string | null;
+  title: string;
+  body: string;
+  sortMs: number;
+  read: boolean;
+  eventId?: string | null;
+  planHostUid?: string | null;
+  raw: Record<string, unknown>;
+};
+
+type StandardActivityFeedItem = {
+  feedKey: string;
+  kind: ActivityFeedKind;
+  id: string;
+  source: ActivityFeedSource;
+  fromUserId: string | null;
+  actorName: string;
+  actorImageUrl: string | null;
+  title: string;
+  body: string;
+  sortMs: number;
+  read: boolean;
+  eventId?: string | null;
+  planHostUid?: string | null;
+  raw: Record<string, unknown>;
+};
+
+type FeedItem = FriendRequestFeedItem | PlanInviteFeedItem | StandardActivityFeedItem;
+
+type LegacyNotificationLockRow = {
+  id: string;
+  type?: string;
+  from?: string;
+  joinerId?: string;
+  planTitle?: string | null;
+  createdAt?: unknown;
+};
 
 function timestampMillis(v: unknown): number {
   if (!v) return 0;
@@ -211,7 +240,7 @@ export default function NotificationsScreen() {
   const resolveActivity = async (item: Record<string, unknown> & { id: string }) => {
     const fromUserId = item.fromUserId ? String(item.fromUserId) : null;
     const { actorName, actorImageUrl } = await resolveActor(fromUserId);
-    const type = String(item.type || "") as ActivityType;
+    const type = String(item.type || "") as PlanInviteFeedItem["kind"] | ActivityFeedKind;
     const planTitle = String(item.planTitle || "").trim();
     const title = String(item.title || "").trim();
     const storedBody = String(item.body || "").trim();
@@ -278,9 +307,9 @@ export default function NotificationsScreen() {
     const reqList = reqSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const activityList = activitySnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     const legacyList = legacySnap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
+      .map((d) => ({ id: d.id, ...d.data() } as LegacyNotificationLockRow))
       .filter((row) =>
-        ["friend_accepted", "open_plan_interest"].includes(String(row.type || ""))
+        ["friend_accepted", "open_plan_interest", "plan_invite"].includes(String(row.type || ""))
       );
 
     const [resolvedReqs, resolvedActivity, resolvedLegacy] = await Promise.all([
@@ -353,22 +382,7 @@ export default function NotificationsScreen() {
       async (snapshot) => {
         const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
         const resolved = await Promise.all(list.map(resolveActivity));
-        prefetchActorAvatars(
-          resolved.map((r) => ({
-            feedKey: r.id,
-            kind: r.type,
-            id: r.id,
-            fromUserId: r.fromUserId,
-            actorName: r.actorName,
-            actorImageUrl: r.actorImageUrl,
-            title: r.title,
-            body: r.body,
-            sortMs: r.sortMs,
-            read: r.read,
-            eventId: r.eventId,
-            raw: r,
-          }))
-        );
+        prefetchActorAvatars(resolved);
         setActivityItems(resolved);
         setLoadError(false);
         activityReady = true;
@@ -386,9 +400,9 @@ export default function NotificationsScreen() {
       legacyRef,
       async (snapshot) => {
         const list = snapshot.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
+          .map((d) => ({ id: d.id, ...d.data() } as LegacyNotificationLockRow))
           .filter((row) =>
-            ["friend_accepted", "open_plan_interest"].includes(String(row.type || ""))
+            ["friend_accepted", "open_plan_interest", "plan_invite"].includes(String(row.type || ""))
           );
         const resolved = await Promise.all(
           list.map((row) =>
@@ -451,29 +465,37 @@ export default function NotificationsScreen() {
           "synq_nudge",
         ].includes(a.type)
       )
-      .map((a) => ({
-        feedKey: `act_${a.id}`,
-        kind: a.type as ActivityType,
-        id: a.id,
-        source: activityIds.has(a.id)
-          ? ("notifications" as const)
-          : ("legacy" as const),
-        fromUserId: a.fromUserId,
-        actorName: a.actorName,
-        actorImageUrl: a.actorImageUrl,
-        title: a.title,
-        body: a.body,
-        sortMs: a.sortMs,
-        read: a.read,
-        eventId: a.eventId,
-        planHostUid: a.planHostUid,
-        raw: a,
-      }));
+      .map((a) => {
+        const source: ActivityFeedSource = activityIds.has(a.id)
+          ? "notifications"
+          : "legacy";
+        const base = {
+          feedKey: `act_${a.id}`,
+          id: a.id,
+          source,
+          fromUserId: a.fromUserId,
+          actorName: a.actorName,
+          actorImageUrl: a.actorImageUrl,
+          title: a.title,
+          body: a.body,
+          sortMs: a.sortMs,
+          read: a.read,
+          eventId: a.eventId,
+          planHostUid: a.planHostUid,
+          raw: a,
+        };
+
+        if (a.type === "plan_invite") {
+          return { ...base, kind: "plan_invite" as const };
+        }
+
+        return { ...base, kind: a.type as ActivityFeedKind };
+      });
 
     return [...requests, ...activity].sort((a, b) => b.sortMs - a.sortMs);
   }, [friendRequests, activityItems, legacyActivityItems]);
 
-  const markActivityRead = async (item: Extract<FeedItem, { kind: ActivityType }>) => {
+  const markActivityRead = async (item: PlanInviteFeedItem | StandardActivityFeedItem) => {
     if (!auth.currentUser || item.source !== "notifications") return;
     try {
       await updateDoc(
@@ -517,7 +539,7 @@ export default function NotificationsScreen() {
     }
   };
 
-  const dismissActivity = async (item: Extract<FeedItem, { kind: ActivityType }>) => {
+  const dismissActivity = async (item: PlanInviteFeedItem | StandardActivityFeedItem) => {
     if (!auth.currentUser || dismissingKeys.has(item.feedKey)) return;
 
     const myId = auth.currentUser.uid;
@@ -615,10 +637,7 @@ export default function NotificationsScreen() {
     }
   };
 
-  const handlePlanInvite = async (
-    item: Extract<FeedItem, { kind: "plan_invite" }>,
-    accept: boolean
-  ) => {
+  const handlePlanInvite = async (item: PlanInviteFeedItem, accept: boolean) => {
     if (!auth.currentUser || dismissingKeys.has(item.feedKey)) return;
 
     if (!accept) {
@@ -641,8 +660,13 @@ export default function NotificationsScreen() {
 
     setDismissingKeys((prev) => new Set(prev).add(item.feedKey));
     try {
-      await acceptPlanInvite(item.id);
-      showAlert("Added", "Plan added to your open plans.");
+      const { status } = await acceptPlanInvite(item.id);
+      await dismissActivity(item);
+      if (status === "already_joined") {
+        showAlert("Already added", "This plan is already in your open plans.");
+      } else {
+        showAlert("Added", "Plan added to your open plans.");
+      }
       router.push("/(tabs)/me");
     } catch (err) {
       showAlert("Error", acceptPlanInviteErrorMessage(err));
@@ -756,7 +780,7 @@ export default function NotificationsScreen() {
     );
   };
 
-  const PlanInviteRow = ({ item }: { item: Extract<FeedItem, { kind: "plan_invite" }> }) => {
+  const PlanInviteRow = ({ item }: { item: PlanInviteFeedItem }) => {
     const avatarUri = resolveAvatar(item.actorImageUrl);
     const isDismissing = dismissingKeys.has(item.feedKey);
 
@@ -812,7 +836,7 @@ export default function NotificationsScreen() {
     );
   };
 
-  const ActivityRow = ({ item }: { item: Extract<FeedItem, { kind: ActivityType }> }) => {
+  const ActivityRow = ({ item }: { item: StandardActivityFeedItem }) => {
     const avatarUri = resolveAvatar(item.actorImageUrl);
     const unread = !item.read;
     const isDismissing = dismissingKeys.has(item.feedKey);
@@ -910,10 +934,20 @@ export default function NotificationsScreen() {
           <ActivityIndicator color={ACCENT} />
         </View>
       ) : loadError ? (
-        <View style={styles.center}>
+        <ScrollView
+          style={styles.emptyScroll}
+          contentContainerStyle={styles.center}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={ACCENT}
+            />
+          }
+        >
           <Text style={styles.emptyTitle}>Could not load notifications</Text>
           <Text style={styles.emptySubtitle}>Pull down to refresh or try again later.</Text>
-        </View>
+        </ScrollView>
       ) : isEmpty ? (
         <ScrollView
           style={styles.emptyScroll}

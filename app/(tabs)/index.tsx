@@ -488,6 +488,7 @@ export default function SynqScreen() {
     resolveAvatar,
     userAvatar: userProfile?.imageurl,
     rejectIfObjectionable,
+    isBlocked,
     onSendError: (msg) => showActionError(msg),
     onMessageDelivered: (clientId, meta) => onMessageDeliveredRef.current(clientId, meta),
   });
