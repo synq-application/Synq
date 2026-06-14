@@ -12,7 +12,6 @@ import {
   synqOutlineAddBtnText,
   synqOutlineAddBtnTextDisabled,
   TEXT,
-  TYPE_SECTION,
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
 import { Image as ExpoImage } from "expo-image";
@@ -1179,11 +1178,8 @@ export default function FriendProfile({
           <>
           <View style={styles.profileSeparator} />
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, styles.openPlansTitle]}>Open plans</Text>
-            <Text style={styles.openPlansSubtitle}>
-              {`Tap to add and let ${
-                friend.displayName?.trim().split(/\s+/)[0] || "them"
-              } know you're going.`}
+            <Text style={styles.profileSectionLabel}>
+              {`${friend.displayName?.trim().split(/\s+/)[0] || "Friend"}'s plans`}
             </Text>
 
             <MonthlyMemoReadOnly
@@ -1628,29 +1624,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginBottom: 12,
     includeFontPadding: false,
-  },
-
-  sectionTitle: {
-    color: "rgba(255,255,255,0.94)",
-    fontSize: TYPE_SECTION,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.15,
-    lineHeight: 26,
-    marginBottom: 10,
-    includeFontPadding: false,
-  },
-
-  openPlansTitle: {
-    marginBottom: 6,
-  },
-
-  openPlansSubtitle: {
-    color: MUTED2,
-    fontSize: 13,
-    fontFamily: fonts.book,
-    lineHeight: 18,
-    marginBottom: 14,
-    paddingRight: 8,
   },
 
   blockedHint: {

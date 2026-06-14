@@ -549,7 +549,7 @@ export default function OpenPlans({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Open plans</Text>
+      <Text style={styles.sectionTitle}>Your plans</Text>
 
       <View style={styles.plansBox}>
       {!visibleEvents.length && (
@@ -682,12 +682,6 @@ export default function OpenPlans({
                     </Text>
                     <CloseButton onPress={closeModal} accessibilityLabel="Close" />
                   </View>
-
-                  {!isEditing ? (
-                    <Text style={styles.sheetSub}>
-                      Tell friends what you're doing, they can join.
-                    </Text>
-                  ) : null}
                 </View>
               </TouchableWithoutFeedback>
 
@@ -1111,13 +1105,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 8,
     paddingHorizontal: 2,
-  },
-  sheetSub: {
-    color: "rgba(255,255,255,0.62)",
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 14,
   },
   planInput: {
     backgroundColor: "#0c0c0c",

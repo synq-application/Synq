@@ -76,6 +76,39 @@ export function filterOutPastOpenPlans<T extends { date?: string }>(
   return events.filter((e) => !isOpenPlanDatePast(String(e?.date || "")));
 }
 
+export function parseOpenPlanDateTime(dateStr: string, timeStr?: string): Date {
+  const raw = String(dateStr || "").trim();
+  const parts = raw.split("-").map(Number);
+  const y = parts[0] || 1970;
+  const m = parts[1] || 1;
+  const d = parts[2] || 1;
+  const date = new Date(y, m - 1, d);
+
+  if (!timeStr) {
+    date.setHours(12, 0, 0, 0);
+    return date;
+  }
+
+  const [t, period] = String(timeStr).split(" ");
+  let [hours, minutes] = t.split(":").map(Number);
+  if (period === "PM" && hours !== 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+  date.setHours(hours, minutes || 0, 0, 0);
+  return date;
+}
+
+/** Sort key for when a plan happens (earliest first). */
+export function openPlanSortValue(event: { date?: string; time?: string }): number {
+  return parseOpenPlanDateTime(String(event?.date || ""), event?.time).getTime();
+}
+
+/** Order open plans by event date/time, not when they were added. */
+export function sortOpenPlansByDateTime<T extends { date?: string; time?: string }>(
+  events: T[]
+): T[] {
+  return [...events].sort((a, b) => openPlanSortValue(a) - openPlanSortValue(b));
+}
+
 /** Friend UIDs who expressed interest on the host's plan (excludes the host). */
 export function collectPlanInterestedFriendIds(
   event: any,

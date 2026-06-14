@@ -14,6 +14,11 @@ const acceptPlanInviteFn = httpsCallable<
   { ok: boolean; status?: string }
 >(functions, "acceptPlanInvite");
 
+const revokePlanInviteFn = httpsCallable<
+  { toUserId: string; eventId: string },
+  { ok: boolean; alreadyRevoked?: boolean }
+>(functions, "revokePlanInvite");
+
 export function planInviteNotifId(
   hostUid: string,
   recipientUid: string,
@@ -107,4 +112,29 @@ export async function sendPlanInvites(
 
 export async function acceptPlanInvite(notificationId: string): Promise<void> {
   await acceptPlanInviteFn({ notificationId });
+}
+
+export function revokePlanInviteErrorMessage(err: unknown): string {
+  if (err instanceof FirebaseError) {
+    switch (err.code) {
+      case "functions/not-found":
+        return err.message || "Plan not found.";
+      case "functions/permission-denied":
+        return "You can only manage invites on your own plans.";
+      case "functions/unauthenticated":
+        return "Sign in to manage plan invites.";
+      default:
+        return err.message || "Could not unsend invite.";
+    }
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return "Could not unsend invite.";
+}
+
+export async function revokePlanInvite(
+  toUserId: string,
+  eventId: string
+): Promise<{ alreadyRevoked: boolean }> {
+  const result = await revokePlanInviteFn({ toUserId, eventId });
+  return { alreadyRevoked: !!result.data?.alreadyRevoked };
 }

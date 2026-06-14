@@ -53,6 +53,8 @@ import {
   prewarmMeTabScreen,
 } from "../src/lib/ownProfileCache";
 import { initSentry } from "../src/lib/sentryInit";
+import { initAnalytics } from "../src/lib/analytics";
+import OfflineBanner from "../src/components/OfflineBanner";
 import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
@@ -73,6 +75,7 @@ import {
 } from "../src/lib/userProfile";
 
 initSentry();
+void initAnalytics();
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -818,7 +821,6 @@ export default function RootLayout() {
     if (pending.kind === "chat") {
       router.push("/(tabs)");
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      let timeoutId2: ReturnType<typeof setTimeout> | undefined;
       const handle = InteractionManager.runAfterInteractions(() => {
         timeoutId = setTimeout(() => {
           DeviceEventEmitter.emit("openChat", {
@@ -826,17 +828,10 @@ export default function RootLayout() {
             messageId: pending.messageId,
           });
         }, 700);
-        timeoutId2 = setTimeout(() => {
-          DeviceEventEmitter.emit("openChat", {
-            chatId: pending.chatId,
-            messageId: pending.messageId,
-          });
-        }, 1400);
       });
       return () => {
         handle.cancel?.();
         if (timeoutId) clearTimeout(timeoutId);
-        if (timeoutId2) clearTimeout(timeoutId2);
       };
     }
   }, [
@@ -928,6 +923,7 @@ export default function RootLayout() {
           >
             <BlockedUsersProvider>
             <View style={styles.root}>
+              <OfflineBanner />
               {navReady ? (
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="(auth)" />
