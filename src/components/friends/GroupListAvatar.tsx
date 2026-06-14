@@ -25,7 +25,7 @@ export default function GroupListAvatar({ memberIds, friends }: Props) {
       const friend = byId.get(id);
       images[id] = resolveAvatar(friend?.imageurl);
     }
-    return getStackAvatarUris(images);
+    return getStackAvatarUris(images, undefined, memberIds);
   }, [memberIds, friends]);
 
   if (memberIds.length === 0) {

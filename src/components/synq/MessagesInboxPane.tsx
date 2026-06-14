@@ -15,7 +15,7 @@ type Props = {
   pinnedChatIds?: string[];
   currentUserId?: string;
   getChatTitle: (chat: any) => string;
-  renderAvatarStack: (images: any) => React.ReactNode;
+  renderAvatarStack: (images: any, participants?: string[]) => React.ReactNode;
   onCloseMessages: () => void;
   onOpenChat: (chat: any) => Promise<void>;
   onPrepareChatPress?: (chatId: string) => void;
@@ -142,7 +142,7 @@ export default function MessagesInboxPane({
             </View>
           ) : null}
           <View style={styles.avatarColumn}>
-            {renderAvatarStack(item.participantImages)}
+            {renderAvatarStack(item.participantImages, item.participants)}
           </View>
           <View style={styles.inboxTextCol}>
             <View style={styles.inboxTitleRow}>

@@ -1871,8 +1871,13 @@ export default function SynqScreen() {
       : "",
   ]);
 
-  const renderAvatarStack = useCallback((images: any) => {
-    const stackUris = getStackAvatarUris(images, auth.currentUser?.uid);
+  const renderAvatarStack = useCallback(
+    (images: any, participants?: string[]) => {
+      const stackUris = getStackAvatarUris(
+        images,
+        auth.currentUser?.uid,
+        participants
+      );
 
     if (stackUris.length === 0) {
       return (

@@ -152,15 +152,22 @@ export const MAX_STACK_AVATARS = 2;
 
 export function getStackAvatarUris(
   images: Record<string, string> | undefined | null,
-  currentUserId?: string
+  currentUserId?: string,
+  participantOrder?: string[]
 ): string[] {
   if (!images) return [];
 
   const seen = new Set<string>();
   const uris: string[] = [];
+  const orderedUids =
+    participantOrder && participantOrder.length > 0
+      ? participantOrder.filter(Boolean)
+      : Object.keys(images).sort();
 
-  for (const [uid, url] of Object.entries(images)) {
+  for (const uid of orderedUids) {
     if (currentUserId && uid === currentUserId) continue;
+    const url = images[uid];
+    if (url == null) continue;
     const uri = resolveAvatar(url);
     if (!uri || seen.has(uri)) continue;
     seen.add(uri);

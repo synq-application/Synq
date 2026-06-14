@@ -82,7 +82,10 @@ type Props = {
   insetsTop: number;
   activeChat: any;
   chatTitle: string;
-  renderAvatarStack: (images: Record<string, string> | undefined) => React.ReactNode;
+  renderAvatarStack: (
+    images: Record<string, string> | undefined,
+    participants?: string[]
+  ) => React.ReactNode;
   rotatingAIText: string;
   pendingScrollToMessageId: string | null;
   setPendingScrollToMessageId: (value: string | null) => void;
@@ -689,8 +692,8 @@ export default function MessagesChatPane({
   );
 
   const headerAvatar = useMemo(
-    () => renderAvatarStack(activeChat?.participantImages),
-    [activeChat?.participantImages, renderAvatarStack]
+    () => renderAvatarStack(activeChat?.participantImages, activeChat?.participants),
+    [activeChat?.participantImages, activeChat?.participants, renderAvatarStack]
   );
 
   const renderMessage = useCallback(
