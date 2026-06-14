@@ -2,7 +2,7 @@ import ProfileTabHeaderOverlay from '@/src/components/ProfileTabHeaderOverlay';
 import { useChatMessages } from '@/src/hooks/useChatMessages';
 import { useSendMessage } from '@/src/hooks/useSendMessage';
 import { useTypingIndicator } from '@/src/hooks/useTypingIndicator';
-import { mergeMessages, pendingMatchesServer } from '@/src/lib/chatMessages';
+import { mergeMessages, pendingMatchesServer, type ChatMessage } from '@/src/lib/chatMessages';
 import { trackEvent } from '@/src/lib/analytics';
 import { useBlockedUsers } from '@/src/lib/blockedUsers';
 import { deleteChat } from '@/src/lib/chats';
@@ -14,6 +14,7 @@ import {
   mergeParticipantMaps,
   mergeParticipantSets,
   participantsMatch,
+  uniqueChatIds,
 } from '@/src/lib/mergeChats';
 import { friendGroupsCacheByUser, friendsListCacheByUser } from '@/src/lib/socialCache';
 import {
@@ -318,6 +319,7 @@ export default function SynqScreen() {
   const [showOptionsList, setShowOptionsList] = useState(false);
   const [currentCategory, setCurrentCategory] = useState('');
   const flatListRef = useRef<FlatList>(null);
+  const chatOpenGraceRef = useRef<Map<string, number>>(new Map());
   const [pendingScrollToMessageId, setPendingScrollToMessageId] = useState<string | null>(null);
   const lastTapRef = useRef<{ [key: string]: number }>({});
   const [hasUnread, setHasUnread] = useState(false);
@@ -363,16 +365,26 @@ export default function SynqScreen() {
     setMessagesPane(next);
   }, []);
 
+  const hiddenChatIds = useMemo(
+    () =>
+      Array.isArray(userProfile?.hiddenChatIds)
+        ? (userProfile.hiddenChatIds as string[]).filter(Boolean)
+        : [],
+    [userProfile?.hiddenChatIds]
+  );
+
   const visibleChats = useMemo(() => {
     const myId = auth.currentUser?.uid;
     if (!myId) return allChats;
+    const hidden = new Set(hiddenChatIds);
     return allChats.filter(
       (c) =>
+        !hidden.has(c.id) &&
         !(c.participants || []).some(
           (p: string) => p && p !== myId && isBlocked(p)
         )
     );
-  }, [allChats, isBlocked]);
+  }, [allChats, isBlocked, hiddenChatIds]);
 
   const pinnedChatIds = useMemo(
     () =>
@@ -458,6 +470,7 @@ export default function SynqScreen() {
     sendMessage: sendMessageCore,
     retryFailedMessage,
     clearPendingMessages,
+    ensureChatFromPending,
     recentlySentRef,
     sendOrderByServerIdRef,
   } = useSendMessage({
@@ -478,7 +491,7 @@ export default function SynqScreen() {
     const merged = mergeMessages(serverMessages, pendingMessages);
     const orderHints = sendOrderByServerIdRef.current;
     if (orderHints.size === 0) return merged;
-    return merged.map((message) => {
+    return merged.map((message: ChatMessage & { sendOrder?: number }) => {
       if (typeof message.sendOrder === "number") return message;
       const sendOrder = orderHints.get(message.id);
       return sendOrder != null ? { ...message, sendOrder } : message;
@@ -824,7 +837,6 @@ export default function SynqScreen() {
     const cachedProfile = getCachedOwnProfile(effectUid);
     if (cachedProfile) {
       setUserProfile(cachedProfile);
-      setMemo((cachedProfile.memo as string) || "");
     }
 
     const init = async () => {
@@ -992,15 +1004,30 @@ export default function SynqScreen() {
   }, [status, user?.uid]);
 
   useEffect(() => {
+    if (activeChatId) {
+      chatOpenGraceRef.current.set(activeChatId, Date.now());
+    }
+  }, [activeChatId]);
+
+  useEffect(() => {
     if (!messagesModalVisible || pendingNewChat) return;
     const activeChatMissing =
-      !!activeChatId && allChats.length > 0 && !allChats.some((c) => c.id === activeChatId);
-    if (activeChatMissing) {
-      setActiveChatId(null);
-      clearMessages();
-      navigateMessagesPane("inbox");
-    }
-  }, [messagesModalVisible, activeChatId, allChats, pendingNewChat, navigateMessagesPane, clearMessages]);
+      !!activeChatId &&
+      allChats.length > 0 &&
+      !allChats.some((c) => c.id === activeChatId);
+    if (!activeChatMissing) return;
+
+    const openedAt = chatOpenGraceRef.current.get(activeChatId);
+    const inGracePeriod =
+      typeof openedAt === "number" && Date.now() - openedAt < 15_000;
+    const hasCachedMessages = !!messagesCacheByChatIdRef.current[activeChatId];
+
+    if (inGracePeriod || hasCachedMessages) return;
+
+    setActiveChatId(null);
+    clearMessages();
+    navigateMessagesPane("inbox");
+  }, [messagesModalVisible, activeChatId, allChats, pendingNewChat, navigateMessagesPane, clearMessages, messagesCacheByChatIdRef]);
 
   const activeParticipantIds = useMemo(() => {
     let ids: string[] = [];
@@ -1332,21 +1359,7 @@ export default function SynqScreen() {
     try {
       let chatId = activeChatId;
       if (pendingNewChat) {
-        const participantImages = freshParticipantImages(
-          pendingNewChat.participantImages,
-          pendingNewChat.participants
-        );
-        const chatRef = await addDoc(collection(db, 'chats'), {
-          participants: pendingNewChat.participants,
-          participantNames: pendingNewChat.participantNames,
-          participantImages,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          lastMessage: '',
-        });
-        chatId = chatRef.id;
-        setActiveChatId(chatId);
-        setPendingNewChat(null);
+        chatId = await ensureChatFromPending();
       }
       if (!chatId) return;
 
@@ -1512,12 +1525,13 @@ export default function SynqScreen() {
 
   const goBackFromChat = useCallback(() => {
     Keyboard.dismiss();
+    stopTyping();
     navigateMessagesPane("inbox");
     setShowAICard(false);
     setShowOptionsList(false);
     setPendingNewChat(null);
     setIsExploreVisible(false);
-  }, [navigateMessagesPane]);
+  }, [navigateMessagesPane, stopTyping]);
 
   const openFriendProfileFromChat = useCallback((friendId: string) => {
     if (!friendId || friendId === auth.currentUser?.uid) return;
@@ -1550,6 +1564,10 @@ export default function SynqScreen() {
   useEffect(() => {
     if (!messagesModalVisible) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (mergeSelectMode) {
+        resetMergeSelect();
+        return true;
+      }
       if (messagesPane === "profile") {
         closeProfileFromChat();
         return true;
@@ -1562,7 +1580,15 @@ export default function SynqScreen() {
       return true;
     });
     return () => sub.remove();
-  }, [messagesModalVisible, messagesPane, closeMessagesModal, closeProfileFromChat, goBackFromChat]);
+  }, [
+    messagesModalVisible,
+    messagesPane,
+    mergeSelectMode,
+    closeMessagesModal,
+    closeProfileFromChat,
+    goBackFromChat,
+    resetMergeSelect,
+  ]);
 
   const startCombineWithChat = (chatId: string) => {
     setInboxActionChat(null);
@@ -1609,6 +1635,44 @@ export default function SynqScreen() {
     }
   };
 
+  const hideMergedSourceChats = async (sourceChatIds: string[]) => {
+    if (!auth.currentUser) return;
+    const myId = auth.currentUser.uid;
+    const ids = uniqueChatIds(sourceChatIds);
+    if (ids.length === 0) return;
+
+    const unpinnedIds = ids.filter((id) => pinnedChatIds.includes(id));
+
+    setUserProfile((prev: any) => {
+      const currentHidden = Array.isArray(prev?.hiddenChatIds)
+        ? prev.hiddenChatIds.filter(Boolean)
+        : [];
+      const currentPinned = Array.isArray(prev?.pinnedChatIds)
+        ? prev.pinnedChatIds.filter(Boolean)
+        : [];
+      return {
+        ...prev,
+        hiddenChatIds: uniqueChatIds([...currentHidden, ...ids]),
+        pinnedChatIds: currentPinned.filter((id: string) => !ids.includes(id)),
+      };
+    });
+
+    try {
+      if (unpinnedIds.length > 0) {
+        await updateDoc(doc(db, "users", myId), {
+          hiddenChatIds: arrayUnion(...ids),
+          pinnedChatIds: arrayRemove(...unpinnedIds),
+        });
+      } else {
+        await updateDoc(doc(db, "users", myId), {
+          hiddenChatIds: arrayUnion(...ids),
+        });
+      }
+    } catch {
+      // Merge succeeded; inbox hide is best-effort and will sync on next profile load.
+    }
+  };
+
   const toggleMergeChatSelection = (chatId: string) => {
     setSelectedMergeChatIds((prev) => {
       if (prev.includes(chatId)) {
@@ -1649,12 +1713,17 @@ export default function SynqScreen() {
   }, [selectedMergeChatIds, visibleChats]);
 
   const executeMergeChats = async () => {
+    if (isMergingChats) return;
     if (!auth.currentUser || selectedMergeChatIds.length !== 2) return;
 
     const myId = auth.currentUser.uid;
     const chatA = visibleChats.find((c) => c.id === selectedMergeChatIds[0]);
     const chatB = visibleChats.find((c) => c.id === selectedMergeChatIds[1]);
-    if (!chatA || !chatB) return;
+    if (!chatA || !chatB) {
+      showActionError("One of those conversations is no longer available.");
+      resetMergeSelect();
+      return;
+    }
 
     setIsMergingChats(true);
     try {
@@ -1670,6 +1739,7 @@ export default function SynqScreen() {
         bumpChatOpenAnchor();
         navigateMessagesPane("chat");
         void markChatRead(existing.id);
+        void hideMergedSourceChats([chatA.id, chatB.id]);
         return;
       }
 
@@ -1723,6 +1793,7 @@ export default function SynqScreen() {
       bumpChatOpenAnchor();
       navigateMessagesPane("chat");
       void markChatRead(chatRef.id);
+      void hideMergedSourceChats([chatA.id, chatB.id]);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       showActionError("Could not create group chat. Please try again.");
@@ -1960,6 +2031,7 @@ export default function SynqScreen() {
                 selectedMergeChatIds={selectedMergeChatIds}
                 mergePreviewTitle={mergePreviewTitle}
                 mergeAnchorTitle={mergeAnchorTitle}
+                mergeReady={!!mergePreviewChat}
                 mergeBusy={isMergingChats}
                 onCancelMergeMode={resetMergeSelect}
                 onToggleMergeChatSelection={toggleMergeChatSelection}
@@ -1976,8 +2048,13 @@ export default function SynqScreen() {
                   <ConfirmModal
                     visible={showMergeConfirmModal}
                     title="Create group chat"
-                    message={`Everyone from both conversations will be added to a chat with ${mergePreviewTitle}.`}
+                    message={
+                      mergePreviewTitle
+                        ? `Everyone from both conversations will be added to a chat with ${mergePreviewTitle}.`
+                        : "Everyone from both conversations will be added to one group chat."
+                    }
                     confirmText="Create"
+                    confirmDisabled={isMergingChats || !mergePreviewChat}
                     onCancel={() => setShowMergeConfirmModal(false)}
                     onConfirm={() => void executeMergeChats()}
                   />

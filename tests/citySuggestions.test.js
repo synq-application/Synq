@@ -151,19 +151,20 @@ describe("citySuggestions", () => {
     expect(new Set(names).size).toBe(3);
     expect(picked[0]).toMatchObject({
       address: expect.any(String),
-      imageUrl: expect.stringMatching(/^https:\/\//),
+      location: expect.any(String),
       rating: "4.5",
     });
+    expect(picked[0]).not.toHaveProperty("imageUrl");
   });
 
-  test("pickRandomVenues skips venues without images", () => {
+  test("pickRandomVenues includes venues regardless of imageUrl", () => {
     const venues = [
       { name: "No Photo", address: "1 St", imageUrl: "" },
       { name: "Has Photo", address: "2 St", imageUrl: "https://a.test/2.jpg" },
     ];
     const picked = pickRandomVenues(venues, 3);
-    expect(picked).toHaveLength(1);
-    expect(picked[0].name).toBe("Has Photo");
+    expect(picked).toHaveLength(2);
+    expect(picked.map((row) => row.name).sort()).toEqual(["Has Photo", "No Photo"]);
   });
 
   test("getCachedCitySuggestions returns null for unsupported cities", () => {

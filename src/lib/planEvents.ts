@@ -14,6 +14,8 @@ export function matchesPlanEvent(e: any, target: any, siblingEvents: any[]): boo
 
   const hostE = String(e?.planHostUid || "").trim();
   const hostT = String(target?.planHostUid || "").trim();
+  if (hostE && hostT && hostE !== hostT) return false;
+
   if (hostE && hostT && hostE === hostT && eventKeyLoose(e) === eventKeyLoose(target)) {
     const sameHostLoose = siblingEvents.filter(
       (x) =>
@@ -34,9 +36,7 @@ export function matchesPlanEvent(e: any, target: any, siblingEvents: any[]): boo
     if (withHost.length === 1 && withHost[0] === e) return true;
   }
 
-  if (eventKeyLoose(e) !== eventKeyLoose(target)) return false;
-  const sameLoose = siblingEvents.filter((x) => eventKeyLoose(x) === eventKeyLoose(target));
-  return sameLoose.length === 1;
+  return false;
 }
 
 export function matchesPlanEventForHostSync(

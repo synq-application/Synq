@@ -14,6 +14,11 @@ const acceptPlanInviteFn = httpsCallable<
   { ok: boolean; status?: string }
 >(functions, "acceptPlanInvite");
 
+const declinePlanInviteFn = httpsCallable<
+  { notificationId: string },
+  { ok: boolean; alreadyDeclined?: boolean }
+>(functions, "declinePlanInvite");
+
 const revokePlanInviteFn = httpsCallable<
   { toUserId: string; eventId: string },
   { ok: boolean; alreadyRevoked?: boolean }
@@ -112,6 +117,25 @@ export async function sendPlanInvites(
 
 export async function acceptPlanInvite(notificationId: string): Promise<void> {
   await acceptPlanInviteFn({ notificationId });
+}
+
+export function declinePlanInviteErrorMessage(err: unknown): string {
+  if (err instanceof FirebaseError) {
+    switch (err.code) {
+      case "functions/failed-precondition":
+        return err.message || "Could not decline this invite.";
+      case "functions/unauthenticated":
+        return "Sign in to decline this invite.";
+      default:
+        return err.message || "Could not decline invite.";
+    }
+  }
+  if (err instanceof Error && err.message) return err.message;
+  return "Could not decline invite.";
+}
+
+export async function declinePlanInvite(notificationId: string): Promise<void> {
+  await declinePlanInviteFn({ notificationId });
 }
 
 export function revokePlanInviteErrorMessage(err: unknown): string {

@@ -59,3 +59,7 @@ export function mergeParticipantMaps(
 
   return { participantNames, participantImages };
 }
+
+export function uniqueChatIds(chatIds: string[]): string[] {
+  return [...new Set(chatIds.map((id) => String(id || "").trim()).filter(Boolean))];
+}
