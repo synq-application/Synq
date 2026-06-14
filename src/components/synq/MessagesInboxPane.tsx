@@ -26,6 +26,7 @@ type Props = {
   selectedMergeChatIds?: string[];
   mergePreviewTitle?: string;
   mergeAnchorTitle?: string;
+  mergeReady?: boolean;
   mergeBusy?: boolean;
   onCancelMergeMode?: () => void;
   onToggleMergeChatSelection?: (chatId: string) => void;
@@ -55,6 +56,7 @@ export default function MessagesInboxPane({
   selectedMergeChatIds = [],
   mergePreviewTitle = "",
   mergeAnchorTitle = "",
+  mergeReady = false,
   mergeBusy = false,
   onCancelMergeMode,
   onToggleMergeChatSelection,
@@ -70,7 +72,6 @@ export default function MessagesInboxPane({
   const inboxHeaderPaddingTop = Math.max(insets.top, 20) + 6;
   const inboxMergeHeaderPaddingTop = Math.max(insets.top, 16) + 6;
   const canCombine = allChats.length >= 2;
-  const mergeReady = selectedMergeChatIds.length === 2;
   const pinnedSet = new Set(pinnedChatIds);
 
   const mergeSubtitle =

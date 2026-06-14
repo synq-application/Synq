@@ -577,10 +577,11 @@ export default function MessagesChatPane({
     return () => clearTimeout(timer);
   }, [
     pendingScrollToMessageId,
-    messages,
+    messages.length,
+    listData,
     flatListRef,
     setPendingScrollToMessageId,
-    scheduleScrollToLatest,
+    scrollToLatest,
   ]);
 
   const flatListInitialRender = useMemo(
@@ -948,13 +949,13 @@ export default function MessagesChatPane({
       <View style={{ flex: 1, paddingBottom: keyboardInset }}>
         {listenerError ? (
           <Pressable
-            style={styles.chatErrorBanner}
+            style={chatHeaderOverlayStyles.chatErrorBanner}
             onPress={onRetryMessages}
             accessibilityRole="button"
             accessibilityLabel="Retry loading messages"
           >
-            <Text style={styles.chatErrorBannerText}>{listenerError}</Text>
-            <Text style={styles.chatErrorBannerAction}>Tap to retry</Text>
+            <Text style={chatHeaderOverlayStyles.chatErrorBannerText}>{listenerError}</Text>
+            <Text style={chatHeaderOverlayStyles.chatErrorBannerAction}>Tap to retry</Text>
           </Pressable>
         ) : null}
         <View style={styles.chatBody}>
@@ -1024,7 +1025,7 @@ export default function MessagesChatPane({
             ListHeaderComponent={
               hasEarlierMessages ? (
                 <Pressable
-                  style={styles.loadEarlierBtn}
+                  style={chatHeaderOverlayStyles.loadEarlierBtn}
                   onPress={onLoadEarlier}
                   disabled={loadingEarlier}
                   accessibilityRole="button"
@@ -1033,7 +1034,7 @@ export default function MessagesChatPane({
                   {loadingEarlier ? (
                     <ActivityIndicator size="small" color={ACCENT} />
                   ) : (
-                    <Text style={styles.loadEarlierText}>Load earlier messages</Text>
+                    <Text style={chatHeaderOverlayStyles.loadEarlierText}>Load earlier messages</Text>
                   )}
                 </Pressable>
               ) : null

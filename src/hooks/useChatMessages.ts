@@ -71,6 +71,7 @@ export function useChatMessages({
 
   const applyCacheEntry = useCallback((chatId: string, entry: ChatCacheEntry) => {
     boundChatIdRef.current = chatId;
+    oldestDocRef.current = null;
     setServerMessages(entry.messages);
     setHasEarlierMessages(entry.hasEarlier);
     setMessagesReady(true);
@@ -136,7 +137,8 @@ export function useChatMessages({
       } catch {
         if (boundChatIdRef.current === chatId || activeChatId === chatId) {
           setServerMessages([]);
-          setMessagesReady(false);
+          setMessagesReady(true);
+          setListenerError("Could not load messages. Check your connection.");
         }
       }
     },
@@ -255,6 +257,9 @@ export function useChatMessages({
 
         setServerMessages((prev) => {
           const latestWindow = reverseMessagePage(page);
+          if (page.length === 0 && prev.length > 0) {
+            return prev;
+          }
           let merged = latestWindow;
           if (prev.length > 0 && page.length > 0) {
             merged = mergeMessagePages(prev, latestWindow);
@@ -278,10 +283,12 @@ export function useChatMessages({
         if (code === "permission-denied") {
           if (boundChatIdRef.current === activeChatId) {
             setServerMessages([]);
-            setMessagesReady(false);
+            setMessagesReady(true);
+            setListenerError("You don't have access to this conversation.");
           }
           return;
         }
+        setMessagesReady(true);
         setListenerError("Could not load messages. Check your connection.");
       }
     );

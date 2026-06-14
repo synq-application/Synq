@@ -382,7 +382,7 @@ export default function OpenPlans({
       if (!eventId || friendIds.length === 0) return;
       if (isEditing) {
         onPlanInvited?.(eventId, friendIds);
-        resetPlanEditorState();
+        setInviteSheetVisible(false);
         return;
       }
       setCreateInviteFriendIds((prev) => {

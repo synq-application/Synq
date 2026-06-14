@@ -3,6 +3,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   increment,
   serverTimestamp,
   updateDoc,
@@ -22,6 +23,30 @@ type ChatMessage = {
   senderId: string;
   createdAt?: unknown;
 };
+
+function otherParticipantsFromList(participants: string[], myId: string): string[] {
+  return participants.filter((pId) => pId && pId !== myId);
+}
+
+async function resolveOtherParticipants(
+  chatId: string,
+  myId: string,
+  allChats: { id: string; participants: string[] }[],
+  fallbackParticipants?: string[]
+): Promise<string[]> {
+  const chat = allChats.find((c) => c.id === chatId);
+  if (chat?.participants?.length) {
+    return otherParticipantsFromList(chat.participants, myId);
+  }
+  if (fallbackParticipants?.length) {
+    return otherParticipantsFromList(fallbackParticipants, myId);
+  }
+  const snap = await getDoc(doc(db, "chats", chatId));
+  const participants = snap.exists()
+    ? ((snap.data()?.participants as string[]) ?? [])
+    : [];
+  return otherParticipantsFromList(participants, myId);
+}
 
 type Params = {
   activeChatId: string | null;
@@ -61,6 +86,42 @@ export function useSendMessage({
 
   const sendOrderRef = useRef(0);
   const sendOrderByServerIdRef = useRef<Map<string, number>>(new Map());
+  const creatingChatRef = useRef<Promise<string> | null>(null);
+
+  const ensureChatFromPending = useCallback(async (): Promise<string | null> => {
+    if (!auth.currentUser) return null;
+    if (!pendingNewChat) return activeChatId;
+
+    if (creatingChatRef.current) {
+      return creatingChatRef.current;
+    }
+
+    const participants = pendingNewChat.participants;
+    const participantNames = pendingNewChat.participantNames;
+    const participantImages = pendingNewChat.participantImages;
+
+    const promise = (async () => {
+      const chatRef = await addDoc(collection(db, "chats"), {
+        participants,
+        participantNames,
+        participantImages,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastMessage: "",
+      });
+      const chatId = chatRef.id;
+      setActiveChatId(chatId);
+      setPendingNewChat(null);
+      return chatId;
+    })();
+
+    creatingChatRef.current = promise;
+    try {
+      return await promise;
+    } finally {
+      creatingChatRef.current = null;
+    }
+  }, [activeChatId, pendingNewChat, setActiveChatId, setPendingNewChat]);
 
   useEffect(() => {
     const matchedServerIds = new Set();
@@ -88,12 +149,7 @@ export function useSendMessage({
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || !auth.currentUser) return false;
-      if (
-        !pendingNewChat &&
-        (!activeChatId || !allChats.find((c) => c.id === activeChatId))
-      ) {
-        return false;
-      }
+      if (!pendingNewChat && !activeChatId) return false;
       if (rejectIfObjectionable(trimmed)) return false;
 
       const myId = auth.currentUser.uid;
@@ -114,24 +170,20 @@ export function useSendMessage({
         let otherParticipants: string[];
 
         if (pendingNewChat) {
-          const chatRef = await addDoc(collection(db, "chats"), {
-            participants: pendingNewChat.participants,
-            participantNames: pendingNewChat.participantNames,
-            participantImages: pendingNewChat.participantImages,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            lastMessage: "",
-          });
-          chatId = chatRef.id;
-          otherParticipants = pendingNewChat.participants.filter(
-            (pId) => pId !== myId
+          const pendingParticipants = pendingNewChat.participants;
+          chatId = await ensureChatFromPending();
+          if (!chatId) return false;
+          otherParticipants = await resolveOtherParticipants(
+            chatId,
+            myId,
+            allChats,
+            pendingParticipants
           );
-          setActiveChatId(chatId);
-          setPendingNewChat(null);
         } else {
-          const currentChat = allChats.find((c) => c.id === activeChatId)!;
-          otherParticipants = currentChat.participants.filter(
-            (pId) => pId !== myId
+          otherParticipants = await resolveOtherParticipants(
+            activeChatId!,
+            myId,
+            allChats
           );
         }
 
@@ -200,6 +252,7 @@ export function useSendMessage({
       userAvatar,
       onSendError,
       onMessageDelivered,
+      ensureChatFromPending,
     ]
   );
 
@@ -223,6 +276,7 @@ export function useSendMessage({
     sendMessage,
     retryFailedMessage,
     clearPendingMessages,
+    ensureChatFromPending,
     recentlySentRef,
     sendOrderByServerIdRef,
   };

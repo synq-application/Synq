@@ -27,6 +27,7 @@ type Props = {
   onConfirm: () => void;
   onCancel: () => void;
   destructive?: boolean;
+  confirmDisabled?: boolean;
 };
 
 export default function ConfirmModal({
@@ -38,6 +39,7 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   destructive = false,
+  confirmDisabled = false,
 }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -58,9 +60,11 @@ export default function ConfirmModal({
 
             <TouchableOpacity
               onPress={onConfirm}
+              disabled={confirmDisabled}
               style={[
                 styles.confirmBtn,
                 destructive && styles.destructiveBtn,
+                confirmDisabled && styles.confirmBtnDisabled,
               ]}
               activeOpacity={0.8}
             >
@@ -135,6 +139,10 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_RADIUS,
     paddingVertical: 10,
     paddingHorizontal: 16,
+  },
+
+  confirmBtnDisabled: {
+    opacity: 0.45,
   },
 
   confirmText: {

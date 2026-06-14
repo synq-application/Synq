@@ -481,6 +481,8 @@ export default function FriendsScreen() {
     setFriendsLoadError(false);
     try {
       await warmFriendsAndConnectionsCache(myId);
+      const nextFriends = sortFriendsByName(friendsListCacheByUser[myId] ?? []);
+      setFriends(nextFriends);
     } catch {
       setFriendsLoadError(true);
     } finally {

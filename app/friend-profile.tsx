@@ -694,17 +694,6 @@ export default function FriendProfile({
           }
         });
       } catch {}
-      try {
-        const usersSnap = await getDocs(collection(db, "users"));
-        usersSnap.docs.forEach((u) => {
-          const display = String((u.data() as any)?.displayName || "")
-            .trim()
-            .toLowerCase();
-          if (display && sourceNameSet.has(display)) {
-            sourceIdsSet.add(u.id);
-          }
-        });
-      } catch {}
       const sourceIds = Array.from(sourceIdsSet);
 
       const displayNameById: Record<string, string> = {};

@@ -48,7 +48,7 @@ import {
   TYPE_CAPTION,
   TYPE_SECTION,
 } from "../constants/Variables";
-import { acceptPlanInvite, acceptPlanInviteErrorMessage } from "../src/lib/planInvite";
+import { acceptPlanInvite, acceptPlanInviteErrorMessage, declinePlanInvite, declinePlanInviteErrorMessage } from "../src/lib/planInvite";
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
@@ -622,6 +622,19 @@ export default function NotificationsScreen() {
     if (!auth.currentUser || dismissingKeys.has(item.feedKey)) return;
 
     if (!accept) {
+      setDismissingKeys((prev) => new Set(prev).add(item.feedKey));
+      try {
+        await declinePlanInvite(item.id);
+      } catch (err) {
+        showAlert("Error", declinePlanInviteErrorMessage(err));
+        return;
+      } finally {
+        setDismissingKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(item.feedKey);
+          return next;
+        });
+      }
       await dismissActivity(item);
       return;
     }
