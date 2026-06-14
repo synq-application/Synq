@@ -18,6 +18,7 @@ type Props = {
   renderAvatarStack: (images: any) => React.ReactNode;
   onCloseMessages: () => void;
   onOpenChat: (chat: any) => Promise<void>;
+  onPrepareChatPress?: (chatId: string) => void;
   onDeleteChat: (chatId: string) => void;
   onChatLongPress?: (chat: any) => void;
   renderDeleteConfirmModal: React.ReactNode;
@@ -46,6 +47,7 @@ export default function MessagesInboxPane({
   renderAvatarStack,
   onCloseMessages,
   onOpenChat,
+  onPrepareChatPress,
   onDeleteChat,
   onChatLongPress,
   renderDeleteConfirmModal,
@@ -108,6 +110,10 @@ export default function MessagesInboxPane({
             return;
           }
           void onOpenChat(item);
+        }}
+        onPressIn={() => {
+          if (mergeSelectMode) return;
+          onPrepareChatPress?.(item.id);
         }}
         onLongPress={() => {
           if (mergeSelectMode) return;
