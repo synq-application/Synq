@@ -5,6 +5,7 @@ import Constants from "expo-constants";
 import { router } from "expo-router";
 import { doc, onSnapshot } from "firebase/firestore";
 import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
+import { clearPushTokenOnSignOut } from "@/src/lib/pushToken";
 import { useAuthRefresh } from "./_layout";
 import React, { useEffect, useState } from "react";
 import {
@@ -104,6 +105,7 @@ export default function SettingsScreen() {
 
   const signOut = async () => {
     try {
+      await clearPushTokenOnSignOut();
       router.replace("/(auth)/welcome");
       await auth.signOut();
     } catch {
@@ -126,7 +128,13 @@ export default function SettingsScreen() {
     value?: string;
     danger?: boolean;
   }) => (
-    <TouchableOpacity style={styles.item} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={styles.item}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
       <View style={styles.itemLeft}>
         <Text style={[styles.itemLabel, danger && styles.dangerText]}>
           {label}
