@@ -31,6 +31,7 @@ import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import { filterOrReject } from "@/src/lib/contentFilter";
 import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
 import { setPendingProfilePhotoSource } from "@/src/lib/pendingProfilePhoto";
+import { clearPushTokenOnSignOut } from "@/src/lib/pushToken";
 import {
   getPhotoLibraryPermission,
   launchProfilePhotoPicker,
@@ -294,6 +295,7 @@ export default function ProfileScreen() {
 
   const signOut = async () => {
     try {
+      await clearPushTokenOnSignOut();
       router.replace("/(auth)/welcome");
       await auth.signOut();
     } catch {
