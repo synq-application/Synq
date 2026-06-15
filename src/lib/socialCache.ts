@@ -5,6 +5,7 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 
 import { db } from "./firebase";
 import type { FriendGroup } from "./friendGroups";
+import type { CommunityGroup } from "./communityGroups";
 import { computeSynqActiveFromUserData } from "./synqSession";
 
 export type Connection = {
@@ -25,6 +26,7 @@ export const mutualFriendsCacheByUser: Record<string, Record<string, Friend[]>> 
 /** viewerId -> target user ids with an outgoing friend request. */
 export const outgoingFriendRequestIdsCacheByUser: Record<string, Set<string>> = {};
 export const friendGroupsCacheByUser: Record<string, FriendGroup[]> = {};
+export const communityGroupsCacheByUser: Record<string, CommunityGroup[]> = {};
 
 const warmFriendsInFlight: Record<string, Promise<void> | undefined> = {};
 const warmOutgoingInFlight: Record<string, Promise<void> | undefined> = {};

@@ -1,15 +1,27 @@
 import Constants from "expo-constants";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDocFromServer } from "firebase/firestore";
 import { Linking, Platform } from "react-native";
 
 import { MINIMUM_NATIVE_BUILD_NUMBER, IOS_APP_STORE_URL, ANDROID_PLAY_STORE_URL } from "@/constants/Variables";
 import { db } from "./firebase";
 
 export function getNativeBuildNumber(): number {
+  const manifest2 = Constants.manifest2?.extra?.expoClient as
+    | { ios?: { buildNumber?: string }; android?: { versionCode?: number } }
+    | undefined;
+  const legacyManifest = Constants.manifest as
+    | { ios?: { buildNumber?: string }; android?: { versionCode?: number } }
+    | null;
+
   const fromConfig =
     Platform.OS === "ios"
-      ? Constants.expoConfig?.ios?.buildNumber
-      : Constants.expoConfig?.android?.versionCode;
+      ? Constants.expoConfig?.ios?.buildNumber ??
+        manifest2?.ios?.buildNumber ??
+        legacyManifest?.ios?.buildNumber
+      : Constants.expoConfig?.android?.versionCode ??
+        manifest2?.android?.versionCode ??
+        legacyManifest?.android?.versionCode;
+
   const raw = fromConfig ?? Constants.nativeBuildVersion ?? "0";
   const n = Number(raw);
   return Number.isFinite(n) ? n : 0;
@@ -35,8 +47,13 @@ export async function checkAppUpdateRequired(): Promise<{
     return { required: true, storeUrl: defaultStoreUrl() };
   }
 
+  // Can't compare against a remote minimum without a readable native build.
+  if (nativeBuild <= 0) {
+    return { required: false, storeUrl: null };
+  }
+
   try {
-    const snap = await getDoc(doc(db, "appConfig", "global"));
+    const snap = await getDocFromServer(doc(db, "appConfig", "global"));
     if (!snap.exists()) {
       return { required: false, storeUrl: null };
     }
