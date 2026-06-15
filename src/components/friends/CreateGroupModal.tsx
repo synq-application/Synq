@@ -45,7 +45,7 @@ export default function CreateGroupModal({
   onClose,
   onCreate,
   title = "New group",
-  hint = "Only you can see this group.",
+  hint = "Name a list to organize friends — like Close friends or Gym crew.",
   submitLabel = "Create group",
   initialName = "",
 }: Props) {
