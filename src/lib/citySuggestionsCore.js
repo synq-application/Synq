@@ -166,19 +166,11 @@ function resolveCityId(senderLocationLabel, registry) {
   return null;
 }
 
-/** @param {CachedVenue} venue */
-function venueHasImage(venue) {
-  const url = venue?.imageUrl;
-  return typeof url === "string" && url.trim().startsWith("http");
-}
-
 /** @param {CachedVenue[]} venues @param {number} count @param {string[]} excludeNames */
 function pickRandomVenues(venues, count = 3, excludeNames = []) {
   if (!Array.isArray(venues) || venues.length === 0) return [];
   const exclude = new Set(excludeNames);
-  const eligible = venues.filter(
-    (venue) => venueHasImage(venue) && !exclude.has(venue.name)
-  );
+  const eligible = venues.filter((venue) => !exclude.has(venue.name));
   if (eligible.length === 0) return [];
 
   const pickCount = Math.min(count, eligible.length);
@@ -191,7 +183,6 @@ function pickRandomVenues(venues, count = 3, excludeNames = []) {
     name: venue.name,
     address: venue.address,
     location: venue.address,
-    imageUrl: venue.imageUrl.trim(),
     rating: "4.5",
   }));
 }
@@ -264,7 +255,6 @@ module.exports = {
   matchesPotomacMd,
   matchesWashingtonDcMetro,
   resolveCityId,
-  venueHasImage,
   pickRandomVenues,
   allParticipantsHaveCachedCitySuggestions,
   getCachedCitySuggestions,

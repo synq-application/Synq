@@ -21,10 +21,7 @@ function isShareDismissed(error: unknown): boolean {
   return /cancel|dismiss/i.test(message);
 }
 
-/**
- * iOS Messages turns a lone https URL into a link preview titled from the page
- * (we set og:title to "Join me on Synq!" on the server).
- */
+/** Text-only fallback when the card image cannot be captured. */
 export async function shareProfileLink(shareWebUrl: string): Promise<void> {
   const url = shareWebUrl.trim();
   if (!url) {
@@ -33,7 +30,7 @@ export async function shareProfileLink(shareWebUrl: string): Promise<void> {
 
   try {
     await Share.share({
-      message: Platform.OS === "ios" ? url : `Join me on Synq!\n${url}`,
+      message: url,
     });
   } catch (error) {
     if (isShareDismissed(error)) return;
@@ -41,7 +38,7 @@ export async function shareProfileLink(shareWebUrl: string): Promise<void> {
   }
 }
 
-/** Shares the profile card image plus a friendly link preview below it. */
+/** Shares the profile card image and the profile link as separate items. */
 export async function captureAndShareProfileCard(
   cardRef: RefObject<ViewShot | null>,
   shareWebUrl: string
@@ -67,14 +64,12 @@ export async function captureAndShareProfileCard(
 
   try {
     if (Platform.OS === "ios") {
-      // Image attachment + https URL unfurls as "Join me on Synq!" (og:title).
       await Share.share({ message: link, url: shareImageUri });
       return;
     }
 
     await Share.share({
-      title: "Join me on Synq!",
-      message: `Join me on Synq!\n${link}`,
+      message: link,
       url: shareImageUri,
     });
   } catch (error) {
