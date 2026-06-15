@@ -231,12 +231,17 @@ export default function MessagesInboxPane({
           ) : null}
         </>
       ) : (
-        <View style={[styles.inboxHeaderRow, { paddingTop: inboxHeaderPaddingTop }]}>
-          <Text style={styles.messagesInboxTitle}>Messages</Text>
-          <CloseButton
-            onPress={onCloseMessages}
-            accessibilityLabel="Close messages"
-          />
+        <View
+          style={[styles.inboxHeaderBlock, { paddingTop: inboxHeaderPaddingTop }]}
+        >
+          <View style={styles.inboxHeaderRow}>
+            <Text style={styles.messagesInboxTitle}>Messages</Text>
+            <CloseButton
+              onPress={onCloseMessages}
+              accessibilityLabel="Close messages"
+            />
+          </View>
+          <View style={styles.headerDivider} />
         </View>
       )}
 

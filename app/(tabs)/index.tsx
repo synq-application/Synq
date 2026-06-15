@@ -2574,13 +2574,15 @@ const styles = StyleSheet.create({
   modalBg: { flex: 1, backgroundColor: BG },
   messagesPaneFill: { flex: 1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
+  inboxHeaderBlock: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
   inboxHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 10,
   },
   inboxTitleRow: {
     flexDirection: 'row',
