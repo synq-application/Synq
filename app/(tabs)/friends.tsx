@@ -542,9 +542,9 @@ export default function FriendsScreen() {
   const listIsEmpty = displayFriends.length === 0;
 
   const handleCreateGroup = useCallback(
-    async (name: string) => {
+    async (name: string, memberIds: string[] = []) => {
       if (!myId) throw new Error("Not signed in.");
-      return createFriendGroup(myId, name);
+      return createFriendGroup(myId, name, memberIds);
     },
     [myId]
   );
