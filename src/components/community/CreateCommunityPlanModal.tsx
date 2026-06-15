@@ -6,11 +6,11 @@ import {
   BUTTON_RADIUS,
   fonts,
   MODAL_RADIUS,
+  MUTED2,
   PRIMARY_CTA_WIDTH,
   TEXT,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
-import PlanDateCalendar from "@/src/components/PlanDateCalendar";
 import PlanTimePicker from "@/src/components/PlanTimePicker";
 import { filterOrReject } from "@/src/lib/contentFilter";
 import { Ionicons } from "@expo/vector-icons";
@@ -97,7 +97,7 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
-  const [activePicker, setActivePicker] = useState<"date" | "time" | null>(null);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
@@ -107,17 +107,10 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
     return windowH - insets.top - insets.bottom - 24;
   }, [insets.top, insets.bottom]);
 
-  const minimumSelectableDate = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
-
   const todayRef = new Date();
   const tomorrowRef = new Date(Date.now() + 86400000);
   const isToday = isSameCalendarDay(selectedDate, todayRef);
   const isTomorrow = isSameCalendarDay(selectedDate, tomorrowRef);
-  const isCustomDate = !isToday && !isTomorrow;
 
   const canPost = title.trim().length > 0 && !busy;
 
@@ -125,7 +118,7 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
     setTitle("");
     setLocation("");
     setSelectedDate(getInitialDate());
-    setActivePicker(null);
+    setTimePickerOpen(false);
     setKeyboardInset(0);
   }, []);
 
@@ -152,44 +145,15 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
     };
   }, [visible]);
 
-  const dismissPickers = useCallback(() => {
-    setActivePicker(null);
-  }, []);
-
   const dismissKeyboard = useCallback(() => {
     Keyboard.dismiss();
   }, []);
-
-  const collapseActivePicker = useCallback(() => {
-    Keyboard.dismiss();
-    if (activePicker) setActivePicker(null);
-  }, [activePicker]);
-
-  const togglePicker = (picker: "date" | "time") => {
-    Keyboard.dismiss();
-    setActivePicker((p) => (p === picker ? null : picker));
-  };
 
   const setDate = (base: Date) => {
     const d = new Date(base);
     d.setHours(selectedDate.getHours());
     d.setMinutes(selectedDate.getMinutes());
     setSelectedDate(d);
-  };
-
-  const formatPlanDateLabel = (d: Date) => {
-    if (isSameCalendarDay(d, todayRef)) return "Today";
-    if (isSameCalendarDay(d, tomorrowRef)) return "Tomorrow";
-    return d.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const handleCalendarSelect = (d: Date) => {
-    setDate(d);
-    setActivePicker(null);
   };
 
   const handleClose = () => {
@@ -204,8 +168,8 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
       Keyboard.dismiss();
       return;
     }
-    if (activePicker) {
-      setActivePicker(null);
+    if (timePickerOpen) {
+      setTimePickerOpen(false);
       return;
     }
     handleClose();
@@ -256,7 +220,7 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
             style={StyleSheet.absoluteFill}
             onPress={handleBackdropPress}
             accessibilityRole="button"
-            accessibilityLabel="Close plan editor"
+            accessibilityLabel="Close community Synq editor"
           />
           <View
             style={[
@@ -269,7 +233,7 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
             <View style={[styles.popupCard, { maxHeight: modalMaxHeight }]}>
               <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
                 <View style={styles.popupTitleRow}>
-                  <Text style={styles.popupTitle}>Add a plan</Text>
+                  <Text style={styles.popupTitle}>Share a community Synq</Text>
                   <CloseButton onPress={handleClose} accessibilityLabel="Close" />
                 </View>
               </TouchableWithoutFeedback>
@@ -287,11 +251,11 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
                 <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
                   <View>
                     <TextInput
-                      placeholder="What's the plan?"
+                      placeholder="What are you up for?"
                       placeholderTextColor="#555"
                       style={styles.planInput}
                       value={title}
-                      onFocus={dismissPickers}
+                      onFocus={() => setTimePickerOpen(false)}
                       onChangeText={setTitle}
                       maxLength={80}
                       returnKeyType="next"
@@ -299,89 +263,51 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
                     />
 
                     <View style={styles.scheduleBlock}>
-                      <TouchableWithoutFeedback onPress={collapseActivePicker} accessible={false}>
-                        <View>
-                          <View style={styles.quickDateRow}>
-                            <DateBtn
-                              label="Today"
-                              selected={isToday}
-                              onPress={() => {
-                                Keyboard.dismiss();
-                                setActivePicker(null);
-                                setDate(new Date());
-                              }}
-                            />
-                            <DateBtn
-                              label="Tomorrow"
-                              selected={isTomorrow}
-                              onPress={() => {
-                                Keyboard.dismiss();
-                                setActivePicker(null);
-                                setDate(new Date(Date.now() + 86400000));
-                              }}
-                            />
-                            <DateBtn
-                              label="Other"
-                              selected={isCustomDate}
-                              onPress={() => togglePicker("date")}
-                            />
-                          </View>
-
-                          <View style={styles.dateTimeRow}>
-                            <TouchableOpacity
-                              style={[
-                                styles.dateTimeField,
-                                activePicker === "date" && styles.dateTimeFieldActive,
-                              ]}
-                              onPress={() => togglePicker("date")}
-                              activeOpacity={0.85}
-                            >
-                              <Ionicons
-                                name="calendar-outline"
-                                size={18}
-                                color={activePicker === "date" ? ACCENT : "#888"}
-                              />
-                              <View style={styles.dateTimeTextWrap}>
-                                <Text style={styles.dateTimeValue}>
-                                  {formatPlanDateLabel(selectedDate)}
-                                </Text>
-                              </View>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[
-                                styles.dateTimeField,
-                                activePicker === "time" && styles.dateTimeFieldActive,
-                              ]}
-                              onPress={() => togglePicker("time")}
-                              activeOpacity={0.85}
-                            >
-                              <Ionicons
-                                name="time-outline"
-                                size={18}
-                                color={activePicker === "time" ? ACCENT : "#888"}
-                              />
-                              <View style={styles.dateTimeTextWrap}>
-                                <Text style={styles.dateTimeValue}>{formatTime(selectedDate)}</Text>
-                              </View>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </TouchableWithoutFeedback>
-                    </View>
-
-                    {activePicker === "date" ? (
-                      <View style={styles.calendarWrap}>
-                        <PlanDateCalendar
-                          value={selectedDate}
-                          minimumDate={minimumSelectableDate}
-                          accentColor={ACCENT}
-                          onChange={handleCalendarSelect}
+                      <View style={styles.quickDateRow}>
+                        <DateBtn
+                          label="Today"
+                          selected={isToday}
+                          onPress={() => {
+                            Keyboard.dismiss();
+                            setTimePickerOpen(false);
+                            setDate(new Date());
+                          }}
+                        />
+                        <DateBtn
+                          label="Tomorrow"
+                          selected={isTomorrow}
+                          onPress={() => {
+                            Keyboard.dismiss();
+                            setTimePickerOpen(false);
+                            setDate(new Date(Date.now() + 86400000));
+                          }}
                         />
                       </View>
-                    ) : null}
 
-                    {activePicker === "time" ? (
+                      <TouchableOpacity
+                        style={[
+                          styles.timeField,
+                          timePickerOpen && styles.timeFieldActive,
+                        ]}
+                        onPress={() => {
+                          Keyboard.dismiss();
+                          setTimePickerOpen((open) => !open);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons
+                          name="time-outline"
+                          size={18}
+                          color={timePickerOpen ? ACCENT : "#888"}
+                        />
+                        <View style={styles.timeFieldTextWrap}>
+                          <Text style={styles.timeFieldLabel}>Time</Text>
+                          <Text style={styles.timeFieldValue}>{formatTime(selectedDate)}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+
+                    {timePickerOpen ? (
                       <PlanTimePicker
                         value={selectedDate}
                         accentColor={ACCENT}
@@ -391,11 +317,11 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
 
                     <View style={styles.locationFieldWrap}>
                       <TextInput
-                        placeholder="Add location"
+                        placeholder="Add location (optional)"
                         placeholderTextColor="#555"
                         style={styles.planInputSecondary}
                         value={location}
-                        onFocus={dismissPickers}
+                        onFocus={() => setTimePickerOpen(false)}
                         onChangeText={setLocation}
                         maxLength={120}
                         returnKeyType="done"
@@ -411,7 +337,7 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
                       {busy ? (
                         <ActivityIndicator color="#061006" size="small" />
                       ) : (
-                        <Text style={styles.popupPostBtnText}>Post</Text>
+                        <Text style={styles.popupPostBtnText}>Share</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -461,7 +387,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   popupTitle: {
     flex: 1,
@@ -490,11 +416,6 @@ const styles = StyleSheet.create({
     color: "#061006",
     fontFamily: fonts.heavy,
     fontSize: 16,
-  },
-  calendarWrap: {
-    marginTop: 6,
-    marginBottom: 8,
-    paddingHorizontal: 2,
   },
   planInput: {
     backgroundColor: "#0c0c0c",
@@ -528,19 +449,13 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_RADIUS,
     padding: 10,
     marginBottom: 10,
+    gap: 10,
   },
   quickDateRow: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 10,
   },
-  dateTimeRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 8,
-  },
-  dateTimeField: {
-    flex: 1,
+  timeField: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -551,12 +466,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
-  dateTimeFieldActive: {
+  timeFieldActive: {
     borderColor: ACCENT,
     backgroundColor: "rgba(0,255,133,0.08)",
   },
-  dateTimeTextWrap: { flex: 1 },
-  dateTimeValue: {
+  timeFieldTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  timeFieldLabel: {
+    color: MUTED2,
+    fontSize: 12,
+    fontFamily: fonts.book,
+  },
+  timeFieldValue: {
     color: TEXT,
     fontSize: 15,
     fontFamily: fonts.heavy,

@@ -56,7 +56,6 @@ type Props = {
   userId: string;
   friends: Friend[];
   joinedGroupIds: Set<string>;
-  suggestedGroups?: CommunityGroup[];
   onClose: () => void;
   onJoined: (groupId: string) => void;
   onOpenGroup: (groupId: string) => void;
@@ -78,7 +77,6 @@ export default function CommunityGroupSearchSheet({
   userId,
   friends,
   joinedGroupIds,
-  suggestedGroups = [],
   onClose,
   onJoined,
   onOpenGroup,
@@ -329,17 +327,7 @@ export default function CommunityGroupSearchSheet({
   );
 
   const renderBrowseHome = () => {
-    const browseSuggestions = (() => {
-      const seen = new Set<string>();
-      const merged: CommunityGroup[] = [];
-      for (const group of [...suggestedGroups, ...exploreGroups]) {
-        if (seen.has(group.id)) continue;
-        seen.add(group.id);
-        merged.push(group);
-        if (merged.length >= 5) break;
-      }
-      return merged;
-    })();
+    const browseSuggestions = exploreGroups.slice(0, 5);
 
     return (
       <FlatList

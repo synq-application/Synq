@@ -1,38 +1,41 @@
 import {
   ACCENT,
-  BG,
-  BORDER,
   fonts,
   MUTED2,
-  ON_ACCENT_TEXT,
-  profileScreenSectionTitle,
   RADIUS_MD,
+  RADIUS_LG,
   SPACE_3,
   SPACE_4,
   SPACE_5,
-  SURFACE,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
 } from "@/constants/Variables";
+import AlertModal from "@/app/alert-modal";
+import ConfirmModal from "@/app/confirm-modal";
 import CreateCommunityPlanModal from "@/src/components/community/CreateCommunityPlanModal";
+import { groupsPageStyles } from "@/src/components/friends/groupsListStyles";
 import {
   addCommunityPlanToUserEvents,
   createCommunityGroupPlan,
   deleteCommunityGroupPlan,
-  formatCommunityPlanDateLabel,
+  getCommunitySynqCardMetaParts,
+  formatCommunitySynqGoingCount,
+  isCommunityPlanGoing,
   isCommunityPlanOnUserEvents,
+  removeCommunityPlanFromUserEvents,
   subscribeCommunityGroupPlans,
   type CommunityGroupPlan,
 } from "@/src/lib/communityGroupPlans";
 import { filterOutPastOpenPlans, sortOpenPlansByDateTime } from "@/src/lib/planEvents";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/src/lib/firebase";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -48,6 +51,8 @@ type Props = {
   isCreator: boolean;
 };
 
+type ConfirmKind = "delete";
+
 export default function CommunityPlansSection({
   groupId,
   groupName,
@@ -62,6 +67,25 @@ export default function CommunityPlansSection({
   const [createVisible, setCreateVisible] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [joiningPlanId, setJoiningPlanId] = useState<string | null>(null);
+  const [showAllPlans, setShowAllPlans] = useState(false);
+  const [pendingPlan, setPendingPlan] = useState<CommunityGroupPlan | null>(null);
+  const [confirmKind, setConfirmKind] = useState<ConfirmKind | null>(null);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+
+  const PLAN_PREVIEW_COUNT = 3;
+
+  const showAlert = useCallback((title: string, message = "") => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  }, []);
+
+  const closeConfirm = useCallback(() => {
+    setConfirmKind(null);
+    setPendingPlan(null);
+  }, []);
 
   useEffect(() => {
     if (!groupId) return;
@@ -91,6 +115,10 @@ export default function CommunityPlansSection({
     [plans]
   );
 
+  const displayedPlans = showAllPlans
+    ? visiblePlans
+    : visiblePlans.slice(0, PLAN_PREVIEW_COUNT);
+
   const handleCreate = useCallback(
     async (input: { title: string; date: string; time: string; location: string }) => {
       if (!uid || !isMember) return;
@@ -99,160 +127,207 @@ export default function CommunityPlansSection({
         await createCommunityGroupPlan(groupId, uid, viewerDisplayName, input);
         setCreateVisible(false);
       } catch (err: unknown) {
-        Alert.alert("Could not post plan", err instanceof Error ? err.message : "Try again.");
+        showAlert("Could not share synq", err instanceof Error ? err.message : "Try again.");
       } finally {
         setCreateBusy(false);
       }
     },
-    [groupId, uid, isMember, viewerDisplayName]
+    [groupId, uid, isMember, viewerDisplayName, showAlert]
   );
 
-  const handleAddToPlans = useCallback(
+  const handleJoin = useCallback(
     async (plan: CommunityGroupPlan) => {
       if (!uid) return;
       if (!isMember) {
-        Alert.alert("Join community", `Join ${groupName} to add this plan.`);
+        showAlert("Join community", `Join ${groupName} to see who's going.`);
         return;
       }
       setJoiningPlanId(plan.id);
       try {
-        const result = await addCommunityPlanToUserEvents(uid, plan, viewerDisplayName);
-        Alert.alert(
-          result === "already" ? "Already added" : "Added",
-          result === "already"
-            ? "This plan is already on your open plans."
-            : "Plan added to your open plans."
-        );
+        await addCommunityPlanToUserEvents(uid, plan, viewerDisplayName);
+        showAlert("Joined!");
       } catch (err: unknown) {
-        Alert.alert("Could not add plan", err instanceof Error ? err.message : "Try again.");
+        showAlert("Could not update", err instanceof Error ? err.message : "Try again.");
       } finally {
         setJoiningPlanId(null);
       }
     },
-    [uid, isMember, groupName, viewerDisplayName]
+    [uid, isMember, groupName, viewerDisplayName, showAlert]
   );
 
-  const handleDelete = useCallback(
-    (plan: CommunityGroupPlan) => {
-      Alert.alert("Delete plan?", `Remove "${plan.title}" from ${groupName}?`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            void deleteCommunityGroupPlan(groupId, plan.id).catch(() => {
-              Alert.alert("Error", "Could not delete this plan.");
-            });
-          },
-        },
-      ]);
+  const handleLeave = useCallback(
+    async (plan: CommunityGroupPlan) => {
+      if (!uid) return;
+      setJoiningPlanId(plan.id);
+      try {
+        await removeCommunityPlanFromUserEvents(uid, plan);
+        showAlert("Left!");
+      } catch (err: unknown) {
+        showAlert("Could not update", err instanceof Error ? err.message : "Try again.");
+      } finally {
+        setJoiningPlanId(null);
+      }
     },
-    [groupId, groupName]
+    [uid, showAlert]
   );
+
+  const openDeleteConfirm = useCallback((plan: CommunityGroupPlan) => {
+    setPendingPlan(plan);
+    setConfirmKind("delete");
+  }, []);
+
+  const handleConfirm = useCallback(async () => {
+    const plan = pendingPlan;
+    closeConfirm();
+    if (!plan || !uid) return;
+
+    try {
+      await deleteCommunityGroupPlan(groupId, plan.id);
+    } catch {
+      showAlert("Error", "Could not remove this synq.");
+    }
+  }, [pendingPlan, closeConfirm, uid, groupId, showAlert]);
+
+  const confirmCopy = useMemo(() => {
+    if (!pendingPlan || confirmKind !== "delete") return null;
+
+    return {
+      title: "Remove synq?",
+      message: `Remove "${pendingPlan.title}" from ${groupName}?`,
+      confirmText: "Remove",
+      destructive: true,
+    };
+  }, [pendingPlan, confirmKind, groupName]);
 
   return (
     <>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Plans</Text>
-        {isMember && visiblePlans.length > 0 ? (
-          <TouchableOpacity
-            style={styles.postBtn}
-            onPress={() => setCreateVisible(true)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Post a plan for this group"
-          >
-            <Ionicons name="add" size={18} color={ACCENT} />
-            <Text style={styles.postBtnText}>Post</Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
+      <View style={styles.sectionBlock}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Community Synqs</Text>
+          {visiblePlans.length > 0 ? (
+            <TouchableOpacity
+              onPress={() => setShowAllPlans((prev) => !prev)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.sectionLink}>
+                {showAllPlans ? "Show less" : "See all"}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-      {loading ? (
-        <ActivityIndicator color={ACCENT} style={styles.loader} />
-      ) : visiblePlans.length === 0 ? (
-        isMember ? (
-          <TouchableOpacity
-            style={styles.postCta}
-            onPress={() => setCreateVisible(true)}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Post a plan for this group"
-          >
-            <Ionicons name="calendar-outline" size={20} color={ACCENT} />
-            <Text style={styles.postCtaText}>Post a plan for this group</Text>
-          </TouchableOpacity>
+        {loading ? (
+          <ActivityIndicator color={ACCENT} style={styles.loader} />
+        ) : displayedPlans.length === 0 ? (
+          isMember ? null : (
+            <Text style={styles.empty}>No community synqs yet.</Text>
+          )
         ) : (
-          <Text style={styles.empty}>No plans yet.</Text>
-        )
-      ) : (
-        <View style={styles.list}>
-          {visiblePlans.map((plan) => {
-            const joined = isCommunityPlanOnUserEvents(plan, userEvents);
-            const isHost = plan.creatorId === uid;
-            const canDelete = isHost || isCreator;
-            const dateParts = formatCommunityPlanDateLabel(plan.date);
+          <View style={styles.list}>
+            {displayedPlans.map((plan) => {
+            const isGoing =
+              isCommunityPlanGoing(plan, uid) ||
+              isCommunityPlanOnUserEvents(plan, userEvents);
+            const canDelete = plan.creatorId === uid || isCreator;
+            const goingCount = Math.max(plan.goingMemberIds.length, isGoing ? 1 : 0);
+            const metaParts = getCommunitySynqCardMetaParts(plan.date, plan.time, plan.location);
+            const metaLabel = metaParts.join(" • ");
+            const peopleInLabel = formatCommunitySynqGoingCount(goingCount);
             const busy = joiningPlanId === plan.id;
 
             return (
-              <View key={plan.id} style={styles.card}>
-                <View style={styles.dateBlock}>
-                  <Text style={styles.weekday}>{dateParts.weekday}</Text>
-                  <Text style={styles.day}>{dateParts.day}</Text>
-                  <Text style={styles.month}>{dateParts.month}</Text>
-                </View>
+              <Pressable
+                key={plan.id}
+                style={styles.card}
+                onLongPress={
+                  canDelete
+                    ? () => {
+                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        openDeleteConfirm(plan);
+                      }
+                    : undefined
+                }
+                delayLongPress={400}
+                accessibilityRole="button"
+                accessibilityLabel={`${plan.title}, ${metaLabel}, ${peopleInLabel}`}
+                accessibilityHint={
+                  canDelete ? "Long press to remove this synq" : undefined
+                }
+              >
+                <View style={styles.cardAccent} />
+                <View style={styles.cardContent}>
+                  <View style={styles.cardTop}>
+                    <View style={styles.cardMain}>
+                      <Text style={styles.planTitle} numberOfLines={2}>
+                        {plan.title}
+                      </Text>
+                      <Text style={styles.planMeta} numberOfLines={2}>
+                        {metaParts.map((part, index) => (
+                          <React.Fragment key={`${part}-${index}`}>
+                            {index > 0 ? (
+                              <>
+                                <Text> </Text>
+                                <Text style={styles.planMetaBullet}>•</Text>
+                                <Text> </Text>
+                              </>
+                            ) : null}
+                            <Text>{part}</Text>
+                          </React.Fragment>
+                        ))}
+                      </Text>
+                      <Text style={styles.peopleIn} numberOfLines={1}>
+                        {peopleInLabel}
+                      </Text>
+                    </View>
 
-                <View style={styles.cardBody}>
-                  <Text style={styles.planTitle} numberOfLines={2}>
-                    {plan.title}
-                  </Text>
-                  {[plan.time, plan.location].some(Boolean) ? (
-                    <Text style={styles.planMeta} numberOfLines={1}>
-                      {[plan.time, plan.location].filter(Boolean).join(" · ")}
-                    </Text>
-                  ) : null}
-
-                  <View style={styles.cardActions}>
-                    {isHost ? (
-                      <View style={[styles.pill, styles.pillHost]}>
-                        <Text style={styles.pillHostText}>Yours</Text>
-                      </View>
-                    ) : joined ? (
-                      <View style={[styles.pill, styles.pillJoined]}>
-                        <Text style={styles.pillJoinedText}>Added</Text>
-                      </View>
-                    ) : (
+                    <View style={styles.cardAside}>
                       <TouchableOpacity
-                        style={[styles.pill, styles.pillAdd, busy && styles.pillDisabled]}
-                        onPress={() => void handleAddToPlans(plan)}
+                        style={[styles.pill, busy && styles.pillDisabled]}
+                        onPress={() =>
+                          isGoing ? void handleLeave(plan) : void handleJoin(plan)
+                        }
                         disabled={busy || !isMember}
                         activeOpacity={0.85}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          isGoing
+                            ? `Leave ${plan.title}`
+                            : `Join ${plan.title}`
+                        }
                       >
                         {busy ? (
-                          <ActivityIndicator color={ON_ACCENT_TEXT} size="small" />
+                          <ActivityIndicator color={ACCENT} size="small" />
                         ) : (
-                          <Text style={styles.pillAddText}>Add</Text>
+                          <Text style={styles.pillText}>
+                            {isGoing ? "Joined" : "Join"}
+                          </Text>
                         )}
                       </TouchableOpacity>
-                    )}
-
-                    {canDelete ? (
-                      <TouchableOpacity
-                        onPress={() => handleDelete(plan)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Delete ${plan.title}`}
-                      >
-                        <Ionicons name="trash-outline" size={18} color={MUTED2} />
-                      </TouchableOpacity>
-                    ) : null}
+                    </View>
                   </View>
                 </View>
-              </View>
+              </Pressable>
             );
           })}
-        </View>
-      )}
+          </View>
+        )}
+
+        {isMember ? (
+          <TouchableOpacity
+            style={styles.startSynqCta}
+            onPress={() => setCreateVisible(true)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Start a community Synq"
+          >
+            <Ionicons name="add" size={20} color={ACCENT} />
+            <View style={styles.startSynqCopy}>
+              <Text style={styles.startSynqTitle}>Start a community Synq</Text>
+              <Text style={styles.startSynqSubtitle}>Post something spontaneous</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
       <CreateCommunityPlanModal
         visible={createVisible}
@@ -260,57 +335,76 @@ export default function CommunityPlansSection({
         onClose={() => setCreateVisible(false)}
         onCreate={handleCreate}
       />
+
+      <ConfirmModal
+        visible={confirmCopy != null}
+        title={confirmCopy?.title}
+        message={confirmCopy?.message ?? ""}
+        confirmText={confirmCopy?.confirmText}
+        destructive={confirmCopy?.destructive}
+        onCancel={closeConfirm}
+        onConfirm={() => void handleConfirm()}
+      />
+
+      <AlertModal
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  sectionBlock: {
+    paddingTop: SPACE_4,
+  },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: SPACE_5,
-    paddingTop: SPACE_4,
     paddingBottom: SPACE_3,
   },
   sectionTitle: {
-    ...profileScreenSectionTitle,
+    ...groupsPageStyles.subsectionTitle,
+    fontSize: 16,
+    marginTop: 0,
     marginBottom: 0,
   },
-  postBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    minHeight: 34,
-    borderRadius: 17,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,255,133,0.35)",
-    backgroundColor: "rgba(0,255,133,0.08)",
-  },
-  postBtnText: {
+  sectionLink: {
     fontFamily: fonts.medium,
     fontSize: TYPE_CAPTION + 1,
     color: ACCENT,
   },
-  postCta: {
+  startSynqCta: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACE_3,
     marginHorizontal: SPACE_5,
+    marginTop: SPACE_3,
     marginBottom: SPACE_4,
     paddingHorizontal: SPACE_4,
-    minHeight: 52,
+    minHeight: 58,
     borderRadius: RADIUS_MD,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(0,255,133,0.28)",
     backgroundColor: "rgba(0,255,133,0.06)",
   },
-  postCtaText: {
+  startSynqCopy: {
     flex: 1,
+    gap: 2,
+  },
+  startSynqTitle: {
     fontFamily: fonts.medium,
-    fontSize: TYPE_BODY,
+    fontSize: TYPE_CAPTION + 1,
     color: TEXT,
+  },
+  startSynqSubtitle: {
+    fontFamily: fonts.book,
+    fontSize: TYPE_CAPTION,
+    color: MUTED2,
   },
   loader: {
     marginVertical: SPACE_4,
@@ -329,91 +423,75 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: "row",
-    gap: SPACE_4,
-    padding: SPACE_4,
-    borderRadius: RADIUS_MD,
+    borderRadius: RADIUS_LG,
+    overflow: "hidden",
+    backgroundColor: "#101214",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
-    backgroundColor: SURFACE,
+    borderColor: "rgba(255,255,255,0.08)",
   },
-  dateBlock: {
-    width: 52,
+  cardAccent: {
+    width: 3,
+    backgroundColor: ACCENT,
+  },
+  cardContent: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: SPACE_4,
+    minWidth: 0,
+  },
+  cardTop: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingTop: 2,
+    gap: SPACE_4,
   },
-  weekday: {
-    fontFamily: fonts.medium,
-    fontSize: 11,
-    color: MUTED2,
-    letterSpacing: 0.6,
-  },
-  day: {
-    fontFamily: fonts.heavy,
-    fontSize: 24,
-    color: TEXT,
-    lineHeight: 28,
-  },
-  month: {
-    fontFamily: fonts.medium,
-    fontSize: 11,
-    color: MUTED2,
-    letterSpacing: 0.6,
-  },
-  cardBody: {
+  cardMain: {
     flex: 1,
     gap: 4,
+    minWidth: 0,
+  },
+  cardAside: {
+    flexShrink: 0,
   },
   planTitle: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_BODY + 1,
+    fontFamily: fonts.heavy,
+    fontSize: 15,
     color: TEXT,
-    lineHeight: 22,
+    lineHeight: 20,
+    letterSpacing: 0.05,
   },
   planMeta: {
     fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION + 1,
+    fontSize: TYPE_CAPTION,
     color: MUTED2,
+    lineHeight: 18,
+  },
+  planMetaBullet: {
+    fontSize: 9,
+    color: MUTED2,
+    lineHeight: 18,
+  },
+  peopleIn: {
+    fontFamily: fonts.medium,
+    fontSize: TYPE_CAPTION,
+    color: ACCENT,
     lineHeight: 18,
     marginTop: 2,
   },
-  cardActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACE_3,
-    marginTop: SPACE_3,
-  },
   pill: {
-    minHeight: 32,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    minWidth: 72,
+    minHeight: 34,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: ACCENT,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
-  pillAdd: {
-    backgroundColor: ACCENT,
-  },
-  pillAddText: {
+  pillText: {
     fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION + 1,
-    color: ON_ACCENT_TEXT,
-  },
-  pillJoined: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,255,133,0.35)",
-    backgroundColor: "rgba(0,255,133,0.08)",
-  },
-  pillJoinedText: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION + 1,
+    fontSize: TYPE_CAPTION,
     color: ACCENT,
-  },
-  pillHost: {
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  pillHostText: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION + 1,
-    color: MUTED2,
   },
   pillDisabled: {
     opacity: 0.6,
