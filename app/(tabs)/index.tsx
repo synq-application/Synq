@@ -33,6 +33,7 @@ import {
   type SynqAudienceSelection,
 } from '@/src/lib/synqBroadcast';
 import { useSynqBoot } from '@/src/lib/synqBootContext';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
@@ -128,6 +129,7 @@ import {
   writeCachedSynqActive,
 } from "../../src/lib/synqSession";
 import { DISMISS_NAVIGATION_OVERLAYS } from "../../src/lib/navigationOverlayEvents";
+import { consumePendingChatOpen, subscribePendingChatOpen } from "../../src/lib/pendingChatOpen";
 import { getCachedOwnProfile } from "../../src/lib/ownProfileCache";
 import { userHasLocation } from "../../src/lib/userProfile";
 import { useAuthRefresh } from '../_layout';
@@ -726,18 +728,26 @@ export default function SynqScreen() {
     };
   }, [status, activePulseOpacity, activePulseScale]);
 
-  useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('openChat', async (data: { chatId?: string; messageId?: string }) => {
-      if (data.chatId) {
-        const mid =
-          typeof data.messageId === "string" && data.messageId.trim()
-            ? data.messageId.trim()
-            : null;
-        await openChatById(data.chatId, { messageId: mid, prefetchChatDoc: true });
-      }
+  const openPendingChatFromNotification = useCallback(() => {
+    const pending = consumePendingChatOpen();
+    if (!pending) return;
+    void openChatById(pending.chatId, {
+      messageId: pending.messageId ?? null,
+      prefetchChatDoc: true,
     });
-    return () => subscription.remove();
   }, [openChatById]);
+
+  useFocusEffect(
+    useCallback(() => {
+      openPendingChatFromNotification();
+    }, [openPendingChatFromNotification])
+  );
+
+  useEffect(() => {
+    const unsub = subscribePendingChatOpen(openPendingChatFromNotification);
+    openPendingChatFromNotification();
+    return unsub;
+  }, [openPendingChatFromNotification]);
 
   useEffect(() => {
     if (!pendingScrollToMessageId) return;

@@ -18,6 +18,8 @@ import {
   dismissActivityNotification,
 } from "@/src/lib/activityNotifications";
 import { DISMISS_NAVIGATION_OVERLAYS } from "@/src/lib/navigationOverlayEvents";
+import { setPendingChatOpen } from "@/src/lib/pendingChatOpen";
+import { parsePushNotificationTap } from "@/src/lib/pushNotificationTapCore";
 import {
   parseProfileShareCodeFromUrl,
   resolveProfileShareCodeToFriendId,
@@ -33,7 +35,6 @@ import React, {
 import {
   DeviceEventEmitter,
   Image,
-  InteractionManager,
   Platform,
   StyleSheet,
   View,
@@ -295,69 +296,9 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    const str = (v: unknown): string | undefined => {
-      if (typeof v === "string" && v.trim()) return v.trim();
-      return undefined;
-    };
-
     const applyNotificationData = (data: Record<string, unknown> | undefined) => {
-      if (!data) return;
-      const chatRaw = data.chatId;
-      const chatId =
-        typeof chatRaw === "string"
-          ? chatRaw
-          : chatRaw != null
-            ? String(chatRaw)
-            : undefined;
-      const messageId = str(data.messageId);
-      const type = typeof data.type === "string" ? data.type : undefined;
-
-      if (chatId) {
-        setPendingNotificationTap({
-          kind: "chat",
-          chatId,
-          messageId: messageId || undefined,
-        });
-        return;
-      }
-
-      if (type === "friend_request") {
-        setPendingNotificationTap({ kind: "notifications" });
-        return;
-      }
-
-      if (type === "friend_accepted") {
-        const friendId = str(data.fromUserId);
-        if (friendId) {
-          setPendingNotificationTap({ kind: "friend_profile", friendId });
-        } else {
-          setPendingNotificationTap({ kind: "notifications" });
-        }
-        return;
-      }
-
-      if (type === "friend_synq_active" || type === "synq_nudge") {
-        setPendingNotificationTap({
-          kind: "synq_home",
-          fromUserId: str(data.fromUserId),
-          notificationType: type,
-        });
-        return;
-      }
-
-      if (type === "open_plan_interest") {
-        setPendingNotificationTap({
-          kind: "me",
-          focusEventId: str(data.eventId),
-          notificationId: str(data.notificationId),
-        });
-        return;
-      }
-
-      if (type === "plan_invite") {
-        setPendingNotificationTap({ kind: "notifications" });
-        return;
-      }
+      const tap = parsePushNotificationTap(data);
+      if (tap) setPendingNotificationTap(tap);
     };
 
     const sub = Notifications.addNotificationResponseReceivedListener(
@@ -889,20 +830,10 @@ export default function RootLayout() {
     }
 
     if (pending.kind === "chat") {
-      router.push("/(tabs)");
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      const handle = InteractionManager.runAfterInteractions(() => {
-        timeoutId = setTimeout(() => {
-          DeviceEventEmitter.emit("openChat", {
-            chatId: pending.chatId,
-            messageId: pending.messageId,
-          });
-        }, 700);
-      });
-      return () => {
-        handle.cancel?.();
-        if (timeoutId) clearTimeout(timeoutId);
-      };
+      DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
+      setPendingChatOpen(pending.chatId, pending.messageId);
+      router.replace("/(tabs)");
+      return;
     }
   }, [
     authReady,

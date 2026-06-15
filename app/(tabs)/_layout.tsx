@@ -72,6 +72,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: "",
+          lazy: false,
           tabBarShowLabel: true,
           tabBarAccessibilityLabel: "Synq home",
           tabBarButton: (props) => (

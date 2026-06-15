@@ -84,6 +84,9 @@ function participantFirstName(fullName: string) {
 }
 /** Modest bump past the header fade overlap (shell uses negative margin). */
 const CHAT_LIST_HEADER_FADE_CLEARANCE = 10;
+/** Keep first paint small — uncapped initialNumToRender was forcing 50 rows on chat open. */
+const CHAT_LIST_INITIAL_RENDER_MIN = 10;
+const CHAT_ESTIMATED_ROW_HEIGHT = 76;
 const CHAT_HEADER_FADE_GRADIENT = [
   HEADER_BLACK,
   "rgba(0,0,0,0.78)",
@@ -95,6 +98,15 @@ const CHAT_HEADER_FADE_LOCATIONS = [0, 0.32, 0.68, 1] as const;
 function getKeyboardInset(event: KeyboardEvent): number {
   const { screenY } = event.endCoordinates;
   return Math.max(0, Dimensions.get("window").height - screenY);
+}
+
+function countHeartReactions(reactions?: Record<string, string>): number {
+  if (!reactions) return 0;
+  let count = 0;
+  for (const value of Object.values(reactions)) {
+    if (value === "heart") count += 1;
+  }
+  return count;
 }
 
 type Props = {
@@ -664,7 +676,7 @@ export default function MessagesChatPane({
       try {
         flatListRef.current?.scrollToIndex({
           index: targetIndex,
-          animated: true,
+          animated: false,
           viewPosition: 0.4,
         });
       } catch {
@@ -683,9 +695,15 @@ export default function MessagesChatPane({
     scrollToLatest,
   ]);
 
-  const flatListInitialRender = useMemo(
-    () => Math.min(Math.max(messages.length, 16), 50),
-    [activeChat?.id]
+  const flatListInitialRender = CHAT_LIST_INITIAL_RENDER_MIN;
+
+  const getMessageItemLayout = useCallback(
+    (_data: ArrayLike<unknown> | null | undefined, index: number) => ({
+      length: CHAT_ESTIMATED_ROW_HEIGHT,
+      offset: CHAT_ESTIMATED_ROW_HEIGHT * index,
+      index,
+    }),
+    []
   );
 
   const setKeyboardVisible = useCallback((visible: boolean) => {
@@ -761,19 +779,6 @@ export default function MessagesChatPane({
     [messages.length, messagesReady, styles.chatListContent, styles.chatListContentEmpty]
   );
 
-  const listContentExtraData = useMemo(
-    () =>
-      messages
-        .map((message) => {
-          const heartCount =
-            message.reactions &&
-            Object.values(message.reactions).filter((v) => v === "heart").length;
-          return `${message.clientId ?? message.id}:${message.text}:${heartCount || 0}`;
-        })
-        .join("\n"),
-    [messages]
-  );
-
   const listAvatarRevision = useMemo(() => {
     const live = liveParticipantImages ?? {};
     return Object.keys(live)
@@ -782,10 +787,7 @@ export default function MessagesChatPane({
       .join("|");
   }, [liveParticipantImages]);
 
-  const listExtraData = useMemo(
-    () => `${listContentExtraData}\n${listAvatarRevision}`,
-    [listContentExtraData, listAvatarRevision]
-  );
+  const listExtraData = listAvatarRevision;
 
   const headerAvatar = useMemo(
     () => renderAvatarStack(activeChat?.participantImages, activeChat?.participants),
@@ -821,9 +823,7 @@ export default function MessagesChatPane({
       if (isSystemIdea) {
         const { name, address } = parseIdeaText(item.text);
         const isLegacyAiSuggestion = isLegacyAiSuggestionText(item.text);
-        const ideaHeartCount =
-          item.reactions &&
-          Object.values(item.reactions).filter((v) => v === "heart").length;
+        const ideaHeartCount = countHeartReactions(item.reactions);
 
         return (
           <RowWrapper {...rowWrapperProps}>
@@ -851,9 +851,7 @@ export default function MessagesChatPane({
       }
 
       const bubbleCap = iMessageBubbleColumnMaxWidth(windowWidth, isMe);
-      const heartCount =
-        item.reactions &&
-        Object.values(item.reactions).filter((v) => v === "heart").length;
+      const heartCount = countHeartReactions(item.reactions);
 
       return (
         <RowWrapper {...rowWrapperProps}>
@@ -1193,10 +1191,11 @@ export default function MessagesChatPane({
               return key ? String(key) : `message-${index}`;
             }}
             showsVerticalScrollIndicator={false}
-            removeClippedSubviews={Platform.OS === "android"}
+            removeClippedSubviews
             initialNumToRender={flatListInitialRender}
-            maxToRenderPerBatch={8}
-            windowSize={9}
+            getItemLayout={hasEarlierMessages ? undefined : getMessageItemLayout}
+            maxToRenderPerBatch={6}
+            windowSize={7}
             updateCellsBatchingPeriod={40}
             scrollEnabled={listPanActive}
             directionalLockEnabled={listPanActive}
