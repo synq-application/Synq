@@ -8,10 +8,14 @@ const AVATAR_SIZE = 48;
 
 type Props = {
   coverPhotoUrl?: string;
+  coverPhotoThumbUrl?: string;
 };
 
-export default function CommunityGroupListAvatar({ coverPhotoUrl }: Props) {
-  const cover = coverPhotoUrl?.trim();
+export default function CommunityGroupListAvatar({
+  coverPhotoUrl,
+  coverPhotoThumbUrl,
+}: Props) {
+  const cover = coverPhotoThumbUrl?.trim() || coverPhotoUrl?.trim();
 
   if (cover) {
     return (

@@ -31,8 +31,6 @@ import {
 import CreateGroupModal from "./CreateGroupModal";
 import GroupListAvatar from "./GroupListAvatar";
 
-const CIRCLES_SUBTITLE = "Private spaces to control who sees your availability.";
-
 type Props = {
   userId: string;
   friends?: Friend[];
@@ -163,7 +161,6 @@ export default function GroupsListPane({
                 <Ionicons name="information-circle-outline" size={16} color={MUTED2} />
               </TouchableOpacity>
             </View>
-            <Text style={groupsPageStyles.sectionSubtitle}>{CIRCLES_SUBTITLE}</Text>
           </View>
 
           {groups.map((group) => (
@@ -202,7 +199,7 @@ export default function GroupsListPane({
               <Ionicons name="add" size={22} color={ACCENT} />
             </View>
             <View style={groupsPageStyles.circleCardMain}>
-              <Text style={groupsPageStyles.circleCardTitle}>New Circle</Text>
+              <Text style={groupsPageStyles.circleCardTitle}>New circle</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -213,7 +210,7 @@ export default function GroupsListPane({
       <CreateGroupModal
         visible={createVisible}
         busy={createBusy}
-        title="New Circle"
+        title="New circle"
         hint="Name your circle — only you control who is in it and who sees your availability."
         submitLabel="Create circle"
         onClose={() => setCreateVisible(false)}

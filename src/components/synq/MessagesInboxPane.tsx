@@ -12,7 +12,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 type Props = {
   styles: any;
   allChats: any[];
-  pinnedChatIds?: string[];
   currentUserId?: string;
   getChatTitle: (chat: any) => string;
   renderAvatarStack: (images: any, participants?: string[]) => React.ReactNode;
@@ -34,7 +33,6 @@ type Props = {
   renderMergeConfirmModal?: React.ReactNode;
   inboxActionChat?: any | null;
   onCloseInboxAction?: () => void;
-  onPinChat?: (chatId: string) => void;
   onCombineChat?: (chatId: string) => void;
   onDeleteFromAction?: (chatId: string) => void;
 };
@@ -42,7 +40,6 @@ type Props = {
 export default function MessagesInboxPane({
   styles,
   allChats,
-  pinnedChatIds = [],
   currentUserId,
   getChatTitle,
   renderAvatarStack,
@@ -64,7 +61,6 @@ export default function MessagesInboxPane({
   renderMergeConfirmModal,
   inboxActionChat = null,
   onCloseInboxAction,
-  onPinChat,
   onCombineChat,
   onDeleteFromAction,
 }: Props) {
@@ -72,7 +68,6 @@ export default function MessagesInboxPane({
   const inboxHeaderPaddingTop = Math.max(insets.top, 20) + 6;
   const inboxMergeHeaderPaddingTop = Math.max(insets.top, 16) + 6;
   const canCombine = allChats.length >= 2;
-  const pinnedSet = new Set(pinnedChatIds);
 
   const mergeSubtitle =
     selectedMergeChatIds.length === 1 && mergeAnchorTitle
@@ -93,7 +88,6 @@ export default function MessagesInboxPane({
       lastSender !== currentUserId &&
       updatedAtMs > lastReadMs;
     const isSelected = selectedMergeChatIds.includes(item.id);
-    const isPinned = pinnedSet.has(item.id);
 
     const rowContent = (
       <TouchableOpacity
@@ -125,7 +119,7 @@ export default function MessagesInboxPane({
         accessibilityLabel={
           mergeSelectMode
             ? `${getChatTitle(item)}${isSelected ? ", selected" : ""}`
-            : `${getChatTitle(item)}${isPinned ? ", pinned" : ""}`
+            : getChatTitle(item)
         }
       >
         <View style={styles.inboxItemRow}>
@@ -157,14 +151,6 @@ export default function MessagesInboxPane({
               >
                 {getChatTitle(item)}
               </Text>
-              {isPinned && !mergeSelectMode ? (
-                <Ionicons
-                  name="pin"
-                  size={14}
-                  color={MUTED2}
-                  style={styles.inboxPinIcon}
-                />
-              ) : null}
             </View>
             {(() => {
               const lm =
@@ -311,14 +297,8 @@ export default function MessagesInboxPane({
       <ChatInboxActionSheet
         visible={!!inboxActionChat}
         chatTitle={inboxActionChat ? getChatTitle(inboxActionChat) : ""}
-        isPinned={
-          inboxActionChat ? pinnedSet.has(inboxActionChat.id) : false
-        }
         canCombine={canCombine}
         onClose={() => onCloseInboxAction?.()}
-        onPin={() => {
-          if (inboxActionChat) onPinChat?.(inboxActionChat.id);
-        }}
         onCombine={() => {
           if (inboxActionChat) onCombineChat?.(inboxActionChat.id);
         }}

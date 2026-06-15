@@ -260,7 +260,10 @@ export default function CommunityGroupSearchSheet({
           onClose();
         }}
       >
-        <CommunityGroupListAvatar coverPhotoUrl={item.coverPhotoUrl} />
+        <CommunityGroupListAvatar
+          coverPhotoUrl={item.coverPhotoUrl}
+          coverPhotoThumbUrl={item.coverPhotoThumbUrl}
+        />
         <View style={styles.resultMain}>
           <Text style={styles.resultName} numberOfLines={1}>
             {item.name}

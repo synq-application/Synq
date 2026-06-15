@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   limit,
   onSnapshot,
@@ -19,6 +20,7 @@ import {
   MAX_COMMUNITY_GROUP_MEMBERS as MAX_MEMBERS,
   mergeCommunityGroupMemberIds as mergeMemberIdsCore,
 } from "./communityGroupsCore.js";
+import { uploadCommunityCoverPhoto } from "./uploadCommunityCoverPhoto";
 
 export const MAX_COMMUNITY_GROUP_MEMBERS = MAX_MEMBERS;
 export const MAX_COMMUNITY_GROUPS_JOINED = 50;
@@ -31,8 +33,21 @@ export type CommunityGroup = {
   nameLower: string;
   creatorId: string;
   memberIds: string[];
+  category?: string;
+  location?: string;
+  about?: string;
+  coverPhotoUrl?: string;
+  coverPhotoThumbUrl?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
+};
+
+export type CreateCommunityGroupInput = {
+  name: string;
+  category?: string;
+  location?: string;
+  about?: string;
+  coverPhotoUrl?: string;
 };
 
 export function communityGroupsCollection() {
@@ -41,6 +56,12 @@ export function communityGroupsCollection() {
 
 export function communityGroupRef(groupId: string) {
   return doc(db, "communityGroups", groupId);
+}
+
+export async function getCommunityGroup(groupId: string): Promise<CommunityGroup | null> {
+  const snap = await getDoc(communityGroupRef(groupId));
+  if (!snap.exists()) return null;
+  return mapCommunityGroupDoc(snap.id, snap.data() as Record<string, unknown>);
 }
 
 function normalizeName(name: string): string {
@@ -58,7 +79,19 @@ function normalizeMemberIds(memberIds: string[]): string[] {
   );
 }
 
-function mapCommunityGroupDoc(id: string, data: Record<string, unknown>): CommunityGroup {
+function optionalTrimmed(value: unknown, maxLen: number): string | undefined {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, maxLen);
+}
+
+export function mapCommunityGroupDoc(id: string, data: Record<string, unknown>): CommunityGroup {
+  const category = optionalTrimmed(data.category, 40);
+  const location = optionalTrimmed(data.location, 80);
+  const about = optionalTrimmed(data.about, 500);
+  const coverPhotoUrl = optionalTrimmed(data.coverPhotoUrl, 2048);
+  const coverPhotoThumbUrl = optionalTrimmed(data.coverPhotoThumbUrl, 2048);
+
   return {
     id,
     name: String(data.name || "").trim() || "Group",
@@ -67,6 +100,11 @@ function mapCommunityGroupDoc(id: string, data: Record<string, unknown>): Commun
     memberIds: normalizeMemberIds(
       Array.isArray(data.memberIds) ? (data.memberIds as string[]) : []
     ),
+    ...(category ? { category } : {}),
+    ...(location ? { location } : {}),
+    ...(about ? { about } : {}),
+    ...(coverPhotoUrl ? { coverPhotoUrl } : {}),
+    ...(coverPhotoThumbUrl ? { coverPhotoThumbUrl } : {}),
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };
@@ -107,11 +145,73 @@ export async function searchCommunityGroups(searchText: string): Promise<Communi
   return snap.docs.map((d) => mapCommunityGroupDoc(d.id, d.data() as Record<string, unknown>));
 }
 
-export async function createCommunityGroup(uid: string, name: string): Promise<string> {
-  const trimmed = normalizeName(name);
+export async function fetchCommunityGroupsByCategory(
+  category: string,
+  limitCount = COMMUNITY_GROUP_SEARCH_LIMIT
+): Promise<CommunityGroup[]> {
+  const trimmed = category.trim();
+  if (!trimmed) return [];
+
+  const snap = await getDocs(
+    query(
+      communityGroupsCollection(),
+      where("category", "==", trimmed),
+      limit(limitCount)
+    )
+  );
+
+  return snap.docs
+    .map((d) => mapCommunityGroupDoc(d.id, d.data() as Record<string, unknown>))
+    .filter((g) => g.memberIds.length > 0)
+    .sort((a, b) => b.memberIds.length - a.memberIds.length || a.name.localeCompare(b.name));
+}
+
+/** Groups the user has not joined, returned in random order for suggested UI. */
+export async function fetchSuggestedCommunityGroups(
+  excludeIds: Set<string>,
+  limitCount = 3
+): Promise<CommunityGroup[]> {
+  const snap = await getDocs(query(communityGroupsCollection(), limit(50)));
+  const eligible = snap.docs
+    .map((d) => mapCommunityGroupDoc(d.id, d.data() as Record<string, unknown>))
+    .filter((g) => !excludeIds.has(g.id) && g.memberIds.length > 0);
+
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+
+  return eligible.slice(0, limitCount);
+}
+
+/** @deprecated Use fetchSuggestedCommunityGroups */
+export async function fetchDiscoverCommunityGroups(
+  excludeIds: Set<string>,
+  limitCount = 8
+): Promise<CommunityGroup[]> {
+  const snap = await getDocs(query(communityGroupsCollection(), limit(50)));
+  return snap.docs
+    .map((d) => mapCommunityGroupDoc(d.id, d.data() as Record<string, unknown>))
+    .filter((g) => !excludeIds.has(g.id) && g.memberIds.length > 0)
+    .sort((a, b) => b.memberIds.length - a.memberIds.length)
+    .slice(0, limitCount);
+}
+
+export async function createCommunityGroup(
+  uid: string,
+  input: CreateCommunityGroupInput | string,
+  coverLocalUri?: string
+): Promise<string> {
+  const payload = typeof input === "string" ? { name: input } : input;
+  const trimmed = normalizeName(payload.name);
   if (!trimmed) {
     throw new Error("Group name is required.");
   }
+
+  const category = optionalTrimmed(payload.category, 40);
+  const location = optionalTrimmed(payload.location, 80);
+  const about = optionalTrimmed(payload.about, 500);
+  let coverPhotoUrl = optionalTrimmed(payload.coverPhotoUrl, 2048);
 
   const createdSnap = await getDocs(
     query(communityGroupsCollection(), where("creatorId", "==", uid))
@@ -128,15 +228,71 @@ export async function createCommunityGroup(uid: string, name: string): Promise<s
   }
 
   const ref = doc(communityGroupsCollection());
+
   await setDoc(ref, {
     name: trimmed,
     nameLower: normalizeNameLower(trimmed),
     creatorId: uid,
     memberIds: [uid],
+    ...(category ? { category } : {}),
+    ...(location ? { location } : {}),
+    ...(about ? { about } : {}),
+    ...(coverPhotoUrl ? { coverPhotoUrl } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+
+  if (coverLocalUri) {
+    const uploaded = await uploadCommunityCoverPhoto(ref.id, coverLocalUri);
+    coverPhotoUrl = uploaded.coverPhotoUrl;
+    await updateDoc(ref, {
+      coverPhotoUrl: uploaded.coverPhotoUrl,
+      coverPhotoThumbUrl: uploaded.coverPhotoThumbUrl,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
   return ref.id;
+}
+
+export async function updateCommunityGroupDetails(
+  groupId: string,
+  input: Partial<CreateCommunityGroupInput> & { coverPhotoThumbUrl?: string }
+): Promise<void> {
+  const updates: Record<string, unknown> = {
+    updatedAt: serverTimestamp(),
+  };
+
+  if (input.name !== undefined) {
+    const trimmed = normalizeName(input.name);
+    if (!trimmed) {
+      throw new Error("Group name is required.");
+    }
+    updates.name = trimmed;
+    updates.nameLower = normalizeNameLower(trimmed);
+  }
+  if (input.category !== undefined) {
+    const category = optionalTrimmed(input.category, 40);
+    updates.category = category ?? "";
+  }
+  if (input.location !== undefined) {
+    const location = optionalTrimmed(input.location, 80);
+    updates.location = location ?? "";
+  }
+  if (input.about !== undefined) {
+    const about = optionalTrimmed(input.about, 500);
+    updates.about = about ?? "";
+  }
+  if (input.coverPhotoUrl !== undefined) {
+    const coverPhotoUrl = optionalTrimmed(input.coverPhotoUrl, 2048);
+    updates.coverPhotoUrl = coverPhotoUrl ?? "";
+  }
+  if (input.coverPhotoThumbUrl !== undefined) {
+    const coverPhotoThumbUrl = optionalTrimmed(input.coverPhotoThumbUrl, 2048);
+    updates.coverPhotoThumbUrl = coverPhotoThumbUrl ?? "";
+  }
+
+  await updateDoc(communityGroupRef(groupId), updates);
 }
 
 export async function joinCommunityGroup(

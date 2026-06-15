@@ -29,8 +29,6 @@ import {
   View,
 } from "react-native";
 
-const COMMUNITY_SUBTITLE = "Meet people through shared interests.";
-
 type Props = {
   userId: string;
   friends?: Friend[];
@@ -60,7 +58,10 @@ function SuggestedRow({
         accessibilityRole="button"
         accessibilityLabel={`${group.name}, ${group.memberIds.length} members`}
       >
-        <CommunityGroupListAvatar coverPhotoUrl={group.coverPhotoUrl} />
+        <CommunityGroupListAvatar
+          coverPhotoUrl={group.coverPhotoUrl}
+          coverPhotoThumbUrl={group.coverPhotoThumbUrl}
+        />
         <View style={groupsPageStyles.communityRowMain}>
           <Text style={groupsPageStyles.communityRowTitle} numberOfLines={1}>
             {group.name}
@@ -187,7 +188,6 @@ export default function CommunitySection({ userId, friends = [] }: Props) {
               <Ionicons name="information-circle-outline" size={16} color={MUTED2} />
             </TouchableOpacity>
           </View>
-          <Text style={groupsPageStyles.sectionSubtitle}>{COMMUNITY_SUBTITLE}</Text>
         </View>
 
         <TouchableOpacity
@@ -233,7 +233,10 @@ export default function CommunitySection({ userId, friends = [] }: Props) {
             accessibilityRole="button"
             accessibilityLabel={`${group.name}, ${group.memberIds.length} members`}
           >
-            <CommunityGroupListAvatar coverPhotoUrl={group.coverPhotoUrl} />
+            <CommunityGroupListAvatar
+          coverPhotoUrl={group.coverPhotoUrl}
+          coverPhotoThumbUrl={group.coverPhotoThumbUrl}
+        />
             <View style={groupsPageStyles.circleCardMain}>
               <Text style={groupsPageStyles.circleCardTitle} numberOfLines={1}>
                 {group.name}
@@ -258,8 +261,7 @@ export default function CommunitySection({ userId, friends = [] }: Props) {
             <Ionicons name="add" size={22} color={ACCENT} />
           </View>
           <View style={groupsPageStyles.circleCardMain}>
-            <Text style={groupsPageStyles.circleCardTitle}>New Community</Text>
-            <Text style={groupsPageStyles.circleCardMeta}>Start a group anyone can join</Text>
+            <Text style={groupsPageStyles.circleCardTitle}>New community</Text>
           </View>
         </TouchableOpacity>
       </View>
