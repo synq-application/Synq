@@ -6,6 +6,7 @@ import {
   ON_ACCENT_TEXT,
   PROFILE_HEADER_TOP_OFFSET,
   TEXT,
+  fonts,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
@@ -28,20 +29,24 @@ import {
   FlatList,
   Keyboard,
   type KeyboardEvent,
+  LayoutAnimation,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet as RNStyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View,
 } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   formatTime,
+  getOtherChatParticipants,
   isAiSuggestionMessage,
   isLegacyAiSuggestionText,
   parseIdeaText,
@@ -62,6 +67,21 @@ const CHAT_BOTTOM_SCROLL_TOLERANCE = 2;
 const CHAT_OPEN_LAYOUT_SETTLE_MS = 450;
 /** Fade from black into the message list, starting just under the AI chip row. */
 const CHAT_HEADER_FADE_BELOW_AI = 28;
+const CHAT_HEADER_FADE_EXPANDED = 36;
+/** Avatar (44) + trailing gap (12) — aligns content with the title column. */
+const CHAT_HEADER_TITLE_INDENT = 56;
+const CHAT_MEMBER_TILE_WIDTH = 68;
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+function participantFirstName(fullName: string) {
+  return (fullName || "").trim().split(/\s+/)[0];
+}
 /** Modest bump past the header fade overlap (shell uses negative margin). */
 const CHAT_LIST_HEADER_FADE_CLEARANCE = 10;
 const CHAT_HEADER_FADE_GRADIENT = [
@@ -256,6 +276,82 @@ export default function MessagesChatPane({
     );
     return otherIds.length === 1 ? otherIds[0] : null;
   }, [activeChat?.participants, activeChat?.participantImages, currentUserId]);
+
+  const canExpandChatTitle = useMemo(() => {
+    if (!activeChat) return false;
+    if (activeChat.customName?.trim()) return true;
+    const participantIds = activeChat.participants?.length
+      ? activeChat.participants
+      : Object.keys(activeChat.participantImages ?? {});
+    const otherIds = participantIds.filter(
+      (id: string) => id && id !== currentUserId
+    );
+    return otherIds.length > 1;
+  }, [
+    activeChat,
+    activeChat?.customName,
+    activeChat?.participants,
+    activeChat?.participantImages,
+    currentUserId,
+  ]);
+
+  const [chatTitleExpanded, setChatTitleExpanded] = useState(false);
+
+  useEffect(() => {
+    setChatTitleExpanded(false);
+  }, [activeChat?.id]);
+
+  const otherParticipants = useMemo(
+    () => getOtherChatParticipants(activeChat, currentUserId),
+    [
+      activeChat,
+      currentUserId,
+      activeChat?.participantNames
+        ? Object.entries(activeChat.participantNames as Record<string, string>)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([uid, name]) => `${uid}:${name}`)
+            .join("|")
+        : "",
+    ]
+  );
+
+  const chatCustomName =
+    typeof activeChat?.customName === "string"
+      ? activeChat.customName.trim()
+      : "";
+
+  const toggleChatTitleExpanded = useCallback(() => {
+    if (!canExpandChatTitle) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setChatTitleExpanded((expanded) => !expanded);
+  }, [canExpandChatTitle]);
+
+  const renderAiChip = useCallback(
+    (chipMarginTop?: number) => (
+      <TouchableOpacity
+        onPress={() => {
+          Keyboard.dismiss();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onOpenAISuggestions();
+        }}
+        style={[
+          styles.aiChipPremium,
+          chipMarginTop != null && { marginTop: chipMarginTop },
+        ]}
+        activeOpacity={0.82}
+        accessibilityRole="button"
+        accessibilityLabel="Open Synq AI place suggestions"
+      >
+        <Ionicons name="sparkles" size={11} color={ACCENT} />
+        <Text style={styles.aiChipTextPremium} numberOfLines={1}>
+          {rotatingAIText}
+        </Text>
+        <Ionicons name="chevron-forward" size={11} color={MUTED2} />
+      </TouchableOpacity>
+    ),
+    [onOpenAISuggestions, rotatingAIText, styles.aiChipPremium, styles.aiChipTextPremium]
+  );
 
   const handleOpenFriendProfile = useCallback(
     (friendId: string) => {
@@ -863,81 +959,204 @@ export default function MessagesChatPane({
   const chatHeaderContentPaddingTop =
     Math.max(insets.top, insetsTop, 10) + PROFILE_HEADER_TOP_OFFSET + 4;
   const compactChatHeader = !showAISuggestions;
+  const aiPillBelowTitle = showAISuggestions && canExpandChatTitle;
+  const headerFadeHeight = chatTitleExpanded
+    ? CHAT_HEADER_FADE_EXPANDED
+    : CHAT_HEADER_FADE_BELOW_AI;
+  const showMemberRoster = otherParticipants.length > 1;
+  const memberCountLabel =
+    otherParticipants.length === 1
+      ? "1 person"
+      : `${otherParticipants.length} people`;
+
+  const renderCollapsedTitle = () => (
+    <Pressable
+      onPress={toggleChatTitleExpanded}
+      style={chatHeaderOverlayStyles.titlePressable}
+      accessibilityRole="button"
+      accessibilityLabel="Expand participant list"
+      accessibilityState={{ expanded: false }}
+    >
+      <Text
+        style={[styles.chatTitle, chatHeaderOverlayStyles.collapsedTitleText]}
+        numberOfLines={1}
+      >
+        {chatTitle}
+      </Text>
+      {showMemberRoster ? (
+        <Text style={chatHeaderOverlayStyles.memberSubtitle}>
+          {memberCountLabel}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+
+  const renderExpandedTitle = () => (
+    <Pressable
+      onPress={toggleChatTitleExpanded}
+      style={chatHeaderOverlayStyles.titlePressable}
+      accessibilityRole="button"
+      accessibilityLabel="Collapse participant list"
+      accessibilityState={{ expanded: true }}
+    >
+      {chatCustomName ? (
+        <Text style={chatHeaderOverlayStyles.expandedHeadline} numberOfLines={1}>
+          {chatCustomName}
+        </Text>
+      ) : (
+        <Text
+          style={[styles.chatTitle, chatHeaderOverlayStyles.collapsedTitleText]}
+          numberOfLines={1}
+        >
+          {chatTitle}
+        </Text>
+      )}
+      <Text style={chatHeaderOverlayStyles.showLessLink}>Show less</Text>
+    </Pressable>
+  );
+
+  const renderMemberStrip = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={chatHeaderOverlayStyles.memberStripScroll}
+      contentContainerStyle={chatHeaderOverlayStyles.memberStripContent}
+    >
+      {otherParticipants.map((participant) => {
+        const avatarUri = resolveChatSenderAvatar(participant.uid, {
+          participantImages: activeChat?.participantImages,
+          liveImages: liveParticipantImages,
+        });
+
+        return (
+          <Pressable
+            key={participant.uid}
+            onPress={() => handleOpenFriendProfile(participant.uid)}
+            disabled={!onOpenFriendProfile}
+            style={({ pressed }) => [
+              chatHeaderOverlayStyles.memberTile,
+              pressed && onOpenFriendProfile
+                ? chatHeaderOverlayStyles.memberTilePressed
+                : null,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${participant.name}'s profile`}
+          >
+            <View style={chatHeaderOverlayStyles.memberTileAvatarWrap}>
+              <ExpoImage
+                source={{ uri: avatarUri }}
+                style={chatHeaderOverlayStyles.memberTileAvatar}
+                cachePolicy="memory-disk"
+                transition={0}
+                recyclingKey={avatarUri}
+              />
+            </View>
+            <Text style={chatHeaderOverlayStyles.memberTileName} numberOfLines={1}>
+              {participantFirstName(participant.name)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
 
   return (
     <View style={styles.modalBg}>
-      <View style={chatHeaderOverlayStyles.shell}>
+      <View
+        style={[
+          chatHeaderOverlayStyles.shell,
+          { marginBottom: -headerFadeHeight },
+        ]}
+      >
         <View
           style={[
-            styles.chatHeader,
-            chatHeaderOverlayStyles.headerContent,
+            chatHeaderOverlayStyles.headerShell,
+            chatTitleExpanded && chatHeaderOverlayStyles.headerShellExpanded,
             { paddingTop: chatHeaderContentPaddingTop },
           ]}
         >
-          <View style={styles.chatHeaderMain}>
-            <View style={styles.chatHeaderIdentityRow}>
-              <View style={styles.chatHeaderAvatarSlot}>
-                {headerProfileFriendId && onOpenFriendProfile ? (
-                  <Pressable
-                    onPress={() => handleOpenFriendProfile(headerProfileFriendId)}
-                    accessibilityRole="button"
-                    accessibilityLabel="View profile"
-                  >
-                    {headerAvatar}
-                  </Pressable>
-                ) : (
-                  headerAvatar
-                )}
-              </View>
+          <View
+            style={[
+              styles.chatHeader,
+              chatTitleExpanded && chatHeaderOverlayStyles.headerTitleRowExpanded,
+            ]}
+          >
+            <View style={styles.chatHeaderMain}>
               <View
                 style={[
-                  styles.chatHeaderTextCol,
-                  compactChatHeader && styles.chatHeaderTextColCompact,
+                  styles.chatHeaderIdentityRow,
+                  chatTitleExpanded
+                    ? chatHeaderOverlayStyles.identityRowExpanded
+                    : chatHeaderOverlayStyles.identityRowCollapsed,
                 ]}
               >
-                <Text style={styles.chatTitle} numberOfLines={1}>
-                  {chatTitle}
-                </Text>
-                {typingUserIds.length > 0 ? (
-                  <Text style={styles.typingIndicatorText}>Typing…</Text>
-                ) : null}
-                {showAISuggestions ? (
-                  <View style={chatHeaderOverlayStyles.aiSubtitleSlot}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        Keyboard.dismiss();
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        onOpenAISuggestions();
-                      }}
-                      style={styles.aiChipPremium}
-                      activeOpacity={0.82}
+                <View style={styles.chatHeaderAvatarSlot}>
+                  {headerProfileFriendId && onOpenFriendProfile ? (
+                    <Pressable
+                      onPress={() => handleOpenFriendProfile(headerProfileFriendId)}
                       accessibilityRole="button"
-                      accessibilityLabel="Open Synq AI place suggestions"
+                      accessibilityLabel="View profile"
                     >
-                      <Ionicons name="sparkles" size={11} color={ACCENT} />
-                      <Text style={styles.aiChipTextPremium} numberOfLines={1}>
-                        {rotatingAIText}
-                      </Text>
-                      <Ionicons name="chevron-forward" size={11} color={MUTED2} />
-                    </TouchableOpacity>
-                  </View>
-                ) : null}
+                      {headerAvatar}
+                    </Pressable>
+                  ) : (
+                    headerAvatar
+                  )}
+                </View>
+                <View
+                  style={[
+                    styles.chatHeaderTextCol,
+                    compactChatHeader && styles.chatHeaderTextColCompact,
+                    chatTitleExpanded
+                      ? chatHeaderOverlayStyles.textColExpanded
+                      : chatHeaderOverlayStyles.textColCollapsed,
+                  ]}
+                >
+                  {canExpandChatTitle ? (
+                    chatTitleExpanded ? (
+                      renderExpandedTitle()
+                    ) : (
+                      renderCollapsedTitle()
+                    )
+                  ) : (
+                    <Text style={styles.chatTitle} numberOfLines={1}>
+                      {chatTitle}
+                    </Text>
+                  )}
+                  {typingUserIds.length > 0 ? (
+                    <Text style={styles.typingIndicatorText}>Typing…</Text>
+                  ) : null}
+                  {showAISuggestions && !aiPillBelowTitle ? (
+                    <View style={chatHeaderOverlayStyles.aiSubtitleSlot}>
+                      {renderAiChip()}
+                    </View>
+                  ) : null}
+                </View>
               </View>
             </View>
-            {showAIUnavailableMessage ? (
-              <Text
-                style={[styles.aiUnavailableHint, styles.chatHeaderUnavailableHint]}
-                numberOfLines={2}
-              >
-                AI isn't available for this chat until everyone enters their
-                locations.
-              </Text>
-            ) : null}
+            <CloseButton
+              onPress={onBackFromChat}
+              accessibilityLabel="Close chat"
+              style={
+                chatTitleExpanded ? chatHeaderOverlayStyles.closeBtnExpanded : undefined
+              }
+            />
           </View>
-          <CloseButton
-            onPress={onBackFromChat}
-            accessibilityLabel="Close chat"
-          />
+          {chatTitleExpanded && showMemberRoster ? renderMemberStrip() : null}
+          {aiPillBelowTitle ? (
+            <View style={chatHeaderOverlayStyles.aiSubtitleSlotExpanded}>
+              {renderAiChip(0)}
+            </View>
+          ) : null}
+          {showAIUnavailableMessage ? (
+            <Text
+              style={[styles.aiUnavailableHint, styles.chatHeaderUnavailableHint]}
+              numberOfLines={2}
+            >
+              AI isn't available for this chat until everyone enters their
+              locations.
+            </Text>
+          ) : null}
         </View>
         <LinearGradient
           pointerEvents="none"
@@ -945,7 +1164,7 @@ export default function MessagesChatPane({
           locations={[...CHAT_HEADER_FADE_LOCATIONS]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
-          style={chatHeaderOverlayStyles.fadeBelowAi}
+          style={[chatHeaderOverlayStyles.fadeBelowAi, { height: headerFadeHeight }]}
         />
       </View>
 
@@ -1159,15 +1378,112 @@ const chatHeaderOverlayStyles = RNStyleSheet.create({
   shell: {
     position: "relative",
     zIndex: 2,
-    marginBottom: -CHAT_HEADER_FADE_BELOW_AI,
   },
-  headerContent: {
+  headerShell: {
     backgroundColor: HEADER_BLACK,
+    paddingBottom: 6,
+  },
+  headerShellExpanded: {
+    paddingBottom: 8,
+  },
+  headerTitleRowExpanded: {
+    alignItems: "flex-start",
+    paddingBottom: 4,
+  },
+  identityRowCollapsed: {
+    alignItems: "center",
+    flex: 1,
+  },
+  identityRowExpanded: {
+    alignItems: "flex-start",
+    flex: 0,
+  },
+  textColCollapsed: {
+    justifyContent: "center",
+    paddingTop: 2,
+  },
+  textColExpanded: {
+    justifyContent: "flex-start",
+    paddingTop: 0,
+  },
+  titlePressable: {
+    alignSelf: "stretch",
+    minWidth: 0,
+  },
+  collapsedTitleText: {
+    flexShrink: 1,
+  },
+  memberSubtitle: {
+    marginTop: 2,
+    color: MUTED2,
+    fontSize: 13,
+    fontFamily: fonts.book,
+    letterSpacing: 0.1,
+  },
+  expandedHeadline: {
+    color: TEXT,
+    fontSize: 20,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.15,
+  },
+  showLessLink: {
+    marginTop: 3,
+    color: MUTED2,
+    fontSize: 13,
+    fontFamily: fonts.medium,
+  },
+  memberStripScroll: {
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  memberStripContent: {
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  memberTile: {
+    width: CHAT_MEMBER_TILE_WIDTH,
+    alignItems: "center",
+    marginRight: 12,
+  },
+  memberTilePressed: {
+    opacity: 0.72,
+  },
+  memberTileAvatarWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "#1C1C1E",
+    overflow: "hidden",
+  },
+  memberTileAvatar: {
+    width: "100%",
+    height: "100%",
+  },
+  memberTileName: {
+    marginTop: 7,
+    width: CHAT_MEMBER_TILE_WIDTH,
+    color: MUTED2,
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    textAlign: "center",
+    letterSpacing: 0.1,
+  },
+  closeBtnExpanded: {
+    marginTop: 2,
   },
   fadeBelowAi: {
     height: CHAT_HEADER_FADE_BELOW_AI,
   },
   aiSubtitleSlot: {
+    minHeight: CHAT_AI_SUBTITLE_SLOT_HEIGHT,
+    justifyContent: "center",
+  },
+  aiSubtitleSlotExpanded: {
+    marginLeft: CHAT_HEADER_TITLE_INDENT,
+    marginTop: 4,
     minHeight: CHAT_AI_SUBTITLE_SLOT_HEIGHT,
     justifyContent: "center",
   },

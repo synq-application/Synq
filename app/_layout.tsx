@@ -228,7 +228,7 @@ export default function RootLayout() {
         fromUserId?: string;
         notificationType?: "friend_synq_active" | "synq_nudge";
       }
-    | { kind: "me"; focusEventId?: string }
+    | { kind: "me"; focusEventId?: string; notificationId?: string }
     | null
   >(null);
 
@@ -349,6 +349,7 @@ export default function RootLayout() {
         setPendingNotificationTap({
           kind: "me",
           focusEventId: str(data.eventId),
+          notificationId: str(data.notificationId),
         });
         return;
       }
@@ -845,6 +846,10 @@ export default function RootLayout() {
 
     if (pending.kind === "friend_profile") {
       if (pending.friendId !== user.uid) {
+        void dismissActivityNotification(
+          user.uid,
+          `${pending.friendId}_accepted_${user.uid}`
+        ).catch(() => {});
         DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
         router.push({
           pathname: "/friend-profile",
@@ -868,6 +873,11 @@ export default function RootLayout() {
     }
 
     if (pending.kind === "me") {
+      if (pending.notificationId) {
+        void dismissActivityNotification(user.uid, pending.notificationId).catch(
+          () => {}
+        );
+      }
       if (pending.focusEventId) {
         router.push(
           `/(tabs)/me?focusEventId=${encodeURIComponent(pending.focusEventId)}`

@@ -13,7 +13,6 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  updateDoc,
   writeBatch,
 } from "firebase/firestore";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -495,16 +494,6 @@ export default function NotificationsScreen() {
     return [...requests, ...activity].sort((a, b) => b.sortMs - a.sortMs);
   }, [friendRequests, activityItems, legacyActivityItems]);
 
-  const markActivityRead = async (item: PlanInviteFeedItem | StandardActivityFeedItem) => {
-    if (!auth.currentUser || item.source !== "notifications") return;
-    try {
-      await updateDoc(
-        doc(db, "users", auth.currentUser.uid, "notifications", item.id),
-        { read: true }
-      );
-    } catch {}
-  };
-
   const clearAll = async () => {
     if (!auth.currentUser || clearingAll || feedItems.length === 0) return;
 
@@ -688,7 +677,7 @@ export default function NotificationsScreen() {
       return;
     }
 
-    void markActivityRead(item);
+    void dismissActivity(item);
 
     if (item.kind === "friend_accepted" && item.fromUserId) {
       router.push({
