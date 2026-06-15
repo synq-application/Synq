@@ -12,6 +12,23 @@ export const formatTime = (timestamp: any) => {
 const chatFirstName = (fullName: string) =>
   (fullName || "").trim().split(/\s+/)[0];
 
+export type ChatParticipantSummary = { uid: string; name: string };
+
+export const getOtherChatParticipants = (
+  chat: any,
+  myId?: string
+): ChatParticipantSummary[] => {
+  if (!chat?.participantNames || !myId) return [];
+
+  return Object.entries(chat.participantNames)
+    .filter(([uid]) => uid !== myId)
+    .map(([uid, name]) => ({ uid, name: (name as string).trim() }))
+    .filter((participant) => participant.name)
+    .sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+};
+
 /** Stable display title for inbox preview and open chat (names sorted A→Z). */
 export const getChatTitle = (chat: any, myId?: string) => {
   if (!chat) return "Synq Chat";
@@ -22,11 +39,9 @@ export const getChatTitle = (chat: any, myId?: string) => {
 
   if (!chat.participantNames || !myId) return "Synq Chat";
 
-  const otherUsers = Object.entries(chat.participantNames)
-    .filter(([uid]) => uid !== myId)
-    .map(([, name]) => (name as string).trim())
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  const otherUsers = getOtherChatParticipants(chat, myId).map(
+    (participant) => participant.name
+  );
 
   if (otherUsers.length === 0) return "Just You";
   if (otherUsers.length === 1) return otherUsers[0];

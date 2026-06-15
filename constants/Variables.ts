@@ -1,5 +1,11 @@
 import type { TextStyle, ViewStyle } from "react-native";
 
+export {
+  SYNQ_OPEN_WEB_BASE,
+  SYNQ_SHARE_HOST,
+  SYNQ_SHARE_WEB_BASE,
+} from "@/src/lib/config";
+
 export const ACCENT = "#00FF85";
 /** Text on accent-filled buttons and chips. */
 export const ON_ACCENT_TEXT = "#061006";
@@ -301,9 +307,6 @@ export const IOS_APP_STORE_URL =
   "https://apps.apple.com/us/app/synq-see-whos-free/id6757319173";
 export const ANDROID_PLAY_STORE_URL =
   "https://play.google.com/store/search?q=Synq&c=apps";
-
-/** Hosted open page — tries synq:// then redirects to the app store. Deploy via Firebase Hosting. */
-export const SYNQ_OPEN_WEB_BASE = "https://new-synq-main.firebaseapp.com/open";
 
 export const aiPrompts = [
     "Let Synq pick the move",

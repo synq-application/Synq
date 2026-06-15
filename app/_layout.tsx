@@ -17,6 +17,11 @@ import {
   activityNotificationId,
   dismissActivityNotification,
 } from "@/src/lib/activityNotifications";
+import { DISMISS_NAVIGATION_OVERLAYS } from "@/src/lib/navigationOverlayEvents";
+import {
+  parseProfileShareCodeFromUrl,
+  resolveProfileShareCodeToFriendId,
+} from "@/src/lib/profileShareUrl";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, {
   createContext,
@@ -147,6 +152,7 @@ export const useAuthRefresh = () => useContext(AuthContext);
 const PENDING_INVITE_FROM_UID_KEY = "synq:pendingInviteFromUid";
 const PENDING_INVITE_CODE_KEY = "synq:pendingInviteCode";
 const PENDING_FRIEND_PROFILE_ID_KEY = "synq:pendingFriendProfileId";
+const PENDING_PROFILE_SHARE_CODE_KEY = "synq:pendingProfileShareCode";
 
 function cleanUid(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -249,8 +255,16 @@ export default function RootLayout() {
     const captureDeepLinkFromUrl = async (url: string | null) => {
       if (!url) return;
       try {
+        const shareCode = parseProfileShareCodeFromUrl(url);
+        if (shareCode) {
+          DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
+          await AsyncStorage.setItem(PENDING_PROFILE_SHARE_CODE_KEY, shareCode);
+          return;
+        }
+
         const friendId = parseFriendProfileIdFromUrl(url);
         if (friendId) {
+          DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
           await AsyncStorage.setItem(PENDING_FRIEND_PROFILE_ID_KEY, friendId);
           return;
         }
@@ -750,6 +764,7 @@ export default function RootLayout() {
       await AsyncStorage.removeItem(PENDING_FRIEND_PROFILE_ID_KEY);
       if (friendId === user.uid) return;
       if (segments[0] === "friend-profile") return;
+      DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
       router.push({
         pathname: "/friend-profile",
         params: { friendId },
@@ -757,6 +772,48 @@ export default function RootLayout() {
     };
 
     void processPendingFriendProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authReady,
+    navReady,
+    assetsReady,
+    user?.uid,
+    user?.displayName,
+    userProfileGate,
+    synqBoot,
+    segments,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (!authReady || !navReady || !assetsReady) return;
+    if (!user?.uid) return;
+    const hasName =
+      !!user.displayName || userProfileGate?.hasDisplayName === true;
+    if (!hasName) return;
+    if (synqBoot === null) return;
+
+    let cancelled = false;
+    const processPendingProfileShareCode = async () => {
+      const shareCode = cleanUid(
+        await AsyncStorage.getItem(PENDING_PROFILE_SHARE_CODE_KEY)
+      );
+      if (!shareCode || cancelled) return;
+      await AsyncStorage.removeItem(PENDING_PROFILE_SHARE_CODE_KEY);
+      const friendId = await resolveProfileShareCodeToFriendId(shareCode);
+      if (!friendId || cancelled) return;
+      if (friendId === user.uid) return;
+      if (segments[0] === "friend-profile") return;
+      DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
+      router.push({
+        pathname: "/friend-profile",
+        params: { friendId },
+      });
+    };
+
+    void processPendingProfileShareCode();
     return () => {
       cancelled = true;
     };
@@ -787,10 +844,13 @@ export default function RootLayout() {
     }
 
     if (pending.kind === "friend_profile") {
-      router.push({
-        pathname: "/friend-profile",
-        params: { friendId: pending.friendId },
-      });
+      if (pending.friendId !== user.uid) {
+        DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
+        router.push({
+          pathname: "/friend-profile",
+          params: { friendId: pending.friendId },
+        });
+      }
       return;
     }
 

@@ -43,7 +43,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
-import { buildProfileShareWebUrl } from "@/src/lib/profileShareUrl";
+import ProfileShareCard from "@/src/components/profile/ProfileShareCard";
+import { captureAndShareProfileCard } from "@/src/lib/shareProfileCard";
 import { router, useLocalSearchParams } from "expo-router";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -53,6 +54,7 @@ import {
   ActivityIndicator,
   AppState,
   AppStateStatus,
+  DeviceEventEmitter,
   Keyboard,
   Modal,
   Pressable,
@@ -64,7 +66,9 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { buildProfileShareWebUrl } from "@/src/lib/profileShareUrl";
 import QRCode from "react-native-qrcode-svg";
+import ViewShot from "react-native-view-shot";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -93,6 +97,7 @@ import {
   pruneSocialCachesToFriendIds,
   warmFriendsAndConnectionsCache,
 } from "../../src/lib/socialCache";
+import { DISMISS_NAVIGATION_OVERLAYS } from "../../src/lib/navigationOverlayEvents";
 import { useAuthRefresh } from "../_layout";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
@@ -175,6 +180,8 @@ export default function ProfileScreen() {
   const isFocused = useIsFocused();
   const headerLayout = useTabHeaderLayout();
   const scrollRef = useRef<ScrollView>(null);
+  const shareCardRef = useRef<ViewShot>(null);
+  const [sharingProfile, setSharingProfile] = useState(false);
   const profileScrollPaddingBottom = TAB_BAR_SCROLL_INSET + SPACE_6;
   const params = useLocalSearchParams<{ focusEventId?: string | string[] }>();
   const focusEventIdRaw = params.focusEventId;
@@ -254,6 +261,20 @@ export default function ProfileScreen() {
   const resolvedProfileImage = useMemo(() => resolveAvatar(profileImage), [profileImage]);
 
   const [showEventModal, setShowEventModal] = useState(false);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      DISMISS_NAVIGATION_OVERLAYS,
+      () => {
+        setQRExpanded(false);
+        setAvatarPreviewOpen(false);
+        setShowInputModal(false);
+        setPhotoMenuVisible(false);
+        setShowEventModal(false);
+      }
+    );
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     const id = typeof focusEventId === "string" ? focusEventId.trim() : "";
@@ -853,10 +874,9 @@ export default function ProfileScreen() {
   }, [interests]);
 
   const profileQrUrl = useMemo(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return "";
-    return buildProfileShareWebUrl(uid);
-  }, [auth.currentUser?.uid]);
+    if (!inviteCode) return "";
+    return buildProfileShareWebUrl(inviteCode);
+  }, [inviteCode]);
   const inviteShareUrl = useMemo(() => {
     if (!inviteCode) return "";
     return `synq://invite/${encodeURIComponent(inviteCode)}`;
@@ -894,21 +914,41 @@ export default function ProfileScreen() {
   }, [auth.currentUser?.uid, fetchInviteCode]);
 
   const shareProfile = async () => {
-    if (!profileQrUrl) {
-      showAlert(
-        "Share unavailable",
-        "We couldn't generate your profile link yet. Please try again in a moment."
-      );
-      return;
-    }
-    const name = auth.currentUser?.displayName?.trim() || "me";
+    if (sharingProfile) return;
+    setSharingProfile(true);
     try {
-      await Share.share({
-        message: `View my Synq profile and connect: ${profileQrUrl}`,
-        url: profileQrUrl,
-      });
+      const code = await fetchInviteCode();
+      const shareUrl = buildProfileShareWebUrl(code);
+      if (!shareUrl) {
+        showAlert(
+          "Share unavailable",
+          "We couldn't generate your profile link yet. Please try again in a moment."
+        );
+        return;
+      }
+      const uid = auth.currentUser?.uid;
+      if (!uid) {
+        showAlert("Share unavailable", "Please sign in and try again.");
+        return;
+      }
+      await captureAndShareProfileCard(
+        shareCardRef,
+        shareUrl,
+        uid,
+        resolvedProfileImage
+      );
     } catch {
-      // User dismissed the share sheet.
+      try {
+        const code = await fetchInviteCode();
+        const shareUrl = buildProfileShareWebUrl(code);
+        if (shareUrl) {
+          await Share.share({ message: "Join me on Synq!", url: shareUrl });
+        }
+      } catch {
+        // User dismissed the share sheet.
+      }
+    } finally {
+      setSharingProfile(false);
     }
   };
 
@@ -1077,10 +1117,13 @@ export default function ProfileScreen() {
               <ProfilePressable
                 contentStyle={styles.editProfileBtn}
                 onPress={shareProfile}
+                disabled={sharingProfile}
                 accessibilityLabel="Share profile"
               >
                 <Ionicons name="share-social-outline" size={14} color={MUTED2} />
-                <Text style={styles.editProfileBtnText}>Share profile</Text>
+                <Text style={styles.editProfileBtnText}>
+                  {sharingProfile ? "Preparing…" : "Share profile"}
+                </Text>
               </ProfilePressable>
             </View>
           </View>
@@ -1424,6 +1467,25 @@ export default function ProfileScreen() {
         onUpload={handleUploadPhoto}
         onRemove={handleRemovePhoto}
       />
+
+      {auth.currentUser?.uid ? (
+        <View
+          pointerEvents="none"
+          style={styles.shareCardCaptureHost}
+          collapsable={false}
+        >
+          <ViewShot
+            ref={shareCardRef}
+            options={{ format: "png", quality: 1, result: "tmpfile" }}
+          >
+            <ProfileShareCard
+              displayName={auth.currentUser?.displayName || ""}
+              avatarUri={resolvedProfileImage}
+              location={locationLower}
+            />
+          </ViewShot>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1431,6 +1493,12 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   /** Full-width scroll (no gutter scrollbar); sections pad themselves. */
   screen: { flex: 1, backgroundColor: BG, position: "relative" },
+  shareCardCaptureHost: {
+    position: "absolute",
+    top: 0,
+    left: -5000,
+    opacity: 1,
+  },
   scrollView: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 20,

@@ -116,6 +116,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, db } from "../../src/lib/firebase";
 import { FRIENDS_TAB_PRESS } from "../../src/lib/friendsTabEvents";
+import { DISMISS_NAVIGATION_OVERLAYS } from "../../src/lib/navigationOverlayEvents";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
 import {
   friendProfileCacheByUser,
@@ -351,6 +352,14 @@ export default function FriendsScreen() {
     });
     return () => subscription.remove();
   }, [scrollFriendsListToTop, closeAddFriendsModal, openAddFriends, router]);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      DISMISS_NAVIGATION_OVERLAYS,
+      closeAddFriendsModal
+    );
+    return () => subscription.remove();
+  }, [closeAddFriendsModal]);
 
   useEffect(() => {
     if (openAddFriends !== "1") return;

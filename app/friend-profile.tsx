@@ -155,7 +155,13 @@ export default function FriendProfile({
   const routeFriendId = Array.isArray(friendId) ? friendId[0] : friendId || "";
   const friendKey = String(embeddedFriendId || routeFriendId);
   const isEmbedded = Boolean(embeddedFriendId);
+  const isOwnProfile = Boolean(viewerId && friendKey && viewerId === friendKey);
   const scrollRef = useRef<ScrollView>(null);
+
+  useLayoutEffect(() => {
+    if (!isOwnProfile || isEmbedded) return;
+    router.replace("/(tabs)/me");
+  }, [isOwnProfile, isEmbedded, router]);
 
   const resetEmbeddedScroll = useCallback(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
@@ -570,6 +576,16 @@ export default function FriendProfile({
     };
     void checkRelationship();
   }, [friendKey]);
+
+  if (isOwnProfile && !isEmbedded) {
+    return (
+      <ProfileShell embedded={false}>
+        <View style={styles.center}>
+          <ActivityIndicator color={ACCENT} />
+        </View>
+      </ProfileShell>
+    );
+  }
 
   if (loading) {
     return (

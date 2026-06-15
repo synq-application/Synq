@@ -127,6 +127,7 @@ import {
   getCachedSynqActiveSync,
   writeCachedSynqActive,
 } from "../../src/lib/synqSession";
+import { DISMISS_NAVIGATION_OVERLAYS } from "../../src/lib/navigationOverlayEvents";
 import { getCachedOwnProfile } from "../../src/lib/ownProfileCache";
 import { userHasLocation } from "../../src/lib/userProfile";
 import { useAuthRefresh } from '../_layout';
@@ -142,7 +143,7 @@ import {
   resolveChatSenderAvatar,
   SynqStatus
 } from '../helpers';
-import { openInMaps } from '../map-utils';
+import { openInMaps } from "@/src/lib/openInMaps";
 import ReportModal from '../report-modal';
 import ChangeSynqAudienceModal from '../synq-screens/ChangeSynqAudienceModal';
 import EditSynqModal from '../synq-screens/EditSynqModal';
@@ -1523,6 +1524,27 @@ export default function SynqScreen() {
     setShowOptionsList(false);
     setShowAICard(false);
   }, [clearMessages, clearPendingMessages]);
+
+  const dismissNavigationOverlays = useCallback(() => {
+    closeMessagesModal();
+    setIsEditModalVisible(false);
+    setReportModalVisible(false);
+    setReportTarget(null);
+    setShowEndSynqModal(false);
+    setChangeAudienceVisible(false);
+    setContentAlertVisible(false);
+    setShowMergeConfirmModal(false);
+    setShowDeleteChatModal(false);
+    setLaunchOverlay(false);
+  }, [closeMessagesModal]);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      DISMISS_NAVIGATION_OVERLAYS,
+      dismissNavigationOverlays
+    );
+    return () => subscription.remove();
+  }, [dismissNavigationOverlays]);
 
   useEffect(() => {
     if (!messagesModalVisible) return;
