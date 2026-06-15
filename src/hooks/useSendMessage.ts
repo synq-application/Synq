@@ -62,6 +62,7 @@ type Params = {
   resolveAvatar: (url: unknown) => string;
   userAvatar?: string;
   rejectIfObjectionable: (text: string) => boolean;
+  isBlocked?: (uid: string) => boolean;
   onSendError: (message: string) => void;
   onMessageDelivered?: (clientId: string, meta: { text: string; senderId: string; sentAt: number }) => void;
 };
@@ -76,6 +77,7 @@ export function useSendMessage({
   resolveAvatar,
   userAvatar,
   rejectIfObjectionable,
+  isBlocked,
   onSendError,
   onMessageDelivered,
 }: Params) {
@@ -187,6 +189,10 @@ export function useSendMessage({
           );
         }
 
+        if (otherParticipants.some((pId) => isBlocked?.(pId))) {
+          throw new Error("blocked_recipient");
+        }
+
         await addDoc(collection(db, "chats", chatId!, "messages"), {
           text: trimmed,
           senderId: myId,
@@ -231,13 +237,17 @@ export function useSendMessage({
         );
 
         return true;
-      } catch {
+      } catch (err) {
         setPendingMessages((prev) =>
           prev.map((p) =>
             p.clientId === clientId ? { ...p, sendStatus: "failed" as const } : p
           )
         );
-        onSendError("Message could not be sent. Please try again.");
+        if (err instanceof Error && err.message === "blocked_recipient") {
+          onSendError("You can't message this user.");
+        } else {
+          onSendError("Message could not be sent. Please try again.");
+        }
         return false;
       }
     },
@@ -246,6 +256,7 @@ export function useSendMessage({
       allChats,
       pendingNewChat,
       rejectIfObjectionable,
+      isBlocked,
       resolveAvatar,
       setActiveChatId,
       setPendingNewChat,

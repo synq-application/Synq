@@ -115,8 +115,11 @@ export async function sendPlanInvites(
   return { invitedIds, alreadyInvitedIds, errors };
 }
 
-export async function acceptPlanInvite(notificationId: string): Promise<void> {
-  await acceptPlanInviteFn({ notificationId });
+export async function acceptPlanInvite(
+  notificationId: string
+): Promise<{ status?: string }> {
+  const result = await acceptPlanInviteFn({ notificationId });
+  return { status: result.data?.status };
 }
 
 export function declinePlanInviteErrorMessage(err: unknown): string {
