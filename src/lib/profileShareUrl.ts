@@ -12,6 +12,13 @@ export function buildProfileShareWebUrl(inviteCode: string): string {
   return `${SYNQ_SHARE_WEB_BASE}/u/${encodeURIComponent(code)}`;
 }
 
+/** Short in-message link (no Firebase hostname) — opens Synq when installed. */
+export function buildProfileShareAppUrl(inviteCode: string): string {
+  const code = normalizeInviteCode(inviteCode);
+  if (!code) return "";
+  return Linking.createURL(`u/${encodeURIComponent(code)}`);
+}
+
 /** Custom-scheme deep link for in-app use (e.g. QR scanned from within Synq). */
 export function buildProfileDeepLinkUrl(friendId: string): string {
   const id = friendId.trim();
@@ -31,6 +38,18 @@ export function parseProfileShareCodeFromUrl(url: string): string | null {
     if (pathMatch?.[1]) {
       const code = normalizeInviteCode(decodeURIComponent(pathMatch[1]));
       return code || null;
+    }
+    const hostname = String(parsed.hostname || "")
+      .trim()
+      .toLowerCase();
+    if (hostname === "u") {
+      const fromHostPath = String(parsed.path || "")
+        .replace(/^\//, "")
+        .trim();
+      if (fromHostPath) {
+        const code = normalizeInviteCode(decodeURIComponent(fromHostPath));
+        return code || null;
+      }
     }
     const codeRaw = parsed.queryParams?.code;
     const fromQuery = Array.isArray(codeRaw) ? codeRaw[0] : codeRaw;

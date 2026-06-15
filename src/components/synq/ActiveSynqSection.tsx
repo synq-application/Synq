@@ -24,7 +24,7 @@ import {
   View,
 } from "react-native";
 import { SYNQ_TAB_LONG_PRESS } from "@/src/lib/synqTabEvents";
-import { friendLocationLine, resolveAvatar } from "../../../app/helpers";
+import { friendLocationLine, resolveAvatar } from "@/src/lib/helpers";
 import {
   ACCENT,
   BG,

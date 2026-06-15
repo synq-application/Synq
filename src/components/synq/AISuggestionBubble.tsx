@@ -6,7 +6,7 @@ import {
   SURFACE,
   TEXT,
 } from "@/constants/Variables";
-import { formatVenueAddressDisplay, stripLegacyAiPrefix } from "@/app/helpers";
+import { formatVenueAddressDisplay, stripLegacyAiPrefix } from "@/src/lib/helpers";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {

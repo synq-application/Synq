@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Friend } from "@/constants/Variables";
 import { Image as ExpoImage } from "expo-image";
 
-import { resolveAvatar } from "../../app/helpers";
+import { resolveAvatar } from "@/src/lib/helpers";
 import {
   friendRelationCacheByUser,
   friendsListCacheByUser,

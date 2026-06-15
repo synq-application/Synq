@@ -1,4 +1,4 @@
-import { getStackAvatarUris, resolveAvatar } from "@/app/helpers";
+import { getStackAvatarUris, resolveAvatar } from "@/src/lib/helpers";
 import { ACCENT } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";

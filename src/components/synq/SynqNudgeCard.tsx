@@ -1,4 +1,4 @@
-import { resolveAvatar } from "@/app/helpers";
+import { resolveAvatar } from "@/src/lib/helpers";
 import {
   ACCENT,
   BORDER,

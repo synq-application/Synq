@@ -51,7 +51,7 @@ import {
   isLegacyAiSuggestionText,
   parseIdeaText,
   resolveChatSenderAvatar
-} from "../../../app/helpers";
+} from "@/src/lib/helpers";
 import AISuggestionBubble from "./AISuggestionBubble";
 import { MESSAGES_STACK_DURATION_MS } from "./MessagesModalStack";
 

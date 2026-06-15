@@ -66,7 +66,7 @@ import {
 
 } from "react-native";
 
-import { resolveAvatar } from "@/app/helpers";
+import { resolveAvatar } from "@/src/lib/helpers";
 
 
 
