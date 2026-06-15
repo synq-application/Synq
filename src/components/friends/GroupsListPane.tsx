@@ -6,6 +6,7 @@ import {
   SPACE_6,
 } from "@/constants/Variables";
 import CommunitySection from "@/src/components/friends/CommunityGroupsSection";
+import GroupsFeatureInfoModal from "@/src/components/friends/GroupsFeatureInfoModal";
 import { groupsPageStyles } from "@/src/components/friends/groupsListStyles";
 import {
   deleteFriendGroup,
@@ -55,6 +56,7 @@ export default function GroupsListPane({
   const [createBusy, setCreateBusy] = useState(false);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<FriendGroup | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [circlesInfoVisible, setCirclesInfoVisible] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -148,9 +150,11 @@ export default function GroupsListPane({
         <View style={groupsPageStyles.section}>
           <View style={groupsPageStyles.sectionHeader}>
             <GroupsSectionHeader
-              title="Your Circles"
+              title="Your circles"
               onAdd={openCreate}
-              accessibilityLabel="New circle"
+              addAccessibilityLabel="New circle"
+              onInfo={() => setCirclesInfoVisible(true)}
+              infoAccessibilityLabel="What are circles"
             />
           </View>
 
@@ -206,6 +210,12 @@ export default function GroupsListPane({
           if (!deleteBusy) setPendingDeleteGroup(null);
         }}
         onConfirm={() => void handleConfirmDelete()}
+      />
+
+      <GroupsFeatureInfoModal
+        visible={circlesInfoVisible}
+        variant="circles"
+        onClose={() => setCirclesInfoVisible(false)}
       />
     </>
   );

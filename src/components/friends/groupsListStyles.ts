@@ -31,6 +31,13 @@ export const groupsPageStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  sectionTitleStart: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
   sectionTitle: {
     fontFamily: fonts.heavy,
     fontSize: 17,
@@ -91,27 +98,6 @@ export const groupsPageStyles = StyleSheet.create({
     color: MUTED2,
     letterSpacing: 0.04,
     lineHeight: 17,
-  },
-  circleCardMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  categoryPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,255,133,0.1)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,255,133,0.24)",
-  },
-  categoryPillText: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION - 1,
-    color: ACCENT,
-    letterSpacing: 0.02,
-    lineHeight: 14,
   },
   searchBar: {
     flexDirection: "row",
