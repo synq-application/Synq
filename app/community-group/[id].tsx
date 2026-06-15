@@ -9,22 +9,20 @@ import {
   fonts,
   Friend,
   MUTED2,
-  ON_ACCENT_TEXT,
-  profileScreenSectionTitle,
   RADIUS_MD,
+  SPACE_2,
   SPACE_3,
   SPACE_4,
   SPACE_5,
   SPACE_6,
   SURFACE,
-  synqOutlineAddBtnCompact,
-  synqOutlineAddBtnText,
   stackNavigationBackBtn,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
 } from "@/constants/Variables";
 import AddMembersToGroupSheet from "@/src/components/friends/AddMembersToGroupSheet";
+import { groupsPageStyles } from "@/src/components/friends/groupsListStyles";
 import BackButton from "@/src/components/BackButton";
 import CommunityPlansSection from "@/src/components/community/CommunityPlansSection";
 import HeaderIconButton from "@/src/components/HeaderIconButton";
@@ -46,6 +44,7 @@ import {
   subscribePendingCommunityGroupInvites,
 } from "@/src/lib/communityGroupInvites";
 import { friendsListCacheByUser } from "@/src/lib/socialCache";
+import { computeSynqActiveFromUserData } from "@/src/lib/synqSession";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -57,9 +56,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Modal,
   Pressable,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -86,18 +85,10 @@ function invitedFriendsSuccessMessage(
   return `Invite sent to ${formatNameList(names)} for ${group}`;
 }
 
-const ADD_MEMBERS_FOOTER_FADE_HEIGHT = 56;
-const ADD_MEMBERS_FOOTER_FADE_GRADIENT = [
-  "rgba(0,0,0,0)",
-  "rgba(0,0,0,0.45)",
-  "#000000",
-  "#000000",
-] as const;
-const ADD_MEMBERS_FOOTER_FADE_LOCATIONS = [0, 0.28, 0.48, 1] as const;
-const ADD_MEMBERS_FOOTER_HEIGHT =
-  ADD_MEMBERS_FOOTER_FADE_HEIGHT + SPACE_3 + 40 + SPACE_6;
-
-const COVER_HERO_HEIGHT = 220;
+const COVER_HERO_HEIGHT = 200;
+const MEMBER_AVATAR_SIZE = 56;
+const MEMBER_PREVIEW_COUNT = 6;
+const AVAILABLE_PREVIEW_COUNT = 3;
 const COVER_HERO_GRADIENT = [
   "rgba(0,0,0,0.45)",
   "rgba(0,0,0,0.08)",
@@ -117,6 +108,7 @@ type MemberRow = {
   id: string;
   displayName: string;
   imageurl?: string;
+  synqActive?: boolean;
 };
 
 export default function CommunityGroupDetailScreen() {
@@ -143,6 +135,8 @@ export default function CommunityGroupDetailScreen() {
     id: string;
     displayName: string;
   } | null>(null);
+  const [showAllMembers, setShowAllMembers] = useState(false);
+  const [showAllAvailable, setShowAllAvailable] = useState(false);
 
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -190,52 +184,44 @@ export default function CommunityGroupDetailScreen() {
 
   useEffect(() => {
     if (!group) return;
-    const byId = new Map(friends.map((f) => [f.id, f]));
-    const missingIds = group.memberIds.filter((id) => !byId.has(id));
-
-    const fromFriends: Record<string, MemberRow> = {};
-    group.memberIds.forEach((memberId) => {
-      const friend = byId.get(memberId);
-      if (friend) {
-        fromFriends[memberId] = {
-          id: memberId,
-          displayName: friend.displayName || "Member",
-          imageurl: (friend as { imageurl?: string }).imageurl,
-        };
-      }
-    });
-    setMemberProfiles((prev) => ({ ...prev, ...fromFriends }));
-
-    if (missingIds.length === 0) return;
 
     let cancelled = false;
     void Promise.all(
-      missingIds.map(async (memberId) => {
+      group.memberIds.map(async (memberId) => {
+        const friend = friends.find((f) => f.id === memberId);
+        let displayName = friend?.displayName?.trim() || "Member";
+        let imageurl = (friend as { imageurl?: string } | undefined)?.imageurl;
+        let synqActive = false;
+
         try {
           const snap = await getDoc(doc(db, "users", memberId));
-          if (!snap.exists()) return null;
-          const data = snap.data() as { displayName?: string; imageurl?: string };
-          return {
-            id: memberId,
-            displayName: String(data.displayName || "").trim() || "Member",
-            imageurl: data.imageurl,
-          } satisfies MemberRow;
+          if (snap.exists()) {
+            const data = snap.data() as {
+              displayName?: string;
+              imageurl?: string;
+            };
+            displayName = String(data.displayName || "").trim() || displayName;
+            imageurl = data.imageurl || imageurl;
+            synqActive = computeSynqActiveFromUserData(snap.data());
+          }
         } catch {
-          return {
-            id: memberId,
-            displayName: "Member",
-          } satisfies MemberRow;
+          // keep cached friend fallback
         }
+
+        return {
+          id: memberId,
+          displayName,
+          imageurl,
+          synqActive,
+        } satisfies MemberRow;
       })
     ).then((rows) => {
       if (cancelled) return;
       const next: Record<string, MemberRow> = {};
       rows.forEach((row) => {
-        if (row) next[row.id] = row;
+        next[row.id] = row;
       });
-      if (Object.keys(next).length > 0) {
-        setMemberProfiles((prev) => ({ ...prev, ...next }));
-      }
+      setMemberProfiles(next);
     });
 
     return () => {
@@ -254,6 +240,7 @@ export default function CommunityGroupDetailScreen() {
         id: memberId,
         displayName: profile?.displayName || "Member",
         imageurl: profile?.imageurl,
+        synqActive: profile?.synqActive,
       };
     });
   }, [group, memberProfiles]);
@@ -368,6 +355,23 @@ export default function CommunityGroupDetailScreen() {
     }
   };
 
+  const availableMembers = useMemo(
+    () => memberRows.filter((member) => member.synqActive),
+    [memberRows]
+  );
+
+  const availablePreview = showAllAvailable
+    ? availableMembers
+    : availableMembers.slice(0, AVAILABLE_PREVIEW_COUNT);
+  const availableOverflow = Math.max(
+    0,
+    availableMembers.length - AVAILABLE_PREVIEW_COUNT
+  );
+
+  const memberPreview = showAllMembers
+    ? memberRows
+    : memberRows.slice(0, MEMBER_PREVIEW_COUNT);
+
   if (!groupId) {
     return (
       <SafeAreaView style={styles.screen}>
@@ -376,99 +380,75 @@ export default function CommunityGroupDetailScreen() {
     );
   }
 
+  const memberCount = group?.memberIds.length ?? 0;
   const memberLabel =
-    group && group.memberIds.length === 1
-      ? "1 member"
-      : `${group?.memberIds.length ?? 0} members`;
+    memberCount === 1 ? "1 member" : `${memberCount} members`;
 
-  const footerHeight = isMember ? ADD_MEMBERS_FOOTER_HEIGHT : SPACE_6;
   const coverPhotoUrl = group?.coverPhotoUrl?.trim() || "";
   const hasCover = coverPhotoUrl.length > 0;
   const coverHeight = insets.top + COVER_HERO_HEIGHT;
 
-  const headerRight =
-    group && isMember ? (
-      <HeaderIconButton
-        name="ellipsis-horizontal"
-        size={22}
-        onPress={() => setOptionsVisible(true)}
-        accessibilityLabel="Group options"
-      />
-    ) : null;
-
-  const profileMeta = group
-    ? [group.category, "Open community", group.location].filter(Boolean).join(" · ")
-    : "";
-
-  const listHeader = group ? (
-    <>
-      {hasCover ? (
-        <View style={[styles.coverHeroWrap, { height: coverHeight }]}>
+  const renderMemberAvatar = (member: MemberRow, showAdmin = false) => (
+    <TouchableOpacity
+      key={member.id}
+      style={styles.memberTile}
+      activeOpacity={0.82}
+      onPress={() =>
+        router.push({
+          pathname: "/friend-profile",
+          params: { friendId: member.id, from: "friends" },
+        })
+      }
+      accessibilityRole="button"
+      accessibilityLabel={member.displayName}
+    >
+      <View style={styles.memberTileAvatarOuter}>
+        <View style={styles.memberTileAvatarWrap}>
           <ExpoImage
-            source={{ uri: coverPhotoUrl }}
-            style={styles.coverHeroImage}
+            source={{ uri: resolveAvatar(member.imageurl) }}
+            style={styles.memberTileAvatar}
             contentFit="cover"
-            transition={160}
             cachePolicy="memory-disk"
-            recyclingKey={coverPhotoUrl}
-          />
-          <LinearGradient
-            colors={[...COVER_HERO_GRADIENT]}
-            locations={[...COVER_HERO_GRADIENT_LOCATIONS]}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={styles.coverHeroGradient}
-            pointerEvents="none"
           />
         </View>
-      ) : null}
-
-      <View style={hasCover ? styles.coverProfileSection : styles.profileHeader}>
-        {!hasCover ? (
-          <View style={styles.profileIcon}>
-            <Ionicons name="people" size={26} color={ACCENT} />
-          </View>
+        {member.synqActive ? (
+          <View style={styles.memberTileActiveDot} />
         ) : null}
-        <Text style={styles.profileName}>{group.name}</Text>
-        {profileMeta ? <Text style={styles.profileMeta}>{profileMeta}</Text> : null}
-        <Text style={styles.profileStats}>{memberLabel}</Text>
-        {group.about ? <Text style={styles.profileAbout}>{group.about}</Text> : null}
       </View>
-
-      {!isMember ? (
-        <TouchableOpacity
-          style={[styles.joinCommunityBtn, joinBusy && styles.joinCommunityBtnDisabled]}
-          disabled={joinBusy}
-          onPress={() => void handleJoin()}
-          activeOpacity={0.88}
-          accessibilityRole="button"
-          accessibilityLabel={`Join ${group.name}`}
-        >
-          {joinBusy ? (
-            <ActivityIndicator color={ON_ACCENT_TEXT} size="small" />
-          ) : (
-            <Text style={styles.joinCommunityBtnText}>Join community</Text>
-          )}
-        </TouchableOpacity>
-      ) : null}
-
-      <CommunityPlansSection
-        groupId={group.id}
-        groupName={group.name}
-        uid={uid}
-        viewerDisplayName={auth.currentUser?.displayName?.trim() || "You"}
-        isMember={isMember}
-        isCreator={isCreator}
-      />
-
-      <View style={styles.sectionHeader}>
-        <View>
-          <Text style={styles.sectionTitle}>Members</Text>
+      <Text style={styles.memberTileName} numberOfLines={1}>
+        {member.displayName.split(" ")[0]}
+      </Text>
+      {showAdmin && member.id === group?.creatorId ? (
+        <View style={styles.adminBadge}>
+          <Text style={styles.adminBadgeText}>Admin</Text>
         </View>
-        <Text style={styles.sectionMeta}>{memberLabel}</Text>
-      </View>
-    </>
-  ) : null;
+      ) : null}
+    </TouchableOpacity>
+  );
+
+  const renderJoinButton = (compact = false) => (
+    <TouchableOpacity
+      style={[
+        styles.joinCommunityBtn,
+        compact && styles.joinCommunityBtnCompact,
+        joinBusy && styles.joinCommunityBtnDisabled,
+      ]}
+      disabled={joinBusy}
+      onPress={() => void handleJoin()}
+      activeOpacity={0.88}
+      accessibilityRole="button"
+      accessibilityLabel={`Join ${group?.name || "community"}`}
+    >
+      {joinBusy ? (
+        <ActivityIndicator color={ACCENT} size="small" />
+      ) : (
+        <>
+          <Ionicons name="person-add-outline" size={16} color={ACCENT} />
+          <Text style={styles.joinCommunityBtnText}>Join</Text>
+        </>
+      )}
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.screen}>
@@ -477,40 +457,23 @@ export default function CommunityGroupDetailScreen() {
         style={styles.flex}
         edges={hasCover ? ["bottom", "left", "right"] : undefined}
       >
-        {!hasCover ? (
+        {!hasCover && group ? (
           <StackScreenHeader
-            title={group?.name || "Group"}
+            title={group.name}
             onBack={goBack}
-            right={headerRight}
+            right={
+              isMember ? (
+                <View style={styles.headerActions}>
+                  <HeaderIconButton
+                    name="ellipsis-horizontal"
+                    size={22}
+                    onPress={() => setOptionsVisible(true)}
+                    accessibilityLabel="Community options"
+                  />
+                </View>
+              ) : undefined
+            }
           />
-        ) : null}
-
-        {hasCover ? (
-          <>
-            <LinearGradient
-              colors={[...COVER_TOP_NAV_GRADIENT]}
-              locations={[...COVER_TOP_NAV_GRADIENT_LOCATIONS]}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={[
-                styles.coverTopNavGradient,
-                { height: insets.top + COVER_TOP_NAV_GRADIENT_HEIGHT },
-              ]}
-              pointerEvents="none"
-            />
-            <View
-              style={[styles.coverNavOverlay, { paddingTop: insets.top + 4 }]}
-              pointerEvents="box-none"
-            >
-              <BackButton onPress={goBack} style={styles.coverBackBtn} />
-              <View style={styles.coverNavSpacer} />
-              {headerRight ? (
-                <View style={styles.coverNavRight}>{headerRight}</View>
-              ) : (
-                <View style={styles.coverNavSide} />
-              )}
-            </View>
-          </>
         ) : null}
 
         {loading ? (
@@ -522,76 +485,216 @@ export default function CommunityGroupDetailScreen() {
             <Text style={styles.errorText}>This group no longer exists.</Text>
           </View>
         ) : (
-          <View style={styles.membersPane}>
-            <FlatList
-              data={isMember ? memberRows : []}
-              keyExtractor={(item) => item.id}
-              style={styles.list}
-              contentContainerStyle={[styles.listContent, { paddingBottom: footerHeight }]}
-              ListHeaderComponent={listHeader}
-              ListEmptyComponent={
-                isMember ? (
-                  <Text style={styles.emptyMembers}>No members yet. Invite friends below.</Text>
-                ) : null
-              }
-              renderItem={({ item }) => (
-                <View style={styles.memberRow}>
-                  <TouchableOpacity
-                    style={styles.memberMain}
-                    activeOpacity={0.82}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/friend-profile",
-                        params: { friendId: item.id, from: "friends" },
-                      })
-                    }
-                  >
-                    <View style={styles.avatarRing}>
-                      <ExpoImage
-                        source={{ uri: resolveAvatar(item.imageurl) }}
-                        style={styles.avatar}
-                        cachePolicy="memory-disk"
+          <ScrollView
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {hasCover ? (
+              <View style={[styles.coverHeroWrap, { height: coverHeight }]}>
+                <ExpoImage
+                  source={{ uri: coverPhotoUrl }}
+                  style={styles.coverHeroImage}
+                  contentFit="cover"
+                  transition={160}
+                  cachePolicy="memory-disk"
+                  recyclingKey={coverPhotoUrl}
+                />
+                <LinearGradient
+                  colors={[...COVER_TOP_NAV_GRADIENT]}
+                  locations={[...COVER_TOP_NAV_GRADIENT_LOCATIONS]}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={[
+                    styles.coverTopNavGradient,
+                    { height: insets.top + COVER_TOP_NAV_GRADIENT_HEIGHT },
+                  ]}
+                  pointerEvents="none"
+                />
+                <LinearGradient
+                  colors={[...COVER_HERO_GRADIENT]}
+                  locations={[...COVER_HERO_GRADIENT_LOCATIONS]}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={styles.coverHeroGradient}
+                  pointerEvents="none"
+                />
+                <View
+                  style={[styles.coverNavOverlay, { paddingTop: insets.top + 4 }]}
+                  pointerEvents="box-none"
+                >
+                  <BackButton onPress={goBack} style={styles.coverBackBtn} />
+                  <View style={styles.coverNavSpacer} />
+                  <View style={styles.coverNavRight}>
+                    {isMember ? (
+                      <HeaderIconButton
+                        name="ellipsis-horizontal"
+                        size={22}
+                        onPress={() => setOptionsVisible(true)}
+                        accessibilityLabel="Community options"
                       />
-                    </View>
-                    <Text style={styles.memberName} numberOfLines={1}>
-                      {item.displayName}
-                    </Text>
-                  </TouchableOpacity>
-                  {(isCreator || item.id === uid) && item.id !== group.creatorId ? (
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
+            <View style={styles.profileSection}>
+              <View style={styles.profileTitleRow}>
+                <View style={styles.profileTitleMain}>
+                  <Text style={styles.profileName}>{group.name}</Text>
+                  <Text style={styles.profileMeta}>
+                    {group.category ? (
+                      <Text style={styles.profileMetaMuted}>{group.category}</Text>
+                    ) : null}
+                    {group.category && group.location ? (
+                      <>
+                        <Text style={styles.profileMetaMuted}> </Text>
+                        <Text style={styles.profileMetaBullet}>•</Text>
+                        <Text style={styles.profileMetaMuted}> </Text>
+                      </>
+                    ) : null}
+                    {group.location ? (
+                      <Text style={styles.profileMetaMuted}>{group.location}</Text>
+                    ) : null}
+                  </Text>
+                </View>
+                {!isMember ? renderJoinButton(true) : null}
+              </View>
+
+              {group.about ? (
+                <Text style={styles.profileAbout}>{group.about}</Text>
+              ) : null}
+            </View>
+
+            {isMember && availableMembers.length > 0 ? (
+              <View style={styles.sectionBlock}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Available now</Text>
+                  {availableMembers.length > 0 ? (
                     <TouchableOpacity
-                      onPress={() => handleRemoveMember(item.id, item.displayName)}
+                      onPress={() => setShowAllAvailable((prev) => !prev)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Remove ${item.displayName} from group`}
-                      style={styles.removeMemberBtn}
                     >
-                      <Text style={styles.removeMemberLabel}>Remove</Text>
+                      <Text style={styles.sectionLink}>
+                        {showAllAvailable ? "Show less" : "See all"}
+                      </Text>
                     </TouchableOpacity>
                   ) : null}
                 </View>
-              )}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalStrip}
+                >
+                  {availablePreview.map((member) => renderMemberAvatar(member))}
+                  {!showAllAvailable && availableOverflow > 0 ? (
+                    <View style={styles.moreTile}>
+                      <View style={styles.moreTileCircle}>
+                        <Text style={styles.moreTileText}>+{availableOverflow} More</Text>
+                      </View>
+                    </View>
+                  ) : null}
+                </ScrollView>
+              </View>
+            ) : null}
+
+            <CommunityPlansSection
+              groupId={group.id}
+              groupName={group.name}
+              uid={uid}
+              viewerDisplayName={auth.currentUser?.displayName?.trim() || "You"}
+              isMember={isMember}
+              isCreator={isCreator}
             />
 
-            {isMember ? (
-              <LinearGradient
-                colors={[...ADD_MEMBERS_FOOTER_FADE_GRADIENT]}
-                locations={[...ADD_MEMBERS_FOOTER_FADE_LOCATIONS]}
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 1 }}
-                style={[styles.addMembersFooter, { height: ADD_MEMBERS_FOOTER_HEIGHT }]}
-              >
-                <TouchableOpacity
-                  style={[synqOutlineAddBtnCompact, styles.addMembersBtn]}
-                  onPress={() => setAddSheetVisible(true)}
-                  activeOpacity={0.85}
+            <View style={styles.sectionBlock}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Members</Text>
+                <View style={styles.sectionHeaderRight}>
+                  <Text style={styles.sectionMetaInline}>{memberLabel}</Text>
+                  {isMember && memberRows.length > 0 ? (
+                    <TouchableOpacity
+                      onPress={() => setShowAllMembers((prev) => !prev)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={styles.sectionLink}>
+                        {showAllMembers ? "Show less" : "See all"}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+
+              {!isMember ? (
+                <View style={styles.membersLockedRow}>
+                  <Ionicons name="lock-closed-outline" size={16} color={MUTED2} />
+                  <Text style={styles.membersLockedText}>
+                    You can&apos;t see members until you join
+                  </Text>
+                </View>
+              ) : memberRows.length === 0 ? (
+                <Text style={styles.emptyMembers}>
+                  No members yet. Invite friends from the menu.
+                </Text>
+              ) : showAllMembers ? (
+                memberRows.map((item) => (
+                  <View key={item.id} style={styles.memberRow}>
+                    <TouchableOpacity
+                      style={styles.memberMain}
+                      activeOpacity={0.82}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/friend-profile",
+                          params: { friendId: item.id, from: "friends" },
+                        })
+                      }
+                    >
+                      <View style={styles.avatarRing}>
+                        <ExpoImage
+                          source={{ uri: resolveAvatar(item.imageurl) }}
+                          style={styles.avatar}
+                          cachePolicy="memory-disk"
+                        />
+                      </View>
+                      <Text style={styles.memberName} numberOfLines={1}>
+                        {item.displayName}
+                      </Text>
+                    </TouchableOpacity>
+                    {(isCreator || item.id === uid) && item.id !== group.creatorId ? (
+                      <TouchableOpacity
+                        onPress={() =>
+                          item.id === uid
+                            ? setLeaveVisible(true)
+                            : handleRemoveMember(item.id, item.displayName)
+                        }
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          item.id === uid
+                            ? `Leave ${group.name}`
+                            : `Remove ${item.displayName} from group`
+                        }
+                        style={styles.removeMemberBtn}
+                      >
+                        <Text style={styles.removeMemberLabel}>
+                          {item.id === uid ? "Leave" : "Remove"}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ))
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalStrip}
                 >
-                  <Ionicons name="person-add-outline" size={18} color={ACCENT} />
-                  <Text style={synqOutlineAddBtnText}>Invite friends</Text>
-                </TouchableOpacity>
-              </LinearGradient>
-            ) : null}
-          </View>
+                  {memberPreview.map((member) => renderMemberAvatar(member, true))}
+                </ScrollView>
+              )}
+            </View>
+          </ScrollView>
         )}
 
       <AddMembersToGroupSheet
@@ -610,6 +713,22 @@ export default function CommunityGroupDetailScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setOptionsVisible(false)} />
           <View style={styles.optionsSheetGroup}>
             <View style={styles.optionsSheet}>
+              {isMember ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.optionsRow}
+                    onPress={() => {
+                      setOptionsVisible(false);
+                      setAddSheetVisible(true);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons name="person-add-outline" size={22} color={TEXT} />
+                    <Text style={styles.optionsRowText}>Invite friends</Text>
+                  </TouchableOpacity>
+                  <View style={styles.optionsDivider} />
+                </>
+              ) : null}
               {isCreator ? (
                 <>
                   <TouchableOpacity
@@ -731,50 +850,77 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: SPACE_5,
-    paddingTop: SPACE_4,
     paddingBottom: SPACE_3,
   },
+  sectionHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  sectionBlock: {
+    paddingTop: SPACE_4,
+  },
   sectionTitle: {
-    ...profileScreenSectionTitle,
-    marginBottom: 4,
+    ...groupsPageStyles.subsectionTitle,
+    fontSize: 16,
+    marginTop: 0,
+    marginBottom: 0,
   },
-  publicBadge: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION,
+  sectionLink: {
+    fontFamily: fonts.medium,
+    fontSize: TYPE_CAPTION + 1,
     color: ACCENT,
-    letterSpacing: 0.2,
   },
-  sectionMeta: {
+  sectionMetaInline: {
     fontFamily: fonts.book,
     fontSize: TYPE_CAPTION,
     color: MUTED2,
-    marginTop: 4,
+  },
+  membersLockedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: SPACE_5,
+    paddingBottom: SPACE_4,
+  },
+  membersLockedText: {
+    flex: 1,
+    fontFamily: fonts.book,
+    fontSize: TYPE_BODY,
+    color: MUTED2,
+    lineHeight: 20,
   },
   joinCommunityBtn: {
-    marginHorizontal: SPACE_5,
-    marginTop: SPACE_3,
-    marginBottom: SPACE_4,
-    minHeight: 48,
-    borderRadius: BUTTON_RADIUS,
-    backgroundColor: ACCENT,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+    minHeight: 36,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: ACCENT,
+    backgroundColor: "transparent",
     justifyContent: "center",
+  },
+  joinCommunityBtnCompact: {
+    flexShrink: 0,
   },
   joinCommunityBtnDisabled: {
     opacity: 0.6,
   },
   joinCommunityBtnText: {
     fontFamily: fonts.heavy,
-    fontSize: TYPE_BODY,
-    color: ON_ACCENT_TEXT,
+    fontSize: TYPE_CAPTION + 1,
+    color: ACCENT,
     letterSpacing: 0.04,
   },
-  membersPane: {
-    flex: 1,
-    position: "relative",
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   coverHeroWrap: {
     width: "100%",
@@ -793,7 +939,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 9,
+    zIndex: 2,
   },
   coverNavOverlay: {
     position: "absolute",
@@ -804,7 +950,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: SPACE_3,
     paddingBottom: SPACE_3,
-    zIndex: 10,
+    zIndex: 3,
   },
   coverBackBtn: {
     ...stackNavigationBackBtn,
@@ -813,19 +959,28 @@ const styles = StyleSheet.create({
   coverNavSpacer: {
     flex: 1,
   },
-  coverNavSide: {
-    width: 40,
-  },
   coverNavRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
     minWidth: 40,
-    alignItems: "flex-end",
+    justifyContent: "flex-end",
   },
-  coverProfileSection: {
+  profileSection: {
     paddingHorizontal: SPACE_5,
-    marginTop: -52,
+    paddingTop: SPACE_4,
     paddingBottom: SPACE_3,
-    gap: 4,
-    zIndex: 1,
+    gap: SPACE_2,
+  },
+  profileTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: SPACE_3,
+  },
+  profileTitleMain: {
+    flex: 1,
+    minWidth: 0,
+    gap: 6,
   },
   profileHeader: {
     paddingHorizontal: SPACE_5,
@@ -833,49 +988,116 @@ const styles = StyleSheet.create({
     paddingBottom: SPACE_3,
     gap: 6,
   },
-  profileIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,255,133,0.1)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,255,133,0.22)",
-    marginBottom: 4,
-  },
   profileName: {
     fontFamily: fonts.heavy,
-    fontSize: 24,
+    fontSize: 26,
     color: TEXT,
-    letterSpacing: 0.08,
+    letterSpacing: 0.04,
+    lineHeight: 30,
   },
   profileMeta: {
     fontFamily: fonts.book,
     fontSize: TYPE_CAPTION + 1,
+    lineHeight: 19,
+  },
+  profileMetaMuted: {
+    color: MUTED2,
+  },
+  profileMetaBullet: {
+    fontSize: 9,
     color: MUTED2,
     lineHeight: 19,
   },
-  profileStats: {
+  horizontalStrip: {
+    paddingHorizontal: SPACE_5,
+    gap: SPACE_4,
+    paddingBottom: SPACE_2,
+  },
+  memberTile: {
+    width: MEMBER_AVATAR_SIZE + 8,
+    alignItems: "center",
+    gap: 6,
+  },
+  memberTileAvatarOuter: {
+    width: MEMBER_AVATAR_SIZE,
+    height: MEMBER_AVATAR_SIZE,
+    position: "relative",
+  },
+  memberTileAvatarWrap: {
+    width: MEMBER_AVATAR_SIZE,
+    height: MEMBER_AVATAR_SIZE,
+    borderRadius: MEMBER_AVATAR_SIZE / 2,
+    overflow: "hidden",
+    backgroundColor: SURFACE,
+    position: "relative",
+  },
+  memberTileAvatar: {
+    width: MEMBER_AVATAR_SIZE,
+    height: MEMBER_AVATAR_SIZE,
+  },
+  memberTileActiveDot: {
+    position: "absolute",
+    right: 2,
+    bottom: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: ACCENT,
+    borderWidth: 2,
+    borderColor: BG,
+  },
+  memberTileName: {
     fontFamily: fonts.medium,
     fontSize: TYPE_CAPTION,
+    color: TEXT,
+    textAlign: "center",
+    width: MEMBER_AVATAR_SIZE + 16,
+  },
+  adminBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,255,133,0.12)",
+  },
+  adminBadgeText: {
+    fontFamily: fonts.medium,
+    fontSize: 10,
     color: ACCENT,
-    letterSpacing: 0.04,
-    marginTop: 2,
+  },
+  moreTile: {
+    width: MEMBER_AVATAR_SIZE + 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  moreTileCircle: {
+    width: MEMBER_AVATAR_SIZE,
+    height: MEMBER_AVATAR_SIZE,
+    borderRadius: MEMBER_AVATAR_SIZE / 2,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  moreTileText: {
+    fontFamily: fonts.medium,
+    fontSize: 10,
+    color: MUTED2,
+    textAlign: "center",
+    lineHeight: 13,
   },
   profileAbout: {
     fontFamily: fonts.book,
     fontSize: TYPE_BODY,
     color: MUTED2,
     lineHeight: 22,
-    marginTop: 6,
   },
   list: {
     flex: 1,
   },
   listContent: {
-    paddingBottom: SPACE_4,
-    flexGrow: 1,
+    paddingBottom: SPACE_6,
   },
   emptyMembers: {
     fontFamily: fonts.book,
@@ -911,8 +1133,8 @@ const styles = StyleSheet.create({
   },
   memberName: {
     flex: 1,
-    fontFamily: fonts.heavy,
-    fontSize: 16,
+    fontFamily: fonts.medium,
+    fontSize: 15,
     color: TEXT,
     letterSpacing: 0.05,
   },
@@ -931,30 +1153,6 @@ const styles = StyleSheet.create({
     fontSize: TYPE_CAPTION,
     color: DESTRUCTIVE,
     letterSpacing: 0.15,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    marginLeft: 48 + 12 + SPACE_5,
-  },
-  addMembersFooter: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: SPACE_5,
-    paddingBottom: SPACE_6,
-    paddingTop: SPACE_3,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    zIndex: 2,
-  },
-  addMembersBtn: {
-    flexDirection: "row",
-    gap: 8,
-    alignSelf: "center",
-    paddingHorizontal: 26,
-    paddingVertical: 11,
   },
   successOverlay: {
     flex: 1,

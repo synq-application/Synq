@@ -92,10 +92,10 @@ export default function CommunitySection({ userId, friends = [] }: Props) {
           onPress={openSearch}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Search communities"
+          accessibilityLabel="Find communities"
         >
           <Ionicons name="search" size={18} color={MUTED3} />
-          <Text style={groupsPageStyles.searchBarPlaceholder}>Search communities</Text>
+          <Text style={groupsPageStyles.searchBarPlaceholder}>Find communities</Text>
         </TouchableOpacity>
 
         {joined.map((group) => (

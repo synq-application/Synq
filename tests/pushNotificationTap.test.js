@@ -42,4 +42,17 @@ describe("parsePushNotificationTap", () => {
       kind: "notifications",
     });
   });
+
+  test("routes community group invites to the group page", () => {
+    expect(
+      parsePushNotificationTap({
+        type: "community_group_invite",
+        groupId: "cg-42",
+        fromUserId: "user-1",
+      })
+    ).toEqual({
+      kind: "community_group",
+      groupId: "cg-42",
+    });
+  });
 });

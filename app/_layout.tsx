@@ -324,7 +324,11 @@ export default function RootLayout() {
 
     const applyNotificationData = (data: Record<string, unknown> | undefined) => {
       const tap = parsePushNotificationTap(data);
-      if (tap) setPendingNotificationTap(tap);
+      if (tap) {
+        setPendingNotificationTap(
+          tap as NonNullable<typeof pendingNotificationTap>
+        );
+      }
     };
 
     const sub = Notifications.addNotificationResponseReceivedListener(
