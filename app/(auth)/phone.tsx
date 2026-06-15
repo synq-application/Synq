@@ -49,6 +49,13 @@ import { usePreAuthTermsGate } from "../../src/lib/usePreAuthTermsGate";
 
 const { width } = Dimensions.get("window");
 
+function formatUsPhoneDisplay(digits: string): string {
+  const d = digits.replace(/\D/g, "").slice(0, 10);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
+  return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
+}
+
 export default function Phone() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isSignIn = mode === "signin";
@@ -98,8 +105,7 @@ export default function Phone() {
   };
 
   const handlePhoneNumberChange = (text: string) => {
-    const formattedText = text.replace(/\D/g, "").slice(0, 10);
-    setPhoneNumber(formattedText);
+    setPhoneNumber(text.replace(/\D/g, "").slice(0, 10));
   };
 
   const getFormattedPhoneNumber = () => {
@@ -179,7 +185,7 @@ export default function Phone() {
 
   const maskedPhone =
     phoneNumber.length === 10
-      ? `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`
+      ? formatUsPhoneDisplay(phoneNumber)
       : "your number";
 
   const recaptchaConfig = (app as any)?.options ?? firebaseConfig;
@@ -238,7 +244,7 @@ export default function Phone() {
 
                 <View style={styles.phoneWrapper}>
                   <TextInput
-                    value={phoneNumber}
+                    value={formatUsPhoneDisplay(phoneNumber)}
                     onChangeText={handlePhoneNumberChange}
                     style={styles.phoneInput}
                     keyboardType="phone-pad"

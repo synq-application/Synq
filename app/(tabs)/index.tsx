@@ -394,25 +394,13 @@ export default function SynqScreen() {
     );
   }, [allChats, isBlocked, hiddenChatIds]);
 
-  const pinnedChatIds = useMemo(
-    () =>
-      Array.isArray(userProfile?.pinnedChatIds)
-        ? (userProfile.pinnedChatIds as string[]).filter(Boolean)
-        : [],
-    [userProfile?.pinnedChatIds]
-  );
-
   const inboxChats = useMemo(() => {
-    const pinned = new Set(pinnedChatIds);
     return [...visibleChats].sort((a, b) => {
-      const aPinned = pinned.has(a.id) ? 1 : 0;
-      const bPinned = pinned.has(b.id) ? 1 : 0;
-      if (aPinned !== bPinned) return bPinned - aPinned;
       const aMs = a.updatedAt?.toMillis?.() ?? a.createdAt?.toMillis?.() ?? 0;
       const bMs = b.updatedAt?.toMillis?.() ?? b.createdAt?.toMillis?.() ?? 0;
       return bMs - aMs;
     });
-  }, [visibleChats, pinnedChatIds]);
+  }, [visibleChats]);
 
   useEffect(() => {
     if (!activeChatId || !auth.currentUser?.uid) return;
@@ -1587,78 +1575,26 @@ export default function SynqScreen() {
     setSelectedMergeChatIds([chatId]);
   };
 
-  const togglePinChat = async (chatId: string) => {
-    if (!auth.currentUser) return;
-    const myId = auth.currentUser.uid;
-    const isPinned = pinnedChatIds.includes(chatId);
-
-    setInboxActionChat(null);
-    setUserProfile((prev: any) => {
-      const current = Array.isArray(prev?.pinnedChatIds)
-        ? prev.pinnedChatIds.filter(Boolean)
-        : [];
-      return {
-        ...prev,
-        pinnedChatIds: isPinned
-          ? current.filter((id: string) => id !== chatId)
-          : [...current, chatId],
-      };
-    });
-
-    try {
-      await updateDoc(doc(db, "users", myId), {
-        pinnedChatIds: isPinned ? arrayRemove(chatId) : arrayUnion(chatId),
-      });
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {
-      setUserProfile((prev: any) => {
-        const current = Array.isArray(prev?.pinnedChatIds)
-          ? prev.pinnedChatIds.filter(Boolean)
-          : [];
-        return {
-          ...prev,
-          pinnedChatIds: isPinned
-            ? [...current, chatId]
-            : current.filter((id: string) => id !== chatId),
-        };
-      });
-      showActionError("Could not update pin. Please try again.");
-    }
-  };
-
   const hideMergedSourceChats = async (sourceChatIds: string[]) => {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
     const ids = uniqueChatIds(sourceChatIds);
     if (ids.length === 0) return;
 
-    const unpinnedIds = ids.filter((id) => pinnedChatIds.includes(id));
-
     setUserProfile((prev: any) => {
       const currentHidden = Array.isArray(prev?.hiddenChatIds)
         ? prev.hiddenChatIds.filter(Boolean)
         : [];
-      const currentPinned = Array.isArray(prev?.pinnedChatIds)
-        ? prev.pinnedChatIds.filter(Boolean)
-        : [];
       return {
         ...prev,
         hiddenChatIds: uniqueChatIds([...currentHidden, ...ids]),
-        pinnedChatIds: currentPinned.filter((id: string) => !ids.includes(id)),
       };
     });
 
     try {
-      if (unpinnedIds.length > 0) {
-        await updateDoc(doc(db, "users", myId), {
-          hiddenChatIds: arrayUnion(...ids),
-          pinnedChatIds: arrayRemove(...unpinnedIds),
-        });
-      } else {
-        await updateDoc(doc(db, "users", myId), {
-          hiddenChatIds: arrayUnion(...ids),
-        });
-      }
+      await updateDoc(doc(db, "users", myId), {
+        hiddenChatIds: arrayUnion(...ids),
+      });
     } catch {
       // Merge succeeded; inbox hide is best-effort and will sync on next profile load.
     }
@@ -2011,7 +1947,6 @@ export default function SynqScreen() {
               <MessagesInboxPane
                 styles={styles}
                 allChats={inboxChats}
-                pinnedChatIds={pinnedChatIds}
                 currentUserId={auth.currentUser?.uid}
                 getChatTitle={getChatTitle}
                 renderAvatarStack={renderAvatarStack}
@@ -2034,7 +1969,6 @@ export default function SynqScreen() {
                 onConfirmMerge={() => setShowMergeConfirmModal(true)}
                 inboxActionChat={inboxActionChat}
                 onCloseInboxAction={() => setInboxActionChat(null)}
-                onPinChat={(chatId) => void togglePinChat(chatId)}
                 onCombineChat={startCombineWithChat}
                 onDeleteFromAction={(chatId) => {
                   setInboxActionChat(null);
@@ -2079,15 +2013,6 @@ export default function SynqScreen() {
                       }
                       try {
                         await deleteChat(chatId);
-                        if (pinnedChatIds.includes(chatId)) {
-                          setUserProfile((prev: any) => ({
-                            ...prev,
-                            pinnedChatIds: (Array.isArray(prev?.pinnedChatIds)
-                              ? prev.pinnedChatIds
-                              : []
-                            ).filter((id: string) => id !== chatId),
-                          }));
-                        }
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                       } catch {
                         showActionError("Could not delete chat. Please try again.");
@@ -2591,10 +2516,6 @@ const styles = StyleSheet.create({
   },
   inboxTitleText: {
     flexShrink: 1,
-  },
-  inboxPinIcon: {
-    marginLeft: 6,
-    transform: [{ rotate: '45deg' }],
   },
   inboxMergeHeader: {
     flexDirection: 'row',

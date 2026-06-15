@@ -19,12 +19,14 @@ import {
   SURFACE,
   synqOutlineAddBtnCompact,
   synqOutlineAddBtnText,
+  stackNavigationBackBtn,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
 } from "@/constants/Variables";
 import AddMembersToGroupSheet from "@/src/components/friends/AddMembersToGroupSheet";
-import CreateGroupModal from "@/src/components/friends/CreateGroupModal";
+import BackButton from "@/src/components/BackButton";
+import CommunityPlansSection from "@/src/components/community/CommunityPlansSection";
 import HeaderIconButton from "@/src/components/HeaderIconButton";
 import StackScreenHeader from "@/src/components/StackScreenHeader";
 import { auth } from "@/src/lib/firebase";
@@ -33,8 +35,8 @@ import {
   deleteCommunityGroup,
   joinCommunityGroup,
   leaveCommunityGroup,
+  mapCommunityGroupDoc,
   removeMemberFromCommunityGroup,
-  renameCommunityGroup,
   type CommunityGroup,
 } from "@/src/lib/communityGroups";
 import {
@@ -56,13 +58,13 @@ import {
   FlatList,
   Modal,
   Pressable,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 function formatNameList(names: string[]): string {
   if (names.length === 0) return "them";
@@ -93,6 +95,22 @@ const ADD_MEMBERS_FOOTER_FADE_LOCATIONS = [0, 0.28, 0.48, 1] as const;
 const ADD_MEMBERS_FOOTER_HEIGHT =
   ADD_MEMBERS_FOOTER_FADE_HEIGHT + SPACE_3 + 40 + SPACE_6;
 
+const COVER_HERO_HEIGHT = 220;
+const COVER_HERO_GRADIENT = [
+  "rgba(0,0,0,0.45)",
+  "rgba(0,0,0,0.08)",
+  "rgba(0,0,0,0.72)",
+  BG,
+] as const;
+const COVER_HERO_GRADIENT_LOCATIONS = [0, 0.42, 0.82, 1] as const;
+const COVER_TOP_NAV_GRADIENT = [
+  "rgba(0,0,0,0.82)",
+  "rgba(0,0,0,0.45)",
+  "rgba(0,0,0,0)",
+] as const;
+const COVER_TOP_NAV_GRADIENT_LOCATIONS = [0, 0.45, 1] as const;
+const COVER_TOP_NAV_GRADIENT_HEIGHT = 96;
+
 type MemberRow = {
   id: string;
   displayName: string;
@@ -101,6 +119,7 @@ type MemberRow = {
 
 export default function CommunityGroupDetailScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id: groupId } = useLocalSearchParams<{ id?: string }>();
   const uid = auth.currentUser?.uid ?? "";
   const friends = uid ? friendsListCacheByUser[uid] ?? [] : [];
@@ -115,8 +134,6 @@ export default function CommunityGroupDetailScreen() {
   const [successMessage, setSuccessMessage] = useState("");
   const pendingMemberIdsRef = useRef<string[] | null>(null);
   const [optionsVisible, setOptionsVisible] = useState(false);
-  const [renameVisible, setRenameVisible] = useState(false);
-  const [renameBusy, setRenameBusy] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [leaveVisible, setLeaveVisible] = useState(false);
   const [joinBusy, setJoinBusy] = useState(false);
@@ -147,7 +164,7 @@ export default function CommunityGroupDetailScreen() {
           setLoading(false);
           return;
         }
-        const data = snap.data();
+        const data = snap.data() as Record<string, unknown>;
         const serverMemberIds = Array.isArray(data.memberIds)
           ? [...new Set((data.memberIds as string[]).filter(Boolean))]
           : [];
@@ -161,15 +178,7 @@ export default function CommunityGroupDetailScreen() {
             memberIds = pending;
           }
         }
-        setGroup({
-          id: snap.id,
-          name: String(data.name || "").trim() || "Group",
-          nameLower: String(data.nameLower || "").trim(),
-          creatorId: String(data.creatorId || "").trim(),
-          memberIds,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
-        });
+        setGroup({ ...mapCommunityGroupDoc(snap.id, data), memberIds });
         setLoading(false);
       },
       () => setLoading(false)
@@ -319,19 +328,6 @@ export default function CommunityGroupDetailScreen() {
     });
   };
 
-  const handleRename = async (name: string) => {
-    if (!group || !isCreator) return;
-    setRenameBusy(true);
-    try {
-      await renameCommunityGroup(group.id, name);
-      setRenameVisible(false);
-    } catch (e: unknown) {
-      Alert.alert("Could not rename", e instanceof Error ? e.message : "Try again.");
-    } finally {
-      setRenameBusy(false);
-    }
-  };
-
   const handleDelete = async () => {
     if (!group || !isCreator) return;
     try {
@@ -368,133 +364,217 @@ export default function CommunityGroupDetailScreen() {
       : `${group?.memberIds.length ?? 0} members`;
 
   const footerHeight = isMember ? ADD_MEMBERS_FOOTER_HEIGHT : SPACE_6;
+  const coverPhotoUrl = group?.coverPhotoUrl?.trim() || "";
+  const hasCover = coverPhotoUrl.length > 0;
+  const coverHeight = insets.top + COVER_HERO_HEIGHT;
 
-  return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar barStyle="light-content" />
-      <StackScreenHeader
-        title={group?.name || "Group"}
-        onBack={goBack}
-        right={
-          group && isMember ? (
-            <HeaderIconButton
-              name="ellipsis-horizontal"
-              size={22}
-              onPress={() => setOptionsVisible(true)}
-              accessibilityLabel="Group options"
-            />
-          ) : null
-        }
+  const headerRight =
+    group && isMember ? (
+      <HeaderIconButton
+        name="ellipsis-horizontal"
+        size={22}
+        onPress={() => setOptionsVisible(true)}
+        accessibilityLabel="Group options"
+      />
+    ) : null;
+
+  const profileMeta = group
+    ? [group.category, "Open community", group.location].filter(Boolean).join(" · ")
+    : "";
+
+  const listHeader = group ? (
+    <>
+      {hasCover ? (
+        <View style={[styles.coverHeroWrap, { height: coverHeight }]}>
+          <ExpoImage
+            source={{ uri: coverPhotoUrl }}
+            style={styles.coverHeroImage}
+            contentFit="cover"
+            transition={160}
+            cachePolicy="memory-disk"
+            recyclingKey={coverPhotoUrl}
+          />
+          <LinearGradient
+            colors={[...COVER_HERO_GRADIENT]}
+            locations={[...COVER_HERO_GRADIENT_LOCATIONS]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.coverHeroGradient}
+            pointerEvents="none"
+          />
+        </View>
+      ) : null}
+
+      <View style={hasCover ? styles.coverProfileSection : styles.profileHeader}>
+        {!hasCover ? (
+          <View style={styles.profileIcon}>
+            <Ionicons name="people" size={26} color={ACCENT} />
+          </View>
+        ) : null}
+        <Text style={styles.profileName}>{group.name}</Text>
+        {profileMeta ? <Text style={styles.profileMeta}>{profileMeta}</Text> : null}
+        <Text style={styles.profileStats}>{memberLabel}</Text>
+        {group.about ? <Text style={styles.profileAbout}>{group.about}</Text> : null}
+      </View>
+
+      {!isMember ? (
+        <TouchableOpacity
+          style={[styles.joinCommunityBtn, joinBusy && styles.joinCommunityBtnDisabled]}
+          disabled={joinBusy}
+          onPress={() => void handleJoin()}
+          activeOpacity={0.88}
+          accessibilityRole="button"
+          accessibilityLabel={`Join ${group.name}`}
+        >
+          {joinBusy ? (
+            <ActivityIndicator color={ON_ACCENT_TEXT} size="small" />
+          ) : (
+            <Text style={styles.joinCommunityBtnText}>Join community</Text>
+          )}
+        </TouchableOpacity>
+      ) : null}
+
+      <CommunityPlansSection
+        groupId={group.id}
+        groupName={group.name}
+        uid={uid}
+        viewerDisplayName={auth.currentUser?.displayName?.trim() || "You"}
+        isMember={isMember}
+        isCreator={isCreator}
       />
 
-      {loading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator color={ACCENT} />
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>Members</Text>
         </View>
-      ) : !group ? (
-        <View style={styles.loading}>
-          <Text style={styles.errorText}>This group no longer exists.</Text>
-        </View>
-      ) : (
-        <View style={styles.membersPane}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Members</Text>
-              <Text style={styles.publicBadge}>Public group</Text>
-            </View>
-            <Text style={styles.sectionMeta}>{memberLabel}</Text>
-          </View>
+        <Text style={styles.sectionMeta}>{memberLabel}</Text>
+      </View>
+    </>
+  ) : null;
 
-          {!isMember ? (
-            <View style={styles.joinBanner}>
-              <Text style={styles.joinBannerText}>
-                Join to see members and add friends to this group.
-              </Text>
-              <TouchableOpacity
-                style={[styles.joinBtn, joinBusy && styles.joinBtnDisabled]}
-                disabled={joinBusy}
-                onPress={() => void handleJoin()}
-                accessibilityRole="button"
-                accessibilityLabel={`Join ${group.name}`}
-              >
-                {joinBusy ? (
-                  <ActivityIndicator color={ON_ACCENT_TEXT} size="small" />
-                ) : (
-                  <Text style={styles.joinBtnText}>Join group</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          ) : null}
-
-          <FlatList
-            data={isMember ? memberRows : []}
-            keyExtractor={(item) => item.id}
-            style={styles.list}
-            contentContainerStyle={[styles.listContent, { paddingBottom: footerHeight }]}
-            ListEmptyComponent={
-              isMember ? (
-                <Text style={styles.emptyMembers}>No members yet. Invite friends below.</Text>
-              ) : null
-            }
-            renderItem={({ item }) => (
-              <View style={styles.memberRow}>
-                <TouchableOpacity
-                  style={styles.memberMain}
-                  activeOpacity={0.82}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/friend-profile",
-                      params: { friendId: item.id, from: "friends" },
-                    })
-                  }
-                >
-                  <View style={styles.avatarRing}>
-                    <ExpoImage
-                      source={{ uri: resolveAvatar(item.imageurl) }}
-                      style={styles.avatar}
-                      cachePolicy="memory-disk"
-                    />
-                  </View>
-                  <Text style={styles.memberName} numberOfLines={1}>
-                    {item.displayName}
-                  </Text>
-                </TouchableOpacity>
-                {(isCreator || item.id === uid) && item.id !== group.creatorId ? (
-                  <TouchableOpacity
-                    onPress={() => handleRemoveMember(item.id, item.displayName)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${item.displayName} from group`}
-                    style={styles.removeMemberBtn}
-                  >
-                    <Text style={styles.removeMemberLabel}>Remove</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            )}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
+  return (
+    <View style={styles.screen}>
+      <StatusBar barStyle="light-content" />
+      <SafeAreaView
+        style={styles.flex}
+        edges={hasCover ? ["bottom", "left", "right"] : undefined}
+      >
+        {!hasCover ? (
+          <StackScreenHeader
+            title={group?.name || "Group"}
+            onBack={goBack}
+            right={headerRight}
           />
+        ) : null}
 
-          {isMember ? (
+        {hasCover ? (
+          <>
             <LinearGradient
-              colors={[...ADD_MEMBERS_FOOTER_FADE_GRADIENT]}
-              locations={[...ADD_MEMBERS_FOOTER_FADE_LOCATIONS]}
+              colors={[...COVER_TOP_NAV_GRADIENT]}
+              locations={[...COVER_TOP_NAV_GRADIENT_LOCATIONS]}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
-              style={[styles.addMembersFooter, { height: ADD_MEMBERS_FOOTER_HEIGHT }]}
+              style={[
+                styles.coverTopNavGradient,
+                { height: insets.top + COVER_TOP_NAV_GRADIENT_HEIGHT },
+              ]}
+              pointerEvents="none"
+            />
+            <View
+              style={[styles.coverNavOverlay, { paddingTop: insets.top + 4 }]}
+              pointerEvents="box-none"
             >
-              <TouchableOpacity
-                style={[synqOutlineAddBtnCompact, styles.addMembersBtn]}
-                onPress={() => setAddSheetVisible(true)}
-                activeOpacity={0.85}
+              <BackButton onPress={goBack} style={styles.coverBackBtn} />
+              <View style={styles.coverNavSpacer} />
+              {headerRight ? (
+                <View style={styles.coverNavRight}>{headerRight}</View>
+              ) : (
+                <View style={styles.coverNavSide} />
+              )}
+            </View>
+          </>
+        ) : null}
+
+        {loading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator color={ACCENT} />
+          </View>
+        ) : !group ? (
+          <View style={styles.loading}>
+            <Text style={styles.errorText}>This group no longer exists.</Text>
+          </View>
+        ) : (
+          <View style={styles.membersPane}>
+            <FlatList
+              data={isMember ? memberRows : []}
+              keyExtractor={(item) => item.id}
+              style={styles.list}
+              contentContainerStyle={[styles.listContent, { paddingBottom: footerHeight }]}
+              ListHeaderComponent={listHeader}
+              ListEmptyComponent={
+                isMember ? (
+                  <Text style={styles.emptyMembers}>No members yet. Invite friends below.</Text>
+                ) : null
+              }
+              renderItem={({ item }) => (
+                <View style={styles.memberRow}>
+                  <TouchableOpacity
+                    style={styles.memberMain}
+                    activeOpacity={0.82}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/friend-profile",
+                        params: { friendId: item.id, from: "friends" },
+                      })
+                    }
+                  >
+                    <View style={styles.avatarRing}>
+                      <ExpoImage
+                        source={{ uri: resolveAvatar(item.imageurl) }}
+                        style={styles.avatar}
+                        cachePolicy="memory-disk"
+                      />
+                    </View>
+                    <Text style={styles.memberName} numberOfLines={1}>
+                      {item.displayName}
+                    </Text>
+                  </TouchableOpacity>
+                  {(isCreator || item.id === uid) && item.id !== group.creatorId ? (
+                    <TouchableOpacity
+                      onPress={() => handleRemoveMember(item.id, item.displayName)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${item.displayName} from group`}
+                      style={styles.removeMemberBtn}
+                    >
+                      <Text style={styles.removeMemberLabel}>Remove</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+            />
+
+            {isMember ? (
+              <LinearGradient
+                colors={[...ADD_MEMBERS_FOOTER_FADE_GRADIENT]}
+                locations={[...ADD_MEMBERS_FOOTER_FADE_LOCATIONS]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={[styles.addMembersFooter, { height: ADD_MEMBERS_FOOTER_HEIGHT }]}
               >
-                <Ionicons name="person-add-outline" size={18} color={ACCENT} />
-                <Text style={synqOutlineAddBtnText}>Invite friends</Text>
-              </TouchableOpacity>
-            </LinearGradient>
-          ) : null}
-        </View>
-      )}
+                <TouchableOpacity
+                  style={[synqOutlineAddBtnCompact, styles.addMembersBtn]}
+                  onPress={() => setAddSheetVisible(true)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="person-add-outline" size={18} color={ACCENT} />
+                  <Text style={synqOutlineAddBtnText}>Invite friends</Text>
+                </TouchableOpacity>
+              </LinearGradient>
+            ) : null}
+          </View>
+        )}
 
       <AddMembersToGroupSheet
         visible={addSheetVisible}
@@ -518,12 +598,15 @@ export default function CommunityGroupDetailScreen() {
                     style={styles.optionsRow}
                     onPress={() => {
                       setOptionsVisible(false);
-                      setRenameVisible(true);
+                      router.push({
+                        pathname: "/community-group/edit",
+                        params: { id: group.id },
+                      });
                     }}
                     activeOpacity={0.75}
                   >
                     <Ionicons name="create-outline" size={22} color={TEXT} />
-                    <Text style={styles.optionsRowText}>Rename group</Text>
+                    <Text style={styles.optionsRowText}>Edit community</Text>
                   </TouchableOpacity>
                   <View style={styles.optionsDivider} />
                   <TouchableOpacity
@@ -560,17 +643,6 @@ export default function CommunityGroupDetailScreen() {
           </View>
         </View>
       </Modal>
-
-      <CreateGroupModal
-        visible={renameVisible}
-        busy={renameBusy}
-        title="Rename group"
-        hint=""
-        submitLabel="Save"
-        initialName={group?.name ?? ""}
-        onClose={() => setRenameVisible(false)}
-        onCreate={handleRename}
-      />
 
       <Modal visible={successVisible} transparent animationType="fade">
         <View style={styles.successOverlay}>
@@ -615,6 +687,7 @@ export default function CommunityGroupDetailScreen() {
         onConfirm={() => void confirmRemoveMember()}
       />
     </SafeAreaView>
+    </View>
   );
 }
 
@@ -622,6 +695,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: BG,
+  },
+  flex: {
+    flex: 1,
   },
   loading: {
     flex: 1,
@@ -659,42 +735,122 @@ const styles = StyleSheet.create({
     color: MUTED2,
     marginTop: 4,
   },
-  joinBanner: {
+  joinCommunityBtn: {
     marginHorizontal: SPACE_5,
+    marginTop: SPACE_3,
     marginBottom: SPACE_4,
-    padding: SPACE_4,
-    borderRadius: RADIUS_MD,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
-    backgroundColor: SURFACE,
-    gap: SPACE_3,
-  },
-  joinBannerText: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_BODY,
-    color: MUTED2,
-    lineHeight: 21,
-  },
-  joinBtn: {
-    alignSelf: "flex-start",
-    minHeight: 40,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    minHeight: 48,
+    borderRadius: BUTTON_RADIUS,
     backgroundColor: ACCENT,
     alignItems: "center",
     justifyContent: "center",
   },
-  joinBtnDisabled: {
+  joinCommunityBtnDisabled: {
     opacity: 0.6,
   },
-  joinBtnText: {
-    fontFamily: fonts.medium,
+  joinCommunityBtnText: {
+    fontFamily: fonts.heavy,
     fontSize: TYPE_BODY,
     color: ON_ACCENT_TEXT,
+    letterSpacing: 0.04,
   },
   membersPane: {
     flex: 1,
     position: "relative",
+  },
+  coverHeroWrap: {
+    width: "100%",
+    backgroundColor: SURFACE,
+    overflow: "hidden",
+    position: "relative",
+  },
+  coverHeroImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  coverHeroGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  coverTopNavGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 9,
+  },
+  coverNavOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: SPACE_3,
+    paddingBottom: SPACE_3,
+    zIndex: 10,
+  },
+  coverBackBtn: {
+    ...stackNavigationBackBtn,
+    marginRight: 0,
+  },
+  coverNavSpacer: {
+    flex: 1,
+  },
+  coverNavSide: {
+    width: 40,
+  },
+  coverNavRight: {
+    minWidth: 40,
+    alignItems: "flex-end",
+  },
+  coverProfileSection: {
+    paddingHorizontal: SPACE_5,
+    marginTop: -52,
+    paddingBottom: SPACE_3,
+    gap: 4,
+    zIndex: 1,
+  },
+  profileHeader: {
+    paddingHorizontal: SPACE_5,
+    paddingTop: SPACE_4,
+    paddingBottom: SPACE_3,
+    gap: 6,
+  },
+  profileIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,255,133,0.1)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,255,133,0.22)",
+    marginBottom: 4,
+  },
+  profileName: {
+    fontFamily: fonts.heavy,
+    fontSize: 24,
+    color: TEXT,
+    letterSpacing: 0.08,
+  },
+  profileMeta: {
+    fontFamily: fonts.book,
+    fontSize: TYPE_CAPTION + 1,
+    color: MUTED2,
+    lineHeight: 19,
+  },
+  profileStats: {
+    fontFamily: fonts.medium,
+    fontSize: TYPE_CAPTION,
+    color: ACCENT,
+    letterSpacing: 0.04,
+    marginTop: 2,
+  },
+  profileAbout: {
+    fontFamily: fonts.book,
+    fontSize: TYPE_BODY,
+    color: MUTED2,
+    lineHeight: 22,
+    marginTop: 6,
   },
   list: {
     flex: 1,
