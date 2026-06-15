@@ -83,7 +83,8 @@ export async function reconcileHostOpenPlansFromFriends(hostUid: string): Promis
           .filter(Boolean)
           .sort()
           .join("|");
-        const nextKey = mergedIds.slice().sort().join("|");
+        const orderedIds = [hostUid, ...mergedIds.filter((id) => id !== hostUid)];
+        const nextKey = orderedIds.slice().sort().join("|");
 
         for (const uid of mergedIds) await ensureName(uid);
         const otherNames = mergedIds
@@ -103,14 +104,16 @@ export async function reconcileHostOpenPlansFromFriends(hostUid: string): Promis
         if (prevKey === nextKey && prevNamesStr === nextNamesStr) continue;
 
         anyChange = true;
-        events[idx] = {
+        const updated: Record<string, unknown> = {
           ...e,
           planHostUid: hostUid,
-          joinedFromIds: mergedIds,
-          joinedFromId: mergedIds[0] || "",
+          joinedFromIds: orderedIds,
+          joinedFromId: hostUid,
           joinedFromNames: otherNames,
           joinedFromName: otherNames.join(", "),
         };
+        delete updated.joinedFromFriendUid;
+        events[idx] = updated;
       }
     } catch {}
   }

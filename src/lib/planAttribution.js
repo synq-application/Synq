@@ -56,15 +56,44 @@ function resolveEffectiveHostUid(event, viewerUid, joinedIds, profileSubjectUid)
   ).trim();
   const joinedThrough = String(event?.joinedFromFriendUid || "").trim();
 
+  // Viewing your own profile: keep yourself as host when planHostUid says so,
+  // or when you created the plan before planHostUid existed.
+  if (
+    profileSubject &&
+    profileSubject === viewer &&
+    joinedIds.includes(profileSubject)
+  ) {
+    if (storedHost && storedHost === profileSubject) return storedHost;
+    if (!storedHost) return profileSubject;
+  }
+
+  // Friend profile: planHostUid can be wrongly stored as the profile owner instead of
+  // the real host when they joined someone else's plan.
+  if (
+    !storedHost &&
+    joinedThrough &&
+    profileSubject &&
+    joinedThrough === profileSubject &&
+    profileSubject !== viewer
+  ) {
+    const hostCandidates = joinedIds.filter(
+      (id) => id !== viewer && id !== profileSubject
+    );
+    if (hostCandidates.length === 1) return hostCandidates[0];
+  }
+
   const othersExcludingHost = joinedIds.filter(
     (id) => id !== viewer && id !== storedHost && id !== joinedThrough
   );
 
-  // Viewer's copy: joined through a friend who was wrongly stored as host.
+  // Viewer's own calendar copy: joined through a friend who was wrongly stored as host.
   if (
     storedHost &&
     joinedThrough &&
     storedHost === joinedThrough &&
+    profileSubject &&
+    profileSubject === viewer &&
+    !(storedHost === profileSubject) &&
     viewer &&
     joinedIds.includes(viewer) &&
     othersExcludingHost.length >= 1
@@ -88,20 +117,21 @@ function resolveEffectiveHostUid(event, viewerUid, joinedIds, profileSubjectUid)
     }
   }
 
-  if (
-    joinedThrough &&
-    joinedThrough !== viewer &&
-    (!profileSubject || joinedThrough !== profileSubject)
-  ) {
-    return joinedThrough;
-  }
-
   if (anchorUid && storedHost === anchorUid) {
     const anchorOthers = joinedIds.filter((id) => id !== viewer && id !== anchorUid);
     if (anchorOthers.length === 1) {
       if (profileSubject && anchorOthers[0] === profileSubject) return storedHost;
       return anchorOthers[0];
     }
+  }
+
+  if (
+    joinedThrough &&
+    joinedThrough !== viewer &&
+    (!profileSubject || joinedThrough !== profileSubject) &&
+    !(storedHost && profileSubject && storedHost === profileSubject)
+  ) {
+    return joinedThrough;
   }
 
   if (storedHost) return storedHost;

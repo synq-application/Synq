@@ -524,7 +524,6 @@ export default function OpenPlans({
               key={p.id}
               style={[
                 styles.card,
-                isOwnPlan ? styles.ownPlanCard : styles.joinedPlanCard,
                 isHighlighted && styles.cardHighlighted,
                 isLast && { marginBottom: 0 },
               ]}
@@ -550,9 +549,43 @@ export default function OpenPlans({
                 </View>
 
                 <View style={styles.planBody}>
-                  <Text style={styles.title} numberOfLines={2}>
-                    {p.title}
-                  </Text>
+                  <View style={styles.planHeaderRow}>
+                    <Text style={styles.title} numberOfLines={2}>
+                      {p.title}
+                    </Text>
+                    <View style={styles.cardActions}>
+                      {isOwnPlan ? (
+                        <>
+                          <Pressable
+                            onPress={() => openEditModal(p)}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Edit ${p.title}`}
+                          >
+                            <Text style={styles.actionEditText}>Edit</Text>
+                          </Pressable>
+                          <Text style={styles.actionSep}>·</Text>
+                          <Pressable
+                            onPress={() => handleDelete(p)}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Delete ${p.title}`}
+                          >
+                            <Text style={styles.actionDeleteText}>Delete</Text>
+                          </Pressable>
+                        </>
+                      ) : (
+                        <Pressable
+                          onPress={() => handleDelete(p)}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${p.title} from your plans`}
+                        >
+                          <Text style={styles.actionRemoveText}>Remove</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
                   {(p.time || p.location) ? (
                     <Text style={styles.meta} numberOfLines={1}>
                       {[p.time, p.location].filter(Boolean).join(" · ")}
@@ -576,50 +609,12 @@ export default function OpenPlans({
                       accessibilityLabel="See everyone going to this plan"
                       style={styles.goingPressable}
                     >
-                      <Text
-                        style={[
-                          styles.goingText,
-                          isOwnPlan && { color: "rgba(0,255,133,0.72)" },
-                        ]}
-                      >
+                      <Text style={styles.goingText}>
                         {othersLine}
                       </Text>
                     </Pressable>
                   ) : null}
                 </View>
-              </View>
-
-              <View style={styles.cardFooter}>
-                {isOwnPlan ? (
-                  <>
-                    <Pressable
-                      style={styles.footerAction}
-                      onPress={() => openEditModal(p)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Edit ${p.title}`}
-                    >
-                      <Text style={styles.footerEditText}>Edit</Text>
-                    </Pressable>
-                    <View style={styles.footerDivider} />
-                    <Pressable
-                      style={styles.footerAction}
-                      onPress={() => handleDelete(p)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Delete ${p.title}`}
-                    >
-                      <Text style={styles.footerDeleteText}>Delete</Text>
-                    </Pressable>
-                  </>
-                ) : (
-                  <Pressable
-                    style={styles.footerActionFull}
-                    onPress={() => handleDelete(p)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${p.title} from your plans`}
-                  >
-                    <Text style={styles.footerRemoveText}>Remove from plans</Text>
-                  </Pressable>
-                )}
               </View>
             </View>
           );
@@ -983,9 +978,9 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 340,
     borderRadius: RADIUS_LG,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
-    backgroundColor: "#0d0d0d",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     marginBottom: 12,
     overflow: "hidden",
     ...Platform.select({
@@ -998,127 +993,110 @@ const styles = StyleSheet.create({
       android: { elevation: 4 },
     }),
   },
-  ownPlanCard: {
-    borderColor: "rgba(0,255,133,0.16)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  joinedPlanCard: {
-    borderColor: BORDER,
-    backgroundColor: "#0c0c0c",
-  },
   cardHighlighted: {
     borderColor: "rgba(0,255,133,0.45)",
     borderWidth: 1,
   },
   cardMain: {
     flexDirection: "row",
-    alignItems: "stretch",
-    paddingTop: 14,
-    paddingHorizontal: 14,
-    paddingBottom: 12,
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   dateBlock: {
-    width: 44,
+    width: 40,
     alignItems: "center",
-    marginRight: 14,
-    paddingTop: 2,
+    marginRight: 10,
   },
   dateWeekday: {
     color: MUTED3,
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: fonts.medium,
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
   },
   dateNumber: {
     color: TEXT,
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: fonts.heavy,
-    lineHeight: 26,
+    lineHeight: 22,
     letterSpacing: -0.5,
-    marginTop: 2,
+    marginTop: 1,
   },
   dateMonth: {
     color: MUTED3,
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: fonts.medium,
-    letterSpacing: 0.5,
-    marginTop: 2,
+    letterSpacing: 0.4,
+    marginTop: 1,
   },
   planBody: {
     flex: 1,
     minWidth: 0,
-    justifyContent: "center",
+  },
+  planHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  cardActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 0,
+    paddingTop: 1,
+  },
+  actionSep: {
+    color: "rgba(255,255,255,0.2)",
+    fontSize: 11,
+    marginHorizontal: 4,
+  },
+  actionEditText: {
+    color: MUTED2,
+    fontSize: 12,
+    fontFamily: fonts.medium,
+  },
+  actionDeleteText: {
+    color: "rgba(255,255,255,0.32)",
+    fontSize: 12,
+    fontFamily: fonts.medium,
+  },
+  actionRemoveText: {
+    color: MUTED3,
+    fontSize: 12,
+    fontFamily: fonts.medium,
   },
   title: {
+    flex: 1,
+    minWidth: 0,
     color: TEXT,
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: fonts.heavy,
-    lineHeight: 21,
+    lineHeight: 19,
     letterSpacing: 0.1,
   },
   meta: {
     color: MUTED2,
-    marginTop: 4,
-    fontSize: 13,
+    marginTop: 2,
+    fontSize: 12,
     fontFamily: fonts.book,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   hostLine: {
     color: MUTED3,
-    marginTop: 6,
-    fontSize: 12,
+    marginTop: 3,
+    fontSize: 11,
     fontFamily: fonts.medium,
     letterSpacing: 0.1,
   },
   goingPressable: {
     alignSelf: "flex-start",
-    marginTop: 8,
+    marginTop: 4,
   },
   goingText: {
-    color: MUTED2,
-    fontSize: 12,
+    color: ACCENT,
+    fontSize: 11,
     fontFamily: fonts.medium,
     letterSpacing: 0.05,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: BORDER,
-  },
-  footerAction: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 11,
-  },
-  footerActionFull: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 11,
-  },
-  footerDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: BORDER,
-  },
-  footerEditText: {
-    color: MUTED2,
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    letterSpacing: 0.15,
-  },
-  footerDeleteText: {
-    color: "rgba(255,255,255,0.32)",
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    letterSpacing: 0.15,
-  },
-  footerRemoveText: {
-    color: MUTED3,
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    letterSpacing: 0.1,
+    lineHeight: 15,
   },
   addBtnRow: {
     width: "100%",
