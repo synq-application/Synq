@@ -40,6 +40,8 @@ import {
   type CommunityGroup,
 } from "@/src/lib/communityGroups";
 import {
+  acceptCommunityGroupInvite,
+  communityGroupInviteRef,
   sendCommunityGroupInvites,
   subscribePendingCommunityGroupInvites,
 } from "@/src/lib/communityGroupInvites";
@@ -260,7 +262,23 @@ export default function CommunityGroupDetailScreen() {
     if (!uid || !group || joinBusy) return;
     setJoinBusy(true);
     try {
-      await joinCommunityGroup(uid, group.id, group.memberIds);
+      const inviteSnap = await getDoc(communityGroupInviteRef(uid, group.id));
+      if (inviteSnap.exists()) {
+        const data = inviteSnap.data() as Record<string, unknown>;
+        await acceptCommunityGroupInvite(uid, {
+          id: group.id,
+          groupId: group.id,
+          groupName: group.name,
+          fromUserId: String(data.fromUserId || "").trim(),
+          fromUserName: String(data.fromUserName || "").trim() || "Friend",
+          fromUserImageUrl: data.fromUserImageUrl
+            ? String(data.fromUserImageUrl)
+            : undefined,
+          createdAt: data.createdAt,
+        });
+      } else {
+        await joinCommunityGroup(uid, group.id, group.memberIds);
+      }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: unknown) {
       Alert.alert("Could not join", e instanceof Error ? e.message : "Try again.");

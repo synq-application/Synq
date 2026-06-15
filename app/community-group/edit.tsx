@@ -144,8 +144,11 @@ export default function EditCommunityScreen() {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       let coverPhotoUrl = existingCoverUrl;
+      let coverPhotoThumbUrl: string | undefined;
       if (coverUri) {
-        coverPhotoUrl = await uploadCommunityCoverPhoto(groupId, coverUri);
+        const uploaded = await uploadCommunityCoverPhoto(groupId, coverUri);
+        coverPhotoUrl = uploaded.coverPhotoUrl;
+        coverPhotoThumbUrl = uploaded.coverPhotoThumbUrl;
       }
 
       await updateCommunityGroupDetails(groupId, {
@@ -154,6 +157,7 @@ export default function EditCommunityScreen() {
         location: location.trim(),
         about: aboutTrimmed,
         ...(coverPhotoUrl ? { coverPhotoUrl } : {}),
+        ...(coverPhotoThumbUrl ? { coverPhotoThumbUrl } : {}),
       });
 
       router.back();

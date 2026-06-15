@@ -158,11 +158,9 @@ export default function AddMembersToGroupSheet({
               <Text style={styles.title}>{mode === "invite" ? "Invite friends" : "Add members"}</Text>
               <CloseButton onPress={handleClose} />
             </View>
-            <Text style={styles.subtitle}>
-              {mode === "invite"
-                ? "Friends you invite can join or decline"
-                : "Search friends to add to this group"}
-            </Text>
+            {mode === "add" ? (
+              <Text style={styles.subtitle}>Search friends to add to this group</Text>
+            ) : null}
             <View style={styles.searchBar}>
               <Ionicons name="search-outline" size={17} color={MUTED2} />
               <TextInput

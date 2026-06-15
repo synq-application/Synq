@@ -745,6 +745,7 @@ export default function NotificationsScreen() {
 
     const myId = auth.currentUser.uid;
     setDismissingKeys((prev) => new Set(prev).add(item.feedKey));
+    setCommunityGroupInvites((prev) => prev.filter((invite) => invite.groupId !== item.groupId));
 
     try {
       if (accept) {
@@ -758,6 +759,11 @@ export default function NotificationsScreen() {
         await declineCommunityGroupInvite(myId, item.groupId);
       }
     } catch (e: unknown) {
+      setCommunityGroupInvites((prev) => {
+        const exists = prev.some((invite) => invite.groupId === item.groupId);
+        if (exists) return prev;
+        return [...prev, item.raw];
+      });
       showAlert("Error", e instanceof Error ? e.message : "Could not process invite.");
     } finally {
       setDismissingKeys((prev) => {
