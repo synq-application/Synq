@@ -57,7 +57,7 @@ import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
-import { prefetchResolvedAvatar, resolveAvatar } from "./helpers";
+import { prefetchResolvedAvatar, resolveAvatar } from "@/src/lib/helpers";
 
 function prefetchActorAvatars(items: { actorImageUrl: string | null }[]) {
   items.forEach((item) => {

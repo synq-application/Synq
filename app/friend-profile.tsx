@@ -77,7 +77,7 @@ import ConfirmModal from "./confirm-modal";
 import ReportModal from "./report-modal";
 import { useBlockedUsers } from "@/src/lib/blockedUsers";
 import { blockUser, unblockUser } from "@/src/lib/moderation";
-import { formatLastSynq, resolveAvatar } from "./helpers";
+import { formatLastSynq, resolveAvatar } from "@/src/lib/helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
 import SynqNudgeCard from "@/src/components/synq/SynqNudgeCard";
 import { computeSynqActiveFromUserData } from "@/src/lib/synqSession";
@@ -100,6 +100,7 @@ import {
   removeFriendMutual,
   removeFriendMutualErrorMessage,
 } from "@/src/lib/friends";
+import { requestDismissNavigationOverlays } from "@/src/lib/navigationOverlayEvents";
 
 type FriendProfileProps = {
   embeddedFriendId?: string;
@@ -163,6 +164,11 @@ export default function FriendProfile({
     if (!isOwnProfile || isEmbedded) return;
     router.replace("/(tabs)/me");
   }, [isOwnProfile, isEmbedded, router]);
+
+  useLayoutEffect(() => {
+    if (isEmbedded) return;
+    requestDismissNavigationOverlays();
+  }, [isEmbedded, friendKey]);
 
   const resetEmbeddedScroll = useCallback(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });

@@ -116,7 +116,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth, db } from "../../src/lib/firebase";
 import { FRIENDS_TAB_PRESS } from "../../src/lib/friendsTabEvents";
-import { DISMISS_NAVIGATION_OVERLAYS } from "../../src/lib/navigationOverlayEvents";
+import { registerDismissNavigationOverlaysHandler } from "../../src/lib/navigationOverlayEvents";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
 import {
   friendProfileCacheByUser,
@@ -134,7 +134,7 @@ import {
 import { useAuthRefresh } from "../_layout";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
-import { friendLocationLine, resolveAvatar } from "../helpers";
+import { friendLocationLine, resolveAvatar } from "@/src/lib/helpers";
 
 const { width } = Dimensions.get("window");
 
@@ -354,11 +354,7 @@ export default function FriendsScreen() {
   }, [scrollFriendsListToTop, closeAddFriendsModal, openAddFriends, router]);
 
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener(
-      DISMISS_NAVIGATION_OVERLAYS,
-      closeAddFriendsModal
-    );
-    return () => subscription.remove();
+    return registerDismissNavigationOverlaysHandler(closeAddFriendsModal);
   }, [closeAddFriendsModal]);
 
   useEffect(() => {

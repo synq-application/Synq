@@ -44,7 +44,10 @@ import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import ProfileShareCard from "@/src/components/profile/ProfileShareCard";
-import { captureAndShareProfileCard } from "@/src/lib/shareProfileCard";
+import {
+  captureAndShareProfileCard,
+  shareProfileLink,
+} from "@/src/lib/shareProfileCard";
 import { router, useLocalSearchParams } from "expo-router";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -59,7 +62,6 @@ import {
   Modal,
   Pressable,
   ScrollView,
-  Share,
   StatusBar,
   StyleSheet,
   Text,
@@ -97,11 +99,11 @@ import {
   pruneSocialCachesToFriendIds,
   warmFriendsAndConnectionsCache,
 } from "../../src/lib/socialCache";
-import { DISMISS_NAVIGATION_OVERLAYS } from "../../src/lib/navigationOverlayEvents";
+import { registerDismissNavigationOverlaysHandler } from "../../src/lib/navigationOverlayEvents";
 import { useAuthRefresh } from "../_layout";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
-import { prefetchResolvedAvatar, resolveAvatar } from "../helpers";
+import { prefetchResolvedAvatar, resolveAvatar } from "@/src/lib/helpers";
 import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
@@ -315,19 +317,17 @@ export default function ProfileScreen() {
     };
   }, [myId, events, friendsForHostNames, fetchedPlanDisplayNames]);
 
-  useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener(
-      DISMISS_NAVIGATION_OVERLAYS,
-      () => {
-        setQRExpanded(false);
-        setAvatarPreviewOpen(false);
-        setShowInputModal(false);
-        setPhotoMenuVisible(false);
-        setShowEventModal(false);
-      }
-    );
-    return () => subscription.remove();
+  const dismissMeTabOverlays = useCallback(() => {
+    setQRExpanded(false);
+    setAvatarPreviewOpen(false);
+    setShowInputModal(false);
+    setPhotoMenuVisible(false);
+    setShowEventModal(false);
   }, []);
+
+  useEffect(() => {
+    return registerDismissNavigationOverlaysHandler(dismissMeTabOverlays);
+  }, [dismissMeTabOverlays]);
 
   useEffect(() => {
     const id = typeof focusEventId === "string" ? focusEventId.trim() : "";
@@ -648,6 +648,12 @@ export default function ProfileScreen() {
           }
           const nextInterests = userData.interests || [];
           const nextImage = userData?.imageurl || null;
+          const nextInviteCode = String(userData.inviteCode || "")
+            .trim()
+            .toUpperCase();
+          if (nextInviteCode) {
+            setInviteCode(nextInviteCode);
+          }
 
           const prevOwn = getCachedOwnProfile(myId);
           setCachedOwnProfile(myId, {
@@ -951,10 +957,23 @@ export default function ProfileScreen() {
 
   const fetchInviteCode = useCallback(async (): Promise<string> => {
     if (inviteCode) return inviteCode;
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      const userSnap = await getDoc(doc(db, "users", uid));
+      const existing = String(userSnap.data()?.inviteCode || "")
+        .trim()
+        .toUpperCase();
+      if (existing) {
+        setInviteCode(existing);
+        return existing;
+      }
+    }
     const functions = getFunctions(undefined, "us-central1");
     const getOrCreateInviteCode = httpsCallable(functions, "getOrCreateInviteCode");
     const result = await getOrCreateInviteCode({});
-    const code = String((result.data as any)?.inviteCode || "").trim();
+    const code = String((result.data as any)?.inviteCode || "")
+      .trim()
+      .toUpperCase();
     if (!code) {
       throw new Error("Could not create invite code.");
     }
@@ -983,6 +1002,7 @@ export default function ProfileScreen() {
   const shareProfile = async () => {
     if (sharingProfile) return;
     setSharingProfile(true);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const code = await fetchInviteCode();
       const shareUrl = buildProfileShareWebUrl(code);
@@ -998,18 +1018,13 @@ export default function ProfileScreen() {
         showAlert("Share unavailable", "Please sign in and try again.");
         return;
       }
-      await captureAndShareProfileCard(
-        shareCardRef,
-        shareUrl,
-        uid,
-        resolvedProfileImage
-      );
+      await captureAndShareProfileCard(shareCardRef, shareUrl);
     } catch {
       try {
         const code = await fetchInviteCode();
         const shareUrl = buildProfileShareWebUrl(code);
         if (shareUrl) {
-          await Share.share({ message: "Join me on Synq!", url: shareUrl });
+          await shareProfileLink(shareUrl);
         }
       } catch {
         // User dismissed the share sheet.

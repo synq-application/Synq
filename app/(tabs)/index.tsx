@@ -128,7 +128,7 @@ import {
   getCachedSynqActiveSync,
   writeCachedSynqActive,
 } from "../../src/lib/synqSession";
-import { DISMISS_NAVIGATION_OVERLAYS } from "../../src/lib/navigationOverlayEvents";
+import { registerDismissNavigationOverlaysHandler } from "../../src/lib/navigationOverlayEvents";
 import { consumePendingChatOpen, subscribePendingChatOpen } from "../../src/lib/pendingChatOpen";
 import { getCachedOwnProfile } from "../../src/lib/ownProfileCache";
 import { userHasLocation } from "../../src/lib/userProfile";
@@ -144,7 +144,7 @@ import {
   resolveAvatar,
   resolveChatSenderAvatar,
   SynqStatus
-} from '../helpers';
+} from '@/src/lib/helpers';
 import { openInMaps } from "@/src/lib/openInMaps";
 import ReportModal from '../report-modal';
 import ChangeSynqAudienceModal from '../synq-screens/ChangeSynqAudienceModal';
@@ -1549,11 +1549,7 @@ export default function SynqScreen() {
   }, [closeMessagesModal]);
 
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener(
-      DISMISS_NAVIGATION_OVERLAYS,
-      dismissNavigationOverlays
-    );
-    return () => subscription.remove();
+    return registerDismissNavigationOverlaysHandler(dismissNavigationOverlays);
   }, [dismissNavigationOverlays]);
 
   useEffect(() => {

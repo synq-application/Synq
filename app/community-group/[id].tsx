@@ -1,5 +1,5 @@
 import ConfirmModal from "@/app/confirm-modal";
-import { resolveAvatar } from "@/app/helpers";
+import { resolveAvatar } from "@/src/lib/helpers";
 import {
   ACCENT,
   BG,

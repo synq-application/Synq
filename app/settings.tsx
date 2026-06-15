@@ -38,7 +38,7 @@ import {
   TYPE_CAPTION,
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
-import { prefetchResolvedAvatar, resolveAvatar } from "./helpers";
+import { prefetchResolvedAvatar, resolveAvatar } from "@/src/lib/helpers";
 
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";

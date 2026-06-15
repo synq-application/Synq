@@ -17,7 +17,7 @@ import {
   activityNotificationId,
   dismissActivityNotification,
 } from "@/src/lib/activityNotifications";
-import { DISMISS_NAVIGATION_OVERLAYS } from "@/src/lib/navigationOverlayEvents";
+import { requestDismissNavigationOverlays } from "@/src/lib/navigationOverlayEvents";
 import { setPendingChatOpen } from "@/src/lib/pendingChatOpen";
 import { parsePushNotificationTap } from "@/src/lib/pushNotificationTapCore";
 import {
@@ -33,6 +33,7 @@ import React, {
   useState,
 } from "react";
 import {
+  AppState,
   DeviceEventEmitter,
   Image,
   Platform,
@@ -91,17 +92,20 @@ const SPLASH_LOGO = require("../assets/logo.png");
 /** Safety cap so the boot overlay never blocks touches indefinitely (e.g. iPad review). */
 const BOOT_SPLASH_MAX_MS = 6000;
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 async function registerForPushNotificationsAsync(): Promise<string | null> {
+  if (Platform.OS === "web") return null;
   try {
     let token: string | null = null;
 
@@ -258,14 +262,14 @@ export default function RootLayout() {
       try {
         const shareCode = parseProfileShareCodeFromUrl(url);
         if (shareCode) {
-          DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
+          requestDismissNavigationOverlays();
           await AsyncStorage.setItem(PENDING_PROFILE_SHARE_CODE_KEY, shareCode);
           return;
         }
 
         const friendId = parseFriendProfileIdFromUrl(url);
         if (friendId) {
-          DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
+          requestDismissNavigationOverlays();
           await AsyncStorage.setItem(PENDING_FRIEND_PROFILE_ID_KEY, friendId);
           return;
         }
@@ -296,6 +300,27 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    const dismissForPendingProfileLink = async () => {
+      const [shareCode, friendId] = await AsyncStorage.multiGet([
+        PENDING_PROFILE_SHARE_CODE_KEY,
+        PENDING_FRIEND_PROFILE_ID_KEY,
+      ]);
+      if (shareCode[1] || friendId[1]) {
+        requestDismissNavigationOverlays();
+      }
+    };
+
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void dismissForPendingProfileLink();
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
     const applyNotificationData = (data: Record<string, unknown> | undefined) => {
       const tap = parsePushNotificationTap(data);
       if (tap) setPendingNotificationTap(tap);
@@ -421,14 +446,16 @@ export default function RootLayout() {
 
       if (u) {
         warmSocialCachesInBackground(u.uid);
-        void registerForPushNotificationsAsync()
-          .then(async (token) => {
-            if (!token) return;
-            try {
-              await updateDoc(doc(db, "users", u.uid), { pushToken: token });
-            } catch {}
-          })
-          .catch(() => {});
+        if (Platform.OS !== "web") {
+          void registerForPushNotificationsAsync()
+            .then(async (token) => {
+              if (!token) return;
+              try {
+                await updateDoc(doc(db, "users", u.uid), { pushToken: token });
+              } catch {}
+            })
+            .catch(() => {});
+        }
       }
     });
 
@@ -706,11 +733,12 @@ export default function RootLayout() {
       await AsyncStorage.removeItem(PENDING_FRIEND_PROFILE_ID_KEY);
       if (friendId === user.uid) return;
       if (segments[0] === "friend-profile") return;
-      DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
+      requestDismissNavigationOverlays();
       router.push({
         pathname: "/friend-profile",
         params: { friendId },
       });
+      requestAnimationFrame(() => requestDismissNavigationOverlays());
     };
 
     void processPendingFriendProfile();
@@ -748,11 +776,12 @@ export default function RootLayout() {
       if (!friendId || cancelled) return;
       if (friendId === user.uid) return;
       if (segments[0] === "friend-profile") return;
-      DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
+      requestDismissNavigationOverlays();
       router.push({
         pathname: "/friend-profile",
         params: { friendId },
       });
+      requestAnimationFrame(() => requestDismissNavigationOverlays());
     };
 
     void processPendingProfileShareCode();
@@ -791,7 +820,7 @@ export default function RootLayout() {
           user.uid,
           `${pending.friendId}_accepted_${user.uid}`
         ).catch(() => {});
-        DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
+        requestDismissNavigationOverlays();
         router.push({
           pathname: "/friend-profile",
           params: { friendId: pending.friendId },
@@ -830,7 +859,7 @@ export default function RootLayout() {
     }
 
     if (pending.kind === "chat") {
-      DeviceEventEmitter.emit(DISMISS_NAVIGATION_OVERLAYS);
+      requestDismissNavigationOverlays();
       setPendingChatOpen(pending.chatId, pending.messageId);
       router.replace("/(tabs)");
       return;

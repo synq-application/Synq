@@ -1,4 +1,4 @@
-import { formatVenueAddressDisplay } from "@/app/helpers";
+import { formatVenueAddressDisplay } from "@/src/lib/helpers";
 import {
     ACCENT,
     BUTTON_RADIUS,
