@@ -468,7 +468,7 @@ export default function CommunityGroupSearchSheet({
 
           <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
             <View style={styles.header}>
-              <Text style={styles.title}>Find communities</Text>
+              <Text style={styles.title}>Search communities</Text>
               <CloseButton onPress={onClose} />
             </View>
           </TouchableWithoutFeedback>

@@ -34,6 +34,7 @@ type Props = {
   title?: string;
   hint?: string;
   submitLabel?: string;
+  placeholder?: string;
   initialName?: string;
 };
 
@@ -47,6 +48,7 @@ export default function CreateGroupModal({
   title = "New group",
   hint = "Name a list to organize friends — like Close friends or Gym crew.",
   submitLabel = "Create group",
+  placeholder = "Group name",
   initialName = "",
 }: Props) {
   const [name, setName] = useState("");
@@ -95,7 +97,7 @@ export default function CreateGroupModal({
             {hint ? <Text style={styles.hint}>{hint}</Text> : null}
             <TextInput
               style={[styles.input, compact && styles.inputCompact]}
-              placeholder="Group name"
+              placeholder={placeholder}
               placeholderTextColor={MUTED2}
               value={name}
               onChangeText={setName}

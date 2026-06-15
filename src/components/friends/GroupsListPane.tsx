@@ -2,12 +2,10 @@ import ConfirmModal from "@/app/confirm-modal";
 import {
   ACCENT,
   Friend,
-  MUTED2,
   MUTED3,
   SPACE_6,
 } from "@/constants/Variables";
 import CommunitySection from "@/src/components/friends/CommunityGroupsSection";
-import GroupsFeatureInfoModal from "@/src/components/friends/GroupsFeatureInfoModal";
 import { groupsPageStyles } from "@/src/components/friends/groupsListStyles";
 import {
   deleteFriendGroup,
@@ -28,14 +26,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import CreateGroupModal from "./CreateGroupModal";
+import CreateCircleModal from "./CreateCircleModal";
 import GroupListAvatar from "./GroupListAvatar";
+import GroupsSectionHeader from "./GroupsSectionHeader";
 
 type Props = {
   userId: string;
   friends?: Friend[];
   listBottomInset?: number;
-  onCreateGroup: (name: string) => Promise<string>;
+  onCreateGroup: (name: string, memberIds?: string[]) => Promise<string>;
 };
 
 function formatMemberCount(count: number): string {
@@ -56,7 +55,6 @@ export default function GroupsListPane({
   const [createBusy, setCreateBusy] = useState(false);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<FriendGroup | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [circlesInfoVisible, setCirclesInfoVisible] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -73,10 +71,10 @@ export default function GroupsListPane({
     return unsub;
   }, [userId]);
 
-  const handleCreate = async (name: string) => {
+  const handleCreate = async (name: string, memberIds: string[] = []) => {
     setCreateBusy(true);
     try {
-      const id = await onCreateGroup(name);
+      const id = await onCreateGroup(name, memberIds);
       setCreateVisible(false);
       router.push({ pathname: "/friend-group/[id]", params: { id } });
     } catch (err: unknown) {
@@ -149,18 +147,11 @@ export default function GroupsListPane({
       >
         <View style={groupsPageStyles.section}>
           <View style={groupsPageStyles.sectionHeader}>
-            <View style={groupsPageStyles.sectionTitleRow}>
-              <Text style={groupsPageStyles.sectionTitle}>Circles</Text>
-                <TouchableOpacity
-                  style={groupsPageStyles.infoBtn}
-                  onPress={() => setCirclesInfoVisible(true)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityRole="button"
-                accessibilityLabel="What are circles"
-              >
-                <Ionicons name="information-circle-outline" size={16} color={MUTED2} />
-              </TouchableOpacity>
-            </View>
+            <GroupsSectionHeader
+              title="Your Circles"
+              onAdd={openCreate}
+              accessibilityLabel="New circle"
+            />
           </View>
 
           {groups.map((group) => (
@@ -188,31 +179,15 @@ export default function GroupsListPane({
             </TouchableOpacity>
           ))}
 
-          <TouchableOpacity
-            style={groupsPageStyles.circleCard}
-            onPress={openCreate}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="New circle"
-          >
-            <View style={groupsPageStyles.newCircleIcon}>
-              <Ionicons name="add" size={22} color={ACCENT} />
-            </View>
-            <View style={groupsPageStyles.circleCardMain}>
-              <Text style={groupsPageStyles.circleCardTitle}>New circle</Text>
-            </View>
-          </TouchableOpacity>
         </View>
 
         <CommunitySection userId={userId} friends={friends} />
       </ScrollView>
 
-      <CreateGroupModal
+      <CreateCircleModal
         visible={createVisible}
         busy={createBusy}
-        title="New circle"
-        hint="Name your circle — only you control who is in it and who sees your availability."
-        submitLabel="Create circle"
+        friends={friends}
         onClose={() => setCreateVisible(false)}
         onCreate={handleCreate}
       />
@@ -231,12 +206,6 @@ export default function GroupsListPane({
           if (!deleteBusy) setPendingDeleteGroup(null);
         }}
         onConfirm={() => void handleConfirmDelete()}
-      />
-
-      <GroupsFeatureInfoModal
-        visible={circlesInfoVisible}
-        variant="circles"
-        onClose={() => setCirclesInfoVisible(false)}
       />
     </>
   );
