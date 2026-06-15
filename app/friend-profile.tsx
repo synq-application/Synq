@@ -60,6 +60,7 @@ import {
   matchesPlanEvent,
   matchesPlanEventForHostSync,
 } from "../src/lib/planEvents";
+import { resolvePlanHostUidForJoin } from "../src/lib/planAttribution";
 import {
   friendProfileCacheByUser,
   friendRelationCacheByUser,
@@ -472,6 +473,18 @@ export default function FriendProfile({
       if (h) uids.add(h);
       const jf = String(e?.joinedFromFriendUid || "").trim();
       if (jf) uids.add(jf);
+      (Array.isArray(e?.joinedFromIds) ? e.joinedFromIds : []).forEach((id: string) => {
+        const uid = String(id || "").trim();
+        if (uid) uids.add(uid);
+      });
+      const stored = e?.attendeeDisplayNames;
+      if (stored && typeof stored === "object") {
+        Object.entries(stored).forEach(([uid, name]) => {
+          const id = String(uid || "").trim();
+          const label = String(name || "").trim();
+          if (id && label) uids.add(id);
+        });
+      }
     });
     uids.add(friendKey);
     let cancelled = false;
@@ -480,6 +493,15 @@ export default function FriendProfile({
       if (friend.displayName) {
         next[friendKey] = String(friend.displayName);
       }
+      events.forEach((e: any) => {
+        const stored = e?.attendeeDisplayNames;
+        if (!stored || typeof stored !== "object") return;
+        Object.entries(stored).forEach(([uid, name]) => {
+          const id = String(uid || "").trim();
+          const label = String(name || "").trim();
+          if (id && label) next[id] = label;
+        });
+      });
       await Promise.all(
         [...uids].map(async (uid) => {
           if (next[uid]) return;
@@ -724,7 +746,7 @@ export default function FriendProfile({
         })
       );
 
-      const planHostUid = String(event?.planHostUid || friendKey || "").trim();
+      const planHostUid = resolvePlanHostUidForJoin(event, friendKey);
       const eventForMatch = { ...event, planHostUid: event.planHostUid || planHostUid };
 
       const syncAttendeesAcrossUsers = async (allAttendeeIds: string[]) => {
@@ -803,13 +825,17 @@ export default function FriendProfile({
           );
           return {
             ...e,
-            planHostUid: e.planHostUid || event.planHostUid || friendKey,
+            planHostUid: e.planHostUid || event.planHostUid || planHostUid,
             mergedIntoExisting: true,
             joinedFromFriendUid: friendKey,
             joinedFromIds: sourceIds,
             joinedFromId: sourceIds[0] || "",
             joinedFromNames: mergedNames,
             joinedFromName: mergedNames.join(", "),
+            attendeeDisplayNames: {
+              ...(e.attendeeDisplayNames || {}),
+              ...displayNameById,
+            },
           };
         });
         await updateDoc(meRef, { events: updatedExistingEvents });
@@ -825,13 +851,14 @@ export default function FriendProfile({
         date: String(event.date || "").trim(),
         time: String(event.time || "").trim(),
         location: String(event.location || "").trim(),
-        planHostUid: String(event.planHostUid || friendKey || "").trim(),
+        planHostUid,
         joinedFromId: friendKey,
         joinedFromIds: sourceIds,
         joinedFromName: sourceNames.join(", "),
         joinedFromNames: sourceNames,
         mergedIntoExisting: false,
         joinedFromFriendUid: friendKey,
+        attendeeDisplayNames: displayNameById,
       };
 
       const nextEvents = [...existingEvents, newEvent].sort(
@@ -1191,11 +1218,12 @@ export default function FriendProfile({
               events={friend.events || []}
               ACCENT={ACCENT}
               fonts={fonts}
+              viewerUid={viewerId}
+              profileSubjectUid={friendKey}
               onPressPlan={handlePlanPress}
               isPlanJoined={planLooksJoined}
               isViewerHostOfPlan={isViewerHostOfFriendsPlan}
               hostDisplayNameByUid={hostDisplayNameByUid}
-              profileFallbackFirstName={friend.displayName?.split(" ")[0] || "Friend"}
             />
           </View>
           </>

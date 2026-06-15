@@ -43,8 +43,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import PlanInviteFriendsSheet, {
   type PlanInviteFriend,
 } from "@/src/components/plans/PlanInviteFriendsSheet";
+import PlanGoingPeopleSheet, {
+  type PlanGoingPerson,
+} from "@/src/components/plans/PlanGoingPeopleSheet";
+import { resolvePlanAttribution } from "@/src/lib/planAttribution";
 import ConfirmModal from "./confirm-modal";
 import AlertModal from "./alert-modal";
+import { router } from "expo-router";
 
 type EventItem = {
   id: string;
@@ -56,7 +61,9 @@ type EventItem = {
   joinedFromIds?: string[];
   joinedFromName?: string;
   joinedFromNames?: string[];
+  joinedFromFriendUid?: string;
   planHostUid?: string;
+  attendeeDisplayNames?: Record<string, string>;
   planInvitedIds?: string[];
 };
 
@@ -111,88 +118,31 @@ export default function OpenPlans({
     return windowH - insets.top - insets.bottom - 24;
   }, [insets.top, insets.bottom]);
 
-  const firstName = (name: string) => String(name || "").trim().split(/\s+/)[0] || "";
-
-  const formatOthersGoingLine = (names: string[]) => {
-    if (names.length === 0) return null;
-    if (names.length === 1) return `${names[0]} is going`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are going`;
-    const head = names.slice(0, -1).join(", ");
-    const tail = names[names.length - 1];
-    return `${head}, and ${tail} are going`;
-  };
-
-  const planAttributionLines = (event: EventItem): { primary: string | null; secondary: string | null } => {
-    const isJoinedPlan =
-      !!event.joinedFromId ||
-      !!event.joinedFromName ||
-      (Array.isArray(event.joinedFromNames) && event.joinedFromNames.length > 0);
-    if (!isJoinedPlan) return { primary: null, secondary: null };
-
-    const rawNames = (Array.isArray(event.joinedFromNames) && event.joinedFromNames.length > 0
-      ? event.joinedFromNames
-      : [event.joinedFromName].filter(Boolean)) as string[];
-    const nameFirsts = Array.from(
-      new Set(rawNames.map((n) => firstName(n)).filter(Boolean))
-    );
-    const hostUid = String(event.planHostUid || "").trim();
-    const viewerFn = viewerUid ? firstName(hostDisplayNameByUid[viewerUid] || "") : "";
-    const hostIsViewer = !!(hostUid && viewerUid && hostUid === viewerUid);
-
-    let hostFn: string | null = null;
-    if (hostUid && !hostIsViewer) {
-      const hostFull = String(hostDisplayNameByUid[hostUid] || "").trim();
-      hostFn = hostFull ? firstName(hostFull) : null;
-      if (!hostFn && nameFirsts.length > 0) {
-        hostFn = nameFirsts[0];
-      }
-      if (!hostFn) hostFn = "Friend";
+  const friendById = useMemo(() => {
+    const map = new Map<string, PlanInviteFriend>();
+    for (const friend of friends) {
+      if (friend.id) map.set(friend.id, friend);
     }
+    return map;
+  }, [friends]);
 
-    const excludeUids = new Set(
-      [viewerUid, hostUid].map((id) => String(id || "").trim()).filter(Boolean)
+  const planAttributionLines = (event: EventItem) => {
+    const { primary, secondary, goingPeople } = resolvePlanAttribution(
+      event,
+      viewerUid,
+      hostDisplayNameByUid,
+      viewerUid
     );
-    const joinedIds = Array.from(
-      new Set(
-        [
-          ...(Array.isArray(event.joinedFromIds) ? event.joinedFromIds : []),
-          event.joinedFromId,
-        ]
-          .map((id) => String(id || "").trim())
-          .filter(Boolean)
-      )
-    );
-
-    let othersFirsts: string[];
-    if (joinedIds.length > 0) {
-      othersFirsts = Array.from(
-        new Set(
-          joinedIds
-            .filter((id) => !excludeUids.has(id))
-            .map((id) => firstName(hostDisplayNameByUid[id] || ""))
-            .filter(Boolean)
-        )
-      );
-    } else {
-      othersFirsts = nameFirsts.filter((n) => {
-        if (viewerFn && n === viewerFn) return false;
-        if (hostFn && n === hostFn) return false;
-        return true;
-      });
-    }
-
-    const primary =
-      hostIsViewer || !hostUid
-        ? null
-        : hostFn
-          ? `${hostFn}'s plan`
-          : null;
-
-    const secondary =
-      othersFirsts.length > 0 ? formatOthersGoingLine(othersFirsts) : null;
-
-    return { primary, secondary };
+    const peopleWithAvatars = goingPeople.map((person) => ({
+      ...person,
+      imageUrl: person.userId ? friendById.get(person.userId)?.imageurl || null : null,
+    }));
+    return { primary, secondary, goingPeople: peopleWithAvatars };
   };
+  const [goingPeopleSheet, setGoingPeopleSheet] = useState<{
+    planTitle: string;
+    people: PlanGoingPerson[];
+  } | null>(null);
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
   const [activePicker, setActivePicker] = useState<"date" | "time" | null>(null);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
@@ -563,14 +513,15 @@ export default function OpenPlans({
             !!p.joinedFromId ||
             !!p.joinedFromName ||
             (Array.isArray(p.joinedFromNames) && p.joinedFromNames.length > 0);
-          const { primary: hostLine, secondary: othersLine } = planAttributionLines(p);
+          const { primary: hostLine, secondary: othersLine, goingPeople } =
+            planAttributionLines(p);
           const hasInterestLines =
             isJoinedPlan && !!(hostLine || othersLine);
           const isHighlighted =
             !!highlightEventId && String(p.id) === String(highlightEventId);
           const canEdit = canEditOpenPlan(p, viewerUid);
           return (
-            <TouchableOpacity
+            <View
               key={p.id}
               style={[
                 styles.card,
@@ -578,12 +529,6 @@ export default function OpenPlans({
                 isHighlighted && { borderColor: ACCENT, borderWidth: 2 },
                 isLast && { marginBottom: 0 },
               ]}
-              onPress={() => {
-                if (canEdit) openEditModal(p);
-              }}
-              disabled={!canEdit}
-              onLongPress={() => handleDelete(p)}
-              delayLongPress={400}
             >
             <View style={styles.dateBlock}>
               <Text style={styles.day}>
@@ -604,30 +549,49 @@ export default function OpenPlans({
                   hasInterestLines && styles.planBodyWithInterest,
                 ]}
               >
-                <Text style={styles.title}>{p.title}</Text>
-                <Text style={styles.meta}>
-                  {p.time}
-                  {p.location ? ` · ${p.location}` : ""}
-                </Text>
-                {hasInterestLines ? (
-                  <>
-                    {hostLine ? (
-                      <Text style={styles.hostPlanLine}>{hostLine}</Text>
-                    ) : null}
-                    {othersLine ? (
-                      <Text
-                        style={[
-                          styles.joinedMeta,
-                          { color: ACCENT, marginTop: hostLine ? 4 : 6 },
-                        ]}
-                      >
-                        {othersLine}
-                      </Text>
-                    ) : null}
-                  </>
+                <TouchableOpacity
+                  activeOpacity={canEdit ? 0.75 : 1}
+                  disabled={!canEdit}
+                  onPress={() => {
+                    if (canEdit) openEditModal(p);
+                  }}
+                  onLongPress={() => handleDelete(p)}
+                  delayLongPress={400}
+                >
+                  <Text style={styles.title}>{p.title}</Text>
+                  <Text style={styles.meta}>
+                    {p.time}
+                    {p.location ? ` · ${p.location}` : ""}
+                  </Text>
+                  {hostLine ? (
+                    <Text style={styles.hostPlanLine}>{hostLine}</Text>
+                  ) : null}
+                </TouchableOpacity>
+                {othersLine && goingPeople.length > 0 ? (
+                  <Pressable
+                    onPress={() =>
+                      setGoingPeopleSheet({
+                        planTitle: p.title,
+                        people: goingPeople,
+                      })
+                    }
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="See everyone going to this plan"
+                  >
+                    <Text
+                      style={[
+                        styles.joinedMeta,
+                        styles.joinedMetaTappable,
+                        { color: ACCENT, marginTop: hostLine ? 4 : 6 },
+                      ]}
+                    >
+                      {othersLine}
+                    </Text>
+                  </Pressable>
                 ) : null}
               </View>
-            </TouchableOpacity>
+            </View>
           );
         })}
       </View>
@@ -883,6 +847,21 @@ export default function OpenPlans({
         />
       ) : null}
 
+      <PlanGoingPeopleSheet
+        visible={!!goingPeopleSheet}
+        planTitle={goingPeopleSheet?.planTitle}
+        people={goingPeopleSheet?.people ?? []}
+        onClose={() => setGoingPeopleSheet(null)}
+        onPressPerson={(person) => {
+          if (!person.userId || person.userId === viewerUid) return;
+          setGoingPeopleSheet(null);
+          router.push({
+            pathname: "/friend-profile",
+            params: { friendId: person.userId },
+          });
+        }}
+      />
+
       {pendingDeleteEvent ? (
       <ConfirmModal
         visible
@@ -1031,6 +1010,10 @@ const styles = StyleSheet.create({
   title: { color: "white", fontSize: 15 },
   meta: { color: "#777", marginTop: 3, fontSize: 13 },
   joinedMeta: { marginTop: 6, fontSize: 12.5, fontFamily: fonts.medium },
+  joinedMetaTappable: {
+    textDecorationLine: "underline",
+    textDecorationColor: "rgba(43,255,136,0.45)",
+  },
   hostPlanLine: {
     color: "rgba(255,255,255,0.45)",
     fontSize: 12,

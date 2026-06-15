@@ -1,4 +1,5 @@
 import { filterOutPastOpenPlans, sortOpenPlansByDateTime } from "@/src/lib/planEvents";
+import { resolvePlanAttribution } from "@/src/lib/planAttribution";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from "react-native";
 
@@ -23,13 +24,18 @@ type EventItem = {
   joinedFromFriendUid?: string;
   joinedFromId?: string;
   joinedFromIds?: string[];
+  joinedFromName?: string;
+  joinedFromNames?: string[];
   planHostUid?: string;
+  attendeeDisplayNames?: Record<string, string>;
 };
 
 type Props = {
   events: EventItem[];
   ACCENT: string;
   fonts: any;
+  viewerUid?: string;
+  profileSubjectUid?: string;
   onPressPlan?: (event: EventItem) => void;
   isPlanJoined?: (event: EventItem) => boolean;
   isViewerHostOfPlan?: (event: EventItem) => boolean;
@@ -41,11 +47,12 @@ export default function FriendOpenPlans({
   events,
   ACCENT,
   fonts,
+  viewerUid = "",
+  profileSubjectUid = "",
   onPressPlan,
   isPlanJoined,
   isViewerHostOfPlan,
   hostDisplayNameByUid,
-  profileFallbackFirstName,
 }: Props) {
   const visibleEvents = useMemo(
     () => sortOpenPlansByDateTime(filterOutPastOpenPlans(events)),
@@ -57,23 +64,14 @@ export default function FriendOpenPlans({
     return new Date(y, m - 1, d);
   };
 
-  const firstName = (name: string) =>
-    String(name || "")
-      .trim()
-      .split(/\s+/)[0] || "";
-
   const planHostLabelForRow = (p: EventItem) => {
-    const hostUid =
-      String(p.planHostUid || "").trim() ||
-      String(p.joinedFromFriendUid || "").trim();
-    const hostFull = hostUid ? hostDisplayNameByUid[hostUid] : "";
-    if (hostUid) {
-      if (!hostFull) return null;
-      return `${firstName(hostFull)}'s plan`;
-    }
-    const fb = profileFallbackFirstName && String(profileFallbackFirstName).trim();
-    if (fb) return `${firstName(fb)}'s plan`;
-    return null;
+    const { primary } = resolvePlanAttribution(
+      p,
+      viewerUid,
+      hostDisplayNameByUid,
+      profileSubjectUid || viewerUid
+    );
+    return primary;
   };
 
   return (

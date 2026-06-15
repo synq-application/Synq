@@ -248,6 +248,7 @@ export default function ProfileScreen() {
     joinedFromNames?: string[];
     joinedFromFriendUid?: string;
     planInvitedIds?: string[];
+    attendeeDisplayNames?: Record<string, string>;
   };
 
   const [events, setEvents] = useState<OpenPlanEvent[]>(
@@ -261,6 +262,58 @@ export default function ProfileScreen() {
   const resolvedProfileImage = useMemo(() => resolveAvatar(profileImage), [profileImage]);
 
   const [showEventModal, setShowEventModal] = useState(false);
+  const [fetchedPlanDisplayNames, setFetchedPlanDisplayNames] = useState<
+    Record<string, string>
+  >({});
+
+  useEffect(() => {
+    if (!myId || events.length === 0) return;
+
+    const known = new Set<string>();
+    if (auth.currentUser?.displayName) known.add(myId);
+    friendsForHostNames.forEach((f) => {
+      if (f.id) known.add(f.id);
+    });
+
+    const missing = new Set<string>();
+    events.forEach((event) => {
+      const host = String(event.planHostUid || "").trim();
+      if (host && !known.has(host)) missing.add(host);
+      (Array.isArray(event.joinedFromIds) ? event.joinedFromIds : []).forEach((id) => {
+        const uid = String(id || "").trim();
+        if (uid && !known.has(uid)) missing.add(uid);
+      });
+      Object.keys(event.attendeeDisplayNames || {}).forEach((uid) => {
+        const id = String(uid || "").trim();
+        if (id) known.add(id);
+      });
+    });
+
+    const toFetch = [...missing].filter((uid) => !fetchedPlanDisplayNames[uid]);
+    if (toFetch.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const fetched: Record<string, string> = {};
+      await Promise.all(
+        toFetch.map(async (uid) => {
+          try {
+            const snap = await getDoc(doc(db, "users", uid));
+            if (!snap.exists()) return;
+            const name = String((snap.data() as { displayName?: string })?.displayName || "").trim();
+            if (name) fetched[uid] = name;
+          } catch {}
+        })
+      );
+      if (!cancelled && Object.keys(fetched).length > 0) {
+        setFetchedPlanDisplayNames((prev) => ({ ...prev, ...fetched }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [myId, events, friendsForHostNames, fetchedPlanDisplayNames]);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener(
@@ -301,8 +354,22 @@ export default function ProfileScreen() {
       const name = (f.displayName || "").trim();
       if (f.id && name) m[f.id] = name;
     });
+    events.forEach((event) => {
+      const names = event?.attendeeDisplayNames;
+      if (!names || typeof names !== "object") return;
+      Object.entries(names).forEach(([uid, name]) => {
+        const id = String(uid || "").trim();
+        const label = String(name || "").trim();
+        if (id && label && !m[id]) m[id] = label;
+      });
+    });
+    Object.entries(fetchedPlanDisplayNames).forEach(([uid, name]) => {
+      const id = String(uid || "").trim();
+      const label = String(name || "").trim();
+      if (id && label && !m[id]) m[id] = label;
+    });
     return m;
-  }, [myId, friendsForHostNames]);
+  }, [myId, friendsForHostNames, events, fetchedPlanDisplayNames]);
 
   const computedTopSynqRows = useMemo(
     () => computeTopSynqRows(myId, friendsForHostNames),
