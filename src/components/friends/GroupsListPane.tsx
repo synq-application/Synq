@@ -6,6 +6,7 @@ import {
   MUTED2,
   MUTED3,
   RADIUS_LG,
+  SPACE_2,
   SPACE_3,
   SPACE_4,
   SPACE_5,
@@ -41,10 +42,11 @@ import Animated, {
   useReducedMotion,
 } from "react-native-reanimated";
 import CreateGroupModal from "./CreateGroupModal";
+import CommunityGroupsSection from "./CommunityGroupsSection";
 import GroupListAvatar from "./GroupListAvatar";
 
-const GROUPS_HINT =
-  "Only you can see your groups. Use them as custom filters for who sees you when you're active.";
+const YOUR_GROUPS_SUBTITLE = "Private — filters for when you're active.";
+const EMPTY_GROUPS_HINT = "Private groups only you can see.";
 
 const GROUP_SURFACE = "#0E1012";
 const GROUP_BORDER = "rgba(255,255,255,0.06)";
@@ -69,7 +71,11 @@ function formatMemberCount(count: number): string {
   return count === 1 ? "1 member" : `${count} members`;
 }
 
-function GroupsEmptyState({ onCreatePress }: { onCreatePress: () => void }) {
+function GroupsEmptyState({
+  onCreatePress,
+}: {
+  onCreatePress: () => void;
+}) {
   const reduced = useReducedMotion();
 
   return (
@@ -82,7 +88,7 @@ function GroupsEmptyState({ onCreatePress }: { onCreatePress: () => void }) {
           Organize your{"\n"}
           <Text style={styles.emptyTitleAccent}>circle</Text>
         </Text>
-        <Text style={[styles.groupsHint, styles.groupsHintCenter]}>{GROUPS_HINT}</Text>
+        <Text style={[styles.groupsHint, styles.groupsHintCenter]}>{EMPTY_GROUPS_HINT}</Text>
       </Animated.View>
       <Animated.View entering={emptyEntering(reduced, STAGGER_DELAYS[1])}>
         <TouchableOpacity
@@ -284,19 +290,29 @@ export default function GroupsListPane({
         ListHeaderComponent={
           hasGroups ? (
             <View style={styles.listHeader}>
-              <Text style={styles.groupsHint}>{GROUPS_HINT}</Text>
-              <View style={styles.sectionRow}>
-                <Text style={styles.sectionTitle}>Your groups</Text>
-                <View style={styles.sectionCountPill}>
-                  <Text style={styles.sectionCountText}>{groups.length}</Text>
+              <View style={styles.sectionBlock}>
+                <View style={styles.sectionRow}>
+                  <Text style={styles.sectionTitle}>Your groups</Text>
+                  <View style={styles.sectionCountPill}>
+                    <Text style={styles.sectionCountText}>{groups.length}</Text>
+                  </View>
                 </View>
+                <Text style={styles.sectionSubtitle}>{YOUR_GROUPS_SUBTITLE}</Text>
+                {groupsListBody}
               </View>
-              {groupsListBody}
+              <CommunityGroupsSection userId={userId} friends={friends} />
             </View>
           ) : null
         }
         ListEmptyComponent={
-          !hasGroups ? <GroupsEmptyState onCreatePress={openCreate} /> : null
+          !hasGroups ? (
+            <View>
+              <GroupsEmptyState onCreatePress={openCreate} />
+              <View style={styles.communitySectionWrap}>
+                <CommunityGroupsSection userId={userId} friends={friends} />
+              </View>
+            </View>
+          ) : null
         }
         renderItem={() => null}
       />
@@ -340,7 +356,13 @@ const styles = StyleSheet.create({
   },
   listHeader: {
     marginBottom: SPACE_4,
-    gap: SPACE_3,
+    gap: SPACE_4,
+  },
+  sectionBlock: {
+    gap: SPACE_2,
+  },
+  communitySectionWrap: {
+    marginTop: SPACE_4,
   },
   groupsHint: {
     fontFamily: fonts.book,
@@ -359,7 +381,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginTop: SPACE_3,
+  },
+  sectionSubtitle: {
+    fontFamily: fonts.book,
+    fontSize: TYPE_CAPTION,
+    color: MUTED3,
+    lineHeight: 17,
+    letterSpacing: 0.05,
+    marginBottom: SPACE_2,
   },
   sectionTitle: {
     fontFamily: fonts.heavy,

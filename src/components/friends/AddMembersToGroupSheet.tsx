@@ -38,11 +38,18 @@ type Props = {
   busy?: boolean;
   friends: Friend[];
   existingMemberIds: string[];
+  pendingInviteIds?: string[];
+  mode?: "add" | "invite";
   onClose: () => void;
   onAdd: (memberIds: string[]) => void | Promise<void>;
 };
 
-function addMembersCtaLabel(selectedCount: number): string {
+function actionCtaLabel(mode: "add" | "invite", selectedCount: number): string {
+  if (mode === "invite") {
+    if (selectedCount === 0) return "Send invites";
+    if (selectedCount === 1) return "Send invite";
+    return `Send invites (${selectedCount})`;
+  }
   if (selectedCount === 0) return "Add members";
   if (selectedCount === 1) return "Add member";
   return `Add members (${selectedCount})`;
@@ -57,6 +64,8 @@ export default function AddMembersToGroupSheet({
   busy,
   friends,
   existingMemberIds,
+  pendingInviteIds = [],
+  mode = "add",
   onClose,
   onAdd,
 }: Props) {
@@ -91,14 +100,15 @@ export default function AddMembersToGroupSheet({
   }, [keyboardInset]);
 
   const existingSet = useMemo(() => new Set(existingMemberIds), [existingMemberIds]);
+  const pendingInviteSet = useMemo(() => new Set(pendingInviteIds), [pendingInviteIds]);
 
   const candidates = useMemo(() => {
     const q = query.trim().toLowerCase();
     return friends
-      .filter((f) => !existingSet.has(f.id))
+      .filter((f) => !existingSet.has(f.id) && !pendingInviteSet.has(f.id))
       .filter((f) => !q || (f.displayName || "").toLowerCase().includes(q))
       .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
-  }, [friends, existingSet, query]);
+  }, [friends, existingSet, pendingInviteSet, query]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -145,10 +155,14 @@ export default function AddMembersToGroupSheet({
         >
           <View style={[styles.sheet, { paddingBottom: Math.max(24, insets.bottom) }]}>
             <View style={styles.header}>
-              <Text style={styles.title}>Add members</Text>
+              <Text style={styles.title}>{mode === "invite" ? "Invite friends" : "Add members"}</Text>
               <CloseButton onPress={handleClose} />
             </View>
-            <Text style={styles.subtitle}>Search friends to add to this group</Text>
+            <Text style={styles.subtitle}>
+              {mode === "invite"
+                ? "Friends you invite can join or decline"
+                : "Search friends to add to this group"}
+            </Text>
             <View style={styles.searchBar}>
               <Ionicons name="search-outline" size={17} color={MUTED2} />
               <TextInput
@@ -169,8 +183,10 @@ export default function AddMembersToGroupSheet({
             ListEmptyComponent={
               <View style={styles.empty}>
                 <Text style={styles.emptyText}>
-                  {friends.length === existingMemberIds.length
-                    ? "All friends are already in this group."
+                  {friends.length === existingMemberIds.length + pendingInviteIds.length
+                    ? mode === "invite"
+                      ? "All friends are already in this group or have a pending invite."
+                      : "All friends are already in this group."
                     : "No friends match your search."}
                 </Text>
               </View>
@@ -211,7 +227,7 @@ export default function AddMembersToGroupSheet({
               {busy ? (
                 <ActivityIndicator color={ON_ACCENT_TEXT} />
               ) : (
-                <Text style={styles.ctaText}>{addMembersCtaLabel(selected.size)}</Text>
+                <Text style={styles.ctaText}>{actionCtaLabel(mode, selected.size)}</Text>
               )}
             </TouchableOpacity>
           </View>

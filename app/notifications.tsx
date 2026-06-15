@@ -48,6 +48,11 @@ import {
   TYPE_SECTION,
 } from "../constants/Variables";
 import { acceptPlanInvite, acceptPlanInviteErrorMessage, declinePlanInvite, declinePlanInviteErrorMessage } from "../src/lib/planInvite";
+import {
+  acceptCommunityGroupInvite,
+  declineCommunityGroupInvite,
+  type CommunityGroupInvite,
+} from "../src/lib/communityGroupInvites";
 import { auth, db } from "../src/lib/firebase";
 
 import AlertModal from "./alert-modal";
@@ -116,7 +121,24 @@ type StandardActivityFeedItem = {
   raw: Record<string, unknown>;
 };
 
-type FeedItem = FriendRequestFeedItem | PlanInviteFeedItem | StandardActivityFeedItem;
+type CommunityGroupInviteFeedItem = {
+  feedKey: string;
+  kind: "community_group_invite";
+  id: string;
+  groupId: string;
+  groupName: string;
+  fromUserId: string;
+  actorName: string;
+  actorImageUrl: string | null;
+  sortMs: number;
+  raw: CommunityGroupInvite;
+};
+
+type FeedItem =
+  | FriendRequestFeedItem
+  | PlanInviteFeedItem
+  | CommunityGroupInviteFeedItem
+  | StandardActivityFeedItem;
 
 type LegacyNotificationLockRow = {
   id: string;
@@ -164,6 +186,7 @@ function NotificationsEmptyState() {
 export default function NotificationsScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [communityGroupInvites, setCommunityGroupInvites] = useState<CommunityGroupInvite[]>([]);
   const [activityItems, setActivityItems] = useState<any[]>([]);
   const [legacyActivityItems, setLegacyActivityItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,6 +229,21 @@ export default function NotificationsScreen() {
     } catch {}
 
     return { actorName, actorImageUrl };
+  };
+
+  const resolveCommunityGroupInvite = async (invite: CommunityGroupInvite) => {
+    const { actorName, actorImageUrl } = await resolveActor(
+      invite.fromUserId,
+      invite.fromUserName,
+      invite.fromUserImageUrl || null
+    );
+
+    return {
+      ...invite,
+      actorName,
+      actorImageUrl,
+      sortMs: timestampMillis(invite.createdAt) || Date.now(),
+    };
   };
 
   const resolveFriendRequest = async (request: Record<string, unknown> & { id: string }) => {
@@ -292,8 +330,9 @@ export default function NotificationsScreen() {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
 
-    const [reqSnap, activitySnap, legacySnap] = await Promise.all([
+    const [reqSnap, groupInviteSnap, activitySnap, legacySnap] = await Promise.all([
       getDocs(collection(db, "users", myId, "friendRequests")),
+      getDocs(collection(db, "users", myId, "communityGroupInvites")),
       getDocs(
         query(
           collection(db, "users", myId, "notifications"),
@@ -311,8 +350,23 @@ export default function NotificationsScreen() {
         ["friend_accepted", "open_plan_interest", "plan_invite"].includes(String(row.type || ""))
       );
 
-    const [resolvedReqs, resolvedActivity, resolvedLegacy] = await Promise.all([
+    const groupInviteList: CommunityGroupInvite[] = groupInviteSnap.docs.map((d) => {
+      const data = d.data() as Record<string, unknown>;
+      return {
+        id: d.id,
+        groupId: String(data.groupId || d.id).trim(),
+        groupName: String(data.groupName || "").trim() || "Group",
+        fromUserId: String(data.fromUserId || "").trim(),
+        fromUserName: String(data.fromUserName || "").trim() || "Friend",
+        fromUserImageUrl: data.fromUserImageUrl ? String(data.fromUserImageUrl) : undefined,
+        createdAt: data.createdAt,
+      };
+    });
+
+    const [resolvedReqs, resolvedGroupInvites, resolvedActivity, resolvedLegacy] =
+      await Promise.all([
       Promise.all(reqList.map(resolveFriendRequest)),
+      Promise.all(groupInviteList.map(resolveCommunityGroupInvite)),
       Promise.all(activityList.map(resolveActivity)),
       Promise.all(
         legacyList.map((row) =>
@@ -329,6 +383,7 @@ export default function NotificationsScreen() {
     ]);
 
     setFriendRequests(resolvedReqs);
+    setCommunityGroupInvites(resolvedGroupInvites);
     setActivityItems(resolvedActivity);
     setLegacyActivityItems(resolvedLegacy);
   };
@@ -344,6 +399,7 @@ export default function NotificationsScreen() {
     const myId = auth.currentUser.uid;
 
     const reqRef = collection(db, "users", myId, "friendRequests");
+    const groupInviteRef = collection(db, "users", myId, "communityGroupInvites");
     const activityRef = query(
       collection(db, "users", myId, "notifications"),
       orderBy("createdAt", "desc")
@@ -351,11 +407,12 @@ export default function NotificationsScreen() {
     const legacyRef = collection(db, "users", myId, "notificationLocks");
 
     let reqReady = false;
+    let groupInviteReady = false;
     let activityReady = false;
     let legacyReady = false;
 
     const maybeDoneLoading = () => {
-      if (reqReady && activityReady && legacyReady) setLoading(false);
+      if (reqReady && groupInviteReady && activityReady && legacyReady) setLoading(false);
     };
 
     const unsubReq = onSnapshot(
@@ -372,6 +429,36 @@ export default function NotificationsScreen() {
         console.error("friendRequests snapshot:", error);
         setLoadError(true);
         reqReady = true;
+        maybeDoneLoading();
+      }
+    );
+
+    const unsubGroupInvites = onSnapshot(
+      groupInviteRef,
+      async (snapshot) => {
+        const list: CommunityGroupInvite[] = snapshot.docs.map((d) => {
+          const data = d.data() as Record<string, unknown>;
+          return {
+            id: d.id,
+            groupId: String(data.groupId || d.id).trim(),
+            groupName: String(data.groupName || "").trim() || "Group",
+            fromUserId: String(data.fromUserId || "").trim(),
+            fromUserName: String(data.fromUserName || "").trim() || "Friend",
+            fromUserImageUrl: data.fromUserImageUrl ? String(data.fromUserImageUrl) : undefined,
+            createdAt: data.createdAt,
+          };
+        });
+        const resolved = await Promise.all(list.map(resolveCommunityGroupInvite));
+        prefetchActorAvatars(resolved);
+        setCommunityGroupInvites(resolved);
+        setLoadError(false);
+        groupInviteReady = true;
+        maybeDoneLoading();
+      },
+      (error) => {
+        console.error("communityGroupInvites snapshot:", error);
+        setLoadError(true);
+        groupInviteReady = true;
         maybeDoneLoading();
       }
     );
@@ -427,6 +514,7 @@ export default function NotificationsScreen() {
 
     return () => {
       unsubReq();
+      unsubGroupInvites();
       unsubActivity();
       unsubLegacy();
     };
@@ -447,6 +535,26 @@ export default function NotificationsScreen() {
       sortMs: r.sortMs,
       raw: r,
     }));
+
+    const groupInvites: FeedItem[] = communityGroupInvites.map((invite) => {
+      const resolved = invite as CommunityGroupInvite & {
+        actorName?: string;
+        actorImageUrl?: string | null;
+        sortMs?: number;
+      };
+      return {
+        feedKey: `cgi_${invite.id}`,
+        kind: "community_group_invite" as const,
+        id: invite.id,
+        groupId: invite.groupId,
+        groupName: invite.groupName,
+        fromUserId: invite.fromUserId,
+        actorName: resolved.actorName || invite.fromUserName,
+        actorImageUrl: resolved.actorImageUrl ?? invite.fromUserImageUrl ?? null,
+        sortMs: resolved.sortMs || timestampMillis(invite.createdAt) || Date.now(),
+        raw: invite,
+      };
+    });
 
     const activityIds = new Set(activityItems.map((a) => a.id));
     const mergedActivity = [
@@ -491,8 +599,8 @@ export default function NotificationsScreen() {
         return { ...base, kind: a.type as ActivityFeedKind };
       });
 
-    return [...requests, ...activity].sort((a, b) => b.sortMs - a.sortMs);
-  }, [friendRequests, activityItems, legacyActivityItems]);
+    return [...requests, ...groupInvites, ...activity].sort((a, b) => b.sortMs - a.sortMs);
+  }, [friendRequests, communityGroupInvites, activityItems, legacyActivityItems]);
 
   const clearAll = async () => {
     if (!auth.currentUser || clearingAll || feedItems.length === 0) return;
@@ -505,6 +613,9 @@ export default function NotificationsScreen() {
     for (const item of feedItems) {
       if (item.kind === "friend_request") {
         const ref = doc(db, "users", myId, "friendRequests", item.id);
+        refByPath.set(ref.path, ref);
+      } else if (item.kind === "community_group_invite") {
+        const ref = doc(db, "users", myId, "communityGroupInvites", item.id);
         refByPath.set(ref.path, ref);
       } else {
         for (const ref of activityDeleteRefs(myId, item.id)) {
@@ -626,6 +737,37 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleCommunityGroupInvite = async (
+    item: CommunityGroupInviteFeedItem,
+    accept: boolean
+  ) => {
+    if (!auth.currentUser || dismissingKeys.has(item.feedKey)) return;
+
+    const myId = auth.currentUser.uid;
+    setDismissingKeys((prev) => new Set(prev).add(item.feedKey));
+
+    try {
+      if (accept) {
+        await acceptCommunityGroupInvite(myId, item.raw);
+        showAlert("Joined", `You joined ${item.groupName}.`);
+        router.push({
+          pathname: "/community-group/[id]",
+          params: { id: item.groupId },
+        });
+      } else {
+        await declineCommunityGroupInvite(myId, item.groupId);
+      }
+    } catch (e: unknown) {
+      showAlert("Error", e instanceof Error ? e.message : "Could not process invite.");
+    } finally {
+      setDismissingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(item.feedKey);
+        return next;
+      });
+    }
+  };
+
   const handlePlanInvite = async (item: PlanInviteFeedItem, accept: boolean) => {
     if (!auth.currentUser || dismissingKeys.has(item.feedKey)) return;
 
@@ -669,7 +811,13 @@ export default function NotificationsScreen() {
   };
 
   const handleActivityPress = useCallback(async (item: FeedItem) => {
-    if (item.kind === "friend_request" || item.kind === "plan_invite") return;
+    if (
+      item.kind === "friend_request" ||
+      item.kind === "plan_invite" ||
+      item.kind === "community_group_invite"
+    ) {
+      return;
+    }
 
     if (item.kind === "friend_synq_active" || item.kind === "synq_nudge") {
       void dismissActivity(item);
@@ -708,6 +856,8 @@ export default function NotificationsScreen() {
         return "Friend going";
       case "plan_invite":
         return "Plan invite";
+      case "community_group_invite":
+        return "Group invite";
       case "friend_synq_active":
         return "Synq active";
       case "synq_nudge":
@@ -761,6 +911,68 @@ export default function NotificationsScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel="Decline friend request"
+          >
+            <CloseIcon size={20} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const CommunityGroupInviteRow = ({ item }: { item: CommunityGroupInviteFeedItem }) => {
+    const avatarUri = resolveAvatar(item.actorImageUrl);
+    const isDismissing = dismissingKeys.has(item.feedKey);
+    const groupLabel = item.groupName.trim() || "a community group";
+
+    return (
+      <View style={styles.row}>
+        <View style={styles.rowLeft}>
+          <View style={styles.avatar}>
+            <ExpoImage
+              source={{ uri: avatarUri }}
+              style={styles.avatarImg}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={0}
+              recyclingKey={avatarUri}
+              priority="high"
+            />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowKicker}>{kickerFor(item.kind)}</Text>
+            <Text style={styles.rowText}>
+              <Text style={styles.boldWhite}>{item.actorName}</Text>
+              <Text style={styles.grayText}> invited you to join </Text>
+              <Text style={styles.boldWhite}>{groupLabel}</Text>
+              <Text style={styles.grayText}>.</Text>
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.rowRight}>
+          <TouchableOpacity
+            onPress={() => void handleCommunityGroupInvite(item, true)}
+            style={styles.acceptBtn}
+            disabled={isDismissing}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Accept group invite"
+          >
+            {isDismissing ? (
+              <ActivityIndicator size="small" color="black" />
+            ) : (
+              <Ionicons name="checkmark" size={18} color="black" />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => void handleCommunityGroupInvite(item, false)}
+            style={styles.dismissBtn}
+            disabled={isDismissing}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Decline group invite"
           >
             <CloseIcon size={20} />
           </TouchableOpacity>
@@ -882,6 +1094,8 @@ export default function NotificationsScreen() {
     <View style={styles.group}>
       {item.kind === "friend_request" ? (
         <FriendRequestRow item={item} />
+      ) : item.kind === "community_group_invite" ? (
+        <CommunityGroupInviteRow item={item} />
       ) : item.kind === "plan_invite" ? (
         <PlanInviteRow item={item} />
       ) : (

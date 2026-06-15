@@ -3,7 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Open Synq</title>
+    <title>Join me on Synq!</title>
+    <meta property="og:title" content="Join me on Synq!" />
+    <meta property="og:description" content="Connect with me on Synq." />
     <style>
       body {
         margin: 0;
@@ -24,7 +26,7 @@
   </head>
   <body>
     <div>
-      <p>Opening Synq…</p>
+      <p id="status">Opening Synq…</p>
       <p><a id="store-link" href="#">Get Synq in the app store</a></p>
     </div>
     <script>
@@ -37,16 +39,10 @@
         var params = new URLSearchParams(window.location.search);
         var friendId = (params.get("friendId") || "").trim();
         var inviteCode = (params.get("code") || "").trim();
-
-        var deepLink = "synq://";
-        if (inviteCode) {
-          deepLink += "invite/" + encodeURIComponent(inviteCode);
-        } else if (friendId) {
-          deepLink +=
-            "friend-profile?friendId=" + encodeURIComponent(friendId);
-        } else {
-          deepLink += "invite";
-        }
+        var pathMatch = window.location.pathname.match(/\/u\/([^/?#]+)/i);
+        var profileShareCode = pathMatch
+          ? decodeURIComponent(pathMatch[1] || "").trim().toUpperCase()
+          : "";
 
         var ua = navigator.userAgent || "";
         var isIOS = /iPad|iPhone|iPod/i.test(ua);
@@ -62,10 +58,59 @@
           storeLink.href = storeUrl;
         }
 
-        window.location.replace(deepLink);
-        window.setTimeout(function () {
-          window.location.replace(storeUrl);
-        }, 1200);
+        function openDeepLink(deepLink) {
+          window.location.replace(deepLink);
+          window.setTimeout(function () {
+            window.location.replace(storeUrl);
+          }, 1200);
+        }
+
+        function resolveProfileShareCode(code, onSuccess, onError) {
+          fetch(
+            "/api/resolve-profile-share?code=" + encodeURIComponent(code)
+          )
+            .then(function (res) {
+              if (!res.ok) throw new Error("resolve_failed");
+              return res.json();
+            })
+            .then(function (data) {
+              var resolvedFriendId = String(data.friendId || "").trim();
+              if (!resolvedFriendId) throw new Error("missing_friend");
+              onSuccess(resolvedFriendId);
+            })
+            .catch(function () {
+              onError();
+            });
+        }
+
+        if (profileShareCode) {
+          resolveProfileShareCode(
+            profileShareCode,
+            function (resolvedFriendId) {
+              openDeepLink(
+                "synq://friend-profile?friendId=" +
+                  encodeURIComponent(resolvedFriendId)
+              );
+            },
+            function () {
+              var status = document.getElementById("status");
+              if (status) status.textContent = "This profile link is no longer available.";
+            }
+          );
+          return;
+        }
+
+        var deepLink = "synq://";
+        if (inviteCode) {
+          deepLink += "invite/" + encodeURIComponent(inviteCode);
+        } else if (friendId) {
+          deepLink +=
+            "friend-profile?friendId=" + encodeURIComponent(friendId);
+        } else {
+          deepLink += "invite";
+        }
+
+        openDeepLink(deepLink);
       })();
     </script>
   </body>

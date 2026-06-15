@@ -1017,6 +1017,13 @@ export default function RootLayout() {
                     }}
                   />
                   <Stack.Screen
+                    name="community-group/[id]"
+                    options={{
+                      animation: "slide_from_right",
+                      gestureEnabled: true,
+                    }}
+                  />
+                  <Stack.Screen
                     name="profile-photo-crop"
                     options={{
                       animation: "slide_from_bottom",
