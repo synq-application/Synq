@@ -16,6 +16,8 @@ type Props = {
   gradientHeight?: number;
   /** Shorter fade when the tab uses an in-flow title (Friends, Synq active). */
   variant?: "icons" | "title";
+  /** Parent already applied top safe-area padding (embedded friend profile). */
+  embedded?: boolean;
 };
 
 /**
@@ -25,19 +27,26 @@ export default function ProfileTabHeaderOverlay({
   children,
   gradientHeight,
   variant = "icons",
+  embedded = false,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const layout = getTabHeaderLayout(insets.top);
+  const layout = getTabHeaderLayout(embedded ? 0 : insets.top);
   const height =
     gradientHeight ??
-    (variant === "title" ? layout.titleGradientHeight : layout.gradientHeight);
+    (embedded
+      ? 56
+      : variant === "title"
+        ? layout.titleGradientHeight
+        : layout.gradientHeight);
 
   return (
     <>
-      <View
-        pointerEvents="none"
-        style={[styles.solidBar, { height: insets.top }]}
-      />
+      {!embedded ? (
+        <View
+          pointerEvents="none"
+          style={[styles.solidBar, { height: insets.top }]}
+        />
+      ) : null}
       <LinearGradient
         pointerEvents="none"
         colors={[...PROFILE_HEADER_FADE_GRADIENT]}
@@ -47,7 +56,10 @@ export default function ProfileTabHeaderOverlay({
         style={[styles.gradient, { height }]}
       />
       {children ? (
-        <View style={[styles.iconRow, { top: layout.top }]} pointerEvents="box-none">
+        <View
+          style={[styles.iconRow, { top: embedded ? 4 : layout.top }]}
+          pointerEvents="box-none"
+        >
           {children}
         </View>
       ) : null}
@@ -55,9 +67,14 @@ export default function ProfileTabHeaderOverlay({
   );
 }
 
-export function useTabHeaderLayout() {
+export function useTabHeaderLayout(opts?: { embedded?: boolean }) {
   const insets = useSafeAreaInsets();
-  return getTabHeaderLayout(insets.top);
+  const embedded = opts?.embedded ?? false;
+  const layout = getTabHeaderLayout(embedded ? 0 : insets.top);
+  return {
+    ...layout,
+    contentPaddingTop: embedded ? 52 : layout.contentPaddingTop,
+  };
 }
 
 const styles = StyleSheet.create({

@@ -11,6 +11,7 @@ import {
   synqOutlineAddBtnDisabled,
   synqOutlineAddBtnText,
   synqOutlineAddBtnTextDisabled,
+  profileScreenSectionTitle,
   TEXT,
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
@@ -47,11 +48,13 @@ import {
   View,
 } from "react-native";
 import {
-  SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { MESSAGES_STACK_DURATION_MS } from "@/src/components/synq/MessagesModalStack";
 import BackButton from "@/src/components/BackButton";
+import ProfileTabHeaderOverlay, {
+  useTabHeaderLayout,
+} from "@/src/components/ProfileTabHeaderOverlay";
 import { Ionicons } from "@expo/vector-icons";
 import {
   eventKey,
@@ -124,7 +127,7 @@ function ProfileShell({
       </View>
     );
   }
-  return <SafeAreaView style={styles.safeArea}>{children}</SafeAreaView>;
+  return <View style={styles.safeArea}>{children}</View>;
 }
 
 export default function FriendProfile({
@@ -159,6 +162,9 @@ export default function FriendProfile({
   const isEmbedded = Boolean(embeddedFriendId);
   const isOwnProfile = Boolean(viewerId && friendKey && viewerId === friendKey);
   const scrollRef = useRef<ScrollView>(null);
+  const headerLayout = useTabHeaderLayout({ embedded: isEmbedded });
+  const profileScrollTopInset =
+    headerLayout.contentPaddingTop - (isEmbedded ? 12 : 30);
 
   useLayoutEffect(() => {
     if (!isOwnProfile || isEmbedded) return;
@@ -169,6 +175,25 @@ export default function FriendProfile({
     if (isEmbedded) return;
     requestDismissNavigationOverlays();
   }, [isEmbedded, friendKey]);
+
+  const renderStickyNav = (showOptions = true) => (
+    <ProfileTabHeaderOverlay embedded={isEmbedded}>
+      <BackButton onPress={handleBack} />
+      {showOptions ? (
+        <TouchableOpacity
+          style={styles.optionsBtn}
+          onPress={() => setShowOptionsSheet(true)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+        >
+          <Ionicons name="ellipsis-horizontal" size={22} color={TEXT} />
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.optionsBtnPlaceholder} />
+      )}
+    </ProfileTabHeaderOverlay>
+  );
 
   const resetEmbeddedScroll = useCallback(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
@@ -618,8 +643,11 @@ export default function FriendProfile({
   if (loading) {
     return (
       <ProfileShell embedded={isEmbedded}>
-        <View style={styles.center}>
-          <ActivityIndicator color={ACCENT} />
+        <View style={styles.screen}>
+          {renderStickyNav(false)}
+          <View style={[styles.center, { paddingTop: headerLayout.contentPaddingTop }]}>
+            <ActivityIndicator color={ACCENT} />
+          </View>
         </View>
       </ProfileShell>
     );
@@ -628,9 +656,11 @@ export default function FriendProfile({
   if (!friend) {
     return (
       <ProfileShell embedded={isEmbedded}>
-        <View style={styles.center}>
-          <BackButton onPress={handleBack} />
-          <Text style={styles.emptyProfileText}>Could not load this profile.</Text>
+        <View style={styles.screen}>
+          {renderStickyNav(false)}
+          <View style={[styles.center, { paddingTop: headerLayout.contentPaddingTop }]}>
+            <Text style={styles.emptyProfileText}>Could not load this profile.</Text>
+          </View>
         </View>
       </ProfileShell>
     );
@@ -798,18 +828,52 @@ export default function FriendProfile({
                   : [e?.joinedFromName].filter(Boolean);
                 const idsChanged = mergedIds.join("|") !== existingIds.join("|");
                 const namesChanged = otherNames.join("|") !== prevNames.join("|");
-                const nextHost = e.planHostUid || planHostUid || undefined;
+                const resolvedHost = String(planHostUid || "").trim();
+                const attendeeIsResolvedHost =
+                  !!resolvedHost && String(attendeeId) === resolvedHost;
+                const nextHost = attendeeIsResolvedHost
+                  ? e.planHostUid || planHostUid || undefined
+                  : resolvedHost || e.planHostUid || planHostUid || undefined;
                 const hostChanged = String(nextHost || "") !== String(e?.planHostUid || "");
-                if (!idsChanged && !namesChanged && !hostChanged) return e;
+                const hostUidForDoc = String(nextHost || planHostUid || "").trim();
+                const orderedIds =
+                  isHostDoc && hostUidForDoc
+                    ? [hostUidForDoc, ...mergedIds.filter((id) => id !== hostUidForDoc)]
+                    : mergedIds;
+                const nextJoinedFromId =
+                  isHostDoc && hostUidForDoc ? hostUidForDoc : orderedIds[0] || "";
+                const hadWrongJoinAnchor =
+                  isHostDoc &&
+                  !!String(e?.joinedFromFriendUid || "").trim() &&
+                  String(e.joinedFromFriendUid).trim() !== hostUidForDoc;
+                if (
+                  !idsChanged &&
+                  !namesChanged &&
+                  !hostChanged &&
+                  !hadWrongJoinAnchor &&
+                  orderedIds.join("|") === mergedIds.join("|") &&
+                  String(e?.joinedFromId || "") === nextJoinedFromId
+                ) {
+                  return e;
+                }
                 changed = true;
-                return {
+                const updated = {
                   ...e,
                   planHostUid: nextHost,
-                  joinedFromIds: mergedIds,
-                  joinedFromId: mergedIds[0] || "",
+                  joinedFromIds: orderedIds,
+                  joinedFromId: nextJoinedFromId,
                   joinedFromNames: otherNames,
                   joinedFromName: otherNames.join(", "),
                 };
+                if (isHostDoc) {
+                  delete updated.joinedFromFriendUid;
+                } else if (
+                  resolvedHost &&
+                  String(updated.joinedFromFriendUid || "").trim() === String(attendeeId)
+                ) {
+                  updated.joinedFromFriendUid = resolvedHost;
+                }
+                return updated;
               });
               if (changed) {
                 await updateDoc(attendeeRef, { events: nextAttendeeEvents });
@@ -1031,26 +1095,18 @@ export default function FriendProfile({
 
   return (
     <ProfileShell embedded={isEmbedded}>
+      <View style={styles.screen}>
       <ScrollView
         ref={scrollRef}
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: profileScrollTopInset },
+        ]}
         showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior={isEmbedded ? "never" : "automatic"}
+        contentInsetAdjustmentBehavior="never"
         onLayout={isEmbedded ? resetEmbeddedScroll : undefined}
       >
-        <View style={styles.topBar}>
-          <BackButton onPress={handleBack} />
-          <TouchableOpacity
-            style={styles.optionsBtn}
-            onPress={() => setShowOptionsSheet(true)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="More options"
-          >
-            <Ionicons name="ellipsis-horizontal" size={22} color={TEXT} />
-          </TouchableOpacity>
-        </View>
         <View style={styles.friendCard}>
           <View style={[styles.header, showNudgeCard && styles.headerWithNudge]}>
             <TouchableOpacity
@@ -1125,8 +1181,7 @@ export default function FriendProfile({
         ) : null}
 
         {mutualFriends.length > 0 && (
-          <>
-          <View style={[styles.section, styles.sectionAfterAction]}>
+          <View style={[styles.profileSection, styles.profileSectionLead]}>
             <Text style={styles.profileSectionLabel}>Mutual friends</Text>
 
             <ScrollView
@@ -1186,14 +1241,14 @@ export default function FriendProfile({
               })}
             </ScrollView>
           </View>
-          <View style={styles.profileSeparator} />
-          </>
         )}
+
+        {mutualFriends.length > 0 ? <View style={styles.profileSectionDivider} /> : null}
 
         <View
           style={[
-            styles.section,
-            mutualFriends.length === 0 && styles.sectionAfterAction,
+            styles.profileSection,
+            mutualFriends.length === 0 && styles.profileSectionLead,
           ]}
         >
           <Text style={styles.profileSectionLabel}>Interests</Text>
@@ -1214,24 +1269,24 @@ export default function FriendProfile({
 
         {showFriendOpenPlansSection ? (
           <>
-          <View style={styles.profileSeparator} />
-          <View style={styles.section}>
-            <Text style={styles.profileSectionLabel}>
-              {`${friend.displayName?.trim().split(/\s+/)[0] || "Friend"}'s plans`}
-            </Text>
+            <View style={styles.profileSectionDivider} />
+            <View style={styles.profileSection}>
+              <Text style={styles.profileSectionLabel}>
+                {`${friend.displayName?.trim().split(/\s+/)[0] || "Friend"}'s plans`}
+              </Text>
 
-            <MonthlyMemoReadOnly
-              events={friend.events || []}
-              ACCENT={ACCENT}
-              fonts={fonts}
-              viewerUid={viewerId}
-              profileSubjectUid={friendKey}
-              onPressPlan={handlePlanPress}
-              isPlanJoined={planLooksJoined}
-              isViewerHostOfPlan={isViewerHostOfFriendsPlan}
-              hostDisplayNameByUid={hostDisplayNameByUid}
-            />
-          </View>
+              <MonthlyMemoReadOnly
+                events={friend.events || []}
+                ACCENT={ACCENT}
+                fonts={fonts}
+                viewerUid={viewerId}
+                profileSubjectUid={friendKey}
+                onPressPlan={handlePlanPress}
+                isPlanJoined={planLooksJoined}
+                isViewerHostOfPlan={isViewerHostOfFriendsPlan}
+                hostDisplayNameByUid={hostDisplayNameByUid}
+              />
+            </View>
           </>
         ) : null}
 
@@ -1250,6 +1305,7 @@ export default function FriendProfile({
           </View>
         ) : null}
       </ScrollView>
+      {renderStickyNav()}
       <Modal visible={showOptionsSheet} transparent animationType="fade">
         <View style={styles.optionsOverlay}>
           <Pressable
@@ -1468,6 +1524,7 @@ export default function FriendProfile({
           />
         </Pressable>
       </Modal>
+      </View>
     </ProfileShell>
   );
 }
@@ -1477,8 +1534,12 @@ const PROFILE_SURFACE_RAISED = "#0E1012";
 const PROFILE_BORDER = "rgba(255,255,255,0.035)";
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BG },
-  container: { flex: 1, paddingHorizontal: 20 },
-  scrollContent: { paddingBottom: 36 },
+  screen: { flex: 1, backgroundColor: BG, position: "relative" },
+  scrollView: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+  },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyProfileText: {
     color: MUTED2,
@@ -1489,14 +1550,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
 
-  topBar: {
-    marginTop: 4,
-    marginBottom: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
 
+  optionsBtnPlaceholder: {
+    width: 38,
+    height: 38,
+  },
   optionsBtn: {
     width: 38,
     height: 38,
@@ -1509,8 +1567,8 @@ const styles = StyleSheet.create({
   },
 
   friendCard: {
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 0,
+    marginBottom: 0,
     backgroundColor: PROFILE_SURFACE,
     borderRadius: RADIUS_MD,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1519,9 +1577,9 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    paddingTop: 20,
+    paddingTop: 8,
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingBottom: 14,
   },
   headerWithNudge: {
     paddingBottom: 14,
@@ -1633,13 +1691,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  section: {
-    marginTop: 0,
-    paddingTop: 0,
+  profileSection: {},
+
+  profileSectionLead: {
+    marginTop: 12,
   },
 
-  sectionAfterAction: {
-    marginTop: 20,
+  profileSectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginVertical: 20,
   },
 
   profileActionWrap: {
@@ -1649,21 +1710,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  profileSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    marginVertical: 22,
-  },
-
-  profileSectionLabel: {
-    color: TEXT,
-    fontSize: 18,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.05,
-    lineHeight: 24,
-    marginBottom: 12,
-    includeFontPadding: false,
-  },
+  profileSectionLabel: profileScreenSectionTitle,
 
   blockedHint: {
     color: MUTED2,

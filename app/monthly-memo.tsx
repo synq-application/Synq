@@ -5,8 +5,11 @@ import {
   BUTTON_RADIUS,
   fonts,
   MODAL_RADIUS,
+  MUTED2,
+  MUTED3,
   PRIMARY_CTA_WIDTH,
   profileScreenSectionTitle,
+  RADIUS_LG,
   TEXT,
 } from "@/constants/Variables";
 import PlanDateCalendar from "@/src/components/PlanDateCalendar";
@@ -236,6 +239,7 @@ export default function OpenPlans({
   };
 
   const openEditModal = (event: EventItem) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (inviteAlertTimerRef.current) {
       clearTimeout(inviteAlertTimerRef.current);
       inviteAlertTimerRef.current = null;
@@ -509,87 +513,113 @@ export default function OpenPlans({
       {sortOpenPlansByDateTime(visibleEvents).map((p, index, arr) => {
           const isLast = index === arr.length - 1;
           const d = parseDate(p.date);
-          const isJoinedPlan =
-            !!p.joinedFromId ||
-            !!p.joinedFromName ||
-            (Array.isArray(p.joinedFromNames) && p.joinedFromNames.length > 0);
+          const isOwnPlan = canEditOpenPlan(p, viewerUid);
           const { primary: hostLine, secondary: othersLine, goingPeople } =
             planAttributionLines(p);
-          const hasInterestLines =
-            isJoinedPlan && !!(hostLine || othersLine);
           const isHighlighted =
             !!highlightEventId && String(p.id) === String(highlightEventId);
-          const canEdit = canEditOpenPlan(p, viewerUid);
+
           return (
             <View
               key={p.id}
               style={[
                 styles.card,
-                isJoinedPlan && styles.joinedCard,
-                isHighlighted && { borderColor: ACCENT, borderWidth: 2 },
+                isOwnPlan ? styles.ownPlanCard : styles.joinedPlanCard,
+                isHighlighted && styles.cardHighlighted,
                 isLast && { marginBottom: 0 },
               ]}
+              accessibilityLabel={
+                isOwnPlan
+                  ? `Your plan, ${p.title}`
+                  : `${hostLine || "Joined plan"}, ${p.title}`
+              }
             >
-            <View style={styles.dateBlock}>
-              <Text style={styles.day}>
-                {d
-                  .toLocaleDateString("en-US", { weekday: "short" })
-                  .toUpperCase()}
-              </Text>
-              <View style={styles.dateNumberWrap}>
-                <Text style={styles.date}>{d.getDate()}</Text>
-              </View>
-              <Text style={styles.month}>
-                {d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()}
-              </Text>
-            </View>
-              <View
-                style={[
-                  styles.planBody,
-                  hasInterestLines && styles.planBodyWithInterest,
-                ]}
-              >
-                <TouchableOpacity
-                  activeOpacity={canEdit ? 0.75 : 1}
-                  disabled={!canEdit}
-                  onPress={() => {
-                    if (canEdit) openEditModal(p);
-                  }}
-                  onLongPress={() => handleDelete(p)}
-                  delayLongPress={400}
-                >
-                  <Text style={styles.title}>{p.title}</Text>
-                  <Text style={styles.meta}>
-                    {p.time}
-                    {p.location ? ` · ${p.location}` : ""}
+              <View style={styles.cardMain}>
+                <View style={styles.dateBlock}>
+                  <Text style={styles.dateWeekday}>
+                    {d
+                      .toLocaleDateString("en-US", { weekday: "short" })
+                      .toUpperCase()}
                   </Text>
-                  {hostLine ? (
-                    <Text style={styles.hostPlanLine}>{hostLine}</Text>
-                  ) : null}
-                </TouchableOpacity>
-                {othersLine && goingPeople.length > 0 ? (
-                  <Pressable
-                    onPress={() =>
-                      setGoingPeopleSheet({
-                        planTitle: p.title,
-                        people: goingPeople,
-                      })
-                    }
-                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="See everyone going to this plan"
-                  >
-                    <Text
-                      style={[
-                        styles.joinedMeta,
-                        styles.joinedMetaTappable,
-                        { color: ACCENT, marginTop: hostLine ? 4 : 6 },
-                      ]}
-                    >
-                      {othersLine}
+                  <Text style={styles.dateNumber}>{d.getDate()}</Text>
+                  <Text style={styles.dateMonth}>
+                    {d
+                      .toLocaleDateString("en-US", { month: "short" })
+                      .toUpperCase()}
+                  </Text>
+                </View>
+
+                <View style={styles.planBody}>
+                  <Text style={styles.title} numberOfLines={2}>
+                    {p.title}
+                  </Text>
+                  {(p.time || p.location) ? (
+                    <Text style={styles.meta} numberOfLines={1}>
+                      {[p.time, p.location].filter(Boolean).join(" · ")}
                     </Text>
+                  ) : null}
+                  {!isOwnPlan && hostLine ? (
+                    <Text style={styles.hostLine} numberOfLines={1}>
+                      {hostLine}
+                    </Text>
+                  ) : null}
+                  {othersLine && goingPeople.length > 0 ? (
+                    <Pressable
+                      onPress={() =>
+                        setGoingPeopleSheet({
+                          planTitle: p.title,
+                          people: goingPeople,
+                        })
+                      }
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="See everyone going to this plan"
+                      style={styles.goingPressable}
+                    >
+                      <Text
+                        style={[
+                          styles.goingText,
+                          isOwnPlan && { color: "rgba(0,255,133,0.72)" },
+                        ]}
+                      >
+                        {othersLine}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+
+              <View style={styles.cardFooter}>
+                {isOwnPlan ? (
+                  <>
+                    <Pressable
+                      style={styles.footerAction}
+                      onPress={() => openEditModal(p)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit ${p.title}`}
+                    >
+                      <Text style={styles.footerEditText}>Edit</Text>
+                    </Pressable>
+                    <View style={styles.footerDivider} />
+                    <Pressable
+                      style={styles.footerAction}
+                      onPress={() => handleDelete(p)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${p.title}`}
+                    >
+                      <Text style={styles.footerDeleteText}>Delete</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <Pressable
+                    style={styles.footerActionFull}
+                    onPress={() => handleDelete(p)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove ${p.title} from your plans`}
+                  >
+                    <Text style={styles.footerRemoveText}>Remove from plans</Text>
                   </Pressable>
-                ) : null}
+                )}
               </View>
             </View>
           );
@@ -877,7 +907,7 @@ export default function OpenPlans({
           viewerUid &&
           pendingDeleteEvent.planHostUid !== viewerUid
             ? "This removes it from your open plans and updates this for your friend."
-            : "Are you sure?"
+            : "This deletes the plan for you and anyone who joined."
         }
         confirmText={
           pendingDeleteEvent?.planHostUid &&
@@ -949,76 +979,146 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
   },
   card: {
-    alignSelf: "flex-start",
-    width: "86%",
+    alignSelf: "stretch",
+    width: "100%",
     maxWidth: 340,
-    backgroundColor: "#0d0d0d",
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: RADIUS_LG,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: BORDER,
-    paddingVertical: 10,
-    paddingLeft: 10,
-    paddingRight: 12,
-    marginBottom: 6,
+    backgroundColor: "#0d0d0d",
+    marginBottom: 12,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 14,
+      },
+      android: { elevation: 4 },
+    }),
+  },
+  ownPlanCard: {
+    borderColor: "rgba(0,255,133,0.16)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  joinedPlanCard: {
+    borderColor: BORDER,
+    backgroundColor: "#0c0c0c",
+  },
+  cardHighlighted: {
+    borderColor: "rgba(0,255,133,0.45)",
+    borderWidth: 1,
+  },
+  cardMain: {
     flexDirection: "row",
     alignItems: "stretch",
+    paddingTop: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  dateBlock: {
+    width: 44,
+    alignItems: "center",
+    marginRight: 14,
+    paddingTop: 2,
+  },
+  dateWeekday: {
+    color: MUTED3,
+    fontSize: 10,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.6,
+  },
+  dateNumber: {
+    color: TEXT,
+    fontSize: 22,
+    fontFamily: fonts.heavy,
+    lineHeight: 26,
+    letterSpacing: -0.5,
+    marginTop: 2,
+  },
+  dateMonth: {
+    color: MUTED3,
+    fontSize: 10,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.5,
+    marginTop: 2,
   },
   planBody: {
     flex: 1,
-    alignSelf: "stretch",
+    minWidth: 0,
     justifyContent: "center",
   },
-  planBodyWithInterest: {
-    justifyContent: "flex-start",
-  },
-  joinedCard: {
-    borderColor: "rgba(43,255,136,0.35)",
-    backgroundColor: "rgba(43,255,136,0.07)",
-  },
-  dateBlock: {
-    width: 52,
-    marginRight: 12,
-    alignSelf: "stretch",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "flex-start",
-  },
-  dateNumberWrap: {
-    flex: 1,
-    width: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: 0,
-  },
-  day: {
-    color: "#888",
-    fontSize: 11,
+  title: {
+    color: TEXT,
+    fontSize: 16,
     fontFamily: fonts.heavy,
-    letterSpacing: 0.3,
-    width: "100%",
-    textAlign: "center",
+    lineHeight: 21,
+    letterSpacing: 0.1,
   },
-  date: {
-    color: "white",
-    fontSize: 19,
-    fontFamily: fonts.heavy,
-    lineHeight: 23,
-    letterSpacing: -0.5,
-    textAlign: "center",
-    width: "100%",
+  meta: {
+    color: MUTED2,
+    marginTop: 4,
+    fontSize: 13,
+    fontFamily: fonts.book,
+    lineHeight: 18,
   },
-  title: { color: "white", fontSize: 15 },
-  meta: { color: "#777", marginTop: 3, fontSize: 13 },
-  joinedMeta: { marginTop: 6, fontSize: 12.5, fontFamily: fonts.medium },
-  joinedMetaTappable: {
-    textDecorationLine: "underline",
-    textDecorationColor: "rgba(43,255,136,0.45)",
-  },
-  hostPlanLine: {
-    color: "rgba(255,255,255,0.45)",
+  hostLine: {
+    color: MUTED3,
+    marginTop: 6,
     fontSize: 12,
-    marginTop: 5,
     fontFamily: fonts.medium,
+    letterSpacing: 0.1,
+  },
+  goingPressable: {
+    alignSelf: "flex-start",
+    marginTop: 8,
+  },
+  goingText: {
+    color: MUTED2,
+    fontSize: 12,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.05,
+  },
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BORDER,
+  },
+  footerAction: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 11,
+  },
+  footerActionFull: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 11,
+  },
+  footerDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: BORDER,
+  },
+  footerEditText: {
+    color: MUTED2,
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.15,
+  },
+  footerDeleteText: {
+    color: "rgba(255,255,255,0.32)",
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.15,
+  },
+  footerRemoveText: {
+    color: MUTED3,
+    fontSize: 13,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.1,
   },
   addBtnRow: {
     width: "100%",
