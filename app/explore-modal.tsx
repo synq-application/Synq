@@ -1,34 +1,65 @@
 import { formatVenueAddressDisplay } from "@/src/lib/helpers";
 import {
     ACCENT,
+    BG,
+    BORDER,
     BUTTON_RADIUS,
+    MODAL_RADIUS,
+    MUTED2,
+    MUTED3,
+    ON_ACCENT_TEXT,
     PRIMARY_CTA_HEIGHT,
     PRIMARY_CTA_WIDTH,
+    RADIUS_LG,
+    TEXT,
+    TYPE_TITLE,
+    cardMetaText,
+    cardTitleText,
     fonts,
+    listRowTitleText,
 } from "@/constants/Variables";
 import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
-import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
 import {
+    GROUP_BORDER,
+    GROUP_ROW_INSET,
+    GROUP_SURFACE,
+} from "@/src/components/friends/groupsListStyles";
+import { vibeCategoryImageUrl } from "@/src/data/vibeCategoryImages";
+import { Ionicons } from "@expo/vector-icons";
+import { Image as ExpoImage } from "expo-image";
+import React from "react";
+import {
+    ActivityIndicator,
     FlatList,
     Keyboard,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    TouchableWithoutFeedback,
     View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const CATEGORY_EMOJI: Record<string, string> = {
-    Drinks: "🍸",
-    Dinner: "🍽️",
-    "Coffee Spots": "☕",
-    Outdoors: "🌳",
-    "Surprise Me": "✨",
-};
+const VIBES = [
+    { label: "Drinks", display: "Drinks" },
+    { label: "Dinner", display: "Dinner" },
+    { label: "Coffee Spots", display: "Coffee" },
+    { label: "Outdoors", display: "Outdoors" },
+    { label: "Surprise Me", display: "Surprise me", featured: true },
+];
+
+const HERO_VIBES = VIBES.filter((v) => !v.featured);
+const SURPRISE_VIBE = VIBES.find((v) => v.featured);
+
+function vibeDisplayLabel(label: string): string {
+    return VIBES.find((v) => v.label === label)?.display ?? label;
+}
+
+const CONTENT_PAD_X = 20;
+const NAV_SIDE = 44;
+const VIBE_THUMB_SIZE = 44;
 
 type Props = {
     visible: boolean;
@@ -45,6 +76,50 @@ type Props = {
     errorMessage?: string | null;
 };
 
+function SheetHeader({
+    title,
+    onClose,
+    onBack,
+    compact,
+    hint,
+}: {
+    title: string;
+    onClose?: () => void;
+    onBack?: () => void;
+    compact?: boolean;
+    hint?: string;
+}) {
+    const showClose = !onBack && !!onClose;
+
+    return (
+        <View
+            style={[
+                styles.sheetHeader,
+                compact && styles.sheetHeaderCompact,
+                hint ? styles.sheetHeaderWithHint : null,
+            ]}
+        >
+            <View style={[styles.headerRow, showClose && styles.headerRowWithClose]}>
+                {onBack ? (
+                    <BackButton onPress={onBack} style={[styles.navIconBtn, styles.navIconBtnLeading]} />
+                ) : null}
+                <View style={styles.headerTitleWrap}>
+                    <Text
+                        style={styles.headerTitle}
+                        numberOfLines={showClose || onBack ? 1 : 2}
+                    >
+                        {title}
+                    </Text>
+                </View>
+                {showClose ? (
+                    <CloseButton onPress={onClose} style={[styles.navIconBtn, styles.navIconBtnTrailing]} />
+                ) : null}
+            </View>
+            {hint ? <Text style={styles.sheetHint}>{hint}</Text> : null}
+        </View>
+    );
+}
+
 export default function ExploreModal({
     visible,
     onClose,
@@ -59,228 +134,491 @@ export default function ExploreModal({
     currentCategory,
     errorMessage,
 }: Props) {
-    const [pressed, setPressed] = useState<string | null>(null);
     const insets = useSafeAreaInsets();
-    const categoryEmoji = CATEGORY_EMOJI[currentCategory] || "✨";
+    const categoryImageUrl = vibeCategoryImageUrl(currentCategory);
 
     if (!visible) return null;
 
-    const vibes = [
-        {
-            label: "Drinks",
-            desc: "Bars, cocktails & happy hour",
-            emoji: "🍸",
-        },
-        {
-            label: "Dinner",
-            desc: "Restaurants worth the trip",
-            emoji: "🍽️",
-        },
-        {
-            label: "Coffee Spots",
-            desc: "Cafes, pastries & slow mornings",
-            emoji: "☕",
-        },
-        {
-            label: "Outdoors",
-            desc: "Parks, trails & fresh air",
-            emoji: "🌳",
-        },
-        {
-            label: "Surprise Me",
-            desc: "We'll pick something for you",
-            emoji: "✨",
-            special: true,
-        },
-    ];
+    const dismissOverlay = () => {
+        if (isAILoading) return;
+        onClose();
+    };
+
+    const handleSelectVibe = (label: string) => {
+        Keyboard.dismiss();
+        onSelectVibe(label);
+    };
+
+    const renderVibeListRow = (item: (typeof VIBES)[number], showDivider: boolean) => (
+        <React.Fragment key={item.label}>
+            <TouchableOpacity
+                activeOpacity={0.85}
+                disabled={isAILoading}
+                onPress={() => handleSelectVibe(item.label)}
+                style={styles.vibeListRow}
+            >
+                <View style={styles.vibeListThumb}>
+                    <ExpoImage
+                        source={{ uri: vibeCategoryImageUrl(item.label) }}
+                        style={styles.vibeListThumbImage}
+                        contentFit="cover"
+                        transition={120}
+                    />
+                </View>
+                <Text style={styles.vibeListLabel} numberOfLines={1}>
+                    {item.display}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color={MUTED3} />
+            </TouchableOpacity>
+            {showDivider ? <View style={styles.vibeListDivider} /> : null}
+        </React.Fragment>
+    );
 
     return (
-        <View style={[StyleSheet.absoluteFill, styles.overlay]}>
-            <TouchableWithoutFeedback
-                onPress={() => {
-                    if (isAILoading) return;
-                    onClose();
-                }}
-            >
-                <View style={{ flex: 1, justifyContent: "flex-end" }}>
-                    <TouchableWithoutFeedback>
-                        <View style={styles.panel}>
-                            {errorMessage ? (
-                                <View style={styles.errorBanner}>
-                                    <Ionicons name="alert-circle" size={20} color="#FF8A84" />
-                                    <Text style={styles.errorBannerText}>{errorMessage}</Text>
-                                    {!isAILoading && !showOptionsList ? (
-                                        <Text style={styles.errorHintText}>
-                                            Pick a vibe below to try again.
+        <View style={styles.overlay}>
+            <Pressable style={styles.backdrop} onPress={dismissOverlay} accessibilityLabel="Close" />
+
+            <View style={[styles.panel, { paddingBottom: insets.bottom }]}>
+                {errorMessage ? (
+                    <View style={styles.errorBanner}>
+                        <Ionicons name="alert-circle" size={20} color="#FF8A84" />
+                        <Text style={styles.errorBannerText}>{errorMessage}</Text>
+                        {!isAILoading && !showOptionsList ? (
+                            <Text style={styles.errorHintText}>
+                                Pick a vibe below to try again.
+                            </Text>
+                        ) : null}
+                    </View>
+                ) : null}
+
+                {!showOptionsList ? (
+                    <View style={styles.pickerView}>
+                        <SheetHeader title="Choose your vibe" onClose={onClose} />
+
+                        <ScrollView
+                            style={styles.pickerScroll}
+                            contentContainerStyle={[
+                                styles.pickerScrollContent,
+                                { paddingBottom: 24 },
+                            ]}
+                            showsVerticalScrollIndicator={false}
+                            showsHorizontalScrollIndicator={false}
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            <View style={[styles.vibePickerBlock, isAILoading && styles.vibeListLoading]}>
+                                <View style={styles.vibeListSurface}>
+                                    {HERO_VIBES.map((item, index) =>
+                                        renderVibeListRow(item, index < HERO_VIBES.length - 1)
+                                    )}
+                                </View>
+
+                                {SURPRISE_VIBE ? (
+                                    <TouchableOpacity
+                                        activeOpacity={0.92}
+                                        disabled={isAILoading}
+                                        onPress={() => handleSelectVibe(SURPRISE_VIBE.label)}
+                                        style={styles.surprisePill}
+                                    >
+                                        <Ionicons name="sparkles" size={17} color={ACCENT} />
+                                        <Text style={styles.surprisePillText}>
+                                            {SURPRISE_VIBE.display}
                                         </Text>
-                                    ) : null}
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+
+                            {isAILoading ? (
+                                <View style={styles.loadingRow}>
+                                    <ActivityIndicator size="small" color={ACCENT} />
+                                    <Text style={styles.loadingText}>Finding spots…</Text>
                                 </View>
                             ) : null}
-
-                            {!showOptionsList ? (
-                                <>
-                                    <View style={styles.header}>
-                                        <Text style={styles.title}>What’s the vibe?</Text>
-                                        <CloseButton onPress={onClose} />
-                                    </View>
-
-                                    <Text style={styles.subtitle}>
-                                        Pick the energy you’re feeling
-                                    </Text>
-
-                                    <ScrollView contentContainerStyle={{ padding: 20 }}>
-
-                                        {vibes.map((item) => {
-                                            const isPressed = pressed === item.label;
-                                            const vibeDisabled = isAILoading;
-
-                                            return (
-                                                <TouchableOpacity
-                                                    key={item.label}
-                                                    activeOpacity={0.9}
-                                                    disabled={vibeDisabled}
-                                                    onPressIn={() => setPressed(item.label)}
-                                                    onPressOut={() => setPressed(null)}
-                                                    onPress={() => {
-                                                        Keyboard.dismiss();
-                                                        onSelectVibe(item.label);
-                                                    }}
-                                                    style={[
-                                                        styles.vibeCard,
-                                                        isPressed && styles.vibeCardPressed,
-                                                        item.special && styles.specialCard,
-                                                        vibeDisabled && styles.vibeCardDisabled,
-                                                    ]}
-                                                >
-                                                    <Text style={styles.vibeEmoji}>{item.emoji}</Text>
-
-                                                    <View style={styles.vibeTextWrap}>
-                                                        <Text style={styles.vibeTitle}>
-                                                            {item.label}
-                                                        </Text>
-                                                        <Text style={styles.vibeDesc}>
-                                                            {item.desc}
-                                                        </Text>
-                                                    </View>
-
-                                                    <Ionicons
-                                                        name="chevron-forward"
-                                                        size={18}
-                                                        color="#555"
-                                                    />
-                                                </TouchableOpacity>
-                                            );
-                                        })}
-
-                                    </ScrollView>
-                                </>
-                            ) : (
-                                <View style={styles.optionsView}>
-                                    <View style={styles.header}>
-                                        <BackButton onPress={onBack} style={styles.backButton} />
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.title} numberOfLines={1}>
-                                                {currentCategory}
-                                            </Text>
-                                        </View>
-                                        <CloseButton onPress={onClose} />
-                                    </View>
-
-                                    {aiOptions.length === 0 ? (
-                                        <View style={styles.emptyOptions}>
-                                            <Text style={styles.emptyOptionsText}>
-                                                No spots found for this vibe. Try another.
-                                            </Text>
-                                        </View>
-                                    ) : (
-                                        <FlatList
-                                            style={styles.optionsList}
-                                            data={aiOptions}
-                                            keyExtractor={(item, index) =>
-                                                `${item.name}-${item.address || item.location || index}`
-                                            }
-                                            contentContainerStyle={{ padding: 20, paddingBottom: 8 }}
-                                            renderItem={({ item }) => {
-                                                const isSelected =
-                                                    selectedOption?.name === item.name;
-
-                                                return (
-                                                    <TouchableOpacity
-                                                        style={[
-                                                            styles.venueCard,
-                                                            isSelected && styles.selectedCard,
-                                                        ]}
-                                                        onPress={() =>
-                                                            setSelectedOption(
-                                                                isSelected ? null : item
-                                                            )
-                                                        }
-                                                    >
-                                                        <Text style={styles.vibeEmoji}>
-                                                            {categoryEmoji}
-                                                        </Text>
-
-                                                        <View style={styles.vibeTextWrap}>
-                                                            <Text style={styles.venueName}>
-                                                                {item.name}
-                                                            </Text>
-                                                            <Text
-                                                                style={styles.venueDesc}
-                                                                numberOfLines={2}
-                                                            >
-                                                                {formatVenueAddressDisplay(
-                                                                    item.address || item.location || ""
-                                                                )}
-                                                            </Text>
-                                                        </View>
-
-                                                        {isSelected ? (
-                                                            <Ionicons
-                                                                name="checkmark-circle"
-                                                                size={24}
-                                                                color={ACCENT}
-                                                            />
-                                                        ) : null}
-                                                    </TouchableOpacity>
-                                                );
-                                            }}
-                                        />
-                                    )}
-
-                                    <View style={[styles.sendFooter, { paddingBottom: Math.max(insets.bottom, 16) + 4 }]}>
-                                        <TouchableOpacity
-                                            style={[styles.sendBtn, !selectedOption && { opacity: 0.5 }]}
-                                            disabled={!selectedOption}
-                                            onPress={sendAISuggestionToChat}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text style={styles.sendText}>Send idea</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            )}
+                        </ScrollView>
+                    </View>
+                ) : (
+                    <View style={styles.placesView}>
+                        <View style={styles.placesHeaderBlock}>
+                            <SheetHeader
+                                title={vibeDisplayLabel(currentCategory)}
+                                onBack={onBack}
+                                compact
+                                hint={
+                                    aiOptions.length > 0
+                                        ? "Select a spot and send it to the chat"
+                                        : undefined
+                                }
+                            />
                         </View>
-                    </TouchableWithoutFeedback>
-                </View>
-            </TouchableWithoutFeedback>
+
+                        {aiOptions.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyStateTitle}>No spots found</Text>
+                                <Text style={styles.emptyStateText}>
+                                    Try another vibe or check back later.
+                                </Text>
+                            </View>
+                        ) : (
+                            <FlatList
+                                style={styles.placesList}
+                                data={aiOptions}
+                                keyExtractor={(item, index) =>
+                                    `${item.name}-${item.address || item.location || index}`
+                                }
+                                contentContainerStyle={styles.bodyContent}
+                                showsVerticalScrollIndicator={false}
+                                keyboardShouldPersistTaps="handled"
+                                renderItem={({ item }) => {
+                                    const isSelected = selectedOption?.name === item.name;
+                                    const address = formatVenueAddressDisplay(
+                                        item.address || item.location || ""
+                                    );
+
+                                    return (
+                                        <TouchableOpacity
+                                            activeOpacity={0.85}
+                                            style={[
+                                                styles.placeRow,
+                                                isSelected && styles.placeRowSelected,
+                                            ]}
+                                            onPress={() =>
+                                                setSelectedOption(isSelected ? null : item)
+                                            }
+                                        >
+                                            <View style={styles.placeIconWrap}>
+                                                <ExpoImage
+                                                    source={{
+                                                        uri:
+                                                            typeof item.imageUrl === "string" &&
+                                                            item.imageUrl.startsWith("http")
+                                                                ? item.imageUrl
+                                                                : categoryImageUrl,
+                                                    }}
+                                                    style={styles.placeImage}
+                                                    contentFit="cover"
+                                                    transition={120}
+                                                />
+                                            </View>
+                                            <View style={styles.placeCopy}>
+                                                <Text style={styles.placeName} numberOfLines={2}>
+                                                    {item.name}
+                                                </Text>
+                                                {address ? (
+                                                    <Text style={styles.placeAddress} numberOfLines={2}>
+                                                        {address}
+                                                    </Text>
+                                                ) : null}
+                                            </View>
+                                            <View style={styles.placeCheckSlot}>
+                                                {isSelected ? (
+                                                    <Ionicons
+                                                        name="checkmark-circle"
+                                                        size={22}
+                                                        color={ACCENT}
+                                                    />
+                                                ) : (
+                                                    <View style={styles.placeCheckEmpty} />
+                                                )}
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                }}
+                                ListFooterComponent={<View style={styles.listFooterSpacer} />}
+                            />
+                        )}
+
+                        <View style={[styles.footerDock, { paddingBottom: 12 }]}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.sendBtn,
+                                    !selectedOption && styles.sendBtnDisabled,
+                                ]}
+                                disabled={!selectedOption}
+                                onPress={sendAISuggestionToChat}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={styles.sendText}>Send idea</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     overlay: {
-        backgroundColor: "rgba(0,0,0,0.85)",
+        ...StyleSheet.absoluteFillObject,
         zIndex: 1000,
     },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0,0,0,0.72)",
+    },
     panel: {
-        height: "85%",
-        backgroundColor: "#0A0A0A",
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        top: "14%",
+        backgroundColor: BG,
+        borderTopLeftRadius: MODAL_RADIUS + 8,
+        borderTopRightRadius: MODAL_RADIUS + 8,
+        overflow: "hidden",
+        flexDirection: "column",
+    },
+    pickerView: {
+        flex: 1,
+        backgroundColor: BG,
+    },
+    pickerScroll: {
+        flex: 1,
+        backgroundColor: BG,
+    },
+    pickerScrollContent: {
+        flexGrow: 1,
+        paddingHorizontal: CONTENT_PAD_X,
+    },
+    vibePickerBlock: {
+        gap: 12,
+        paddingTop: 2,
+    },
+    vibeListLoading: {
+        opacity: 0.55,
+    },
+    vibeListSurface: {
+        backgroundColor: GROUP_SURFACE,
+        borderRadius: RADIUS_LG,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: GROUP_BORDER,
+        overflow: "hidden",
+    },
+    vibeListRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 14,
+        paddingVertical: 13,
+        paddingHorizontal: 16,
+        backgroundColor: GROUP_SURFACE,
+    },
+    vibeListThumb: {
+        width: VIBE_THUMB_SIZE,
+        height: VIBE_THUMB_SIZE,
+        borderRadius: VIBE_THUMB_SIZE / 2,
+        overflow: "hidden",
+        backgroundColor: "rgba(255,255,255,0.04)",
+        flexShrink: 0,
+    },
+    vibeListThumbImage: {
+        width: VIBE_THUMB_SIZE,
+        height: VIBE_THUMB_SIZE,
+    },
+    vibeListLabel: {
+        ...listRowTitleText,
+        flex: 1,
+        minWidth: 0,
+    },
+    vibeListDivider: {
+        height: StyleSheet.hairlineWidth,
+        backgroundColor: GROUP_BORDER,
+        marginLeft: GROUP_ROW_INSET,
+    },
+    surprisePill: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        minHeight: 52,
+        borderRadius: RADIUS_LG,
+        backgroundColor: GROUP_SURFACE,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: GROUP_BORDER,
+    },
+    surprisePillText: {
+        color: ACCENT,
+        fontFamily: fonts.medium,
+        fontSize: 16,
+        letterSpacing: 0.04,
+    },
+    loadingRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        marginTop: 24,
+    },
+    loadingText: {
+        color: MUTED2,
+        fontSize: 14,
+        fontFamily: fonts.medium,
+    },
+    sheetHeader: {
+        paddingTop: 26,
+        paddingBottom: 16,
+    },
+    sheetHeaderCompact: {
+        paddingBottom: 0,
+    },
+    sheetHeaderWithHint: {
+        paddingBottom: 12,
+    },
+    sheetHint: {
+        ...cardMetaText,
+        paddingHorizontal: CONTENT_PAD_X,
+        marginTop: 6,
+    },
+    placesHeaderBlock: {
+        paddingBottom: 14,
+    },
+    headerRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: CONTENT_PAD_X,
+        gap: 4,
+    },
+    headerRowWithClose: {
+        minHeight: NAV_SIDE,
+    },
+    navIconBtn: {
+        width: NAV_SIDE,
+        height: NAV_SIDE,
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        alignSelf: "center",
+    },
+    navIconBtnLeading: {
+        marginLeft: -10,
+    },
+    navIconBtnTrailing: {
+        marginRight: -10,
+    },
+    headerTitleWrap: {
+        flex: 1,
+        minHeight: NAV_SIDE,
+        justifyContent: "center",
+        minWidth: 0,
+    },
+    headerTitle: {
+        color: TEXT,
+        fontSize: TYPE_TITLE,
+        lineHeight: 32,
+        fontFamily: fonts.heavy,
+        letterSpacing: 0.15,
+    },
+    bodyContent: {
+        paddingHorizontal: CONTENT_PAD_X,
+        paddingBottom: 24,
+    },
+    placesView: {
+        flex: 1,
+    },
+    placesList: {
+        flex: 1,
+    },
+    placeRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 14,
+        backgroundColor: GROUP_SURFACE,
+        borderRadius: RADIUS_LG,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: GROUP_BORDER,
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+        marginBottom: 10,
+    },
+    placeRowSelected: {
+        borderColor: "rgba(0,255,133,0.45)",
+        backgroundColor: "rgba(0,255,133,0.06)",
+    },
+    placeIconWrap: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: GROUP_BORDER,
+        overflow: "hidden",
+    },
+    placeImage: {
+        width: "100%",
+        height: "100%",
+    },
+    placeCopy: {
+        flex: 1,
+        minWidth: 0,
+        gap: 3,
+    },
+    placeName: {
+        ...cardTitleText,
+        fontSize: 17,
+        lineHeight: 22,
+    },
+    placeAddress: {
+        ...cardMetaText,
+        lineHeight: 18,
+    },
+    placeCheckSlot: {
+        width: 24,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    placeCheckEmpty: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: "rgba(255,255,255,0.12)",
+    },
+    listFooterSpacer: {
+        height: 8,
+    },
+    footerDock: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: BORDER,
+        paddingTop: 14,
+        paddingHorizontal: 20,
+        backgroundColor: BG,
+    },
+    sendBtn: {
+        alignSelf: "center",
+        width: PRIMARY_CTA_WIDTH,
+        height: PRIMARY_CTA_HEIGHT,
+        backgroundColor: ACCENT,
+        borderRadius: BUTTON_RADIUS,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    sendBtnDisabled: {
+        opacity: 0.45,
+    },
+    sendText: {
+        fontSize: 16,
+        color: ON_ACCENT_TEXT,
+        fontFamily: fonts.medium,
+    },
+    emptyState: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 40,
+        paddingBottom: 48,
+    },
+    emptyStateTitle: {
+        color: TEXT,
+        fontSize: 17,
+        fontFamily: fonts.heavy,
+        marginBottom: 8,
+    },
+    emptyStateText: {
+        ...cardMetaText,
+        textAlign: "center",
+        lineHeight: 20,
     },
     errorBanner: {
         marginHorizontal: 20,
-        marginTop: 16,
+        marginTop: 8,
         marginBottom: 4,
         paddingHorizontal: 14,
         paddingVertical: 12,
@@ -303,133 +641,5 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontFamily: fonts.medium,
         textAlign: "center",
-    },
-    optionsView: {
-        flex: 1,
-    },
-    optionsList: {
-        flex: 1,
-    },
-    header: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        padding: 20,
-        alignItems: "center",
-    },
-    backButton: { marginRight: 12 },
-    title: {
-        color: "white",
-        fontSize: 22,
-        fontFamily: "Avenir-Heavy",
-    },
-    subtitle: {
-        color: "#777",
-        fontSize: 14,
-        marginHorizontal: 20,
-        marginTop: -10,
-        marginBottom: 10,
-    },
-
-    vibeCard: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#111",
-        padding: 18,
-        borderRadius: 20,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: "#1A1A1A",
-    },
-
-    vibeCardPressed: {
-        transform: [{ scale: 0.97 }],
-        borderColor: ACCENT,
-    },
-
-    vibeCardDisabled: {
-        opacity: 0.45,
-    },
-
-    specialCard: {
-        borderColor: "#2A2A2A",
-    },
-
-    vibeEmoji: {
-        fontSize: 28,
-        marginRight: 14,
-    },
-
-    vibeTextWrap: {
-        flex: 1,
-        marginRight: 8,
-    },
-
-    vibeTitle: {
-        color: "white",
-        fontSize: 18,
-        fontFamily: "Avenir-Heavy",
-    },
-
-    vibeDesc: {
-        color: "#777",
-        fontSize: 13,
-        marginTop: 4,
-    },
-
-    venueCard: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#111",
-        padding: 18,
-        borderRadius: 20,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: "#1A1A1A",
-    },
-    selectedCard: {
-        borderColor: ACCENT,
-    },
-    venueName: {
-        color: "white",
-        fontSize: 18,
-        fontFamily: "Avenir-Heavy",
-    },
-    venueDesc: {
-        color: "#777",
-        fontSize: 13,
-        marginTop: 4,
-    },
-
-    sendFooter: {
-        paddingHorizontal: 20,
-        paddingTop: 6,
-    },
-    sendBtn: {
-        alignSelf: "center",
-        width: PRIMARY_CTA_WIDTH,
-        height: PRIMARY_CTA_HEIGHT,
-        backgroundColor: ACCENT,
-        borderRadius: BUTTON_RADIUS,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    sendText: {
-        fontSize: 16,
-        color: "black",
-        fontFamily: fonts.medium,
-    },
-
-    emptyOptions: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 32,
-    },
-    emptyOptionsText: {
-        color: "#888",
-        fontSize: 15,
-        fontFamily: fonts.medium,
-        textAlign: "center",
-        lineHeight: 22,
     },
 });

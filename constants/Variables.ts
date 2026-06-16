@@ -130,13 +130,102 @@ export const TYPE_TITLE = 26;
 export const TYPE_SECTION = 20;
 export const TYPE_BODY = 16;
 export const TYPE_CAPTION = 13;
+export const TYPE_LEAD = 14;
+export const TYPE_SUBHEAD = 17;
+export const TYPE_FINE = 12;
 
-/** Section headings on Me and Friends (Top Synqs, Open plans, etc.). */
-export const profileScreenSectionTitle: TextStyle = {
+/** In-scroll section titles (Groups, Me, Friends, plan lists). */
+export const listSectionTitle: TextStyle = {
   color: TEXT,
-  fontSize: 18,
   fontFamily: fonts.heavy,
-  letterSpacing: 0.15,
+  fontSize: TYPE_SUBHEAD,
+  lineHeight: 22,
+  letterSpacing: 0.06,
+};
+
+/** Subsections on detail screens (Members, Community Synqs). */
+export const detailSectionTitle: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.heavy,
+  fontSize: TYPE_BODY,
+  lineHeight: 20,
+  letterSpacing: 0.06,
+};
+
+/** Primary title on list cards and rows. */
+export const cardTitleText: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.medium,
+  fontSize: TYPE_BODY,
+  lineHeight: 20,
+  letterSpacing: 0.04,
+};
+
+/** Secondary line under card titles (member count, time, location). */
+export const cardMetaText: TextStyle = {
+  color: MUTED2,
+  fontFamily: fonts.book,
+  fontSize: TYPE_CAPTION,
+  lineHeight: 17,
+  letterSpacing: 0.04,
+};
+
+/** Profile and community hero names. */
+export const profileNameText: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.heavy,
+  fontSize: TYPE_TITLE,
+  lineHeight: 30,
+  letterSpacing: 0.04,
+};
+
+/** Profile subtitle lines (city, category). */
+export const profileLocationText: TextStyle = {
+  color: MUTED2,
+  fontFamily: fonts.book,
+  fontSize: TYPE_LEAD,
+  lineHeight: 19,
+  letterSpacing: 0.04,
+};
+
+/** List row primary label (friends, members). */
+export const listRowTitleText: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.medium,
+  fontSize: TYPE_BODY,
+  lineHeight: 20,
+  letterSpacing: 0.04,
+};
+
+/** Body copy and empty states. */
+export const bodyBookText: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.book,
+  fontSize: TYPE_BODY,
+  lineHeight: 22,
+  letterSpacing: 0.02,
+};
+
+/** Accent inline actions (See all, section links). */
+export const sectionLinkText: TextStyle = {
+  color: ACCENT,
+  fontFamily: fonts.medium,
+  fontSize: TYPE_LEAD,
+  letterSpacing: 0.04,
+};
+
+/** Search fields and subdued placeholders. */
+export const searchPlaceholderText: TextStyle = {
+  color: MUTED3,
+  fontFamily: fonts.book,
+  fontSize: TYPE_LEAD,
+  lineHeight: 18,
+  letterSpacing: 0.02,
+};
+
+/** Section headings on Me, Friends, and plan lists. */
+export const profileScreenSectionTitle: TextStyle = {
+  ...listSectionTitle,
   marginBottom: 12,
 };
 
