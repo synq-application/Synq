@@ -66,8 +66,8 @@ const CHAT_BOTTOM_SCROLL_TOLERANCE = 2;
 /** Skip follow-up scroll-to-bottom while the list lays out after chat open. */
 const CHAT_OPEN_LAYOUT_SETTLE_MS = 450;
 /** Fade from black into the message list, starting just under the AI chip row. */
-const CHAT_HEADER_FADE_BELOW_AI = 28;
-const CHAT_HEADER_FADE_EXPANDED = 36;
+const CHAT_HEADER_FADE_BELOW_AI = 44;
+const CHAT_HEADER_FADE_EXPANDED = 52;
 /** Avatar (44) + trailing gap (12) — aligns content with the title column. */
 const CHAT_HEADER_TITLE_INDENT = 56;
 const CHAT_MEMBER_TILE_WIDTH = 68;
@@ -89,11 +89,13 @@ const CHAT_LIST_INITIAL_RENDER_MIN = 10;
 const CHAT_ESTIMATED_ROW_HEIGHT = 76;
 const CHAT_HEADER_FADE_GRADIENT = [
   HEADER_BLACK,
-  "rgba(0,0,0,0.78)",
-  "rgba(0,0,0,0.38)",
+  "rgba(0,0,0,0.94)",
+  "rgba(0,0,0,0.72)",
+  "rgba(0,0,0,0.42)",
+  "rgba(0,0,0,0.16)",
   "rgba(9,10,11,0)",
 ] as const;
-const CHAT_HEADER_FADE_LOCATIONS = [0, 0.32, 0.68, 1] as const;
+const CHAT_HEADER_FADE_LOCATIONS = [0, 0.1, 0.3, 0.52, 0.76, 1] as const;
 
 function getKeyboardInset(event: KeyboardEvent): number {
   const { screenY } = event.endCoordinates;

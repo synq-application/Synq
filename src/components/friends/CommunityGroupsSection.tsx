@@ -1,5 +1,6 @@
 import {
   Friend,
+  MUTED2,
   MUTED3,
 } from "@/constants/Variables";
 import CommunityGroupListAvatar from "@/src/components/friends/CommunityGroupListAvatar";
@@ -82,14 +83,17 @@ export default function CommunitySection({ userId, friends = [] }: Props) {
         </View>
 
         <TouchableOpacity
-          style={groupsPageStyles.searchBar}
+          style={groupsPageStyles.browseRow}
           onPress={openSearch}
-          activeOpacity={0.8}
+          activeOpacity={0.75}
           accessibilityRole="button"
-          accessibilityLabel="Search communities"
+          accessibilityLabel="Find communities"
         >
-          <Ionicons name="search" size={18} color={MUTED3} />
-          <Text style={groupsPageStyles.searchBarPlaceholder}>Search communities</Text>
+          <View style={groupsPageStyles.browseRowIcon}>
+            <Ionicons name="compass-outline" size={20} color={MUTED2} />
+          </View>
+          <Text style={groupsPageStyles.browseRowTitle}>Find communities</Text>
+          <Ionicons name="chevron-forward" size={16} color={MUTED3} />
         </TouchableOpacity>
 
         {joined.map((group) => (

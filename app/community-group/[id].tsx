@@ -19,17 +19,17 @@ import {
   stackNavigationBackBtn,
   TEXT,
   cardMetaText,
-  detailSectionTitle,
   profileNameText,
   profileLocationText,
   listRowTitleText,
+  listSectionTitle,
   sectionLinkText,
   TYPE_CAPTION,
   TYPE_LEAD,
   TYPE_BODY,
 } from "@/constants/Variables";
 import AddMembersToGroupSheet from "@/src/components/friends/AddMembersToGroupSheet";
-import { groupsPageStyles } from "@/src/components/friends/groupsListStyles";
+import { groupsPageStyles, GROUP_BORDER } from "@/src/components/friends/groupsListStyles";
 import BackButton from "@/src/components/BackButton";
 import CommunityPlansSection from "@/src/components/community/CommunityPlansSection";
 import HeaderIconButton from "@/src/components/HeaderIconButton";
@@ -74,6 +74,10 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+function SectionDelimiter() {
+  return <View style={styles.sectionDelimiter} />;
+}
+
 function formatNameList(names: string[]): string {
   if (names.length === 0) return "them";
   if (names.length === 1) return names[0];
@@ -92,8 +96,8 @@ function invitedFriendsSuccessMessage(
   return `Invite sent to ${formatNameList(names)} for ${group}`;
 }
 
-const COVER_HERO_HEIGHT = 200;
-const MEMBER_AVATAR_SIZE = 56;
+const COVER_HERO_HEIGHT = 168;
+const MEMBER_AVATAR_SIZE = 48;
 const MEMBER_PREVIEW_COUNT = 6;
 const AVAILABLE_PREVIEW_COUNT = 3;
 const COVER_HERO_GRADIENT = [
@@ -363,8 +367,11 @@ export default function CommunityGroupDetailScreen() {
   };
 
   const availableMembers = useMemo(
-    () => memberRows.filter((member) => member.synqActive),
-    [memberRows]
+    () =>
+      memberRows.filter(
+        (member) => member.id !== uid && member.synqActive === true
+      ),
+    [memberRows, uid]
   );
 
   const availablePreview = showAllAvailable
@@ -546,7 +553,7 @@ export default function CommunityGroupDetailScreen() {
               </View>
             ) : null}
 
-            <View style={styles.profileSection}>
+            <View style={[styles.profileSection, hasCover && styles.profileSectionWithCover]}>
               <View style={styles.profileTitleRow}>
                 <View style={styles.profileTitleMain}>
                   <Text style={styles.profileName}>{group.name}</Text>
@@ -575,35 +582,37 @@ export default function CommunityGroupDetailScreen() {
             </View>
 
             {isMember && availableMembers.length > 0 ? (
-              <View style={styles.sectionBlock}>
+              <>
+                <View style={styles.sectionBlock}>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>Available now</Text>
-                  {availableMembers.length > 0 ? (
-                    <TouchableOpacity
-                      onPress={() => setShowAllAvailable((prev) => !prev)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
+                  <TouchableOpacity
+                    onPress={() => setShowAllAvailable((prev) => !prev)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={styles.sectionHeaderAction}
+                  >
                       <Text style={styles.sectionLink}>
                         {showAllAvailable ? "Show less" : "See all"}
                       </Text>
                     </TouchableOpacity>
-                  ) : null}
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalStrip}
-                >
-                  {availablePreview.map((member) => renderMemberAvatar(member))}
-                  {!showAllAvailable && availableOverflow > 0 ? (
-                    <View style={styles.moreTile}>
-                      <View style={styles.moreTileCircle}>
-                        <Text style={styles.moreTileText}>+{availableOverflow} More</Text>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalStrip}
+                  >
+                    {availablePreview.map((member) => renderMemberAvatar(member))}
+                    {!showAllAvailable && availableOverflow > 0 ? (
+                      <View style={styles.moreTile}>
+                        <View style={styles.moreTileCircle}>
+                          <Text style={styles.moreTileText}>+{availableOverflow} More</Text>
+                        </View>
                       </View>
-                    </View>
-                  ) : null}
-                </ScrollView>
-              </View>
+                    ) : null}
+                  </ScrollView>
+                </View>
+                <SectionDelimiter />
+              </>
             ) : null}
 
             <CommunityPlansSection
@@ -615,22 +624,25 @@ export default function CommunityGroupDetailScreen() {
               isCreator={isCreator}
             />
 
+            <SectionDelimiter />
+
             <View style={styles.sectionBlock}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Members</Text>
-                <View style={styles.sectionHeaderRight}>
-                  <Text style={styles.sectionMetaInline}>{memberLabel}</Text>
-                  {isMember && memberRows.length > 0 ? (
-                    <TouchableOpacity
-                      onPress={() => setShowAllMembers((prev) => !prev)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Text style={styles.sectionLink}>
-                        {showAllMembers ? "Show less" : "See all"}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
+                <View style={styles.sectionHeaderMain}>
+                  <Text style={styles.sectionTitle}>Members</Text>
+                  <Text style={styles.sectionMetaBelow}>{memberLabel}</Text>
                 </View>
+                {isMember && memberRows.length > 0 ? (
+                  <TouchableOpacity
+                    onPress={() => setShowAllMembers((prev) => !prev)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={styles.sectionHeaderAction}
+                  >
+                    <Text style={styles.sectionLink}>
+                      {showAllMembers ? "Show less" : "See all"}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
 
               {!isMember ? (
@@ -857,21 +869,31 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     paddingHorizontal: SPACE_5,
-    paddingBottom: SPACE_3,
+    paddingBottom: SPACE_2,
+    gap: SPACE_3,
   },
-  sectionHeaderRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+  sectionHeaderMain: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  sectionHeaderAction: {
+    paddingTop: 2,
   },
   sectionBlock: {
-    paddingTop: SPACE_4,
+    paddingTop: SPACE_2,
+  },
+  sectionDelimiter: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: GROUP_BORDER,
+    marginHorizontal: SPACE_5,
+    marginVertical: SPACE_2,
   },
   sectionTitle: {
-    ...detailSectionTitle,
+    ...listSectionTitle,
     marginTop: 0,
     marginBottom: 0,
   },
@@ -882,6 +904,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.book,
     fontSize: TYPE_CAPTION,
     color: MUTED2,
+  },
+  sectionMetaBelow: {
+    ...cardMetaText,
   },
   membersLockedRow: {
     flexDirection: "row",
@@ -976,6 +1001,9 @@ const styles = StyleSheet.create({
     paddingBottom: SPACE_3,
     gap: SPACE_2,
   },
+  profileSectionWithCover: {
+    paddingTop: SPACE_2,
+  },
   profileTitleRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1036,11 +1064,11 @@ const styles = StyleSheet.create({
   },
   memberTileActiveDot: {
     position: "absolute",
-    right: 2,
-    bottom: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    right: 1,
+    bottom: 1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: ACCENT,
     borderWidth: 2,
     borderColor: BG,

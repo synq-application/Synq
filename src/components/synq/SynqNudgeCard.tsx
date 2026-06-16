@@ -1,13 +1,15 @@
 import { resolveAvatar } from "@/src/lib/helpers";
 import {
   ACCENT,
-  BORDER,
   fonts,
   MUTED2,
   RADIUS_MD,
-  SURFACE,
   TEXT,
 } from "@/constants/Variables";
+import {
+  GROUP_BORDER,
+  GROUP_SURFACE,
+} from "@/src/components/friends/groupsListStyles";
 import { Image as ExpoImage } from "expo-image";
 import React from "react";
 import {
@@ -90,16 +92,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: SURFACE,
+    backgroundColor: GROUP_SURFACE,
     borderRadius: RADIUS_MD,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,255,133,0.18)",
+    borderColor: GROUP_BORDER,
     paddingVertical: 11,
     paddingHorizontal: 12,
   },
   cardSent: {
-    borderColor: BORDER,
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: GROUP_BORDER,
+    backgroundColor: GROUP_SURFACE,
   },
   avatar: {
     width: 36,

@@ -1,12 +1,16 @@
 import {
   ACCENT,
-  fonts,
-  MUTED2,
-  MUTED3,
   ON_ACCENT_TEXT,
   RADIUS_LG,
-  TEXT,
+  cardMetaText,
+  cardTitleText,
+  detailSectionTitle,
+  fonts,
+  listRowTitleText,
+  listSectionTitle,
+  searchPlaceholderText,
   TYPE_CAPTION,
+  TYPE_SECTION,
 } from "@/constants/Variables";
 import { StyleSheet } from "react-native";
 
@@ -39,11 +43,9 @@ export const groupsPageStyles = StyleSheet.create({
     minWidth: 0,
   },
   sectionTitle: {
-    fontFamily: fonts.heavy,
-    fontSize: 17,
-    lineHeight: 22,
-    color: TEXT,
-    letterSpacing: 0.06,
+    ...listSectionTitle,
+    fontSize: TYPE_SECTION,
+    lineHeight: 26,
   },
   sectionAddBtn: {
     width: 26,
@@ -56,11 +58,8 @@ export const groupsPageStyles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   sectionSubtitle: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION + 1,
-    color: MUTED3,
+    ...searchPlaceholderText,
     lineHeight: 19,
-    letterSpacing: 0.04,
     paddingRight: 8,
   },
   infoBtn: {
@@ -85,19 +84,34 @@ export const groupsPageStyles = StyleSheet.create({
     justifyContent: "center",
   },
   circleCardTitle: {
-    fontFamily: fonts.medium,
-    fontSize: 16,
-    color: TEXT,
-    letterSpacing: 0.04,
-    lineHeight: 20,
+    ...cardTitleText,
     marginBottom: 2,
   },
   circleCardMeta: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION,
-    color: MUTED2,
-    letterSpacing: 0.04,
-    lineHeight: 17,
+    ...cardMetaText,
+  },
+  browseRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: GROUP_SURFACE,
+    borderRadius: RADIUS_LG,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: GROUP_BORDER,
+  },
+  browseRowIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  browseRowTitle: {
+    ...listRowTitleText,
+    flex: 1,
   },
   searchBar: {
     flexDirection: "row",
@@ -112,17 +126,12 @@ export const groupsPageStyles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
   },
   searchBarPlaceholder: {
+    ...searchPlaceholderText,
     flex: 1,
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION + 1,
-    color: MUTED3,
-    lineHeight: 18,
   },
   subsectionTitle: {
-    fontFamily: fonts.heavy,
+    ...detailSectionTitle,
     fontSize: 15,
-    color: TEXT,
-    letterSpacing: 0.06,
     marginTop: 4,
   },
   discoverScroll: {
@@ -155,9 +164,9 @@ export const groupsPageStyles = StyleSheet.create({
     backgroundColor: "#1C1C1E",
   },
   discoverCardTitle: {
+    ...cardTitleText,
     fontFamily: fonts.heavy,
     fontSize: 15,
-    color: TEXT,
     letterSpacing: 0.05,
     marginBottom: 4,
   },
@@ -171,9 +180,8 @@ export const groupsPageStyles = StyleSheet.create({
     marginBottom: 4,
   },
   discoverCardMeta: {
-    fontFamily: fonts.book,
+    ...cardMetaText,
     fontSize: TYPE_CAPTION - 1,
-    color: MUTED2,
     marginBottom: 12,
   },
   joinBtn: {
@@ -223,17 +231,12 @@ export const groupsPageStyles = StyleSheet.create({
     justifyContent: "center",
   },
   communityRowTitle: {
+    ...listRowTitleText,
     fontFamily: fonts.heavy,
-    fontSize: 16,
-    color: TEXT,
-    letterSpacing: 0.06,
     marginBottom: 2,
   },
   communityRowMeta: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION,
-    color: MUTED2,
-    letterSpacing: 0.04,
+    ...cardMetaText,
   },
   rowSeparator: {
     height: StyleSheet.hairlineWidth,

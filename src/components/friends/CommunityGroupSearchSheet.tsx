@@ -1,17 +1,22 @@
 import {
   ACCENT,
   BG,
+  BORDER,
+  cardMetaText,
   Friend,
   fonts,
+  MODAL_RADIUS,
   MUTED2,
   MUTED3,
   ON_ACCENT_TEXT,
+  profileInterestPillText,
+  profileInterestPillTextActive,
   RADIUS_LG,
-  RADIUS_MD,
-  stackScreenHeaderTitle,
+  SURFACE,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
+  TYPE_TITLE,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
 import CommunityGroupListAvatar from "@/src/components/friends/CommunityGroupListAvatar";
@@ -22,18 +27,13 @@ import {
 } from "@/src/components/friends/groupsListStyles";
 import { COMMUNITY_GROUP_CATEGORIES } from "@/src/lib/communityGroupCategories";
 import {
-  COMMUNITY_CATEGORY_ICON_RING,
-  getCommunityCategoryIcon,
-} from "@/src/lib/communityCategoryIcons";
-import {
   CommunityGroup,
-  fetchCommunityGroupsByCategory,
-  fetchSuggestedCommunityGroups,
+  fetchAllCommunityGroups,
   joinCommunityGroup,
   searchCommunityGroups,
 } from "@/src/lib/communityGroups";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -42,6 +42,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -62,10 +63,23 @@ type Props = {
 };
 
 const LIST_GAP = 10;
-const SECTION_GAP = 28;
+const NAV_SIDE = 44;
+const CONTENT_PAD_X = 20;
 
 function formatMemberCount(count: number): string {
   return count === 1 ? "1 member" : `${count} members`;
+}
+
+function sortGroupsByName(groups: CommunityGroup[]): CommunityGroup[] {
+  return [...groups].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function filterGroupsByCategory(
+  groups: CommunityGroup[],
+  category: string | null
+): CommunityGroup[] {
+  if (!category) return groups;
+  return groups.filter((group) => group.category === category);
 }
 
 function ListGap() {
@@ -87,9 +101,8 @@ export default function CommunityGroupSearchSheet({
   const [searching, setSearching] = useState(false);
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [categoryGroups, setCategoryGroups] = useState<CommunityGroup[]>([]);
-  const [categoryLoading, setCategoryLoading] = useState(false);
-  const [exploreGroups, setExploreGroups] = useState<CommunityGroup[]>([]);
+  const [allGroups, setAllGroups] = useState<CommunityGroup[]>([]);
+  const [allGroupsLoading, setAllGroupsLoading] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
@@ -121,9 +134,8 @@ export default function CommunityGroupSearchSheet({
       setSearching(false);
       setJoiningId(null);
       setSelectedCategory(null);
-      setCategoryGroups([]);
-      setCategoryLoading(false);
-      setExploreGroups([]);
+      setAllGroups([]);
+      setAllGroupsLoading(false);
       if (searchTimerRef.current) {
         clearTimeout(searchTimerRef.current);
         searchTimerRef.current = null;
@@ -141,12 +153,11 @@ export default function CommunityGroupSearchSheet({
       return;
     }
 
-    setSelectedCategory(null);
     setSearching(true);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
       void searchCommunityGroups(trimmed)
-        .then((groups) => setResults(groups))
+        .then((groups) => setResults(sortGroupsByName(groups)))
         .catch(() => setResults([]))
         .finally(() => setSearching(false));
     }, 280);
@@ -157,46 +168,34 @@ export default function CommunityGroupSearchSheet({
   }, [query, visible]);
 
   useEffect(() => {
-    if (!visible || !selectedCategory) {
-      setCategoryGroups([]);
-      setCategoryLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setCategoryLoading(true);
-    void fetchCommunityGroupsByCategory(selectedCategory)
-      .then((groups) => {
-        if (!cancelled) setCategoryGroups(groups);
-      })
-      .catch(() => {
-        if (!cancelled) setCategoryGroups([]);
-      })
-      .finally(() => {
-        if (!cancelled) setCategoryLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [visible, selectedCategory]);
-
-  useEffect(() => {
     if (!visible) return;
 
     let cancelled = false;
-    void fetchSuggestedCommunityGroups(joinedGroupIds, 5)
+    setAllGroupsLoading(true);
+    void fetchAllCommunityGroups()
       .then((groups) => {
-        if (!cancelled) setExploreGroups(groups);
+        if (!cancelled) setAllGroups(sortGroupsByName(groups));
       })
       .catch(() => {
-        if (!cancelled) setExploreGroups([]);
+        if (!cancelled) setAllGroups([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAllGroupsLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [visible, joinedGroupIds]);
+  }, [visible]);
+
+  const trimmed = query.trim();
+
+  const displayGroups = useMemo(() => {
+    const base = trimmed ? results : allGroups;
+    return sortGroupsByName(filterGroupsByCategory(base, selectedCategory));
+  }, [trimmed, results, allGroups, selectedCategory]);
+
+  const listLoading = trimmed ? searching : allGroupsLoading;
 
   const handleJoin = async (group: CommunityGroup) => {
     if (!userId || joiningId) return;
@@ -224,18 +223,10 @@ export default function CommunityGroupSearchSheet({
     onClose();
   };
 
-  const selectCategory = (category: string) => {
+  const selectCategory = (category: string | null) => {
     dismissKeyboard();
-    setQuery("");
     setSelectedCategory(category);
   };
-
-  const clearCategory = () => {
-    setSelectedCategory(null);
-    setCategoryGroups([]);
-  };
-
-  const trimmed = query.trim();
 
   const listTouchProps = {
     onStartShouldSetResponder: () => {
@@ -250,7 +241,7 @@ export default function CommunityGroupSearchSheet({
 
     return (
       <TouchableOpacity
-        style={styles.resultCard}
+        style={groupsPageStyles.circleCard}
         activeOpacity={0.78}
         onPress={() => {
           dismissKeyboard();
@@ -262,11 +253,11 @@ export default function CommunityGroupSearchSheet({
           coverPhotoUrl={item.coverPhotoUrl}
           coverPhotoThumbUrl={item.coverPhotoThumbUrl}
         />
-        <View style={styles.resultMain}>
-          <Text style={styles.resultName} numberOfLines={1}>
+        <View style={groupsPageStyles.circleCardMain}>
+          <Text style={groupsPageStyles.circleCardTitle} numberOfLines={1}>
             {item.name}
           </Text>
-          <Text style={styles.resultMeta} numberOfLines={1}>
+          <Text style={groupsPageStyles.circleCardMeta} numberOfLines={1}>
             {formatMemberCount(item.memberIds.length)}
             {item.category ? ` · ${item.category}` : ""}
             {item.location ? ` · ${item.location}` : ""}
@@ -295,43 +286,80 @@ export default function CommunityGroupSearchSheet({
     );
   };
 
-  const renderCategoryBrowse = () => (
-    <View style={styles.categorySection}>
-      <Text style={styles.exploreTitle}>Explore</Text>
-      <View style={styles.categoryPillSurface}>
-        <View style={styles.categoryPillGrid}>
-          {COMMUNITY_GROUP_CATEGORIES.map((category) => (
-            <TouchableOpacity
-              key={category}
-              style={styles.categoryPill}
-              onPress={() => selectCategory(category)}
-              activeOpacity={0.78}
-              accessibilityRole="button"
-              accessibilityLabel={`Browse ${category} communities`}
-            >
-              <View style={styles.categoryPillIcon}>
-                <Ionicons
-                  name={getCommunityCategoryIcon(category)}
-                  size={17}
-                  color={COMMUNITY_CATEGORY_ICON_RING.iconColor}
-                />
-              </View>
-              <Text style={styles.categoryPillLabel} numberOfLines={2}>
-                {category}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    </View>
+  const renderCategoryChips = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.categoryChipsWrap}
+      style={styles.categoryChipsScroll}
+    >
+      <TouchableOpacity
+        style={[styles.categoryChip, selectedCategory === null && styles.categoryChipOn]}
+        onPress={() => selectCategory(null)}
+        activeOpacity={0.78}
+        accessibilityRole="button"
+        accessibilityState={{ selected: selectedCategory === null }}
+        accessibilityLabel="Show all communities"
+      >
+        <Text
+          style={[
+            styles.categoryChipText,
+            selectedCategory === null && styles.categoryChipTextOn,
+          ]}
+        >
+          All
+        </Text>
+      </TouchableOpacity>
+      {COMMUNITY_GROUP_CATEGORIES.map((category) => {
+        const active = selectedCategory === category;
+        return (
+          <TouchableOpacity
+            key={category}
+            style={[styles.categoryChip, active && styles.categoryChipOn]}
+            onPress={() => selectCategory(category)}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={`Filter by ${category}`}
+          >
+            <Text style={[styles.categoryChipText, active && styles.categoryChipTextOn]}>
+              {category}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
   );
 
-  const renderBrowseHome = () => {
-    const browseSuggestions = exploreGroups.slice(0, 5);
+  const emptyMessage = trimmed
+    ? selectedCategory
+      ? `No groups found for "${trimmed}" in ${selectedCategory}.`
+      : `No groups found for "${trimmed}".`
+    : selectedCategory
+      ? `No communities in ${selectedCategory} yet.`
+      : "No communities yet.";
 
-    return (
+  let listContent: React.ReactNode;
+
+  if (listLoading) {
+    listContent = (
+      <Pressable style={styles.centered} onPress={dismissKeyboard}>
+        <ActivityIndicator color={ACCENT} />
+      </Pressable>
+    );
+  } else if (displayGroups.length === 0) {
+    listContent = (
+      <Pressable style={styles.emptyPressable} onPress={dismissKeyboard}>
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyHint}>{emptyMessage}</Text>
+        </View>
+      </Pressable>
+    );
+  } else {
+    listContent = (
       <FlatList
-        data={browseSuggestions}
+        data={displayGroups}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -340,121 +368,16 @@ export default function CommunityGroupSearchSheet({
         contentContainerStyle={listContentPadding}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <>
-            {renderCategoryBrowse()}
-            {browseSuggestions.length > 0 ? (
-              <Text style={[groupsPageStyles.subsectionTitle, styles.suggestedTitle]}>
-                Suggested
-              </Text>
-            ) : null}
-          </>
+          trimmed ? (
+            <Text style={styles.resultsLabel}>
+              {displayGroups.length === 1 ? "1 result" : `${displayGroups.length} results`}
+            </Text>
+          ) : null
         }
         renderItem={({ item }) => renderGroupRow(item)}
         ItemSeparatorComponent={ListGap}
       />
     );
-  };
-
-  const renderCategoryResults = () => (
-    <FlatList
-      data={categoryGroups}
-      keyExtractor={(item) => item.id}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-      onScrollBeginDrag={dismissKeyboard}
-      style={styles.list}
-      contentContainerStyle={listContentPadding}
-      showsVerticalScrollIndicator={false}
-      ListHeaderComponent={
-        <View style={styles.categoryResultsHeader}>
-          <TouchableOpacity
-            style={styles.backToBrowseBtn}
-            onPress={clearCategory}
-            activeOpacity={0.75}
-            accessibilityRole="button"
-            accessibilityLabel="Back to all categories"
-          >
-            <Ionicons name="chevron-back" size={15} color={MUTED2} />
-            <Text style={styles.backToBrowseText}>Explore</Text>
-          </TouchableOpacity>
-          <View style={styles.categoryResultsTitleRow}>
-            <View style={styles.categoryPillIconLg}>
-              <Ionicons
-                name={getCommunityCategoryIcon(selectedCategory ?? "Other")}
-                size={18}
-                color={COMMUNITY_CATEGORY_ICON_RING.iconColor}
-              />
-            </View>
-            <View style={styles.categoryResultsCopy}>
-              <Text style={styles.categoryResultsTitle}>{selectedCategory}</Text>
-              <Text style={styles.categoryResultsMeta}>
-                {categoryGroups.length === 1
-                  ? "1 community"
-                  : `${categoryGroups.length} communities`}
-              </Text>
-            </View>
-          </View>
-        </View>
-      }
-      renderItem={({ item }) => renderGroupRow(item)}
-      ItemSeparatorComponent={ListGap}
-      ListEmptyComponent={
-        categoryLoading ? null : (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyHint}>
-              No communities in {selectedCategory} yet.
-            </Text>
-          </View>
-        )
-      }
-    />
-  );
-
-  let listContent: React.ReactNode;
-
-  if (searching) {
-    listContent = (
-      <Pressable style={styles.centered} onPress={dismissKeyboard}>
-        <ActivityIndicator color={ACCENT} />
-      </Pressable>
-    );
-  } else if (trimmed) {
-    listContent =
-      results.length === 0 ? (
-        <Pressable style={styles.emptyPressable} onPress={dismissKeyboard}>
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyHint}>No groups found for &ldquo;{trimmed}&rdquo;.</Text>
-          </View>
-        </Pressable>
-      ) : (
-        <FlatList
-          data={results}
-          keyExtractor={(item) => item.id}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          onScrollBeginDrag={dismissKeyboard}
-          style={styles.list}
-          contentContainerStyle={listContentPadding}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <Text style={styles.resultsLabel}>
-              {results.length === 1 ? "1 result" : `${results.length} results`}
-            </Text>
-          }
-          renderItem={({ item }) => renderGroupRow(item)}
-          ItemSeparatorComponent={ListGap}
-        />
-      );
-  } else if (selectedCategory) {
-    listContent = categoryLoading ? (
-      <Pressable style={styles.centered} onPress={dismissKeyboard}>
-        <ActivityIndicator color={ACCENT} />
-      </Pressable>
-    ) : (
-      renderCategoryResults()
-    );
-  } else {
-    listContent = renderBrowseHome();
   }
 
   return (
@@ -467,9 +390,13 @@ export default function CommunityGroupSearchSheet({
           </View>
 
           <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
-            <View style={styles.header}>
-              <Text style={styles.title}>Search communities</Text>
-              <CloseButton onPress={onClose} />
+            <View style={styles.sheetHeader}>
+              <View style={styles.headerRow}>
+                <View style={styles.headerTitleWrap}>
+                  <Text style={styles.title}>Discover</Text>
+                </View>
+                <CloseButton onPress={onClose} style={styles.navIconBtnTrailing} />
+              </View>
             </View>
           </TouchableWithoutFeedback>
 
@@ -491,6 +418,8 @@ export default function CommunityGroupSearchSheet({
             ) : null}
           </View>
 
+          {renderCategoryChips()}
+
           <View style={styles.listArea} {...listTouchProps}>
             {listContent}
           </View>
@@ -503,24 +432,24 @@ export default function CommunityGroupSearchSheet({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.62)",
+    backgroundColor: "rgba(0,0,0,0.72)",
     justifyContent: "flex-end",
   },
   sheet: {
     flex: 1,
     maxHeight: "94%",
     backgroundColor: BG,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
+    borderTopLeftRadius: MODAL_RADIUS + 8,
+    borderTopRightRadius: MODAL_RADIUS + 8,
+    paddingHorizontal: CONTENT_PAD_X,
     borderWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: 0,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: GROUP_BORDER,
   },
   handleWrap: {
     alignItems: "center",
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   handle: {
     width: 36,
@@ -528,26 +457,65 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: "rgba(255,255,255,0.14)",
   },
-  header: {
+  sheetHeader: {
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingBottom: 18,
+    minHeight: NAV_SIDE,
+    gap: 4,
+  },
+  headerTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
+  },
+  navIconBtnTrailing: {
+    width: NAV_SIDE,
+    height: NAV_SIDE,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginRight: -10,
   },
   title: {
-    ...stackScreenHeaderTitle,
-    fontSize: 22,
-    lineHeight: 28,
-    letterSpacing: 0.1,
-  },
-  exploreTitle: {
-    ...groupsPageStyles.sectionTitle,
-    marginBottom: 12,
+    color: TEXT,
+    fontSize: TYPE_TITLE,
+    lineHeight: 32,
+    fontFamily: fonts.heavy,
+    letterSpacing: 0.15,
   },
   searchRow: {
     ...groupsPageStyles.searchBar,
-    marginBottom: 22,
+    marginBottom: 16,
   },
+  categoryChipsScroll: {
+    flexGrow: 0,
+    marginBottom: 16,
+    marginHorizontal: -CONTENT_PAD_X,
+  },
+  categoryChipsWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: CONTENT_PAD_X,
+  },
+  categoryChip: {
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  categoryChipOn: {
+    backgroundColor: "rgba(0,255,133,0.12)",
+    borderColor: "rgba(0,255,133,0.55)",
+  },
+  categoryChipText: profileInterestPillText,
+  categoryChipTextOn: profileInterestPillTextActive,
   searchInput: {
     flex: 1,
     fontFamily: fonts.book,
@@ -564,145 +532,9 @@ const styles = StyleSheet.create({
   listGap: {
     height: LIST_GAP,
   },
-  suggestedTitle: {
-    marginTop: SECTION_GAP - 4,
-    marginBottom: 10,
-  },
   resultsLabel: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION + 1,
-    color: MUTED2,
-    letterSpacing: 0.03,
-    marginBottom: 14,
-  },
-  categorySection: {
-    marginBottom: 8,
-  },
-  categoryPillSurface: {
-    backgroundColor: GROUP_SURFACE,
-    borderRadius: RADIUS_LG,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: GROUP_BORDER,
-    padding: 12,
-  },
-  categoryPillGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  categoryPill: {
-    flexGrow: 1,
-    flexBasis: "47%",
-    maxWidth: "48%",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    minHeight: 88,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    borderRadius: RADIUS_MD,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: GROUP_BORDER,
-  },
-  categoryPillIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COMMUNITY_CATEGORY_ICON_RING.backgroundColor,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COMMUNITY_CATEGORY_ICON_RING.borderColor,
-  },
-  categoryPillIconLg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COMMUNITY_CATEGORY_ICON_RING.backgroundColor,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COMMUNITY_CATEGORY_ICON_RING.borderColor,
-  },
-  categoryPillLabel: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_BODY,
-    color: TEXT,
-    letterSpacing: 0.03,
-    textAlign: "center",
-    lineHeight: 19,
-  },
-  categoryResultsHeader: {
-    gap: 10,
-    marginBottom: 16,
-  },
-  categoryResultsTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  categoryResultsCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  backToBrowseBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    alignSelf: "flex-start",
-    paddingVertical: 2,
-    marginBottom: 6,
-  },
-  backToBrowseText: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION + 1,
-    color: MUTED2,
-    letterSpacing: 0.03,
-  },
-  categoryResultsTitle: {
-    ...groupsPageStyles.sectionTitle,
-    fontSize: 20,
-    lineHeight: 26,
-    marginTop: 0,
-  },
-  categoryResultsMeta: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION + 1,
-    color: MUTED3,
-    letterSpacing: 0.03,
-    marginTop: 2,
-  },
-  resultCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: GROUP_SURFACE,
-    borderRadius: RADIUS_LG,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: GROUP_BORDER,
-  },
-  resultMain: {
-    flex: 1,
-    minWidth: 0,
-    justifyContent: "center",
-  },
-  resultName: {
-    fontFamily: fonts.heavy,
-    fontSize: 16,
-    color: TEXT,
-    letterSpacing: 0.05,
-    marginBottom: 3,
-  },
-  resultMeta: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION,
-    color: MUTED2,
-    letterSpacing: 0.03,
-    lineHeight: 17,
+    ...cardMetaText,
+    marginBottom: 12,
   },
   joinedPill: {
     paddingHorizontal: 11,
@@ -731,12 +563,10 @@ const styles = StyleSheet.create({
     borderColor: GROUP_BORDER,
   },
   emptyHint: {
-    fontFamily: fonts.book,
+    ...cardMetaText,
     fontSize: TYPE_BODY,
-    color: MUTED2,
     textAlign: "center",
     lineHeight: 22,
-    letterSpacing: 0.02,
   },
   emptyPressable: {
     flex: 1,

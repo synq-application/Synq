@@ -8,12 +8,18 @@ import {
   MUTED2,
   MUTED3,
   PRIMARY_CTA_WIDTH,
+  cardTitleText,
+  cardMetaText,
   profileScreenSectionTitle,
   RADIUS_LG,
   TEXT,
 } from "@/constants/Variables";
 import PlanDateCalendar from "@/src/components/PlanDateCalendar";
 import PlanTimePicker from "@/src/components/PlanTimePicker";
+import {
+  GROUP_BORDER,
+  GROUP_SURFACE,
+} from "@/src/components/friends/groupsListStyles";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import {
   canEditOpenPlan,
@@ -978,20 +984,11 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 340,
     borderRadius: RADIUS_LG,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: GROUP_BORDER,
+    backgroundColor: GROUP_SURFACE,
     marginBottom: 12,
     overflow: "hidden",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
-        shadowRadius: 14,
-      },
-      android: { elevation: 4 },
-    }),
   },
   cardHighlighted: {
     borderColor: "rgba(0,255,133,0.45)",
@@ -1067,17 +1064,11 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     minWidth: 0,
-    color: TEXT,
-    fontSize: 15,
-    fontFamily: fonts.heavy,
-    lineHeight: 19,
-    letterSpacing: 0.1,
+    ...cardTitleText,
   },
   meta: {
-    color: MUTED2,
+    ...cardMetaText,
     marginTop: 2,
-    fontSize: 12,
-    fontFamily: fonts.book,
     lineHeight: 16,
   },
   hostLine: {

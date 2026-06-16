@@ -4,17 +4,21 @@ import {
   MUTED2,
   RADIUS_MD,
   RADIUS_LG,
+  SPACE_2,
   SPACE_3,
   SPACE_4,
   SPACE_5,
   TEXT,
   TYPE_BODY,
+  cardTitleText,
+  cardMetaText,
+  listSectionTitle,
+  sectionLinkText,
   TYPE_CAPTION,
 } from "@/constants/Variables";
 import AlertModal from "@/app/alert-modal";
 import ConfirmModal from "@/app/confirm-modal";
 import CreateCommunityPlanModal from "@/src/components/community/CreateCommunityPlanModal";
-import { groupsPageStyles } from "@/src/components/friends/groupsListStyles";
 import {
   addCommunityPlanToUserEvents,
   createCommunityGroupPlan,
@@ -27,12 +31,12 @@ import {
   subscribeCommunityGroupPlans,
   type CommunityGroupPlan,
 } from "@/src/lib/communityGroupPlans";
-import { filterOutPastOpenPlans, sortOpenPlansByDateTime } from "@/src/lib/planEvents";
+import { filterOutPastOpenPlans, isOpenPlanPast, sortOpenPlansByDateTime } from "@/src/lib/planEvents";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/src/lib/firebase";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -73,6 +77,7 @@ export default function CommunityPlansSection({
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
+  const prunedPastPlanIdsRef = useRef(new Set<string>());
 
   const PLAN_PREVIEW_COUNT = 3;
 
@@ -114,6 +119,23 @@ export default function CommunityPlansSection({
     () => sortOpenPlansByDateTime(filterOutPastOpenPlans(plans)),
     [plans]
   );
+
+  useEffect(() => {
+    prunedPastPlanIdsRef.current.clear();
+  }, [groupId]);
+
+  useEffect(() => {
+    if (!groupId || loading) return;
+
+    const pastPlans = plans.filter((plan) => isOpenPlanPast(plan));
+    for (const plan of pastPlans) {
+      if (prunedPastPlanIdsRef.current.has(plan.id)) continue;
+      prunedPastPlanIdsRef.current.add(plan.id);
+      void deleteCommunityGroupPlan(groupId, plan.id).catch(() => {
+        prunedPastPlanIdsRef.current.delete(plan.id);
+      });
+    }
+  }, [groupId, loading, plans]);
 
   const displayedPlans = showAllPlans
     ? visiblePlans
@@ -203,7 +225,7 @@ export default function CommunityPlansSection({
     <>
       <View style={styles.sectionBlock}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Community Synqs</Text>
+          <Text style={styles.sectionTitle}>Upcoming</Text>
           {visiblePlans.length > 0 ? (
             <TouchableOpacity
               onPress={() => setShowAllPlans((prev) => !prev)}
@@ -220,7 +242,7 @@ export default function CommunityPlansSection({
           <ActivityIndicator color={ACCENT} style={styles.loader} />
         ) : displayedPlans.length === 0 ? (
           isMember ? null : (
-            <Text style={styles.empty}>No community synqs yet.</Text>
+            <Text style={styles.empty}>Nothing upcoming yet.</Text>
           )
         ) : (
           <View style={styles.list}>
@@ -318,12 +340,12 @@ export default function CommunityPlansSection({
             onPress={() => setCreateVisible(true)}
             activeOpacity={0.85}
             accessibilityRole="button"
-            accessibilityLabel="Start a community Synq"
+            accessibilityLabel="Share a plan"
           >
             <Ionicons name="add" size={20} color={ACCENT} />
             <View style={styles.startSynqCopy}>
-              <Text style={styles.startSynqTitle}>Start a community Synq</Text>
-              <Text style={styles.startSynqSubtitle}>Post something spontaneous</Text>
+              <Text style={styles.startSynqTitle}>Share a plan</Text>
+              <Text style={styles.startSynqSubtitle}>Invite others in the group</Text>
             </View>
           </TouchableOpacity>
         ) : null}
@@ -358,33 +380,31 @@ export default function CommunityPlansSection({
 
 const styles = StyleSheet.create({
   sectionBlock: {
-    paddingTop: SPACE_4,
+    paddingTop: SPACE_2,
   },
   sectionHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     paddingHorizontal: SPACE_5,
-    paddingBottom: SPACE_3,
+    paddingBottom: SPACE_2,
+    gap: SPACE_3,
   },
   sectionTitle: {
-    ...groupsPageStyles.subsectionTitle,
-    fontSize: 16,
+    ...listSectionTitle,
     marginTop: 0,
     marginBottom: 0,
   },
   sectionLink: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION + 1,
-    color: ACCENT,
+    ...sectionLinkText,
   },
   startSynqCta: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACE_3,
     marginHorizontal: SPACE_5,
-    marginTop: SPACE_3,
-    marginBottom: SPACE_4,
+    marginTop: SPACE_2,
+    marginBottom: SPACE_2,
     paddingHorizontal: SPACE_4,
     minHeight: 58,
     borderRadius: RADIUS_MD,
@@ -419,7 +439,7 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: SPACE_5,
     gap: SPACE_3,
-    paddingBottom: SPACE_4,
+    paddingBottom: SPACE_2,
   },
   card: {
     flexDirection: "row",
@@ -453,16 +473,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   planTitle: {
-    fontFamily: fonts.heavy,
-    fontSize: 15,
-    color: TEXT,
-    lineHeight: 20,
-    letterSpacing: 0.05,
+    ...cardTitleText,
   },
   planMeta: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION,
-    color: MUTED2,
+    ...cardMetaText,
     lineHeight: 18,
   },
   planMetaBullet: {

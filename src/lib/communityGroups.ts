@@ -26,6 +26,7 @@ export const MAX_COMMUNITY_GROUP_MEMBERS = MAX_MEMBERS;
 export const MAX_COMMUNITY_GROUPS_JOINED = 50;
 export const MAX_COMMUNITY_GROUPS_CREATED = 10;
 export const COMMUNITY_GROUP_SEARCH_LIMIT = 25;
+export const ALL_COMMUNITY_GROUPS_LIMIT = 200;
 
 export type CommunityGroup = {
   id: string;
@@ -143,6 +144,18 @@ export async function searchCommunityGroups(searchText: string): Promise<Communi
   );
 
   return snap.docs.map((d) => mapCommunityGroupDoc(d.id, d.data() as Record<string, unknown>));
+}
+
+export async function fetchAllCommunityGroups(
+  limitCount = ALL_COMMUNITY_GROUPS_LIMIT
+): Promise<CommunityGroup[]> {
+  const snap = await getDocs(
+    query(communityGroupsCollection(), orderBy("nameLower"), limit(limitCount))
+  );
+
+  return snap.docs
+    .map((d) => mapCommunityGroupDoc(d.id, d.data() as Record<string, unknown>))
+    .filter((g) => g.memberIds.length > 0);
 }
 
 export async function fetchCommunityGroupsByCategory(
