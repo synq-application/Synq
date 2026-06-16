@@ -1,5 +1,11 @@
 import type { TextStyle, ViewStyle } from "react-native";
 
+export {
+  SYNQ_OPEN_WEB_BASE,
+  SYNQ_SHARE_HOST,
+  SYNQ_SHARE_WEB_BASE,
+} from "@/src/lib/config";
+
 export const ACCENT = "#00FF85";
 /** Text on accent-filled buttons and chips. */
 export const ON_ACCENT_TEXT = "#061006";
@@ -124,13 +130,102 @@ export const TYPE_TITLE = 26;
 export const TYPE_SECTION = 20;
 export const TYPE_BODY = 16;
 export const TYPE_CAPTION = 13;
+export const TYPE_LEAD = 14;
+export const TYPE_SUBHEAD = 17;
+export const TYPE_FINE = 12;
 
-/** Section headings on Me and Friends (Top Synqs, Open plans, etc.). */
-export const profileScreenSectionTitle: TextStyle = {
+/** In-scroll section titles (Groups, Me, Friends, plan lists). */
+export const listSectionTitle: TextStyle = {
   color: TEXT,
-  fontSize: 18,
   fontFamily: fonts.heavy,
-  letterSpacing: 0.15,
+  fontSize: TYPE_SUBHEAD,
+  lineHeight: 22,
+  letterSpacing: 0.06,
+};
+
+/** Subsections on detail screens (Members, Upcoming). */
+export const detailSectionTitle: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.heavy,
+  fontSize: TYPE_BODY,
+  lineHeight: 20,
+  letterSpacing: 0.06,
+};
+
+/** Primary title on list cards and rows. */
+export const cardTitleText: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.medium,
+  fontSize: TYPE_BODY,
+  lineHeight: 20,
+  letterSpacing: 0.04,
+};
+
+/** Secondary line under card titles (member count, time, location). */
+export const cardMetaText: TextStyle = {
+  color: MUTED2,
+  fontFamily: fonts.book,
+  fontSize: TYPE_CAPTION,
+  lineHeight: 17,
+  letterSpacing: 0.04,
+};
+
+/** Profile and community hero names. */
+export const profileNameText: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.heavy,
+  fontSize: TYPE_TITLE,
+  lineHeight: 30,
+  letterSpacing: 0.04,
+};
+
+/** Profile subtitle lines (city, category). */
+export const profileLocationText: TextStyle = {
+  color: MUTED2,
+  fontFamily: fonts.book,
+  fontSize: TYPE_LEAD,
+  lineHeight: 19,
+  letterSpacing: 0.04,
+};
+
+/** List row primary label (friends, members). */
+export const listRowTitleText: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.medium,
+  fontSize: TYPE_BODY,
+  lineHeight: 20,
+  letterSpacing: 0.04,
+};
+
+/** Body copy and empty states. */
+export const bodyBookText: TextStyle = {
+  color: TEXT,
+  fontFamily: fonts.book,
+  fontSize: TYPE_BODY,
+  lineHeight: 22,
+  letterSpacing: 0.02,
+};
+
+/** Accent inline actions (See all, section links). */
+export const sectionLinkText: TextStyle = {
+  color: ACCENT,
+  fontFamily: fonts.medium,
+  fontSize: TYPE_LEAD,
+  letterSpacing: 0.04,
+};
+
+/** Search fields and subdued placeholders. */
+export const searchPlaceholderText: TextStyle = {
+  color: MUTED3,
+  fontFamily: fonts.book,
+  fontSize: TYPE_LEAD,
+  lineHeight: 18,
+  letterSpacing: 0.02,
+};
+
+/** Section headings on Me, Friends, and plan lists. */
+export const profileScreenSectionTitle: TextStyle = {
+  ...listSectionTitle,
   marginBottom: 12,
 };
 
@@ -292,6 +387,16 @@ export interface Friend {
   interests?: string[];
   mutualCount?: number;
 }
+/** AI place suggestions in chat — shown when everyone in the chat has a location. */
+export const AI_PLACE_SUGGESTIONS_ENABLED = true;
+
+/** Native builds below this must update (also set Firestore appConfig/global via scripts/set-app-config.mjs). 1.0.4 = build 144. */
+export const MINIMUM_NATIVE_BUILD_NUMBER = 144;
+export const IOS_APP_STORE_URL =
+  "https://apps.apple.com/us/app/synq-see-whos-free/id6757319173";
+export const ANDROID_PLAY_STORE_URL =
+  "https://play.google.com/store/search?q=Synq&c=apps";
+
 export const aiPrompts = [
     "Let Synq pick the move",
     "Find something fun nearby",

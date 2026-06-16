@@ -58,10 +58,10 @@ export default function AboutUsScreen() {
           </Text>
           <Text style={styles.copyText}>
             In a fast-paced world with unpredictable schedules, we're overwhelmed by content we
-            don't care about—and no one wants to add yet another commitment to their calendar.
+            don't care about, and no one wants to add yet another commitment to their calendar.
           </Text>
           <Text style={styles.copyText}>
-            What if technology didn't only connect us—but helped us feel connected? Synq isn't
+            What if technology didn't only connect us, but helped us feel connected? Synq isn't
             just another social app. It's a tool for presence, spontaneity, and real-world
             connection.
           </Text>
@@ -76,19 +76,29 @@ export default function AboutUsScreen() {
             <View style={styles.bulletRow}>
               <Text style={styles.bulletDot}>•</Text>
               <Text style={styles.bulletText}>
-                Tap <Text style={styles.bold}>Synq</Text> when you're open.
+                Add friends you actually want to see
               </Text>
             </View>
             <View style={styles.bulletRow}>
               <Text style={styles.bulletDot}>•</Text>
               <Text style={styles.bulletText}>
-                See friends who are also open and start something simple.
+                Share an optional mood, choose who can see you&apos;re free, and
+                tap to go Synq active
               </Text>
             </View>
             <View style={styles.bulletRow}>
               <Text style={styles.bulletDot}>•</Text>
               <Text style={styles.bulletText}>
-                Keep it lightweight—no pressure, no calendar commitment.
+                When friends are active too, select them and tap{" "}
+                <Text style={styles.bold}>Start plan</Text> to open a chat and
+                coordinate
+              </Text>
+            </View>
+            <View style={styles.bulletRow}>
+              <Text style={styles.bulletDot}>•</Text>
+              <Text style={styles.bulletText}>
+                Post <Text style={styles.bold}>Open plans</Text> on your profile
+                for upcoming hangouts friends can join
               </Text>
             </View>
           </View>

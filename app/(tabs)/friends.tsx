@@ -9,14 +9,16 @@ import {
   MUTED,
   MUTED2,
   MUTED3,
+  cardMetaText,
+  listRowTitleText,
+  profileNameText,
   profileScreenSectionTitle,
-  RADIUS_LG,
   RADIUS_MD,
-  SPACE_2,
   SPACE_3,
   SPACE_4,
   SPACE_5,
   SPACE_6,
+  stackScreenHeaderTitle,
   SURFACE,
   synqOutlineAddBtn,
   synqOutlineAddBtnCompact,
@@ -24,26 +26,37 @@ import {
   synqOutlineAddBtnText,
   synqOutlineAddBtnTextCompact,
   synqOutlineAddBtnTextDisabled,
-  stackScreenHeaderTitle,
-  tabScreenMainHeaderTitle,
   TAB_BAR_SCROLL_INSET,
+  tabScreenMainHeaderTitle,
   TEXT,
   TYPE_BODY,
-  TYPE_CAPTION,
+  TYPE_CAPTION
 } from "@/constants/Variables";
-import { useBlockedUsers } from "@/src/lib/blockedUsers";
-import {
-  buildFriendDistanceMap,
-  resolveOriginCoords,
-  sortFriendsByDistanceKm,
-  sortFriendsByNameWithNoLocationLast,
-} from "@/src/lib/friendDistance";
 import CloseButton from "@/src/components/CloseButton";
 import CloseIcon from "@/src/components/CloseIcon";
+import FriendsGroupsHeaderTitle, {
+  type FriendsTabMode,
+} from "@/src/components/friends/FriendsGroupsSegment";
+import {
+  FriendsSortMenu,
+  FriendsSortTrigger,
+  type FriendsSortMode,
+} from "@/src/components/friends/FriendsSortControls";
+import GroupsListPane from "@/src/components/friends/GroupsListPane";
 import ProfileTabHeaderOverlay, {
   useTabHeaderLayout,
 } from "@/src/components/ProfileTabHeaderOverlay";
+import SynqRefreshControl from "@/src/components/SynqRefreshControl";
+import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import TabHeaderIconRow from "@/src/components/TabHeaderIconRow";
+import { useBlockedUsers } from "@/src/lib/blockedUsers";
+import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
+import { createFriendGroup } from "@/src/lib/friendGroups";
+import {
+  fetchSuggestedFriends,
+  searchUsersForFriend,
+} from "@/src/lib/userSearch";
+import { useSortedFriendsList } from "@/src/lib/useSortedFriendsList";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
@@ -74,10 +87,8 @@ import {
   DeviceEventEmitter,
   Dimensions,
   FlatList,
-  Platform,
   Keyboard,
-  Modal,
-  Pressable,
+  Platform,
   SectionList,
   StatusBar,
   StyleSheet,
@@ -89,7 +100,7 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-  type ViewStyle,
+  type ViewStyle
 } from "react-native";
 import Animated, {
   cancelAnimation,
@@ -106,18 +117,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
-import { createFriendGroup } from "@/src/lib/friendGroups";
-import FriendsGroupsHeaderTitle, {
-  type FriendsTabMode,
-} from "@/src/components/friends/FriendsGroupsSegment";
-import GroupsListPane from "@/src/components/friends/GroupsListPane";
 import { auth, db } from "../../src/lib/firebase";
-import { useAuthRefresh } from "../_layout";
 import { FRIENDS_TAB_PRESS } from "../../src/lib/friendsTabEvents";
+import { registerDismissNavigationOverlaysHandler } from "../../src/lib/navigationOverlayEvents";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../../src/lib/locationPromptEvents";
 import {
   friendProfileCacheByUser,
+  friendIdsKey,
   friendsListCacheByUser,
   hydrateMutualCountsForUsers,
   resolveMutualFriendCount,
@@ -128,19 +134,12 @@ import {
   warmOutgoingFriendRequestsCache,
   warmSuggestedCache,
 } from "../../src/lib/socialCache";
+import { useAuthRefresh } from "../_layout";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
-import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
-import { friendLocationLine, resolveAvatar } from "../helpers";
+import { friendLocationLine, resolveAvatar } from "@/src/lib/helpers";
 
 const { width } = Dimensions.get("window");
-
-type FriendsSortMode = "alphabetical" | "distance";
-
-const FRIENDS_SORT_LABELS: Record<FriendsSortMode, string> = {
-  alphabetical: "Alphabetical",
-  distance: "Distance",
-};
 
 const sortFriendsByName = (list: Friend[]) =>
   [...list].sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""));
@@ -215,128 +214,6 @@ function FriendsHeaderAddButton({
         <Ionicons name="person-add-outline" size={22} color="rgba(0,255,133,0.88)" />
       </Animated.View>
     </TouchableOpacity>
-  );
-}
-
-const SORT_MENU_FADE_MS = 280;
-
-function FriendsSortTrigger({
-  sortMode,
-  onPress,
-}: {
-  sortMode: FriendsSortMode;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={styles.sortBarBtn}
-      onPress={() => {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-      activeOpacity={0.82}
-      accessibilityRole="button"
-      accessibilityLabel={`Sort by, ${FRIENDS_SORT_LABELS[sortMode]}`}
-      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-    >
-      <Text style={styles.sortBarLabel}>Sort by</Text>
-      <Ionicons name="chevron-down" size={12} color={MUTED2} style={styles.sortBarChevron} />
-    </TouchableOpacity>
-  );
-}
-
-function FriendsSortMenu({
-  visible,
-  sortMode,
-  onSelect,
-  onClose,
-}: {
-  visible: boolean;
-  sortMode: FriendsSortMode;
-  onSelect: (mode: FriendsSortMode) => void;
-  onClose: () => void;
-}) {
-  const reduced = useReducedMotion();
-  const [modalVisible, setModalVisible] = useState(false);
-  const opacity = useSharedValue(0);
-
-  const options: { mode: FriendsSortMode; label: string }[] = [
-    { mode: "alphabetical", label: "Alphabetical" },
-    { mode: "distance", label: "Distance" },
-  ];
-
-  const finishClose = useCallback(() => {
-    setModalVisible(false);
-    onClose();
-  }, [onClose]);
-
-  const dismiss = useCallback(() => {
-    if (reduced) {
-      finishClose();
-      return;
-    }
-    opacity.value = withTiming(
-      0,
-      { duration: SORT_MENU_FADE_MS, easing: Easing.in(Easing.cubic) },
-      (done) => {
-        if (done) runOnJS(finishClose)();
-      }
-    );
-  }, [reduced, finishClose, opacity]);
-
-  useEffect(() => {
-    if (!visible) return;
-    setModalVisible(true);
-    opacity.value = reduced
-      ? 1
-      : withTiming(1, { duration: SORT_MENU_FADE_MS, easing: Easing.out(Easing.cubic) });
-  }, [visible, reduced, opacity]);
-
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
-  if (!modalVisible) return null;
-
-  return (
-    <Modal visible transparent animationType="none" onRequestClose={dismiss}>
-      <Animated.View style={[styles.sortMenuOverlay, overlayStyle]}>
-        <Pressable style={styles.sortMenuBackdrop} onPress={dismiss} accessibilityRole="button" accessibilityLabel="Dismiss sort menu" />
-        <Pressable style={styles.sortMenuSheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.sortMenuHandle} />
-          <Text style={styles.sortMenuTitle}>Sort by</Text>
-          {options.map((option, index) => {
-            const selected = sortMode === option.mode;
-            return (
-              <View key={option.mode}>
-                {index > 0 ? <View style={styles.sortMenuSeparator} /> : null}
-                <TouchableOpacity
-                  style={styles.sortMenuOption}
-                  onPress={() => {
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    onSelect(option.mode);
-                    dismiss();
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Text
-                    style={[
-                      styles.sortMenuOptionLabel,
-                      selected && styles.sortMenuOptionLabelSelected,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                  {selected ? (
-                    <Ionicons name="checkmark" size={18} color={ACCENT} />
-                  ) : null}
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-        </Pressable>
-      </Animated.View>
-    </Modal>
   );
 }
 
@@ -434,16 +311,18 @@ export default function FriendsScreen() {
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [friendsLoadError, setFriendsLoadError] = useState(false);
+  const [refreshingFriends, setRefreshingFriends] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [sortMode, setSortMode] = useState<FriendsSortMode>("alphabetical");
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const [myCoords, setMyCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [myCityLabel, setMyCityLabel] = useState("");
-  const [friendDistancesKm, setFriendDistancesKm] = useState<Record<string, number>>({});
-  const [distanceSortReady, setDistanceSortReady] = useState(sortMode !== "distance");
   const [headerFadeTop, setHeaderFadeTop] = useState(0);
   const [listScrollY, setListScrollY] = useState(0);
   const [friendsTabMode, setFriendsTabMode] = useState<FriendsTabMode>("friends");
+  const friendsListRef = useRef<FlatList<Friend>>(null);
+  const friendsRefreshInFlightRef = useRef(false);
+  const lastFriendsIdsKeyRef = useRef("");
 
   const showAddFriendsModal = searchModalVisible;
   const headerFadeOpacity = Math.min(1, listScrollY / 28);
@@ -461,15 +340,25 @@ export default function FriendsScreen() {
     setSearchModalVisible(false);
   }, []);
 
+  const scrollFriendsListToTop = useCallback((animated = false) => {
+    friendsListRef.current?.scrollToOffset({ offset: 0, animated });
+    setListScrollY(0);
+  }, []);
+
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener(FRIENDS_TAB_PRESS, () => {
+      scrollFriendsListToTop(true);
       closeAddFriendsModal();
       if (openAddFriends === "1") {
         router.setParams({ openAddFriends: "" });
       }
     });
     return () => subscription.remove();
-  }, [closeAddFriendsModal, openAddFriends, router]);
+  }, [scrollFriendsListToTop, closeAddFriendsModal, openAddFriends, router]);
+
+  useEffect(() => {
+    return registerDismissNavigationOverlaysHandler(closeAddFriendsModal);
+  }, [closeAddFriendsModal]);
 
   useEffect(() => {
     if (openAddFriends !== "1") return;
@@ -493,11 +382,13 @@ export default function FriendsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      scrollFriendsListToTop(false);
+
       const t = setTimeout(() => {
         DeviceEventEmitter.emit(LOCATION_PROMPT_CHECK_REQUEST);
       }, 1000);
       return () => clearTimeout(t);
-    }, [])
+    }, [scrollFriendsListToTop])
   );
 
   useEffect(() => {
@@ -560,7 +451,13 @@ export default function FriendsScreen() {
           setIsFriendsInitialLoading(true);
         }
         void warmOutgoingFriendRequestsCache(myId);
-        await warmFriendsAndConnectionsCache(myId);
+        const idsKey = friendIdsKey(friendIds);
+        const friendsChanged = idsKey !== lastFriendsIdsKeyRef.current;
+        lastFriendsIdsKeyRef.current = idsKey;
+        await warmFriendsAndConnectionsCache(myId, {
+          friendIds,
+          force: friendsChanged,
+        });
         const fetchedFriends: Friend[] = friendIds.map(
           (friendId) =>
             profileCache[friendId] ??
@@ -595,60 +492,62 @@ export default function FriendsScreen() {
     };
   }, [myId]);
 
+  const refreshFriends = useCallback(async () => {
+    if (!myId || friendsRefreshInFlightRef.current) return;
+    friendsRefreshInFlightRef.current = true;
+    setRefreshingFriends(true);
+    setFriendsLoadError(false);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const startedAt = Date.now();
+    try {
+      await warmFriendsAndConnectionsCache(myId, { force: true });
+      const nextFriends = sortFriendsByName(friendsListCacheByUser[myId] ?? []);
+      setFriends(nextFriends);
+    } catch {
+      setFriendsLoadError(true);
+    } finally {
+      const elapsed = Date.now() - startedAt;
+      const minVisibleMs = 520;
+      if (elapsed < minVisibleMs) {
+        await new Promise((resolve) => setTimeout(resolve, minVisibleMs - elapsed));
+      }
+      setRefreshingFriends(false);
+      friendsRefreshInFlightRef.current = false;
+    }
+  }, [myId]);
+
   const { isBlocked } = useBlockedUsers();
 
-  useEffect(() => {
-    if (sortMode !== "distance") {
-      setDistanceSortReady(true);
-      return;
-    }
+  const userProfileForSort = useMemo(
+    () =>
+      ({
+        ...(myCoords ? { lat: myCoords.lat, lng: myCoords.lng } : {}),
+        ...(myCityLabel ? { locationDisplay: myCityLabel } : {}),
+      }) as Record<string, unknown>,
+    [myCoords, myCityLabel]
+  );
 
-    let cancelled = false;
-    setDistanceSortReady(false);
+  const filteredFriends = useMemo(
+    () =>
+      friends.filter((f) => {
+        if (isBlocked(f.id)) return false;
+        return (f.displayName || "")
+          .toLowerCase()
+          .includes(searchText.toLowerCase());
+      }),
+    [friends, searchText, isBlocked]
+  );
 
-    (async () => {
-      const origin = await resolveOriginCoords(myCoords, myCityLabel);
-      if (cancelled) return;
-
-      if (!origin || friends.length === 0) {
-        setFriendDistancesKm({});
-        setDistanceSortReady(true);
-        return;
-      }
-
-      const map = await buildFriendDistanceMap(friends, origin);
-      if (!cancelled) {
-        setFriendDistancesKm(map);
-        setDistanceSortReady(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sortMode, friends, myCoords, myCityLabel]);
-
-  const displayFriends = useMemo(() => {
-    const filtered = friends.filter((f) => {
-      if (isBlocked(f.id)) return false;
-      return (f.displayName || "")
-        .toLowerCase()
-        .includes(searchText.toLowerCase());
-    });
-    if (sortMode === "distance" && distanceSortReady) {
-      return sortFriendsByDistanceKm(filtered, friendDistancesKm);
-    }
-    return sortFriendsByNameWithNoLocationLast(filtered);
-  }, [friends, searchText, sortMode, distanceSortReady, friendDistancesKm, isBlocked]);
+  const displayFriends = useSortedFriendsList(filteredFriends, sortMode, userProfileForSort);
 
   const showFriendSearch =
     friendsTabMode === "friends" && friends.length > 0 && !isFriendsInitialLoading;
   const listIsEmpty = displayFriends.length === 0;
 
   const handleCreateGroup = useCallback(
-    async (name: string) => {
+    async (name: string, memberIds: string[] = []) => {
       if (!myId) throw new Error("Not signed in.");
-      return createFriendGroup(myId, name);
+      return createFriendGroup(myId, name, memberIds);
     },
     [myId]
   );
@@ -678,6 +577,8 @@ export default function FriendsScreen() {
     <TouchableOpacity
       style={styles.friendRow}
       activeOpacity={0.82}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${item.displayName || "friend"} profile`}
       onPress={() => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
@@ -776,8 +677,15 @@ export default function FriendsScreen() {
       {friendsLoadError && !isFriendsInitialLoading ? (
         <View style={styles.friendsLoadErrorWrap}>
           <Text style={styles.friendsLoadErrorText}>
-            Could not load friends. Pull to refresh or try again later.
+            Could not load friends.
           </Text>
+          <TouchableOpacity
+            onPress={() => void refreshFriends()}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading friends"
+          >
+            <Text style={styles.friendsLoadErrorRetry}>Tap to retry</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
 
@@ -801,8 +709,16 @@ export default function FriendsScreen() {
         </View>
       ) : (
         <FlatList
+          ref={friendsListRef}
           style={styles.friendsList}
           scrollIndicatorInsets={{ right: 0 }}
+          refreshControl={
+            <SynqRefreshControl
+              refreshing={refreshingFriends}
+              onRefresh={() => void refreshFriends()}
+              enabled={!isFriendsInitialLoading}
+            />
+          }
           data={displayFriends}
           keyExtractor={(item) => item.id}
           renderItem={renderFriendRow}
@@ -1100,6 +1016,16 @@ function SearchModal({
       if (cached.length > 0) {
         applySuggested(cached);
       }
+
+      void fetchSuggestedFriends()
+        .then((serverList) => {
+          if (!auth.currentUser || auth.currentUser.uid !== myId) return;
+          if (serverList.length > 0) {
+            suggestedCacheByUser[myId] = serverList;
+            applySuggested(serverList);
+          }
+        })
+        .catch(() => {});
 
       void warmSuggestedCache(myId)
         .then(() => {
@@ -1440,29 +1366,7 @@ function SearchModal({
       setIsSearching(true);
 
       try {
-        const usersRef = collection(db, "users");
-        const snap = await getDocs(usersRef);
-
-        const mapped = snap.docs.map((d) => ({ id: d.id, ...d.data() } as any));
-
-        const normalize = (str: string) =>
-          str.toLowerCase().trim().replace(/\s+/g, " ");
-
-        const search = normalize(val);
-
-        const filtered = mapped.filter((u) => {
-          const displayName = normalize(u.displayName || "");
-          const fullName = normalize(`${u.firstName || ""} ${u.lastName || ""}`);
-          const email = normalize(u.email || "");
-
-          const matches =
-            displayName.includes(search) ||
-            fullName.includes(search) ||
-            email.includes(search);
-
-          return u.id !== auth.currentUser?.uid && matches;
-        });
-
+        const filtered = await searchUsersForFriend(val);
         setResults(filtered);
         hydratePendingForUsers(filtered.map((u) => u.id));
         hydrateIncomingForUsers(filtered.map((u) => u.id));
@@ -2076,85 +1980,6 @@ const styles = StyleSheet.create({
     marginTop: SPACE_3,
     marginBottom: 14,
   },
-  sortBarBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    minHeight: 32,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: BUTTON_RADIUS,
-    backgroundColor: FRIENDS_SURFACE,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: FRIENDS_SEARCH_BORDER,
-  },
-  sortBarLabel: {
-    color: "rgba(255,255,255,0.52)",
-    fontSize: TYPE_CAPTION,
-    fontFamily: fonts.medium,
-    letterSpacing: 0.22,
-  },
-  sortBarChevron: {
-    marginTop: 1,
-    opacity: 0.9,
-  },
-  sortMenuOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.78)",
-    justifyContent: "flex-end",
-  },
-  sortMenuBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  sortMenuSheet: {
-    backgroundColor: BG,
-    borderTopLeftRadius: RADIUS_LG,
-    borderTopRightRadius: RADIUS_LG,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255,255,255,0.06)",
-    paddingTop: 10,
-    paddingBottom: 44,
-  },
-  sortMenuHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    alignSelf: "center",
-    marginBottom: 18,
-  },
-  sortMenuTitle: {
-    color: MUTED3,
-    fontSize: 13,
-    fontFamily: fonts.book,
-    letterSpacing: 0.15,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    includeFontPadding: false,
-  },
-  sortMenuSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    marginLeft: 20,
-  },
-  sortMenuOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-  },
-  sortMenuOptionLabel: {
-    flex: 1,
-    color: MUTED2,
-    fontSize: 17,
-    fontFamily: fonts.book,
-    letterSpacing: 0.02,
-    paddingRight: 12,
-  },
-  sortMenuOptionLabelSelected: {
-    color: TEXT,
-    fontFamily: fonts.medium,
-  },
   friendCountPill: {
     minWidth: 0,
     paddingHorizontal: 0,
@@ -2207,18 +2032,15 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   friendNameAccent: {
-    color: TEXT,
-    fontSize: 16,
+    ...listRowTitleText,
     fontFamily: fonts.heavy,
     letterSpacing: 0.05,
   },
   friendRowMeta: { flexDirection: "row", alignItems: "center" },
   friendRowMetaIcon: { marginRight: 4 },
   friendRowLocation: {
-    color: MUTED2,
-    fontSize: 13,
+    ...cardMetaText,
     flex: 1,
-    fontFamily: fonts.book,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
@@ -2247,8 +2069,8 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
   },
-  friendName: { color: TEXT, fontSize: 18, fontFamily: fonts.heavy },
-  mutualText: { color: MUTED2, fontSize: 13, fontFamily: fonts.book, marginTop: 3 },
+  friendName: { ...listRowTitleText, fontFamily: fonts.heavy },
+  mutualText: { ...cardMetaText, marginTop: 3 },
   friendsLoadErrorWrap: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -2264,6 +2086,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: TYPE_BODY,
     textAlign: "center",
+  },
+  friendsLoadErrorRetry: {
+    color: ACCENT,
+    fontFamily: fonts.heavy,
+    fontSize: TYPE_BODY,
+    textAlign: "center",
+    marginTop: 8,
   },
   friendsList: { flex: 1, width: "100%" },
   friendsListContent: { paddingBottom: TAB_BAR_SCROLL_INSET },
@@ -2343,8 +2172,8 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
     padding: 18,
   },
-  emptyTitle: { color: TEXT, textAlign: "center", fontFamily: fonts.heavy, fontSize: 18 },
-  emptyText: { color: MUTED, textAlign: "center", fontFamily: fonts.book, fontSize: 14, marginTop: 12, lineHeight: 20, paddingHorizontal: 8 },
+  emptyTitle: { ...listRowTitleText, fontFamily: fonts.heavy, textAlign: "center" },
+  emptyText: { ...cardMetaText, color: MUTED, textAlign: "center", marginTop: 12, lineHeight: 20, paddingHorizontal: 8 },
   popupOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.78)",
@@ -2372,9 +2201,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: ACCENT,
   },
-  popupName: { color: TEXT, fontSize: 24, fontFamily: fonts.heavy, letterSpacing: 0.2 },
-  popupLocation: { marginTop: 6, color: "rgba(255,255,255,0.35)", fontSize: 13, fontFamily: fonts.book },
-  popupLocationText: { color: "rgba(255,255,255,0.35)", fontSize: 13, fontFamily: fonts.book },
+  popupName: { ...profileNameText, letterSpacing: 0.2 },
+  popupLocation: { ...cardMetaText, marginTop: 6, color: "rgba(255,255,255,0.35)" },
+  popupLocationText: { ...cardMetaText, color: "rgba(255,255,255,0.35)" },
   interestsContainer: { width: "100%", marginTop: 10, marginBottom: 10 },
   sectionLabel: profileScreenSectionTitle,
   interestsScroll: { maxHeight: 150, width: "100%" },

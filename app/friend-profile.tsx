@@ -11,8 +11,11 @@ import {
   synqOutlineAddBtnDisabled,
   synqOutlineAddBtnText,
   synqOutlineAddBtnTextDisabled,
+  profileNameText,
+  profileLocationText,
+  profileScreenSectionTitle,
   TEXT,
-  TYPE_SECTION,
+  TYPE_CAPTION,
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
 import { Image as ExpoImage } from "expo-image";
@@ -28,11 +31,17 @@ import {
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Animated,
-  InteractionManager,
   Modal,
   Pressable,
   ScrollView,
@@ -41,8 +50,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { MESSAGES_STACK_DURATION_MS } from "@/src/components/synq/MessagesModalStack";
 import BackButton from "@/src/components/BackButton";
+import ProfileTabHeaderOverlay, {
+  useTabHeaderLayout,
+} from "@/src/components/ProfileTabHeaderOverlay";
 import { Ionicons } from "@expo/vector-icons";
 import {
   eventKey,
@@ -51,6 +66,7 @@ import {
   matchesPlanEvent,
   matchesPlanEventForHostSync,
 } from "../src/lib/planEvents";
+import { resolvePlanHostUidForJoin } from "../src/lib/planAttribution";
 import {
   friendProfileCacheByUser,
   friendRelationCacheByUser,
@@ -67,7 +83,7 @@ import ConfirmModal from "./confirm-modal";
 import ReportModal from "./report-modal";
 import { useBlockedUsers } from "@/src/lib/blockedUsers";
 import { blockUser, unblockUser } from "@/src/lib/moderation";
-import { formatLastSynq, resolveAvatar } from "./helpers";
+import { formatLastSynq, resolveAvatar } from "@/src/lib/helpers";
 import MonthlyMemoReadOnly from "./readonly-monthly-memo";
 import SynqNudgeCard from "@/src/components/synq/SynqNudgeCard";
 import { computeSynqActiveFromUserData } from "@/src/lib/synqSession";
@@ -78,6 +94,7 @@ import {
   readNudgeSentState,
   sendSynqNudge,
   synqNudgeErrorMessage,
+  warmSynqNudgeClient,
 } from "@/src/lib/synqNudge";
 import {
   addMembersToFriendGroup,
@@ -89,30 +106,137 @@ import {
   removeFriendMutual,
   removeFriendMutualErrorMessage,
 } from "@/src/lib/friends";
+import { requestDismissNavigationOverlays } from "@/src/lib/navigationOverlayEvents";
 
-export default function FriendProfile() {
-  const { friendId, from } = useLocalSearchParams<{
+type FriendProfileProps = {
+  embeddedFriendId?: string;
+  onEmbeddedBack?: () => void;
+};
+
+function ProfileShell({
+  embedded,
+  children,
+}: {
+  embedded: boolean;
+  children: React.ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  if (embedded) {
+    return (
+      <View
+        style={[styles.safeArea, { paddingTop: Math.max(insets.top, 10) }]}
+      >
+        {children}
+      </View>
+    );
+  }
+  return <View style={styles.safeArea}>{children}</View>;
+}
+
+export default function FriendProfile({
+  embeddedFriendId,
+  onEmbeddedBack,
+}: FriendProfileProps = {}) {
+  const {
+    friendId,
+    from,
+    communityGroupId,
+    communityGroupName,
+    communityPlanId,
+    communityPlanTitle,
+  } = useLocalSearchParams<{
     friendId?: string | string[];
     from?: string;
+    communityGroupId?: string;
+    communityGroupName?: string;
+    communityPlanId?: string;
+    communityPlanTitle?: string;
   }>();
   const router = useRouter();
 
   const goBackOrHome = useCallback(() => {
+    if (onEmbeddedBack) {
+      onEmbeddedBack();
+      return;
+    }
     if (router.canGoBack()) {
       router.back();
       return;
     }
     router.replace("/(tabs)/friends");
-  }, [router]);
+  }, [router, onEmbeddedBack]);
 
   const handleBack = () => {
     goBackOrHome();
   };
 
+  const communityContextLabel = useMemo(() => {
+    if (from !== "community") return null;
+    const planTitle = String(communityPlanTitle || "").trim();
+    const groupName = String(communityGroupName || "").trim();
+    if (planTitle && groupName) {
+      return `You were both in for ${planTitle} in ${groupName}.`;
+    }
+    if (groupName) return `You met in ${groupName}.`;
+    return "You met through a community.";
+  }, [from, communityPlanTitle, communityGroupName]);
+
   const viewerId = auth.currentUser?.uid ?? "";
-  const friendKey = String(
-    Array.isArray(friendId) ? friendId[0] : friendId || ""
+  const routeFriendId = Array.isArray(friendId) ? friendId[0] : friendId || "";
+  const friendKey = String(embeddedFriendId || routeFriendId);
+  const isEmbedded = Boolean(embeddedFriendId);
+  const isOwnProfile = Boolean(viewerId && friendKey && viewerId === friendKey);
+  const scrollRef = useRef<ScrollView>(null);
+  const headerLayout = useTabHeaderLayout({ embedded: isEmbedded });
+  const profileScrollTopInset =
+    headerLayout.contentPaddingTop - (isEmbedded ? 12 : 30);
+
+  useLayoutEffect(() => {
+    if (!isOwnProfile || isEmbedded) return;
+    router.replace("/(tabs)/me");
+  }, [isOwnProfile, isEmbedded, router]);
+
+  useLayoutEffect(() => {
+    if (isEmbedded) return;
+    requestDismissNavigationOverlays();
+  }, [isEmbedded, friendKey]);
+
+  const renderStickyNav = (showOptions = true) => (
+    <ProfileTabHeaderOverlay embedded={isEmbedded}>
+      <BackButton onPress={handleBack} />
+      {showOptions ? (
+        <TouchableOpacity
+          style={styles.optionsBtn}
+          onPress={() => setShowOptionsSheet(true)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+        >
+          <Ionicons name="ellipsis-horizontal" size={22} color={TEXT} />
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.optionsBtnPlaceholder} />
+      )}
+    </ProfileTabHeaderOverlay>
   );
+
+  const resetEmbeddedScroll = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isEmbedded || !friendKey) return;
+    resetEmbeddedScroll();
+    const frame = requestAnimationFrame(resetEmbeddedScroll);
+    const timer = setTimeout(
+      resetEmbeddedScroll,
+      MESSAGES_STACK_DURATION_MS + 48
+    );
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, [isEmbedded, friendKey, resetEmbeddedScroll]);
   const cachedFriend =
     viewerId && friendKey
       ? friendProfileCacheByUser[viewerId]?.[friendKey] ?? null
@@ -172,15 +296,12 @@ export default function FriendProfile() {
     try {
       await removeFriendMutual(friendKey);
       setIsFriend(false);
-      setRemovingFriend(false);
-      await new Promise<void>((resolve) => {
-        InteractionManager.runAfterInteractions(() => resolve());
-      });
       goBackOrHome();
     } catch (e) {
       console.error("Failed to remove friend", e);
-      setRemovingFriend(false);
       showAlert("Could not remove friend", removeFriendMutualErrorMessage(e));
+    } finally {
+      setRemovingFriend(false);
     }
   }, [friendKey, goBackOrHome]);
 
@@ -320,7 +441,12 @@ export default function FriendProfile() {
       cancelled = true;
       if (expiryTimer) clearTimeout(expiryTimer);
     };
-  }, [nudgeSentStorageKey, nudgeSent]);
+  }, [nudgeSentStorageKey]);
+
+  useEffect(() => {
+    if (!showNudgeCard || nudgeSent) return;
+    warmSynqNudgeClient();
+  }, [showNudgeCard, nudgeSent]);
 
   const handleSynqNudge = async () => {
     if (!friendKey || nudgeLoading || nudgeSent || !canNudgeFriend) return;
@@ -334,14 +460,12 @@ export default function FriendProfile() {
       showAlert("Nudge sent", "They'll get a notification asking if they're free.");
     } catch (err) {
       const msg = synqNudgeErrorMessage(err);
-      if (
-        msg.includes("again in a few hours") &&
-        nudgeSentStorageKey
-      ) {
+      if (msg.includes("again in a few hours") && nudgeSentStorageKey) {
         await persistNudgeSent(nudgeSentStorageKey);
         setNudgeSent(true);
+      } else {
+        showAlert("Couldn't nudge", msg);
       }
-      showAlert("Couldn't nudge", msg);
     } finally {
       setNudgeLoading(false);
     }
@@ -405,6 +529,18 @@ export default function FriendProfile() {
       if (h) uids.add(h);
       const jf = String(e?.joinedFromFriendUid || "").trim();
       if (jf) uids.add(jf);
+      (Array.isArray(e?.joinedFromIds) ? e.joinedFromIds : []).forEach((id: string) => {
+        const uid = String(id || "").trim();
+        if (uid) uids.add(uid);
+      });
+      const stored = e?.attendeeDisplayNames;
+      if (stored && typeof stored === "object") {
+        Object.entries(stored).forEach(([uid, name]) => {
+          const id = String(uid || "").trim();
+          const label = String(name || "").trim();
+          if (id && label) uids.add(id);
+        });
+      }
     });
     uids.add(friendKey);
     let cancelled = false;
@@ -413,6 +549,15 @@ export default function FriendProfile() {
       if (friend.displayName) {
         next[friendKey] = String(friend.displayName);
       }
+      events.forEach((e: any) => {
+        const stored = e?.attendeeDisplayNames;
+        if (!stored || typeof stored !== "object") return;
+        Object.entries(stored).forEach(([uid, name]) => {
+          const id = String(uid || "").trim();
+          const label = String(name || "").trim();
+          if (id && label) next[id] = label;
+        });
+      });
       await Promise.all(
         [...uids].map(async (uid) => {
           if (next[uid]) return;
@@ -510,24 +655,39 @@ export default function FriendProfile() {
     void checkRelationship();
   }, [friendKey]);
 
-  if (loading) {
+  if (isOwnProfile && !isEmbedded) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <ProfileShell embedded={false}>
         <View style={styles.center}>
           <ActivityIndicator color={ACCENT} />
         </View>
-      </SafeAreaView>
+      </ProfileShell>
+    );
+  }
+
+  if (loading) {
+    return (
+      <ProfileShell embedded={isEmbedded}>
+        <View style={styles.screen}>
+          {renderStickyNav(false)}
+          <View style={[styles.center, { paddingTop: headerLayout.contentPaddingTop }]}>
+            <ActivityIndicator color={ACCENT} />
+          </View>
+        </View>
+      </ProfileShell>
     );
   }
 
   if (!friend) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.center}>
-          <BackButton onPress={handleBack} />
-          <Text style={styles.emptyProfileText}>Could not load this profile.</Text>
+      <ProfileShell embedded={isEmbedded}>
+        <View style={styles.screen}>
+          {renderStickyNav(false)}
+          <View style={[styles.center, { paddingTop: headerLayout.contentPaddingTop }]}>
+            <Text style={styles.emptyProfileText}>Could not load this profile.</Text>
+          </View>
         </View>
-      </SafeAreaView>
+      </ProfileShell>
     );
   }
 
@@ -555,6 +715,20 @@ export default function FriendProfile() {
         senderImageUrl,
         status: "pending",
         sentAt: serverTimestamp(),
+        ...(from === "community" && communityGroupId
+          ? {
+              metVia: {
+                communityGroupId: String(communityGroupId),
+                ...(communityGroupName
+                  ? { communityGroupName: String(communityGroupName) }
+                  : {}),
+                ...(communityPlanId ? { communityPlanId: String(communityPlanId) } : {}),
+                ...(communityPlanTitle
+                  ? { communityPlanTitle: String(communityPlanTitle) }
+                  : {}),
+              },
+            }
+          : {}),
       });
       batch.set(doc(db, "users", user.uid, "outgoingFriendRequests", friendKey), {
         to: friendKey,
@@ -633,17 +807,6 @@ export default function FriendProfile() {
           }
         });
       } catch {}
-      try {
-        const usersSnap = await getDocs(collection(db, "users"));
-        usersSnap.docs.forEach((u) => {
-          const display = String((u.data() as any)?.displayName || "")
-            .trim()
-            .toLowerCase();
-          if (display && sourceNameSet.has(display)) {
-            sourceIdsSet.add(u.id);
-          }
-        });
-      } catch {}
       const sourceIds = Array.from(sourceIdsSet);
 
       const displayNameById: Record<string, string> = {};
@@ -658,7 +821,7 @@ export default function FriendProfile() {
         })
       );
 
-      const planHostUid = String(event?.planHostUid || friendKey || "").trim();
+      const planHostUid = resolvePlanHostUidForJoin(event, friendKey);
       const eventForMatch = { ...event, planHostUid: event.planHostUid || planHostUid };
 
       const syncAttendeesAcrossUsers = async (allAttendeeIds: string[]) => {
@@ -704,18 +867,52 @@ export default function FriendProfile() {
                   : [e?.joinedFromName].filter(Boolean);
                 const idsChanged = mergedIds.join("|") !== existingIds.join("|");
                 const namesChanged = otherNames.join("|") !== prevNames.join("|");
-                const nextHost = e.planHostUid || planHostUid || undefined;
+                const resolvedHost = String(planHostUid || "").trim();
+                const attendeeIsResolvedHost =
+                  !!resolvedHost && String(attendeeId) === resolvedHost;
+                const nextHost = attendeeIsResolvedHost
+                  ? e.planHostUid || planHostUid || undefined
+                  : resolvedHost || e.planHostUid || planHostUid || undefined;
                 const hostChanged = String(nextHost || "") !== String(e?.planHostUid || "");
-                if (!idsChanged && !namesChanged && !hostChanged) return e;
+                const hostUidForDoc = String(nextHost || planHostUid || "").trim();
+                const orderedIds =
+                  isHostDoc && hostUidForDoc
+                    ? [hostUidForDoc, ...mergedIds.filter((id) => id !== hostUidForDoc)]
+                    : mergedIds;
+                const nextJoinedFromId =
+                  isHostDoc && hostUidForDoc ? hostUidForDoc : orderedIds[0] || "";
+                const hadWrongJoinAnchor =
+                  isHostDoc &&
+                  !!String(e?.joinedFromFriendUid || "").trim() &&
+                  String(e.joinedFromFriendUid).trim() !== hostUidForDoc;
+                if (
+                  !idsChanged &&
+                  !namesChanged &&
+                  !hostChanged &&
+                  !hadWrongJoinAnchor &&
+                  orderedIds.join("|") === mergedIds.join("|") &&
+                  String(e?.joinedFromId || "") === nextJoinedFromId
+                ) {
+                  return e;
+                }
                 changed = true;
-                return {
+                const updated = {
                   ...e,
                   planHostUid: nextHost,
-                  joinedFromIds: mergedIds,
-                  joinedFromId: mergedIds[0] || "",
+                  joinedFromIds: orderedIds,
+                  joinedFromId: nextJoinedFromId,
                   joinedFromNames: otherNames,
                   joinedFromName: otherNames.join(", "),
                 };
+                if (isHostDoc) {
+                  delete updated.joinedFromFriendUid;
+                } else if (
+                  resolvedHost &&
+                  String(updated.joinedFromFriendUid || "").trim() === String(attendeeId)
+                ) {
+                  updated.joinedFromFriendUid = resolvedHost;
+                }
+                return updated;
               });
               if (changed) {
                 await updateDoc(attendeeRef, { events: nextAttendeeEvents });
@@ -737,13 +934,17 @@ export default function FriendProfile() {
           );
           return {
             ...e,
-            planHostUid: e.planHostUid || event.planHostUid || friendKey,
+            planHostUid: e.planHostUid || event.planHostUid || planHostUid,
             mergedIntoExisting: true,
             joinedFromFriendUid: friendKey,
             joinedFromIds: sourceIds,
             joinedFromId: sourceIds[0] || "",
             joinedFromNames: mergedNames,
             joinedFromName: mergedNames.join(", "),
+            attendeeDisplayNames: {
+              ...(e.attendeeDisplayNames || {}),
+              ...displayNameById,
+            },
           };
         });
         await updateDoc(meRef, { events: updatedExistingEvents });
@@ -759,13 +960,14 @@ export default function FriendProfile() {
         date: String(event.date || "").trim(),
         time: String(event.time || "").trim(),
         location: String(event.location || "").trim(),
-        planHostUid: String(event.planHostUid || friendKey || "").trim(),
+        planHostUid,
         joinedFromId: friendKey,
         joinedFromIds: sourceIds,
         joinedFromName: sourceNames.join(", "),
         joinedFromNames: sourceNames,
         mergedIntoExisting: false,
         joinedFromFriendUid: friendKey,
+        attendeeDisplayNames: displayNameById,
       };
 
       const nextEvents = [...existingEvents, newEvent].sort(
@@ -825,7 +1027,7 @@ export default function FriendProfile() {
       const existingEvents = Array.isArray(meData?.events) ? meData.events : [];
       const myEvent = existingEvents.find((e: any) => matchesPlanEvent(e, event, existingEvents));
       if (!myEvent || !isInSharedPlanWithFriend(myEvent, user.uid, friendKey)) {
-        showAlert("Not in this plan", "You aren't showing interest in this plan together.");
+        showAlert("Not in this plan", "You aren't going to this plan together.");
         return;
       }
 
@@ -924,31 +1126,26 @@ export default function FriendProfile() {
       await updateDoc(meRef, { events: nextEvents });
 
       setJoinedKeysForEvent(event, false);
-      showAlert("Removed", "You're no longer interested in this plan together.");
+      showAlert("Removed", "You're no longer going to this plan together.");
     } catch (e: any) {
       showAlert("Error", e?.message || "Could not remove this plan.");
     }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <ProfileShell embedded={isEmbedded}>
+      <View style={styles.screen}>
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        ref={scrollRef}
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: profileScrollTopInset },
+        ]}
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
+        onLayout={isEmbedded ? resetEmbeddedScroll : undefined}
       >
-        <View style={styles.topBar}>
-          <BackButton onPress={handleBack} />
-          <TouchableOpacity
-            style={styles.optionsBtn}
-            onPress={() => setShowOptionsSheet(true)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="More options"
-          >
-            <Ionicons name="ellipsis-horizontal" size={22} color={TEXT} />
-          </TouchableOpacity>
-        </View>
         <View style={styles.friendCard}>
           <View style={[styles.header, showNudgeCard && styles.headerWithNudge]}>
             <TouchableOpacity
@@ -1004,6 +1201,9 @@ export default function FriendProfile() {
           </View>
         ) : !isFriend ? (
           <View style={styles.profileActionWrap}>
+            {communityContextLabel ? (
+              <Text style={styles.communityContextText}>{communityContextLabel}</Text>
+            ) : null}
             <TouchableOpacity
               activeOpacity={0.8}
               style={[synqOutlineAddBtn, requestSent && synqOutlineAddBtnDisabled]}
@@ -1023,8 +1223,7 @@ export default function FriendProfile() {
         ) : null}
 
         {mutualFriends.length > 0 && (
-          <>
-          <View style={[styles.section, styles.sectionAfterAction]}>
+          <View style={[styles.profileSection, styles.profileSectionLead]}>
             <Text style={styles.profileSectionLabel}>Mutual friends</Text>
 
             <ScrollView
@@ -1084,14 +1283,14 @@ export default function FriendProfile() {
               })}
             </ScrollView>
           </View>
-          <View style={styles.profileSeparator} />
-          </>
         )}
+
+        {mutualFriends.length > 0 ? <View style={styles.profileSectionDivider} /> : null}
 
         <View
           style={[
-            styles.section,
-            mutualFriends.length === 0 && styles.sectionAfterAction,
+            styles.profileSection,
+            mutualFriends.length === 0 && styles.profileSectionLead,
           ]}
         >
           <Text style={styles.profileSectionLabel}>Interests</Text>
@@ -1112,26 +1311,24 @@ export default function FriendProfile() {
 
         {showFriendOpenPlansSection ? (
           <>
-          <View style={styles.profileSeparator} />
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, styles.openPlansTitle]}>Open plans</Text>
-            <Text style={styles.openPlansSubtitle}>
-              {`Tap to add and let ${
-                friend.displayName?.trim().split(/\s+/)[0] || "them"
-              } know you're interested in joining.`}
-            </Text>
+            <View style={styles.profileSectionDivider} />
+            <View style={styles.profileSection}>
+              <Text style={styles.profileSectionLabel}>
+                {`${friend.displayName?.trim().split(/\s+/)[0] || "Friend"}'s plans`}
+              </Text>
 
-            <MonthlyMemoReadOnly
-              events={friend.events || []}
-              ACCENT={ACCENT}
-              fonts={fonts}
-              onPressPlan={handlePlanPress}
-              isPlanJoined={planLooksJoined}
-              isViewerHostOfPlan={isViewerHostOfFriendsPlan}
-              hostDisplayNameByUid={hostDisplayNameByUid}
-              profileFallbackFirstName={friend.displayName?.split(" ")[0] || "Friend"}
-            />
-          </View>
+              <MonthlyMemoReadOnly
+                events={friend.events || []}
+                ACCENT={ACCENT}
+                fonts={fonts}
+                viewerUid={viewerId}
+                profileSubjectUid={friendKey}
+                onPressPlan={handlePlanPress}
+                isPlanJoined={planLooksJoined}
+                isViewerHostOfPlan={isViewerHostOfFriendsPlan}
+                hostDisplayNameByUid={hostDisplayNameByUid}
+              />
+            </View>
           </>
         ) : null}
 
@@ -1150,6 +1347,7 @@ export default function FriendProfile() {
           </View>
         ) : null}
       </ScrollView>
+      {renderStickyNav()}
       <Modal visible={showOptionsSheet} transparent animationType="fade">
         <View style={styles.optionsOverlay}>
           <Pressable
@@ -1325,7 +1523,7 @@ export default function FriendProfile() {
       <ConfirmModal
         visible={showUnjoinModal}
         title="Remove this plan?"
-        message="This removes it from your open plans and updates interest for this friend."
+        message="This removes it from your open plans and updates this for your friend."
         confirmText="Remove"
         destructive
         onCancel={() => {
@@ -1368,9 +1566,9 @@ export default function FriendProfile() {
           />
         </Pressable>
       </Modal>
-    </SafeAreaView>
+      </View>
+    </ProfileShell>
   );
-
 }
 
 const PROFILE_SURFACE = "#0A0B0D";
@@ -1378,8 +1576,12 @@ const PROFILE_SURFACE_RAISED = "#0E1012";
 const PROFILE_BORDER = "rgba(255,255,255,0.035)";
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BG },
-  container: { flex: 1, paddingHorizontal: 20 },
-  scrollContent: { paddingBottom: 36 },
+  screen: { flex: 1, backgroundColor: BG, position: "relative" },
+  scrollView: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+  },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyProfileText: {
     color: MUTED2,
@@ -1390,14 +1592,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
 
-  topBar: {
-    marginTop: 4,
-    marginBottom: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
 
+  optionsBtnPlaceholder: {
+    width: 38,
+    height: 38,
+  },
   optionsBtn: {
     width: 38,
     height: 38,
@@ -1410,8 +1609,8 @@ const styles = StyleSheet.create({
   },
 
   friendCard: {
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 0,
+    marginBottom: 0,
     backgroundColor: PROFILE_SURFACE,
     borderRadius: RADIUS_MD,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1420,9 +1619,9 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    paddingTop: 20,
+    paddingTop: 8,
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingBottom: 14,
   },
   headerWithNudge: {
     paddingBottom: 14,
@@ -1504,10 +1703,7 @@ const styles = StyleSheet.create({
   },
 
   name: {
-    color: TEXT,
-    fontSize: 24,
-    lineHeight: 30,
-    fontFamily: fonts.heavy,
+    ...profileNameText,
     includeFontPadding: false,
   },
 
@@ -1518,29 +1714,29 @@ const styles = StyleSheet.create({
   },
 
   locationText: {
-    color: MUTED2,
+    ...profileLocationText,
     marginLeft: 4,
-    fontFamily: fonts.book,
-    fontSize: 15,
-    lineHeight: 20,
   },
 
   lastSynqText: {
     color: "rgba(255,255,255,0.4)",
     marginTop: 6,
-    fontFamily: fonts.medium,
-    fontSize: 13,
+    fontFamily: fonts.book,
+    fontSize: TYPE_CAPTION,
     lineHeight: 18,
     textAlign: "center",
   },
 
-  section: {
-    marginTop: 0,
-    paddingTop: 0,
+  profileSection: {},
+
+  profileSectionLead: {
+    marginTop: 12,
   },
 
-  sectionAfterAction: {
-    marginTop: 20,
+  profileSectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    marginVertical: 20,
   },
 
   profileActionWrap: {
@@ -1548,46 +1744,18 @@ const styles = StyleSheet.create({
     marginTop: 22,
     marginBottom: 4,
     alignItems: "center",
+    gap: 12,
   },
-
-  profileSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    marginVertical: 22,
-  },
-
-  profileSectionLabel: {
-    color: TEXT,
-    fontSize: 18,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.05,
-    lineHeight: 24,
-    marginBottom: 12,
-    includeFontPadding: false,
-  },
-
-  sectionTitle: {
-    color: "rgba(255,255,255,0.94)",
-    fontSize: TYPE_SECTION,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.15,
-    lineHeight: 26,
-    marginBottom: 10,
-    includeFontPadding: false,
-  },
-
-  openPlansTitle: {
-    marginBottom: 6,
-  },
-
-  openPlansSubtitle: {
+  communityContextText: {
     color: MUTED2,
-    fontSize: 13,
     fontFamily: fonts.book,
-    lineHeight: 18,
-    marginBottom: 14,
-    paddingRight: 8,
+    fontSize: TYPE_CAPTION + 1,
+    lineHeight: 20,
+    textAlign: "center",
+    paddingHorizontal: 24,
   },
+
+  profileSectionLabel: profileScreenSectionTitle,
 
   blockedHint: {
     color: MUTED2,
@@ -1650,18 +1818,19 @@ const styles = StyleSheet.create({
 
   synqsContainer: {
     flexDirection: "row",
-    gap: 20,
+    justifyContent: "flex-start",
+    gap: 14,
   },
 
   connItem: {
     alignItems: "center",
-    width: 80,
+    width: 72,
   },
 
   imageCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 55,
+    height: 55,
+    borderRadius: 50,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.1)",
     justifyContent: "center",
@@ -1671,9 +1840,9 @@ const styles = StyleSheet.create({
   },
 
   connImg: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 55,
+    height: 55,
+    borderRadius: 50,
   },
 
   connName: {

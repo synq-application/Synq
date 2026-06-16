@@ -49,6 +49,13 @@ import { usePreAuthTermsGate } from "../../src/lib/usePreAuthTermsGate";
 
 const { width } = Dimensions.get("window");
 
+function formatUsPhoneDisplay(digits: string): string {
+  const d = digits.replace(/\D/g, "").slice(0, 10);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
+  return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
+}
+
 export default function Phone() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isSignIn = mode === "signin";
@@ -58,9 +65,10 @@ export default function Phone() {
   const [confirm, setConfirm] = useState<any>(null);
   const [isCodeSent, setIsCodeSent] = useState(false);
   const [code, setCode] = useState(["", "", "", "", "", ""]);
-  const inputs = useRef<(TextInput | null)[]>([]);
+  const autofillInputRef = useRef<TextInput | null>(null);
   const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
@@ -76,62 +84,87 @@ export default function Phone() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  const handlePhoneNumberChange = (text: string) => {
-    const formattedText = text.replace(/\D/g, "").slice(0, 10);
-    setPhoneNumber(formattedText);
-  };
+  useEffect(() => {
+    if (!isCodeSent) return;
+    const timer = setTimeout(() => {
+      autofillInputRef.current?.focus();
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [isCodeSent]);
 
-  const handleChange = (text: string, index: number) => {
-    const cleanText = text.replace(/\D/g, "");
-
-    if (cleanText.length > 1) {
-      const otpArray = cleanText.slice(0, 6).split("");
-      const newCode = ["", "", "", "", "", ""];
-      otpArray.forEach((char, i) => (newCode[i] = char));
-      setCode(newCode);
-      Keyboard.dismiss();
-      return;
-    }
-
-    const newCode = [...code];
-    newCode[index] = cleanText;
+  const applyOtpDigits = (text: string) => {
+    const digits = text.replace(/\D/g, "").slice(0, 6);
+    const newCode = ["", "", "", "", "", ""];
+    digits.split("").forEach((char, index) => {
+      newCode[index] = char;
+    });
     setCode(newCode);
-    if (cleanText && index < 5) inputs.current[index + 1]?.focus();
+    if (digits.length === 6) {
+      Keyboard.dismiss();
+    }
   };
 
-  const handleKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === "Backspace" && index > 0 && !code[index]) {
-      inputs.current[index - 1]?.focus();
+  const handlePhoneNumberChange = (text: string) => {
+    setPhoneNumber(text.replace(/\D/g, "").slice(0, 10));
+  };
+
+  const getFormattedPhoneNumber = () => {
+    const digits = phoneNumber.replace(/\D/g, "");
+    if (digits.length !== 10) return null;
+    const cc = countryCode.startsWith("+") ? countryCode : `+${countryCode}`;
+    return `${cc}${digits}`;
+  };
+
+  const requestVerificationCode = async () => {
+    if (!recaptchaVerifier.current) return null;
+
+    const formattedPhoneNumber = getFormattedPhoneNumber();
+    if (!formattedPhoneNumber) {
+      showAlert("Please enter a 10-digit phone number.", "Invalid phone");
+      return null;
     }
+
+    const confirmation = await signInWithPhoneNumber(
+      auth,
+      formattedPhoneNumber,
+      recaptchaVerifier.current as any
+    );
+    setConfirm(confirmation);
+    setIsCodeSent(true);
+    setCode(["", "", "", "", "", ""]);
+    setTimeout(() => autofillInputRef.current?.focus(), 350);
+    return confirmation;
   };
 
   const sendVerificationCode = async () => {
-    if (!recaptchaVerifier.current) return;
-
-    const digits = phoneNumber.replace(/\D/g, "");
-    if (digits.length !== 10) {
-      showAlert("Please enter a 10-digit phone number.", "Invalid phone");
-      return;
-    }
-
-    const cc = countryCode.startsWith("+") ? countryCode : `+${countryCode}`;
-    const formattedPhoneNumber = `${cc}${digits}`;
-
     try {
       setLoading(true);
-      const confirmation = await signInWithPhoneNumber(
-        auth,
-        formattedPhoneNumber,
-        recaptchaVerifier.current as any
-      );
-      setConfirm(confirmation);
-      setIsCodeSent(true);
-      setCode(["", "", "", "", "", ""]);
+      await requestVerificationCode();
     } catch (error: any) {
       showAlert(error?.message ?? "Please try again.", "Error");
     } finally {
       setLoading(false);
     }
+  };
+
+  const resendVerificationCode = async () => {
+    if (resending || loading) return;
+
+    try {
+      setResending(true);
+      await requestVerificationCode();
+      showAlert("We sent you a new code.", "Code resent");
+    } catch (error: any) {
+      showAlert(error?.message ?? "Please try again.", "Could not resend");
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const resetPhoneEntry = () => {
+    setIsCodeSent(false);
+    setConfirm(null);
+    setCode(["", "", "", "", "", ""]);
   };
 
   const verifyCode = async () => {
@@ -144,7 +177,7 @@ export default function Phone() {
     } catch (error: any) {
       showAlert("Invalid code. Please try again.", "Error");
       setCode(["", "", "", "", "", ""]);
-      inputs.current[0]?.focus();
+      autofillInputRef.current?.focus();
     } finally {
       setLoading(false);
     }
@@ -152,7 +185,7 @@ export default function Phone() {
 
   const maskedPhone =
     phoneNumber.length === 10
-      ? `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`
+      ? formatUsPhoneDisplay(phoneNumber)
       : "your number";
 
   const recaptchaConfig = (app as any)?.options ?? firebaseConfig;
@@ -211,7 +244,7 @@ export default function Phone() {
 
                 <View style={styles.phoneWrapper}>
                   <TextInput
-                    value={phoneNumber}
+                    value={formatUsPhoneDisplay(phoneNumber)}
                     onChangeText={handlePhoneNumberChange}
                     style={styles.phoneInput}
                     keyboardType="phone-pad"
@@ -264,34 +297,48 @@ export default function Phone() {
               <Text style={styles.subtitle}>Sent to {maskedPhone}</Text>
 
               <View style={styles.otpRow}>
+                <TextInput
+                  ref={autofillInputRef}
+                  value={code.join("")}
+                  onChangeText={applyOtpDigits}
+                  keyboardType="number-pad"
+                  textContentType="oneTimeCode"
+                  autoComplete={Platform.OS === "android" ? "sms-otp" : "one-time-code"}
+                  importantForAutofill="yes"
+                  maxLength={6}
+                  caretHidden
+                  style={styles.otpAutofillInput}
+                  accessibilityLabel="Verification code"
+                />
                 {code.map((digit, index) => (
-                  <TextInput
+                  <TouchableOpacity
                     key={index}
-                    ref={(el) => {
-                      inputs.current[index] = el;
-                    }}
-                    value={digit}
-                    onChangeText={(text) => handleChange(text, index)}
-                    onKeyPress={(e) => handleKeyPress(e, index)}
-                    keyboardType="number-pad"
-                    textContentType="oneTimeCode"
-                    autoComplete={Platform.OS === "android" ? "sms-otp" : "one-time-code"}
-                    maxLength={6}
+                    activeOpacity={0.85}
+                    onPress={() => autofillInputRef.current?.focus()}
                     style={[styles.otpBox, digit !== "" && styles.otpBoxFilled]}
-                  />
+                    accessibilityRole="button"
+                    accessibilityLabel={`Digit ${index + 1}`}
+                  >
+                    <Text style={styles.otpDigit}>{digit}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
 
-              <TouchableOpacity
-                onPress={() => {
-                  setIsCodeSent(false);
-                  setConfirm(null);
-                  setCode(["", "", "", "", "", ""]);
-                }}
-                style={styles.linkBtn}
-              >
-                <Text style={styles.linkText}>Wrong number or didn’t get a code?</Text>
-              </TouchableOpacity>
+              <View style={styles.otpLinksRow}>
+                <TouchableOpacity onPress={resetPhoneEntry} style={styles.linkBtnInline}>
+                  <Text style={styles.linkText}>Wrong number?</Text>
+                </TouchableOpacity>
+                <Text style={styles.linkDivider}>·</Text>
+                <TouchableOpacity
+                  onPress={resendVerificationCode}
+                  disabled={loading || resending}
+                  style={styles.linkBtnInline}
+                >
+                  <Text style={[styles.linkText, (loading || resending) && styles.linkTextDisabled]}>
+                    {resending ? "Sending…" : "Resend code"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
                 onPress={verifyCode}
@@ -419,23 +466,48 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   disabledButton: { backgroundColor: "rgba(125, 255, 166, 0.30)" },
-  otpRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 34 },
+  otpRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 34,
+    position: "relative",
+  },
+  otpAutofillInput: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.02,
+    color: "transparent",
+    fontSize: 16,
+  },
   otpBox: {
     width: width / 8.5,
     height: 58,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderRadius: BUTTON_RADIUS,
-    textAlign: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  otpDigit: {
     fontSize: 22,
     color: TEXT,
     fontFamily: fonts.heavy,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
   },
   otpBoxFilled: {
     borderColor: ACCENT,
     backgroundColor: "rgba(125, 255, 166, 0.06)",
   },
   linkBtn: { marginTop: 18, alignSelf: "center" },
+  otpLinksRow: {
+    marginTop: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  linkBtnInline: { paddingVertical: 4, paddingHorizontal: 2 },
+  linkDivider: { color: "rgba(255,255,255,0.35)", fontSize: 15 },
   linkText: { color: ACCENT, fontSize: 15, fontFamily: fonts.medium },
+  linkTextDisabled: { opacity: 0.45 },
 });

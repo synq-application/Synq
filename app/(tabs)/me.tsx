@@ -13,7 +13,9 @@ import {
   PRIMARY_CTA_WIDTH,
   profileInterestPillText,
   profileInterestPillTextActive,
+  profileNameText,
   profileScreenSectionTitle,
+  profileLocationText,
   SPACE_6,
   SURFACE,
   TAB_BAR_SCROLL_INSET,
@@ -31,6 +33,7 @@ import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import { filterOrReject } from "@/src/lib/contentFilter";
 import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
 import { setPendingProfilePhotoSource } from "@/src/lib/pendingProfilePhoto";
+import { clearPushTokenOnSignOut } from "@/src/lib/pushToken";
 import {
   getPhotoLibraryPermission,
   launchProfilePhotoPicker,
@@ -42,7 +45,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
-import * as Linking from "expo-linking";
+import ProfileShareCard from "@/src/components/profile/ProfileShareCard";
+import {
+  captureAndShareProfileCard,
+  shareProfileLink,
+} from "@/src/lib/shareProfileCard";
 import { router, useLocalSearchParams } from "expo-router";
 import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -52,18 +59,20 @@ import {
   ActivityIndicator,
   AppState,
   AppStateStatus,
+  DeviceEventEmitter,
   Keyboard,
   Modal,
   Pressable,
   ScrollView,
-  Share,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from "react-native";
+import { buildProfileShareWebUrl } from "@/src/lib/profileShareUrl";
 import QRCode from "react-native-qrcode-svg";
+import ViewShot from "react-native-view-shot";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -83,7 +92,8 @@ import {
   topSynqRowsToCache,
   type TopSynqRow,
 } from "../../src/lib/ownProfileCache";
-import { filterOutPastOpenPlans, matchesPlanEvent } from "../../src/lib/planEvents";
+import { filterOutPastOpenPlans, matchesPlanEvent, sortOpenPlansByDateTime } from "../../src/lib/planEvents";
+import { sendPlanInvites } from "../../src/lib/planInvite";
 import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
   friendRelationCacheByUser,
@@ -91,10 +101,11 @@ import {
   pruneSocialCachesToFriendIds,
   warmFriendsAndConnectionsCache,
 } from "../../src/lib/socialCache";
+import { registerDismissNavigationOverlaysHandler } from "../../src/lib/navigationOverlayEvents";
 import { useAuthRefresh } from "../_layout";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
-import { prefetchResolvedAvatar, resolveAvatar } from "../helpers";
+import { prefetchResolvedAvatar, resolveAvatar } from "@/src/lib/helpers";
 import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
@@ -173,6 +184,8 @@ export default function ProfileScreen() {
   const isFocused = useIsFocused();
   const headerLayout = useTabHeaderLayout();
   const scrollRef = useRef<ScrollView>(null);
+  const shareCardRef = useRef<ViewShot>(null);
+  const [sharingProfile, setSharingProfile] = useState(false);
   const profileScrollPaddingBottom = TAB_BAR_SCROLL_INSET + SPACE_6;
   const params = useLocalSearchParams<{ focusEventId?: string | string[] }>();
   const focusEventIdRaw = params.focusEventId;
@@ -238,6 +251,8 @@ export default function ProfileScreen() {
     joinedFromName?: string;
     joinedFromNames?: string[];
     joinedFromFriendUid?: string;
+    planInvitedIds?: string[];
+    attendeeDisplayNames?: Record<string, string>;
   };
 
   const [events, setEvents] = useState<OpenPlanEvent[]>(
@@ -251,6 +266,70 @@ export default function ProfileScreen() {
   const resolvedProfileImage = useMemo(() => resolveAvatar(profileImage), [profileImage]);
 
   const [showEventModal, setShowEventModal] = useState(false);
+  const [fetchedPlanDisplayNames, setFetchedPlanDisplayNames] = useState<
+    Record<string, string>
+  >({});
+
+  useEffect(() => {
+    if (!myId || events.length === 0) return;
+
+    const known = new Set<string>();
+    if (auth.currentUser?.displayName) known.add(myId);
+    friendsForHostNames.forEach((f) => {
+      if (f.id) known.add(f.id);
+    });
+
+    const missing = new Set<string>();
+    events.forEach((event) => {
+      const host = String(event.planHostUid || "").trim();
+      if (host && !known.has(host)) missing.add(host);
+      (Array.isArray(event.joinedFromIds) ? event.joinedFromIds : []).forEach((id) => {
+        const uid = String(id || "").trim();
+        if (uid && !known.has(uid)) missing.add(uid);
+      });
+      Object.keys(event.attendeeDisplayNames || {}).forEach((uid) => {
+        const id = String(uid || "").trim();
+        if (id) known.add(id);
+      });
+    });
+
+    const toFetch = [...missing].filter((uid) => !fetchedPlanDisplayNames[uid]);
+    if (toFetch.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const fetched: Record<string, string> = {};
+      await Promise.all(
+        toFetch.map(async (uid) => {
+          try {
+            const snap = await getDoc(doc(db, "users", uid));
+            if (!snap.exists()) return;
+            const name = String((snap.data() as { displayName?: string })?.displayName || "").trim();
+            if (name) fetched[uid] = name;
+          } catch {}
+        })
+      );
+      if (!cancelled && Object.keys(fetched).length > 0) {
+        setFetchedPlanDisplayNames((prev) => ({ ...prev, ...fetched }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [myId, events, friendsForHostNames, fetchedPlanDisplayNames]);
+
+  const dismissMeTabOverlays = useCallback(() => {
+    setQRExpanded(false);
+    setAvatarPreviewOpen(false);
+    setShowInputModal(false);
+    setPhotoMenuVisible(false);
+    setShowEventModal(false);
+  }, []);
+
+  useEffect(() => {
+    return registerDismissNavigationOverlaysHandler(dismissMeTabOverlays);
+  }, [dismissMeTabOverlays]);
 
   useEffect(() => {
     const id = typeof focusEventId === "string" ? focusEventId.trim() : "";
@@ -277,8 +356,22 @@ export default function ProfileScreen() {
       const name = (f.displayName || "").trim();
       if (f.id && name) m[f.id] = name;
     });
+    events.forEach((event) => {
+      const names = event?.attendeeDisplayNames;
+      if (!names || typeof names !== "object") return;
+      Object.entries(names).forEach(([uid, name]) => {
+        const id = String(uid || "").trim();
+        const label = String(name || "").trim();
+        if (id && label && !m[id]) m[id] = label;
+      });
+    });
+    Object.entries(fetchedPlanDisplayNames).forEach(([uid, name]) => {
+      const id = String(uid || "").trim();
+      const label = String(name || "").trim();
+      if (id && label && !m[id]) m[id] = label;
+    });
     return m;
-  }, [myId, friendsForHostNames]);
+  }, [myId, friendsForHostNames, events, fetchedPlanDisplayNames]);
 
   const computedTopSynqRows = useMemo(
     () => computeTopSynqRows(myId, friendsForHostNames),
@@ -291,8 +384,42 @@ export default function ProfileScreen() {
     setAlertVisible(true);
   };
 
+  const markPlanInvited = useCallback((eventId: string, friendIds: string[]) => {
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.id !== eventId) return e;
+        const invited = new Set(
+          (Array.isArray(e.planInvitedIds) ? e.planInvitedIds : [])
+            .map((id) => String(id || "").trim())
+            .filter(Boolean)
+        );
+        friendIds.forEach((id) => {
+          const uid = String(id || "").trim();
+          if (uid) invited.add(uid);
+        });
+        return { ...e, planInvitedIds: [...invited] };
+      })
+    );
+  }, []);
+
+  const unmarkPlanInvited = useCallback((eventId: string, friendId: string) => {
+    const uid = String(friendId || "").trim();
+    if (!uid) return;
+    setEvents((prev) =>
+      prev.map((e) => {
+        if (e.id !== eventId) return e;
+        const invited = (Array.isArray(e.planInvitedIds) ? e.planInvitedIds : [])
+          .map((id) => String(id || "").trim())
+          .filter(Boolean)
+          .filter((id) => id !== uid);
+        return { ...e, planInvitedIds: invited };
+      })
+    );
+  }, []);
+
   const signOut = async () => {
     try {
+      await clearPushTokenOnSignOut();
       router.replace("/(auth)/welcome");
       await auth.signOut();
     } catch {
@@ -320,13 +447,19 @@ export default function ProfileScreen() {
     }
 
     const newItem = {
-      id: Date.now().toString(),
+      id: String(eventToSave.id || Date.now().toString()),
       date: eventToSave.date,
       title: eventToSave.title,
       time: eventToSave.time || "",
       location: eventToSave.location || "",
       planHostUid: auth.currentUser.uid,
     };
+
+    const inviteFriendIds = Array.isArray(eventToSave.inviteFriendIds)
+      ? eventToSave.inviteFriendIds
+          .map((id: unknown) => String(id || "").trim())
+          .filter(Boolean)
+      : [];
 
     const ref = doc(db, "users", auth.currentUser.uid);
     try {
@@ -335,11 +468,37 @@ export default function ProfileScreen() {
         ? (snap.data() as { events?: unknown }).events
         : undefined;
       const existing = Array.isArray(raw) ? (raw as OpenPlanEvent[]) : [];
-      const updatedEvents = [...existing, newItem];
+      const updatedEvents = sortOpenPlansByDateTime([...existing, newItem]);
 
       await updateDoc(ref, {
         events: updatedEvents,
       });
+
+      if (inviteFriendIds.length > 0) {
+        try {
+          const { invitedIds, alreadyInvitedIds, errors } = await sendPlanInvites(
+            inviteFriendIds,
+            newItem.id
+          );
+          const sent = [...invitedIds, ...alreadyInvitedIds];
+          if (sent.length > 0) {
+            markPlanInvited(newItem.id, sent);
+          }
+          if (errors.length > 0) {
+            showAlert(
+              "Some invites failed",
+              sent.length > 0
+                ? "Your plan was posted, but some invites could not be sent."
+                : errors[0] || "Your plan was posted, but invites could not be sent."
+            );
+          }
+        } catch {
+          showAlert(
+            "Invites not sent",
+            "Your plan was posted, but invites could not be sent. Try again from Edit plan."
+          );
+        }
+      }
 
       setShowEventModal(false);
       setNewEvent({ title: "", date: "", time: "", location: "" });
@@ -411,7 +570,8 @@ export default function ProfileScreen() {
         changed = true;
         return { ...e, ...updatedPayload };
       });
-      if (changed) await updateDoc(ref, { events: next });
+      const toWrite = uid === myUid ? sortOpenPlansByDateTime(next) : next;
+      if (changed) await updateDoc(ref, { events: toWrite });
     };
 
     try {
@@ -490,6 +650,12 @@ export default function ProfileScreen() {
           }
           const nextInterests = userData.interests || [];
           const nextImage = userData?.imageurl || null;
+          const nextInviteCode = String(userData.inviteCode || "")
+            .trim()
+            .toUpperCase();
+          if (nextInviteCode) {
+            setInviteCode(nextInviteCode);
+          }
 
           const prevOwn = getCachedOwnProfile(myId);
           setCachedOwnProfile(myId, {
@@ -759,24 +925,33 @@ export default function ProfileScreen() {
   };
 
   const saveInterests = async () => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !interestsDirty) return;
     try {
       await updateDoc(doc(db, "users", auth.currentUser.uid), {
         interests: selectedInterests,
       });
+      setInterests([...selectedInterests]);
       setShowInputModal(false);
     } catch (e) {
       showAlert("Error", "Could not save interests.");
     }
   };
 
+  const interestsDirty = useMemo(() => {
+    if (selectedInterests.length !== interests.length) return true;
+    const saved = new Set(interests);
+    return selectedInterests.some((interest) => !saved.has(interest));
+  }, [interests, selectedInterests]);
+
+  const openInterestsModal = useCallback(() => {
+    setSelectedInterests([...interests]);
+    setShowInputModal(true);
+  }, [interests]);
+
   const profileQrUrl = useMemo(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return "";
-    return Linking.createURL("/friend-profile", {
-      queryParams: { friendId: uid },
-    });
-  }, [auth.currentUser?.uid]);
+    if (!inviteCode) return "";
+    return buildProfileShareWebUrl(inviteCode);
+  }, [inviteCode]);
   const inviteShareUrl = useMemo(() => {
     if (!inviteCode) return "";
     return `synq://invite/${encodeURIComponent(inviteCode)}`;
@@ -784,10 +959,23 @@ export default function ProfileScreen() {
 
   const fetchInviteCode = useCallback(async (): Promise<string> => {
     if (inviteCode) return inviteCode;
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      const userSnap = await getDoc(doc(db, "users", uid));
+      const existing = String(userSnap.data()?.inviteCode || "")
+        .trim()
+        .toUpperCase();
+      if (existing) {
+        setInviteCode(existing);
+        return existing;
+      }
+    }
     const functions = getFunctions(undefined, "us-central1");
     const getOrCreateInviteCode = httpsCallable(functions, "getOrCreateInviteCode");
     const result = await getOrCreateInviteCode({});
-    const code = String((result.data as any)?.inviteCode || "").trim();
+    const code = String((result.data as any)?.inviteCode || "")
+      .trim()
+      .toUpperCase();
     if (!code) {
       throw new Error("Could not create invite code.");
     }
@@ -814,29 +1002,37 @@ export default function ProfileScreen() {
   }, [auth.currentUser?.uid, fetchInviteCode]);
 
   const shareProfile = async () => {
-    const fallbackUid = auth.currentUser?.uid;
-    const fallbackUrl = fallbackUid
-      ? `synq://invite?inviteFrom=${encodeURIComponent(fallbackUid)}`
-      : "";
+    if (sharingProfile) return;
+    setSharingProfile(true);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const code = await fetchInviteCode();
-      const url = `synq://invite/${encodeURIComponent(code)}`;
-      await Share.share({
-        message: `Join me on Synq and let's connect: ${url}`,
-        url,
-      });
-    } catch {
-      if (!fallbackUrl) {
+      const shareUrl = buildProfileShareWebUrl(code);
+      if (!shareUrl) {
         showAlert(
-          "We couldn't generate your invite link yet. Please try again in a moment.",
-          "Share unavailable"
+          "Share unavailable",
+          "We couldn't generate your profile link yet. Please try again in a moment."
         );
         return;
       }
-      await Share.share({
-        message: `Join me on Synq and let's connect: ${fallbackUrl}`,
-        url: fallbackUrl,
-      });
+      const uid = auth.currentUser?.uid;
+      if (!uid) {
+        showAlert("Share unavailable", "Please sign in and try again.");
+        return;
+      }
+      await captureAndShareProfileCard(shareCardRef, shareUrl);
+    } catch {
+      try {
+        const code = await fetchInviteCode();
+        const shareUrl = buildProfileShareWebUrl(code);
+        if (shareUrl) {
+          await shareProfileLink(shareUrl);
+        }
+      } catch {
+        // User dismissed the share sheet.
+      }
+    } finally {
+      setSharingProfile(false);
     }
   };
 
@@ -1005,10 +1201,13 @@ export default function ProfileScreen() {
               <ProfilePressable
                 contentStyle={styles.editProfileBtn}
                 onPress={shareProfile}
+                disabled={sharingProfile}
                 accessibilityLabel="Share profile"
               >
                 <Ionicons name="share-social-outline" size={14} color={MUTED2} />
-                <Text style={styles.editProfileBtnText}>Share profile</Text>
+                <Text style={styles.editProfileBtnText}>
+                  {sharingProfile ? "Preparing…" : "Share profile"}
+                </Text>
               </ProfilePressable>
             </View>
           </View>
@@ -1079,6 +1278,9 @@ export default function ProfileScreen() {
           viewerUid={myId}
           hostDisplayNameByUid={hostDisplayNameByUid}
           highlightEventId={planHighlightId}
+          friends={friendsForHostNames}
+          onPlanInvited={markPlanInvited}
+          onPlanUninvited={unmarkPlanInvited}
         />
       </View>
       <View style={styles.section}>
@@ -1089,7 +1291,7 @@ export default function ProfileScreen() {
               Add a few interests so friends know what you are into.
             </Text>
             <SynqPlusAddButton
-              onPress={() => setShowInputModal(true)}
+              onPress={openInterestsModal}
               accessibilityLabel="Add interests"
               style={styles.interestsAddPlanBtnSpacing}
             />
@@ -1110,7 +1312,7 @@ export default function ProfileScreen() {
               ))}
             </View>
             <SynqPlusAddButton
-              onPress={() => setShowInputModal(true)}
+              onPress={openInterestsModal}
               accessibilityLabel="Add more interests"
               style={styles.interestsAddBelow}
             />
@@ -1184,7 +1386,10 @@ export default function ProfileScreen() {
               <View style={styles.interestHeader}>
                 <Text style={styles.interestTitle}>What are you into?</Text>
                 <CloseButton
-                  onPress={() => setShowInputModal(false)}
+                  onPress={() => {
+                    setSelectedInterests([...interests]);
+                    setShowInputModal(false);
+                  }}
                   accessibilityLabel="Close interests"
                 />
               </View>
@@ -1223,21 +1428,30 @@ export default function ProfileScreen() {
               </ScrollView>
             </View>
 
-            <TouchableOpacity onPress={saveInterests} style={styles.interestSaveBtn}>
-              <Text style={styles.interestSaveBtnText}>Save Changes</Text>
+            <TouchableOpacity
+              onPress={saveInterests}
+              disabled={!interestsDirty}
+              style={[
+                styles.interestSaveBtn,
+                !interestsDirty && styles.interestSaveBtnDisabled,
+              ]}
+              activeOpacity={interestsDirty ? 0.85 : 1}
+              accessibilityRole="button"
+              accessibilityLabel="Save interests"
+              accessibilityState={{ disabled: !interestsDirty }}
+            >
+              <Text style={styles.interestSaveBtnText}>Save</Text>
             </TouchableOpacity>
           </View>
           </SafeAreaView>
         </SafeAreaProvider>
       </Modal>
-      <ConfirmModal
+      <AlertModal
         visible={photoPermissionPromptVisible}
         title="Photo library access"
         message="Synq needs access to your photo library so you can choose a profile photo."
-        confirmText="Continue"
-        cancelText="Not now"
-        onCancel={() => setPhotoPermissionPromptVisible(false)}
-        onConfirm={() => {
+        buttonText="Continue"
+        onClose={() => {
           setPhotoPermissionPromptVisible(false);
           void (async () => {
             setIsPickingImage(true);
@@ -1337,6 +1551,25 @@ export default function ProfileScreen() {
         onUpload={handleUploadPhoto}
         onRemove={handleRemovePhoto}
       />
+
+      {auth.currentUser?.uid ? (
+        <View
+          pointerEvents="none"
+          style={styles.shareCardCaptureHost}
+          collapsable={false}
+        >
+          <ViewShot
+            ref={shareCardRef}
+            options={{ format: "png", quality: 1, result: "tmpfile" }}
+          >
+            <ProfileShareCard
+              displayName={auth.currentUser?.displayName || ""}
+              avatarUri={resolvedProfileImage}
+              location={locationLower}
+            />
+          </ViewShot>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1344,6 +1577,12 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   /** Full-width scroll (no gutter scrollbar); sections pad themselves. */
   screen: { flex: 1, backgroundColor: BG, position: "relative" },
+  shareCardCaptureHost: {
+    position: "absolute",
+    top: 0,
+    left: -5000,
+    opacity: 1,
+  },
   scrollView: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 20,
@@ -1415,10 +1654,8 @@ const styles = StyleSheet.create({
   qrToggle: { position: "absolute", bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
   qrToggleInner: { alignItems: "center", justifyContent: "center" },
   nameAccent: {
+    ...profileNameText,
     color: ACCENT,
-    fontSize: 24,
-    lineHeight: 32,
-    fontFamily: fonts.heavy,
     letterSpacing: 0.2,
     marginTop: 14,
     textAlign: "center",
@@ -1434,9 +1671,8 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   locationText: {
+    ...profileLocationText,
     color: MUTED,
-    fontSize: 14,
-    fontFamily: fonts.book,
     flexShrink: 1,
   },
   editProfileBtn: {
@@ -1591,6 +1827,9 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_RADIUS,
     alignItems: "center",
     justifyContent: "center",
+  },
+  interestSaveBtnDisabled: {
+    opacity: 0.45,
   },
   interestSaveBtnText: {
     color: "black",

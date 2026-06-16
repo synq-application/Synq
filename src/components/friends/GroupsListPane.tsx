@@ -1,21 +1,13 @@
 import ConfirmModal from "@/app/confirm-modal";
 import {
   ACCENT,
-  fonts,
   Friend,
-  MUTED2,
   MUTED3,
-  RADIUS_LG,
-  SPACE_3,
-  SPACE_4,
-  SPACE_5,
   SPACE_6,
-  synqOutlineAddBtn,
-  synqOutlineAddBtnText,
-  TEXT,
-  TYPE_BODY,
-  TYPE_CAPTION,
 } from "@/constants/Variables";
+import CommunitySection from "@/src/components/friends/CommunityGroupsSection";
+import GroupsFeatureInfoModal from "@/src/components/friends/GroupsFeatureInfoModal";
+import { groupsPageStyles } from "@/src/components/friends/groupsListStyles";
 import {
   deleteFriendGroup,
   FriendGroup,
@@ -29,133 +21,25 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  useReducedMotion,
-} from "react-native-reanimated";
-import CreateGroupModal from "./CreateGroupModal";
+import CreateCircleModal from "./CreateCircleModal";
 import GroupListAvatar from "./GroupListAvatar";
-
-const GROUPS_HINT =
-  "Only you can see your groups. Use them as custom filters for who sees you when you're active.";
-
-const GROUP_SURFACE = "#0E1012";
-const GROUP_BORDER = "rgba(255,255,255,0.06)";
-const ROW_INSET = 72;
-const STAGGER_DELAYS = [0, 120] as const;
-
-function emptyEntering(reduced: boolean, delayMs: number) {
-  if (reduced) {
-    return FadeIn.duration(1);
-  }
-  return FadeInDown.duration(380).delay(delayMs);
-}
+import GroupsSectionHeader from "./GroupsSectionHeader";
 
 type Props = {
   userId: string;
   friends?: Friend[];
   listBottomInset?: number;
-  onCreateGroup: (name: string) => Promise<string>;
+  onCreateGroup: (name: string, memberIds?: string[]) => Promise<string>;
 };
 
 function formatMemberCount(count: number): string {
   return count === 1 ? "1 member" : `${count} members`;
-}
-
-function GroupsEmptyState({ onCreatePress }: { onCreatePress: () => void }) {
-  const reduced = useReducedMotion();
-
-  return (
-    <View style={styles.emptyWrap}>
-      <Animated.View
-        entering={emptyEntering(reduced, STAGGER_DELAYS[0])}
-        style={styles.emptyHeroBlock}
-      >
-        <Text style={styles.emptyTitle}>
-          Organize your{"\n"}
-          <Text style={styles.emptyTitleAccent}>circle</Text>
-        </Text>
-        <Text style={[styles.groupsHint, styles.groupsHintCenter]}>{GROUPS_HINT}</Text>
-      </Animated.View>
-      <Animated.View entering={emptyEntering(reduced, STAGGER_DELAYS[1])}>
-        <TouchableOpacity
-          style={[synqOutlineAddBtn, styles.emptyCta]}
-          onPress={onCreatePress}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Create your first group"
-        >
-          <Ionicons name="add" size={20} color={ACCENT} />
-          <Text style={synqOutlineAddBtnText}>Create group</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
-  );
-}
-
-function GroupRowSeparator() {
-  return <View style={styles.rowSeparator} />;
-}
-
-function NewGroupRow({ onPress, isFooter }: { onPress: () => void; isFooter?: boolean }) {
-  return (
-    <TouchableOpacity
-      style={[styles.newGroupRow, isFooter && styles.newGroupRowFooter]}
-      onPress={onPress}
-      activeOpacity={0.75}
-      accessibilityRole="button"
-      accessibilityLabel="New group"
-    >
-      <View style={styles.newGroupIcon}>
-        <Ionicons name="add" size={20} color={ACCENT} />
-      </View>
-      <Text style={styles.newGroupLabel}>New group</Text>
-    </TouchableOpacity>
-  );
-}
-
-function GroupRow({
-  group,
-  friends,
-  onPress,
-  onLongPress,
-}: {
-  group: FriendGroup;
-  friends: Friend[];
-  onPress: () => void;
-  onLongPress: () => void;
-}) {
-  const memberLabel = formatMemberCount(group.memberIds.length);
-
-  return (
-    <TouchableOpacity
-      style={styles.groupRow}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      delayLongPress={400}
-      activeOpacity={0.75}
-      accessibilityRole="button"
-      accessibilityLabel={`${group.name}, ${group.memberIds.length} members`}
-      accessibilityHint="Long press to delete this group"
-    >
-      <GroupListAvatar memberIds={group.memberIds} friends={friends} />
-      <View style={styles.groupRowMain}>
-        <Text style={styles.groupName} numberOfLines={1}>
-          {group.name}
-        </Text>
-        <Text style={styles.groupMeta} numberOfLines={1}>
-          {memberLabel}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
 }
 
 export default function GroupsListPane({
@@ -172,6 +56,7 @@ export default function GroupsListPane({
   const [createBusy, setCreateBusy] = useState(false);
   const [pendingDeleteGroup, setPendingDeleteGroup] = useState<FriendGroup | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [circlesInfoVisible, setCirclesInfoVisible] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -188,10 +73,10 @@ export default function GroupsListPane({
     return unsub;
   }, [userId]);
 
-  const handleCreate = async (name: string) => {
+  const handleCreate = async (name: string, memberIds: string[] = []) => {
     setCreateBusy(true);
     try {
-      const id = await onCreateGroup(name);
+      const id = await onCreateGroup(name, memberIds);
       setCreateVisible(false);
       router.push({ pathname: "/friend-group/[id]", params: { id } });
     } catch (err: unknown) {
@@ -200,7 +85,7 @@ export default function GroupsListPane({
         typeof message === "string" &&
         (message.includes("permission") || message.includes("PERMISSION_DENIED"));
       Alert.alert(
-        "Could not create group",
+        "Could not create circle",
         permissionDenied
           ? "Firestore may be missing the new groups rules. Deploy firestore rules, then try again."
           : message
@@ -235,7 +120,7 @@ export default function GroupsListPane({
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
       Alert.alert(
-        "Could not delete group",
+        "Could not delete circle",
         err instanceof Error ? err.message : "Try again."
       );
     } finally {
@@ -251,66 +136,69 @@ export default function GroupsListPane({
     );
   }
 
-  const hasGroups = groups.length > 0;
-
-  const groupsListBody = hasGroups ? (
-    <View style={styles.groupSurface}>
-      {groups.map((group, index) => (
-        <React.Fragment key={group.id}>
-          {index > 0 ? <GroupRowSeparator /> : null}
-          <GroupRow
-            group={group}
-            friends={friends}
-            onPress={() => openGroup(group.id)}
-            onLongPress={() => promptDeleteGroup(group)}
-          />
-        </React.Fragment>
-      ))}
-      <GroupRowSeparator />
-      <NewGroupRow onPress={openCreate} isFooter />
-    </View>
-  ) : null;
-
   return (
     <>
-      <FlatList
-        data={[]}
-        style={styles.list}
+      <ScrollView
+        style={styles.scroll}
         contentContainerStyle={[
-          styles.listContent,
-          !hasGroups && styles.listContentEmpty,
+          groupsPageStyles.scrollContent,
           { paddingBottom: listBottomInset },
         ]}
-        ListHeaderComponent={
-          hasGroups ? (
-            <View style={styles.listHeader}>
-              <Text style={styles.groupsHint}>{GROUPS_HINT}</Text>
-              <View style={styles.sectionRow}>
-                <Text style={styles.sectionTitle}>Your groups</Text>
-                <View style={styles.sectionCountPill}>
-                  <Text style={styles.sectionCountText}>{groups.length}</Text>
-                </View>
-              </View>
-              {groupsListBody}
-            </View>
-          ) : null
-        }
-        ListEmptyComponent={
-          !hasGroups ? <GroupsEmptyState onCreatePress={openCreate} /> : null
-        }
-        renderItem={() => null}
-      />
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={groupsPageStyles.section}>
+          <View style={groupsPageStyles.sectionHeader}>
+            <GroupsSectionHeader
+              title="Your circles"
+              onAdd={openCreate}
+              addAccessibilityLabel="New circle"
+              onInfo={() => setCirclesInfoVisible(true)}
+              infoAccessibilityLabel="What are circles"
+            />
+          </View>
 
-      <CreateGroupModal
+          {groups.map((group) => (
+            <TouchableOpacity
+              key={group.id}
+              style={groupsPageStyles.circleCard}
+              onPress={() => openGroup(group.id)}
+              onLongPress={() => promptDeleteGroup(group)}
+              delayLongPress={400}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`${group.name}, ${group.memberIds.length} members`}
+              accessibilityHint="Long press to delete this circle"
+            >
+              <GroupListAvatar memberIds={group.memberIds} friends={friends} />
+              <View style={groupsPageStyles.circleCardMain}>
+                <Text style={groupsPageStyles.circleCardTitle} numberOfLines={1}>
+                  {group.name}
+                </Text>
+                <Text style={groupsPageStyles.circleCardMeta} numberOfLines={1}>
+                  {formatMemberCount(group.memberIds.length)}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={MUTED3} />
+            </TouchableOpacity>
+          ))}
+
+        </View>
+
+        <CommunitySection userId={userId} friends={friends} />
+      </ScrollView>
+
+      <CreateCircleModal
         visible={createVisible}
         busy={createBusy}
+        friends={friends}
         onClose={() => setCreateVisible(false)}
         onCreate={handleCreate}
       />
 
       <ConfirmModal
         visible={pendingDeleteGroup != null}
-        title="Delete group?"
+        title="Delete circle?"
         message={
           pendingDeleteGroup
             ? `Delete "${pendingDeleteGroup.name}"? This cannot be undone.`
@@ -323,190 +211,24 @@ export default function GroupsListPane({
         }}
         onConfirm={() => void handleConfirmDelete()}
       />
+
+      <GroupsFeatureInfoModal
+        visible={circlesInfoVisible}
+        variant="circles"
+        onClose={() => setCirclesInfoVisible(false)}
+      />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  list: {
+  scroll: {
     flex: 1,
-  },
-  listContent: {
-    flexGrow: 1,
-    paddingTop: 2,
-  },
-  listContentEmpty: {
-    flexGrow: 1,
-  },
-  listHeader: {
-    marginBottom: SPACE_4,
-    gap: SPACE_3,
-  },
-  groupsHint: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION + 1,
-    color: MUTED3,
-    lineHeight: 19,
-    letterSpacing: 0.1,
-  },
-  groupsHintCenter: {
-    textAlign: "center",
-    maxWidth: 300,
-    marginTop: SPACE_4,
-    marginBottom: SPACE_6,
-  },
-  sectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginTop: SPACE_3,
-  },
-  sectionTitle: {
-    fontFamily: fonts.heavy,
-    fontSize: 18,
-    color: TEXT,
-    letterSpacing: 0.12,
-  },
-  sectionCountPill: {
-    minWidth: 26,
-    height: 22,
-    paddingHorizontal: 8,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: GROUP_BORDER,
-  },
-  sectionCountText: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION,
-    color: MUTED2,
-    fontVariant: ["tabular-nums"],
-    includeFontPadding: false,
-  },
-  groupSurface: {
-    marginTop: SPACE_3,
-    backgroundColor: GROUP_SURFACE,
-    borderRadius: RADIUS_LG,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: GROUP_BORDER,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  groupRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 15,
-    paddingHorizontal: 16,
-    backgroundColor: GROUP_SURFACE,
-  },
-  groupRowMain: {
-    flex: 1,
-    minWidth: 0,
-    justifyContent: "center",
-  },
-  groupName: {
-    fontFamily: fonts.heavy,
-    fontSize: 17,
-    color: TEXT,
-    letterSpacing: 0.08,
-    marginBottom: 4,
-  },
-  groupMeta: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION + 1,
-    color: MUTED2,
-    letterSpacing: 0.05,
-  },
-  rowSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: GROUP_BORDER,
-    marginLeft: ROW_INSET,
-  },
-  newGroupRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 15,
-    paddingHorizontal: 16,
-    backgroundColor: GROUP_SURFACE,
-  },
-  newGroupRowFooter: {
-    borderBottomLeftRadius: RADIUS_LG,
-    borderBottomRightRadius: RADIUS_LG,
-  },
-  newGroupIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,255,133,0.08)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,255,133,0.2)",
-  },
-  newGroupLabel: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_BODY,
-    color: ACCENT,
-    letterSpacing: 0.12,
   },
   loading: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: SPACE_6,
-  },
-  emptyWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: SPACE_5,
-    paddingTop: SPACE_5,
-    paddingBottom: SPACE_6,
-    minHeight: 380,
-  },
-  emptyHeroBlock: {
-    alignItems: "center",
-    width: "100%",
-  },
-  emptyIconOrb: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: SPACE_5,
-    backgroundColor: "rgba(0,255,133,0.08)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,255,133,0.22)",
-  },
-  emptyTitle: {
-    fontFamily: fonts.heavy,
-    fontSize: 32,
-    lineHeight: 38,
-    color: TEXT,
-    textAlign: "center",
-    letterSpacing: 0.15,
-    marginBottom: SPACE_3,
-  },
-  emptyTitleAccent: {
-    color: ACCENT,
-    fontFamily: fonts.heavy,
-    fontSize: 32,
-    lineHeight: 38,
-    letterSpacing: 0.15,
-  },
-  emptyCta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 22,
   },
 });

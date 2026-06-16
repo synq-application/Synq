@@ -2,21 +2,23 @@ import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
 import ChatInboxActionSheet from "@/src/components/synq/ChatInboxActionSheet";
 import { MUTED2 } from "@/constants/Variables";
+import { getCommunityChatInboxSubtitle } from "@/src/lib/helpers";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React from "react";
 import { FlatList, Text, TouchableOpacity, View } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   styles: any;
   allChats: any[];
-  pinnedChatIds?: string[];
   currentUserId?: string;
   getChatTitle: (chat: any) => string;
-  renderAvatarStack: (images: any) => React.ReactNode;
+  renderAvatarStack: (images: any, participants?: string[]) => React.ReactNode;
   onCloseMessages: () => void;
   onOpenChat: (chat: any) => Promise<void>;
+  onPrepareChatPress?: (chatId: string) => void;
   onDeleteChat: (chatId: string) => void;
   onChatLongPress?: (chat: any) => void;
   renderDeleteConfirmModal: React.ReactNode;
@@ -24,6 +26,7 @@ type Props = {
   selectedMergeChatIds?: string[];
   mergePreviewTitle?: string;
   mergeAnchorTitle?: string;
+  mergeReady?: boolean;
   mergeBusy?: boolean;
   onCancelMergeMode?: () => void;
   onToggleMergeChatSelection?: (chatId: string) => void;
@@ -31,7 +34,6 @@ type Props = {
   renderMergeConfirmModal?: React.ReactNode;
   inboxActionChat?: any | null;
   onCloseInboxAction?: () => void;
-  onPinChat?: (chatId: string) => void;
   onCombineChat?: (chatId: string) => void;
   onDeleteFromAction?: (chatId: string) => void;
 };
@@ -39,12 +41,12 @@ type Props = {
 export default function MessagesInboxPane({
   styles,
   allChats,
-  pinnedChatIds = [],
   currentUserId,
   getChatTitle,
   renderAvatarStack,
   onCloseMessages,
   onOpenChat,
+  onPrepareChatPress,
   onDeleteChat,
   onChatLongPress,
   renderDeleteConfirmModal,
@@ -52,6 +54,7 @@ export default function MessagesInboxPane({
   selectedMergeChatIds = [],
   mergePreviewTitle = "",
   mergeAnchorTitle = "",
+  mergeReady = false,
   mergeBusy = false,
   onCancelMergeMode,
   onToggleMergeChatSelection,
@@ -59,19 +62,20 @@ export default function MessagesInboxPane({
   renderMergeConfirmModal,
   inboxActionChat = null,
   onCloseInboxAction,
-  onPinChat,
   onCombineChat,
   onDeleteFromAction,
 }: Props) {
+  const insets = useSafeAreaInsets();
+  const inboxHeaderPaddingTop = Math.max(insets.top, 20) + 6;
+  const inboxMergeHeaderPaddingTop = Math.max(insets.top, 16) + 6;
   const canCombine = allChats.length >= 2;
-  const mergeReady = selectedMergeChatIds.length === 2;
-  const pinnedSet = new Set(pinnedChatIds);
 
-  const mergeSubtitle = mergeReady
-    ? "Ready to create your group chat"
-    : selectedMergeChatIds.length === 1 && mergeAnchorTitle
+  const mergeSubtitle =
+    selectedMergeChatIds.length === 1 && mergeAnchorTitle
       ? `Pick one more to combine with ${mergeAnchorTitle}`
-      : `Pick two conversations · ${selectedMergeChatIds.length}/2 selected`;
+      : !mergeReady
+        ? "Pick two conversations"
+        : "";
 
   const renderChatRow = (item: any, index: number) => {
     const updatedAtMs = item.updatedAt?.toMillis?.() ?? 0;
@@ -85,10 +89,6 @@ export default function MessagesInboxPane({
       lastSender !== currentUserId &&
       updatedAtMs > lastReadMs;
     const isSelected = selectedMergeChatIds.includes(item.id);
-    const isPinned = pinnedSet.has(item.id);
-    const selectionOrder = isSelected
-      ? selectedMergeChatIds.indexOf(item.id) + 1
-      : 0;
 
     const rowContent = (
       <TouchableOpacity
@@ -105,6 +105,10 @@ export default function MessagesInboxPane({
           }
           void onOpenChat(item);
         }}
+        onPressIn={() => {
+          if (mergeSelectMode) return;
+          onPrepareChatPress?.(item.id);
+        }}
         onLongPress={() => {
           if (mergeSelectMode) return;
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -116,7 +120,7 @@ export default function MessagesInboxPane({
         accessibilityLabel={
           mergeSelectMode
             ? `${getChatTitle(item)}${isSelected ? ", selected" : ""}`
-            : `${getChatTitle(item)}${isPinned ? ", pinned" : ""}`
+            : getChatTitle(item)
         }
       >
         <View style={styles.inboxItemRow}>
@@ -128,12 +132,12 @@ export default function MessagesInboxPane({
               ]}
             >
               {isSelected ? (
-                <Text style={styles.inboxSelectBadgeText}>{selectionOrder}</Text>
+                <Ionicons name="checkmark" size={15} color="white" />
               ) : null}
             </View>
           ) : null}
           <View style={styles.avatarColumn}>
-            {renderAvatarStack(item.participantImages)}
+            {renderAvatarStack(item.participantImages, item.participants)}
           </View>
           <View style={styles.inboxTextCol}>
             <View style={styles.inboxTitleRow}>
@@ -148,15 +152,16 @@ export default function MessagesInboxPane({
               >
                 {getChatTitle(item)}
               </Text>
-              {isPinned && !mergeSelectMode ? (
-                <Ionicons
-                  name="pin"
-                  size={14}
-                  color={MUTED2}
-                  style={styles.inboxPinIcon}
-                />
-              ) : null}
             </View>
+            {(() => {
+              const subtitle = getCommunityChatInboxSubtitle(item);
+              if (!subtitle) return null;
+              return (
+                <Text style={styles.communityChatMeta} numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              );
+            })()}
             {(() => {
               const lm =
                 typeof item.lastMessage === "string"
@@ -206,7 +211,7 @@ export default function MessagesInboxPane({
     <View style={styles.modalBg}>
       {mergeSelectMode ? (
         <>
-          <View style={styles.inboxMergeHeader}>
+          <View style={[styles.inboxMergeHeader, { paddingTop: inboxMergeHeaderPaddingTop }]}>
             <BackButton
               onPress={onCancelMergeMode}
               style={styles.inboxMergeBackBtn}
@@ -217,19 +222,24 @@ export default function MessagesInboxPane({
             </Text>
             <View style={styles.inboxMergeHeaderSide} />
           </View>
-          <Text style={styles.inboxMergeSubtitle}>{mergeSubtitle}</Text>
+          {mergeSubtitle ? (
+            <Text style={styles.inboxMergeSubtitle}>{mergeSubtitle}</Text>
+          ) : null}
         </>
       ) : (
-        <View style={styles.inboxHeaderRow}>
-          <Text style={styles.messagesInboxTitle}>Messages</Text>
-          <CloseButton
-            onPress={onCloseMessages}
-            accessibilityLabel="Close messages"
-          />
+        <View
+          style={[styles.inboxHeaderBlock, { paddingTop: inboxHeaderPaddingTop }]}
+        >
+          <View style={styles.inboxHeaderRow}>
+            <Text style={styles.messagesInboxTitle}>Messages</Text>
+            <CloseButton
+              onPress={onCloseMessages}
+              accessibilityLabel="Close messages"
+            />
+          </View>
+          <View style={styles.headerDivider} />
         </View>
       )}
-
-      <View style={styles.messagesHeaderDivider} />
 
       <FlatList
         data={allChats}
@@ -297,14 +307,8 @@ export default function MessagesInboxPane({
       <ChatInboxActionSheet
         visible={!!inboxActionChat}
         chatTitle={inboxActionChat ? getChatTitle(inboxActionChat) : ""}
-        isPinned={
-          inboxActionChat ? pinnedSet.has(inboxActionChat.id) : false
-        }
         canCombine={canCombine}
         onClose={() => onCloseInboxAction?.()}
-        onPin={() => {
-          if (inboxActionChat) onPinChat?.(inboxActionChat.id);
-        }}
         onCombine={() => {
           if (inboxActionChat) onCombineChat?.(inboxActionChat.id);
         }}

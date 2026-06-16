@@ -45,7 +45,6 @@ import {
 import { userHasLocation } from "../../src/lib/userProfile";
 import { useAuthRefresh } from "../_layout";
 import AlertModal from "../alert-modal";
-import ConfirmModal from "../confirm-modal";
 
 const US_STATE_ABBREV: Record<string, string> = stateAbbreviations;
 
@@ -356,14 +355,12 @@ export default function LocationDetails() {
           message={alertMessage}
           onClose={() => setAlertVisible(false)}
         />
-        <ConfirmModal
+        <AlertModal
           visible={locationPermissionPromptVisible}
           title="Location access"
-          message="Synq uses your location once to auto-fill your city and state. You can decline and enter your location manually instead."
-          confirmText="Continue"
-          cancelText="Not now"
-          onCancel={() => setLocationPermissionPromptVisible(false)}
-          onConfirm={() => {
+          message="Synq uses your location once to auto-fill your city and state."
+          buttonText="Continue"
+          onClose={() => {
             setLocationPermissionPromptVisible(false);
             void requestLocationAccessAndFill();
           }}

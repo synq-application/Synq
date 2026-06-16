@@ -1,9 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { FirebaseError } from "firebase/app";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "./firebase";
+import { app, auth } from "./firebase";
 
 const functions = getFunctions(app, "us-central1");
+const sendSynqNudgeFn = httpsCallable<{ toUserId: string }, { ok: boolean }>(
+  functions,
+  "sendSynqNudge"
+);
 
 export const SYNQ_NUDGE_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 
@@ -69,9 +73,10 @@ export function synqNudgeErrorMessage(err: unknown): string {
 }
 
 export async function sendSynqNudge(toUserId: string): Promise<void> {
-  const fn = httpsCallable<{ toUserId: string }, { ok: boolean }>(
-    functions,
-    "sendSynqNudge"
-  );
-  await fn({ toUserId });
+  await sendSynqNudgeFn({ toUserId });
+}
+
+/** Prefetch auth so the first nudge tap does not wait on getIdToken. */
+export function warmSynqNudgeClient(): void {
+  void auth.currentUser?.getIdToken().catch(() => {});
 }

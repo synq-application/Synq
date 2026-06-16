@@ -21,10 +21,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 type Props = {
   visible: boolean;
   chatTitle: string;
-  isPinned: boolean;
   canCombine: boolean;
   onClose: () => void;
-  onPin: () => void;
   onCombine: () => void;
   onDelete: () => void;
 };
@@ -32,10 +30,8 @@ type Props = {
 export default function ChatInboxActionSheet({
   visible,
   chatTitle,
-  isPinned,
   canCombine,
   onClose,
-  onPin,
   onCombine,
   onDelete,
 }: Props) {
@@ -61,38 +57,19 @@ export default function ChatInboxActionSheet({
           {chatTitle}
         </Text>
         <View style={styles.sheet}>
-          <TouchableOpacity
-            style={styles.option}
-            onPress={onPin}
-            activeOpacity={0.75}
-            accessibilityRole="button"
-            accessibilityLabel={isPinned ? "Unpin conversation" : "Pin conversation"}
-          >
-            <Ionicons
-              name={isPinned ? "pin" : "pin-outline"}
-              size={22}
-              color={TEXT}
-            />
-            <Text style={styles.optionText}>
-              {isPinned ? "Unpin chat" : "Pin chat"}
-            </Text>
-          </TouchableOpacity>
           {canCombine ? (
-            <>
-              <View style={styles.divider} />
-              <TouchableOpacity
-                style={styles.option}
-                onPress={onCombine}
-                activeOpacity={0.75}
-                accessibilityRole="button"
-                accessibilityLabel="Combine with another chat"
-              >
-                <Ionicons name="people-outline" size={22} color={TEXT} />
-                <Text style={styles.optionText}>Combine with another chat</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              style={styles.option}
+              onPress={onCombine}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Combine with another chat"
+            >
+              <Ionicons name="people-outline" size={22} color={TEXT} />
+              <Text style={styles.optionText}>Combine with another chat</Text>
+            </TouchableOpacity>
           ) : null}
-          <View style={styles.divider} />
+          {canCombine ? <View style={styles.divider} /> : null}
           <TouchableOpacity
             style={styles.option}
             onPress={onDelete}

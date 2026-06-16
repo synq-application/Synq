@@ -2,7 +2,7 @@ import StackScreenHeader from '@/src/components/StackScreenHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { deleteField, doc, getDoc, updateDoc } from "firebase/firestore";
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -140,7 +140,6 @@ export default function EditProfileScreen() {
     useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const locationGlow = useSharedValue(0);
-  const successDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState<string | undefined>();
   const [alertMessage, setAlertMessage] = useState("");
@@ -201,24 +200,6 @@ export default function EditProfileScreen() {
     );
   };
 
-  const scheduleAutofillDismiss = () => {
-    if (successDismissTimer.current) {
-      clearTimeout(successDismissTimer.current);
-    }
-    successDismissTimer.current = setTimeout(() => {
-      setLocationAutofill("dismissed");
-      successDismissTimer.current = null;
-    }, 1800);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (successDismissTimer.current) {
-        clearTimeout(successDismissTimer.current);
-      }
-    };
-  }, []);
-
   useEffect(() => {
     const loadUserData = async () => {
       if (!auth.currentUser) return;
@@ -257,14 +238,9 @@ export default function EditProfileScreen() {
     setResolvedLocationPreview(`${data.city}, ${data.stateAbbrev}`);
     setLocationAutofill("success");
     pulseLocationFields();
-    scheduleAutofillDismiss();
   };
 
   const resetLocationAutofill = () => {
-    if (successDismissTimer.current) {
-      clearTimeout(successDismissTimer.current);
-      successDismissTimer.current = null;
-    }
     setLocating(false);
     setLocatingPhase("gps");
     setLocationAutofill("offered");
@@ -349,7 +325,7 @@ export default function EditProfileScreen() {
       : "Looking up city and state…";
 
   const handleSave = async () => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || !isDirty || saving || removingLocation) return;
     const nameCheck = filterOrReject(displayName.trim());
     if (!nameCheck.ok) {
       showAlert(nameCheck.reason, "Content not allowed");
@@ -578,17 +554,20 @@ export default function EditProfileScreen() {
 
           <TouchableOpacity
             onPress={handleSave}
-            disabled={saving || removingLocation}
+            disabled={!isDirty || saving || removingLocation}
             style={[
               styles.saveButton,
-              (saving || removingLocation) && styles.disabledControl,
+              (!isDirty || saving || removingLocation) && styles.saveButtonDisabled,
             ]}
-            activeOpacity={0.9}
+            activeOpacity={isDirty && !saving && !removingLocation ? 0.9 : 1}
+            accessibilityRole="button"
+            accessibilityLabel="Save profile"
+            accessibilityState={{ disabled: !isDirty || saving || removingLocation }}
           >
             {saving ? (
               <ActivityIndicator size="small" color="black" />
             ) : (
-              <Text style={styles.saveButtonText}>Save changes</Text>
+              <Text style={styles.saveButtonText}>Save</Text>
             )}
           </TouchableOpacity>
 
@@ -639,14 +618,12 @@ export default function EditProfileScreen() {
           onConfirm={confirmRemoveLocation}
           onCancel={() => setShowRemoveLocationConfirm(false)}
         />
-        <ConfirmModal
+        <AlertModal
           visible={locationPermissionPromptVisible}
           title="Location access"
-          message="Synq uses your location once to auto-fill your city and state. You can decline and enter your location manually instead."
-          confirmText="Continue"
-          cancelText="Not now"
-          onCancel={() => setLocationPermissionPromptVisible(false)}
-          onConfirm={() => {
+          message="Synq uses your location once to auto-fill your city and state."
+          buttonText="Continue"
+          onClose={() => {
             setLocationPermissionPromptVisible(false);
             void requestLocationAccessAndFill();
           }}
@@ -792,6 +769,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACE_5,
     alignItems: "center",
     justifyContent: "center",
+  },
+  saveButtonDisabled: {
+    opacity: 0.45,
   },
   saveButtonText: {
     color: ON_ACCENT_TEXT,

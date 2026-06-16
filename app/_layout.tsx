@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Asset } from "expo-asset";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
@@ -12,6 +13,17 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 import { onAuthStateChanged, signOut, updateProfile, User } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
+import {
+  activityNotificationId,
+  dismissActivityNotification,
+} from "@/src/lib/activityNotifications";
+import { requestDismissNavigationOverlays } from "@/src/lib/navigationOverlayEvents";
+import { setPendingChatOpen } from "@/src/lib/pendingChatOpen";
+import { parsePushNotificationTap } from "@/src/lib/pushNotificationTapCore";
+import {
+  parseProfileShareCodeFromUrl,
+  resolveProfileShareCodeToFriendId,
+} from "@/src/lib/profileShareUrl";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, {
   createContext,
@@ -21,42 +33,46 @@ import React, {
   useState,
 } from "react";
 import {
+  AppState,
   DeviceEventEmitter,
   Image,
-  InteractionManager,
   Platform,
   StyleSheet,
   View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { initSentry } from "../src/lib/sentryInit";
-
-initSentry();
 import LocationUpdateModal from "../components/LocationUpdateModal";
+import RequiredUpdateBlocker from "../components/RequiredUpdateBlocker";
 import { ACCENT, BG } from "../constants/Variables";
-import { auth, db } from "../src/lib/firebase";
+import { BlockedUsersProvider } from "../src/lib/blockedUsers";
 import {
   getPreAuthTermsAccepted,
   persistCommunityTermsAcceptance,
   userHasAcceptedCommunityTerms,
 } from "../src/lib/communityTerms";
+import { auth, db } from "../src/lib/firebase";
+import { checkAppUpdateRequired } from "../src/lib/appUpdateGate";
 import { LOCATION_PROMPT_CHECK_REQUEST } from "../src/lib/locationPromptEvents";
 import {
   hydrateOwnProfileFromDisk,
   prewarmMeTabScreen,
 } from "../src/lib/ownProfileCache";
+import { initSentry } from "../src/lib/sentryInit";
+import { initAnalytics } from "../src/lib/analytics";
+import OfflineBanner from "../src/components/OfflineBanner";
 import {
   hydrateSocialCachesFromDisk,
   warmSocialCachesInBackground,
 } from "../src/lib/socialCache";
 import { SynqBootProvider } from "../src/lib/synqBootContext";
-import { BlockedUsersProvider } from "../src/lib/blockedUsers";
 import {
   computeSynqActiveFromUserData,
+  getCachedSynqActiveSync,
+  hydrateSynqStatusFromDisk,
   readCachedSynqActive,
+  writeCachedSynqActive,
 } from "../src/lib/synqSession";
 import {
   displayNameFromUserDoc,
@@ -64,6 +80,9 @@ import {
   userHasDisplayName,
   userHasLocation,
 } from "../src/lib/userProfile";
+
+initSentry();
+void initAnalytics();
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -74,17 +93,20 @@ const SPLASH_LOGO = require("../assets/logo.png");
 const BOOT_SPLASH_MAX_MS = 6000;
 const PROFILE_GATE_TIMEOUT_MS = 12000;
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 async function registerForPushNotificationsAsync(): Promise<string | null> {
+  if (Platform.OS === "web") return null;
   try {
     let token: string | null = null;
 
@@ -135,11 +157,29 @@ const AuthContext = createContext({
 export const useAuthRefresh = () => useContext(AuthContext);
 const PENDING_INVITE_FROM_UID_KEY = "synq:pendingInviteFromUid";
 const PENDING_INVITE_CODE_KEY = "synq:pendingInviteCode";
+const PENDING_FRIEND_PROFILE_ID_KEY = "synq:pendingFriendProfileId";
+const PENDING_PROFILE_SHARE_CODE_KEY = "synq:pendingProfileShareCode";
 
 function cleanUid(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const v = raw.trim();
   return v ? v : null;
+}
+
+function parseFriendProfileIdFromUrl(url: string): string | null {
+  try {
+    const parsed = Linking.parse(url);
+    const path = String(parsed.path || "").trim().replace(/^\//, "");
+    const hostname = String(parsed.hostname || "").trim();
+    const isFriendProfile =
+      hostname === "friend-profile" || path === "friend-profile";
+    const isOpenPage = path === "open" || path.endsWith("/open");
+    if (!isFriendProfile && !isOpenPage) return null;
+    const friendIdRaw = parsed.queryParams?.friendId;
+    return cleanUid(Array.isArray(friendIdRaw) ? friendIdRaw[0] : friendIdRaw);
+  } catch {
+    return null;
+  }
 }
 
 function snoozedUntilMsFromField(raw: unknown): number {
@@ -172,6 +212,11 @@ export default function RootLayout() {
   } | null>(null);
   const synqBootUidRef = useRef<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [updateRequired, setUpdateRequired] = useState<{
+    checked: boolean;
+    required: boolean;
+    storeUrl: string | null;
+  }>({ checked: false, required: false, storeUrl: null });
   const [communityTermsOk, setCommunityTermsOk] = useState<boolean | null>(null);
   const [userProfileGate, setUserProfileGate] = useState<{
     hasDisplayName: boolean;
@@ -184,8 +229,13 @@ export default function RootLayout() {
     | { kind: "chat"; chatId: string; messageId?: string }
     | { kind: "notifications" }
     | { kind: "friend_profile"; friendId: string }
-    | { kind: "synq_home" }
-    | { kind: "me"; focusEventId?: string }
+    | { kind: "community_group"; groupId: string; planId?: string }
+    | {
+        kind: "synq_home";
+        fromUserId?: string;
+        notificationType?: "friend_synq_active" | "synq_nudge";
+      }
+    | { kind: "me"; focusEventId?: string; notificationId?: string }
     | null
   >(null);
 
@@ -194,9 +244,38 @@ export default function RootLayout() {
   };
 
   useEffect(() => {
-    const captureInviteFromUrl = async (url: string | null) => {
+    let cancelled = false;
+    void checkAppUpdateRequired().then((result) => {
+      if (cancelled) return;
+      setUpdateRequired({
+        checked: true,
+        required: result.required,
+        storeUrl: result.storeUrl,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const captureDeepLinkFromUrl = async (url: string | null) => {
       if (!url) return;
       try {
+        const shareCode = parseProfileShareCodeFromUrl(url);
+        if (shareCode) {
+          requestDismissNavigationOverlays();
+          await AsyncStorage.setItem(PENDING_PROFILE_SHARE_CODE_KEY, shareCode);
+          return;
+        }
+
+        const friendId = parseFriendProfileIdFromUrl(url);
+        if (friendId) {
+          requestDismissNavigationOverlays();
+          await AsyncStorage.setItem(PENDING_FRIEND_PROFILE_ID_KEY, friendId);
+          return;
+        }
+
         const parsed = Linking.parse(url);
         const path = String(parsed.path || "").trim();
         const fromRaw = parsed.queryParams?.from ?? parsed.queryParams?.inviteFrom;
@@ -215,66 +294,41 @@ export default function RootLayout() {
       } catch {}
     };
 
-    void Linking.getInitialURL().then(captureInviteFromUrl);
+    void Linking.getInitialURL().then(captureDeepLinkFromUrl);
     const sub = Linking.addEventListener("url", ({ url }) => {
-      void captureInviteFromUrl(url);
+      void captureDeepLinkFromUrl(url);
     });
     return () => sub.remove();
   }, []);
 
   useEffect(() => {
-    const str = (v: unknown): string | undefined => {
-      if (typeof v === "string" && v.trim()) return v.trim();
-      return undefined;
+    const dismissForPendingProfileLink = async () => {
+      const [shareCode, friendId] = await AsyncStorage.multiGet([
+        PENDING_PROFILE_SHARE_CODE_KEY,
+        PENDING_FRIEND_PROFILE_ID_KEY,
+      ]);
+      if (shareCode[1] || friendId[1]) {
+        requestDismissNavigationOverlays();
+      }
     };
 
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void dismissForPendingProfileLink();
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+
     const applyNotificationData = (data: Record<string, unknown> | undefined) => {
-      if (!data) return;
-      const chatRaw = data.chatId;
-      const chatId =
-        typeof chatRaw === "string"
-          ? chatRaw
-          : chatRaw != null
-            ? String(chatRaw)
-            : undefined;
-      const messageId = str(data.messageId);
-      const type = typeof data.type === "string" ? data.type : undefined;
-
-      if (chatId) {
-        setPendingNotificationTap({
-          kind: "chat",
-          chatId,
-          messageId: messageId || undefined,
-        });
-        return;
-      }
-
-      if (type === "friend_request") {
-        setPendingNotificationTap({ kind: "notifications" });
-        return;
-      }
-
-      if (type === "friend_accepted") {
-        const friendId = str(data.fromUserId);
-        if (friendId) {
-          setPendingNotificationTap({ kind: "friend_profile", friendId });
-        } else {
-          setPendingNotificationTap({ kind: "notifications" });
-        }
-        return;
-      }
-
-      if (type === "friend_synq_active" || type === "synq_nudge") {
-        setPendingNotificationTap({ kind: "synq_home" });
-        return;
-      }
-
-      if (type === "open_plan_interest") {
-        setPendingNotificationTap({
-          kind: "me",
-          focusEventId: str(data.eventId),
-        });
-        return;
+      const tap = parsePushNotificationTap(data);
+      if (tap) {
+        setPendingNotificationTap(
+          tap as NonNullable<typeof pendingNotificationTap>
+        );
       }
     };
 
@@ -305,23 +359,22 @@ export default function RootLayout() {
     let cancelled = false;
     if (synqBootUidRef.current !== user.uid) {
       synqBootUidRef.current = user.uid;
-      setSynqBoot({ cachedSynqActive: false });
+      setSynqBoot({ cachedSynqActive: getCachedSynqActiveSync(user.uid) });
     }
     (async () => {
-      let cachedSynqActive = false;
+      let cachedSynqActive = getCachedSynqActiveSync(user.uid);
       try {
-        const [cached, userSnap] = await Promise.all([
-          readCachedSynqActive(user.uid),
-          getDoc(doc(db, "users", user.uid)),
-        ]);
+        const userSnap = await getDoc(doc(db, "users", user.uid));
         cachedSynqActive = userSnap.exists()
           ? computeSynqActiveFromUserData(userSnap.data())
-          : cached;
+          : cachedSynqActive;
+        writeCachedSynqActive(user.uid, cachedSynqActive);
       } catch {
         try {
           cachedSynqActive = await readCachedSynqActive(user.uid);
+          writeCachedSynqActive(user.uid, cachedSynqActive);
         } catch {
-          cachedSynqActive = false;
+          cachedSynqActive = getCachedSynqActiveSync(user.uid);
         }
       }
       if (!cancelled) {
@@ -377,7 +430,9 @@ export default function RootLayout() {
         await Promise.all([
           hydrateSocialCachesFromDisk(u.uid),
           hydrateOwnProfileFromDisk(u.uid),
+          hydrateSynqStatusFromDisk(u.uid),
         ]);
+        setSynqBoot({ cachedSynqActive: getCachedSynqActiveSync(u.uid) });
         prewarmMeTabScreen(u.uid);
         const cachedGate = profileGateFromCache(u.uid);
         if (cachedGate) {
@@ -397,14 +452,16 @@ export default function RootLayout() {
 
       if (u) {
         warmSocialCachesInBackground(u.uid);
-        void registerForPushNotificationsAsync()
-          .then(async (token) => {
-            if (!token) return;
-            try {
-              await updateDoc(doc(db, "users", u.uid), { pushToken: token });
-            } catch {}
-          })
-          .catch(() => {});
+        if (Platform.OS !== "web") {
+          void registerForPushNotificationsAsync()
+            .then(async (token) => {
+              if (!token) return;
+              try {
+                await updateDoc(doc(db, "users", u.uid), { pushToken: token });
+              } catch {}
+            })
+            .catch(() => {});
+        }
       }
     });
 
@@ -560,9 +617,7 @@ export default function RootLayout() {
               ? { hasDisplayName: true, hasLocation: false }
               : { hasDisplayName: false, hasLocation: false });
           setUserProfileGate(fallbackGate);
-          setCommunityTermsOk(
-            fallbackGate.hasDisplayName ? true : false
-          );
+          setCommunityTermsOk(fallbackGate.hasDisplayName ? true : false);
         }
       }
     })();
@@ -583,11 +638,15 @@ export default function RootLayout() {
     const onDetailsPage = segments[1] === "details";
     const onProfilePhotoCropPage = segments[0] === "profile-photo-crop";
     const onCommunityTermsPage = segments[1] === "community-terms";
+    const onFriendProfile = segments[0] === "friend-profile";
     const hasName =
       !!user?.displayName || userProfileGate?.hasDisplayName === true;
 
     if (!user) {
-      if (!inAuthGroup) router.replace("/(auth)/welcome");
+      if (!inAuthGroup) {
+        if (onFriendProfile && !authReady) return;
+        router.replace("/(auth)/welcome");
+      }
       return;
     }
 
@@ -687,6 +746,90 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!authReady || !navReady || !assetsReady) return;
+    if (!user?.uid) return;
+    const hasName =
+      !!user.displayName || userProfileGate?.hasDisplayName === true;
+    if (!hasName) return;
+    if (synqBoot === null) return;
+
+    let cancelled = false;
+    const processPendingFriendProfile = async () => {
+      const friendId = cleanUid(
+        await AsyncStorage.getItem(PENDING_FRIEND_PROFILE_ID_KEY)
+      );
+      if (!friendId || cancelled) return;
+      await AsyncStorage.removeItem(PENDING_FRIEND_PROFILE_ID_KEY);
+      if (friendId === user.uid) return;
+      if (segments[0] === "friend-profile") return;
+      requestDismissNavigationOverlays();
+      router.push({
+        pathname: "/friend-profile",
+        params: { friendId },
+      });
+      requestAnimationFrame(() => requestDismissNavigationOverlays());
+    };
+
+    void processPendingFriendProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authReady,
+    navReady,
+    assetsReady,
+    user?.uid,
+    user?.displayName,
+    userProfileGate,
+    synqBoot,
+    segments,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (!authReady || !navReady || !assetsReady) return;
+    if (!user?.uid) return;
+    const hasName =
+      !!user.displayName || userProfileGate?.hasDisplayName === true;
+    if (!hasName) return;
+    if (synqBoot === null) return;
+
+    let cancelled = false;
+    const processPendingProfileShareCode = async () => {
+      const shareCode = cleanUid(
+        await AsyncStorage.getItem(PENDING_PROFILE_SHARE_CODE_KEY)
+      );
+      if (!shareCode || cancelled) return;
+      await AsyncStorage.removeItem(PENDING_PROFILE_SHARE_CODE_KEY);
+      const friendId = await resolveProfileShareCodeToFriendId(shareCode);
+      if (!friendId || cancelled) return;
+      if (friendId === user.uid) return;
+      if (segments[0] === "friend-profile") return;
+      requestDismissNavigationOverlays();
+      router.push({
+        pathname: "/friend-profile",
+        params: { friendId },
+      });
+      requestAnimationFrame(() => requestDismissNavigationOverlays());
+    };
+
+    void processPendingProfileShareCode();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authReady,
+    navReady,
+    assetsReady,
+    user?.uid,
+    user?.displayName,
+    userProfileGate,
+    synqBoot,
+    segments,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (!authReady || !navReady || !assetsReady) return;
     if (!user) return;
     if (synqBoot === null) return;
     if (!pendingNotificationTap) return;
@@ -699,20 +842,51 @@ export default function RootLayout() {
       return;
     }
 
-    if (pending.kind === "friend_profile") {
+    if (pending.kind === "community_group") {
       router.push({
-        pathname: "/friend-profile",
-        params: { friendId: pending.friendId },
+        pathname: "/community-group/[id]",
+        params: {
+          id: pending.groupId,
+          ...(pending.planId ? { planId: pending.planId } : {}),
+        },
       });
       return;
     }
 
+    if (pending.kind === "friend_profile") {
+      if (pending.friendId !== user.uid) {
+        void dismissActivityNotification(
+          user.uid,
+          `${pending.friendId}_accepted_${user.uid}`
+        ).catch(() => {});
+        requestDismissNavigationOverlays();
+        router.push({
+          pathname: "/friend-profile",
+          params: { friendId: pending.friendId },
+        });
+      }
+      return;
+    }
+
     if (pending.kind === "synq_home") {
+      const fromUserId = pending.fromUserId;
+      const notificationType = pending.notificationType;
+      if (fromUserId && notificationType) {
+        void dismissActivityNotification(
+          user.uid,
+          activityNotificationId(notificationType, fromUserId, user.uid)
+        ).catch(() => {});
+      }
       router.push("/(tabs)");
       return;
     }
 
     if (pending.kind === "me") {
+      if (pending.notificationId) {
+        void dismissActivityNotification(user.uid, pending.notificationId).catch(
+          () => {}
+        );
+      }
       if (pending.focusEventId) {
         router.push(
           `/(tabs)/me?focusEventId=${encodeURIComponent(pending.focusEventId)}`
@@ -724,28 +898,10 @@ export default function RootLayout() {
     }
 
     if (pending.kind === "chat") {
-      router.push("/(tabs)");
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      let timeoutId2: ReturnType<typeof setTimeout> | undefined;
-      const handle = InteractionManager.runAfterInteractions(() => {
-        timeoutId = setTimeout(() => {
-          DeviceEventEmitter.emit("openChat", {
-            chatId: pending.chatId,
-            messageId: pending.messageId,
-          });
-        }, 700);
-        timeoutId2 = setTimeout(() => {
-          DeviceEventEmitter.emit("openChat", {
-            chatId: pending.chatId,
-            messageId: pending.messageId,
-          });
-        }, 1400);
-      });
-      return () => {
-        handle.cancel?.();
-        if (timeoutId) clearTimeout(timeoutId);
-        if (timeoutId2) clearTimeout(timeoutId2);
-      };
+      requestDismissNavigationOverlays();
+      setPendingChatOpen(pending.chatId, pending.messageId);
+      router.replace("/(tabs)");
+      return;
     }
   }, [
     authReady,
@@ -818,6 +974,14 @@ export default function RootLayout() {
       />
     ) : null;
 
+  if (updateRequired.checked && updateRequired.required) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <RequiredUpdateBlocker storeUrl={updateRequired.storeUrl} />
+      </GestureHandlerRootView>
+    );
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
@@ -828,19 +992,45 @@ export default function RootLayout() {
           >
             <BlockedUsersProvider>
             <View style={styles.root}>
+              <OfflineBanner />
               {navReady ? (
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="(auth)" />
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen
                     name="friend-profile"
+                    options={({ route }) => ({
+                      animation:
+                        (route.params as { from?: string } | undefined)?.from ===
+                        "chat"
+                          ? "none"
+                          : "slide_from_right",
+                      gestureEnabled: true,
+                    })}
+                  />
+                  <Stack.Screen
+                    name="friend-group/[id]"
                     options={{
                       animation: "slide_from_right",
                       gestureEnabled: true,
                     }}
                   />
                   <Stack.Screen
-                    name="friend-group/[id]"
+                    name="community-group/create"
+                    options={{
+                      animation: "slide_from_right",
+                      gestureEnabled: true,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="community-group/edit"
+                    options={{
+                      animation: "slide_from_right",
+                      gestureEnabled: true,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="community-group/[id]"
                     options={{
                       animation: "slide_from_right",
                       gestureEnabled: true,
@@ -893,7 +1083,9 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   bootSplashLogo: {
-    width: 300,
-    height: 220,
+    width: 150,
+    height: 150,
+    maxWidth: "42%",
+    maxHeight: "22%",
   },
 });

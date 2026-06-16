@@ -1,18 +1,52 @@
+import ProfileTabHeaderOverlay from '@/src/components/ProfileTabHeaderOverlay';
+import { useChatMessages } from '@/src/hooks/useChatMessages';
+import { useSendMessage } from '@/src/hooks/useSendMessage';
+import { useTypingIndicator } from '@/src/hooks/useTypingIndicator';
+import { mergeMessages, pendingMatchesServer, type ChatMessage } from '@/src/lib/chatMessages';
+import { trackEvent } from '@/src/lib/analytics';
+import { useBlockedUsers } from '@/src/lib/blockedUsers';
+import { deleteChat } from '@/src/lib/chats';
+import { filterOrReject } from '@/src/lib/contentFilter';
+import { ignoreSnapshotPermissionDenied } from '@/src/lib/firestoreListeners';
+import { subscribeFriendGroups, type FriendGroup } from '@/src/lib/friendGroups';
+import {
+  findChatWithParticipants,
+  mergeParticipantMaps,
+  mergeParticipantSets,
+  participantsMatch,
+  uniqueChatIds,
+} from '@/src/lib/mergeChats';
+import {
+  friendGroupsCacheByUser,
+  friendsListCacheByUser,
+  pollSynqActiveFriends,
+  SYNQ_FRIEND_POLL_TTL_MS,
+} from '@/src/lib/socialCache';
+import {
+  buildSynqBroadcastFirestorePayload,
+  filterActiveFriendsForInbound,
+  formatSynqAudienceLabel,
+  getMyAudienceSet,
+  loadSynqAudiencePreference,
+  saveSynqAudiencePreference,
+  selectionFromUserBroadcastFields,
+  type SynqAudienceSelection,
+} from '@/src/lib/synqBroadcast';
+import { useSynqBoot } from '@/src/lib/synqBootContext';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ExpoImage } from "expo-image";
-import * as Notifications from "expo-notifications";
 import {
   addDoc,
   arrayRemove,
   arrayUnion,
   collection,
-  deleteDoc,
   deleteField,
   doc,
   getDoc,
-  increment,
   onSnapshot,
   orderBy,
   query,
@@ -20,21 +54,15 @@ import {
   updateDoc,
   where
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import React, { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import Reanimated, {
-  FadeIn,
-  FadeOut,
-  SlideInLeft,
-  SlideInRight,
-  SlideOutLeft,
-  SlideOutRight,
-} from 'react-native-reanimated';
 import {
   Animated,
-  Easing,
+  ActivityIndicator,
+  BackHandler,
   DeviceEventEmitter,
+  Easing,
   FlatList,
+  InteractionManager,
   Keyboard,
   Modal,
   PixelRatio,
@@ -43,15 +71,21 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   TouchableWithoutFeedback,
   useWindowDimensions,
   Vibration,
-  View,
+  View
 } from 'react-native';
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Reanimated, {
+  FadeIn,
+  FadeOut,
+} from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
+type MessagesPane = "inbox" | "chat" | "profile";
 import {
   ACCENT,
+  AI_PLACE_SUGGESTIONS_ENABLED,
   aiPrompts,
   BG,
   BORDER,
@@ -66,61 +100,68 @@ import {
   ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
+  SPACE_3,
   SPACE_4,
   SPACE_5,
   SURFACE,
-  TEXT,
   tabScreenMainHeaderTitle,
+  TEXT,
+  cardMetaText,
+  cardTitleText,
+  listSectionTitle,
   TYPE_BODY,
+  TYPE_FINE,
+  TYPE_LEAD,
 } from '../../constants/Variables';
-import { ignoreSnapshotPermissionDenied } from '@/src/lib/firestoreListeners';
+import ActiveSynqSection from '../../src/components/synq/ActiveSynqSection';
+import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
+import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
+import MessagesModalStack from '../../src/components/synq/MessagesModalStack';
 import { auth, db } from '../../src/lib/firebase';
-import { useAuthRefresh } from '../_layout';
-import { useSynqBoot } from "../../src/lib/synqBootContext";
+import {
+  buildLocationPrompt,
+  formatUserLocationLabel,
+  uniqueLocationLabels,
+  type ChatAiLocationStatus,
+} from "../../src/lib/chatAiLocation";
+import {
+  allParticipantsHaveCachedCitySuggestions,
+  getCachedCitySuggestions,
+  hasCachedCitySuggestions,
+} from "../../src/lib/citySuggestions";
+import type { SynqSuggestion } from "../../src/lib/synqSuggestions";
 import {
   computeSynqActiveFromUserData,
-  synqStatusStorageKey,
+  getCachedSynqActiveSync,
+  writeCachedSynqActive,
 } from "../../src/lib/synqSession";
-import ConfirmModal from '../confirm-modal';
+import { registerDismissNavigationOverlaysHandler } from "../../src/lib/navigationOverlayEvents";
+import { consumePendingChatOpen, subscribePendingChatOpen } from "../../src/lib/pendingChatOpen";
+import { getCachedOwnProfile } from "../../src/lib/ownProfileCache";
+import { userHasLocation } from "../../src/lib/userProfile";
+import { useAuthRefresh } from '../_layout';
 import AlertModal from '../alert-modal';
-import { filterOrReject } from '@/src/lib/contentFilter';
-import {
-  findChatWithParticipants,
-  mergeParticipantMaps,
-  mergeParticipantSets,
-  participantsMatch,
-} from '@/src/lib/mergeChats';
-import { useBlockedUsers } from '@/src/lib/blockedUsers';
-import ReportModal from '../report-modal';
+import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
+import {
+  GROUP_BORDER,
+  GROUP_SURFACE,
+} from '../../src/components/friends/groupsListStyles';
+import FriendProfile from '../friend-profile';
 import {
   getChatTitle as buildChatTitle,
   getStackAvatarUris,
+  isCustomAvatar,
   resolveAvatar,
-  SynqStatus,
-  wrapChatTitle,
-} from '../helpers';
-import { openInMaps } from '../map-utils';
-import ActiveSynqSection from '../../src/components/synq/ActiveSynqSection';
-import ProfileTabHeaderOverlay from '@/src/components/ProfileTabHeaderOverlay';
-import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
-import MessagesInboxPane from '../../src/components/synq/MessagesInboxPane';
-import EditSynqModal from '../synq-screens/EditSynqModal';
+  resolveChatSenderAvatar,
+  SynqStatus
+} from '@/src/lib/helpers';
+import { openInMaps } from "@/src/lib/openInMaps";
+import ReportModal from '../report-modal';
 import ChangeSynqAudienceModal from '../synq-screens/ChangeSynqAudienceModal';
+import EditSynqModal from '../synq-screens/EditSynqModal';
 import InactiveSynqView from '../synq-screens/InactiveSynqView';
 import SynqActivatingView from '../synq-screens/SynqActivatingView';
-import {
-  buildSynqBroadcastFirestorePayload,
-  filterActiveFriendsForInbound,
-  formatSynqAudienceLabel,
-  loadSynqAudiencePreference,
-  saveSynqAudiencePreference,
-  selectionFromUserBroadcastFields,
-  type SynqAudienceSelection,
-  getMyAudienceSet,
-} from '@/src/lib/synqBroadcast';
-import { subscribeFriendGroups, type FriendGroup } from '@/src/lib/friendGroups';
-import { friendGroupsCacheByUser, friendsListCacheByUser } from '@/src/lib/socialCache';
 
 function prefetchParticipantAvatars(chat: { participantImages?: Record<string, unknown> } | null | undefined) {
   const images = chat?.participantImages || {};
@@ -140,10 +181,11 @@ const IMESSAGE_REF_SCREEN_WIDTH = 375;
 const IMESSAGE_BUBBLE_MAX_WIDTH_PT = 252;
 const IMESSAGE_BUBBLE_FONT_SIZE = 17;
 const IMESSAGE_BUBBLE_LINE_HEIGHT = 22;
-const IMESSAGE_BUBBLE_PADDING_H = 9;
-const IMESSAGE_BUBBLE_PADDING_V = 8;
+/** MessageKit / Messages.app label insets (top/bottom). */
+const IMESSAGE_BUBBLE_PADDING_V = 7;
+/** Horizontal inset inside the bubble (symmetric; tail space not needed in flat bubbles). */
+const IMESSAGE_BUBBLE_PADDING_H = 10;
 const IMESSAGE_BUBBLE_CORNER_RADIUS = 18;
-const MESSAGE_BUBBLE_MIN_HEIGHT = 36;
 const IMESSAGE_CHAT_HORIZONTAL_INSET = 8;
 const IMESSAGE_BUBBLE_OUTER_MARGIN = 6;
 const IMESSAGE_INCOMING_AVATAR_BLOCK = 34 + 7;
@@ -163,17 +205,22 @@ function ChatMessageBubble({
   isMe,
   onPress,
   heartCount,
+  sendStatus,
 }: {
   text: string;
   bubbleCap: number;
   isMe: boolean;
   onPress: () => void;
   heartCount: number;
+  sendStatus?: "sending" | "failed";
 }) {
   const fontScale = PixelRatio.getFontScale();
-  const padH = Math.round(IMESSAGE_BUBBLE_PADDING_H * fontScale);
+  const fontSize = IMESSAGE_BUBBLE_FONT_SIZE * fontScale;
+  const lineHeight = IMESSAGE_BUBBLE_LINE_HEIGHT * fontScale;
   const padV = Math.round(IMESSAGE_BUBBLE_PADDING_V * fontScale);
-  const innerMax = bubbleCap - 2 * padH;
+  const padH = Math.round(IMESSAGE_BUBBLE_PADDING_H * fontScale);
+  const minHeight = padV * 2 + lineHeight;
+  const innerMax = bubbleCap - padH * 2;
 
   return (
     <Pressable onPress={onPress}>
@@ -181,8 +228,14 @@ function ChatMessageBubble({
         style={[
           styles.bubble,
           isMe ? styles.myBubble : styles.theirBubble,
-          { paddingHorizontal: padH, paddingVertical: padV },
-          { maxWidth: bubbleCap, alignSelf: "flex-start" },
+          {
+            paddingTop: padV,
+            paddingBottom: padV,
+            paddingHorizontal: padH,
+            minHeight,
+            maxWidth: bubbleCap,
+            alignSelf: "flex-start",
+          },
           { position: "relative", overflow: "visible" },
         ]}
       >
@@ -191,28 +244,40 @@ function ChatMessageBubble({
             styles.bubbleText,
             {
               color: isMe ? "black" : "white",
+              fontSize,
+              lineHeight,
               maxWidth: innerMax,
               textAlign: "left",
             },
+            sendStatus === "failed" && { color: isMe ? "#8B0000" : "#FFB4B4" },
           ]}
+          {...Platform.select({
+            ios: { lineBreakStrategyIOS: "standard" as const },
+            android: { textBreakStrategy: "simple" as const },
+          })}
         >
           {text}
         </Text>
+        {sendStatus === "failed" ? (
+          <Text style={styles.failedMessageHint}>Tap to retry</Text>
+        ) : null}
         {heartCount > 0 ? (
           <View
             style={[
               styles.heartReaction,
-              isMe ? { left: -4, right: undefined } : { right: -6, left: undefined },
+              isMe ? { left: -10, right: undefined } : { right: -10, left: undefined },
             ]}
           >
             {Array.from({ length: heartCount }, (_, i) => (
-              <Ionicons
+              <View
                 key={i}
-                name="heart"
-                size={14}
-                color="#FF2D55"
-                style={{ marginLeft: i > 0 ? 3 : 0 }}
-              />
+                style={[
+                  styles.heartReactionBadge,
+                  i > 0 && styles.heartReactionBadgeOverlap,
+                ]}
+              >
+                <Ionicons name="heart" size={12} color="#FF2D55" />
+              </View>
             ))}
           </View>
         ) : null}
@@ -221,9 +286,17 @@ function ChatMessageBubble({
   );
 }
 
+const MemoChatMessageBubble = React.memo(ChatMessageBubble);
+
 export default function SynqScreen() {
   const { user } = useAuthRefresh();
   const synqBoot = useSynqBoot();
+  const router = useRouter();
+  const routeParams = useLocalSearchParams<{
+    openChatId?: string | string[];
+    openPendingChat?: string;
+  }>();
+  const isIndexFocused = useIsFocused();
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const tabletContentStyle =
@@ -232,10 +305,13 @@ export default function SynqScreen() {
       : undefined;
 
   const [memo, setMemo] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
+  const uid = user?.uid ?? "";
+  const cachedSynqActiveOnMount =
+    synqBoot?.cachedSynqActive === true ||
+    (uid ? getCachedSynqActiveSync(uid) : false);
   const [synq, setSynq] = useState<SynqUi>(() => ({
-    status: synqBoot?.cachedSynqActive ? "active" : "idle",
-    hydrated: false,
+    status: cachedSynqActiveOnMount ? "active" : "idle",
+    hydrated: cachedSynqActiveOnMount,
   }));
   const { status, hydrated } = synq;
   const [availableFriends, setAvailableFriends] = useState<any[]>([]);
@@ -243,18 +319,27 @@ export default function SynqScreen() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [messagesModalVisible, setMessagesModalVisible] = useState(false);
-  const [messagesPane, setMessagesPane] = useState<"inbox" | "chat">("inbox");
+  const [messagesPane, setMessagesPane] = useState<MessagesPane>("inbox");
+  const messagesPaneRef = useRef<MessagesPane>("inbox");
+  const [profileFriendId, setProfileFriendId] = useState<string | null>(null);
   const isChatPaneOpen = messagesModalVisible && messagesPane === "chat";
   const [isExploreVisible, setIsExploreVisible] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [chatOpenAnchorKey, setChatOpenAnchorKey] = useState(0);
+  const bumpChatOpenAnchor = useCallback(() => {
+    setChatOpenAnchorKey((key) => key + 1);
+  }, []);
   const [pendingNewChat, setPendingNewChat] = useState<{
+    chatId?: string;
     participants: string[];
     participantNames: Record<string, string>;
     participantImages: Record<string, string>;
+    communityGroupId?: string;
+    communityGroupName?: string;
+    communityPlanId?: string;
+    communityPlanTitle?: string;
   } | null>(null);
   const [allChats, setAllChats] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [messagesReady, setMessagesReady] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isAILoading, setIsAILoading] = useState(false);
   const [showAICard, setShowAICard] = useState(false);
@@ -264,9 +349,9 @@ export default function SynqScreen() {
   const [showOptionsList, setShowOptionsList] = useState(false);
   const [currentCategory, setCurrentCategory] = useState('');
   const flatListRef = useRef<FlatList>(null);
+  const chatOpenGraceRef = useRef<Map<string, number>>(new Map());
   const [pendingScrollToMessageId, setPendingScrollToMessageId] = useState<string | null>(null);
   const lastTapRef = useRef<{ [key: string]: number }>({});
-  const ideaMapOpenTimerRef = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
   const [hasUnread, setHasUnread] = useState(false);
   const [showEndSynqModal, setShowEndSynqModal] = useState(false);
   const [friendGroups, setFriendGroups] = useState<FriendGroup[]>([]);
@@ -284,9 +369,12 @@ export default function SynqScreen() {
   const [isMergingChats, setIsMergingChats] = useState(false);
   const [inboxActionChat, setInboxActionChat] = useState<any | null>(null);
   const [rotatingAIText, setRotatingAIText] = useState(aiPrompts[0]);
+  const [aiExploreError, setAiExploreError] = useState<string | null>(null);
+  const activeParticipantIdsRef = useRef<string[]>([]);
   const [isStartingSynq, setIsStartingSynq] = useState(false);
   const [launchOverlay, setLaunchOverlay] = useState(false);
   const [contentAlertVisible, setContentAlertVisible] = useState(false);
+  const [contentAlertTitle, setContentAlertTitle] = useState("Content not allowed");
   const [contentAlertMessage, setContentAlertMessage] = useState("");
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<{
@@ -298,36 +386,43 @@ export default function SynqScreen() {
   const activePulseOpacity = useRef(new Animated.Value(1)).current;
   const activePulseScale = useRef(new Animated.Value(1)).current;
 
+  useEffect(() => {
+    messagesPaneRef.current = messagesPane;
+  }, [messagesPane]);
+
+  const navigateMessagesPane = useCallback((next: MessagesPane) => {
+    if (next === messagesPaneRef.current) return;
+    setMessagesPane(next);
+  }, []);
+
+  const hiddenChatIds = useMemo(
+    () =>
+      Array.isArray(userProfile?.hiddenChatIds)
+        ? (userProfile.hiddenChatIds as string[]).filter(Boolean)
+        : [],
+    [userProfile?.hiddenChatIds]
+  );
+
   const visibleChats = useMemo(() => {
     const myId = auth.currentUser?.uid;
     if (!myId) return allChats;
+    const hidden = new Set(hiddenChatIds);
     return allChats.filter(
       (c) =>
+        !hidden.has(c.id) &&
         !(c.participants || []).some(
           (p: string) => p && p !== myId && isBlocked(p)
         )
     );
-  }, [allChats, isBlocked]);
-
-  const pinnedChatIds = useMemo(
-    () =>
-      Array.isArray(userProfile?.pinnedChatIds)
-        ? (userProfile.pinnedChatIds as string[]).filter(Boolean)
-        : [],
-    [userProfile?.pinnedChatIds]
-  );
+  }, [allChats, isBlocked, hiddenChatIds]);
 
   const inboxChats = useMemo(() => {
-    const pinned = new Set(pinnedChatIds);
     return [...visibleChats].sort((a, b) => {
-      const aPinned = pinned.has(a.id) ? 1 : 0;
-      const bPinned = pinned.has(b.id) ? 1 : 0;
-      if (aPinned !== bPinned) return bPinned - aPinned;
       const aMs = a.updatedAt?.toMillis?.() ?? a.createdAt?.toMillis?.() ?? 0;
       const bMs = b.updatedAt?.toMillis?.() ?? b.createdAt?.toMillis?.() ?? 0;
       return bMs - aMs;
     });
-  }, [visibleChats, pinnedChatIds]);
+  }, [visibleChats]);
 
   useEffect(() => {
     if (!activeChatId || !auth.currentUser?.uid) return;
@@ -340,15 +435,16 @@ export default function SynqScreen() {
       )
     ) {
       setActiveChatId(null);
-      setMessages([]);
-      setMessagesPane("inbox");
+      clearMessages();
+      navigateMessagesPane("inbox");
       setPendingNewChat(null);
     }
-  }, [activeChatId, allChats, isBlocked]);
+  }, [activeChatId, allChats, isBlocked, navigateMessagesPane]);
 
   const rejectIfObjectionable = (text: string): boolean => {
     const result = filterOrReject(text);
     if (!result.ok) {
+      setContentAlertTitle("Content not allowed");
       setContentAlertMessage(result.reason);
       setContentAlertVisible(true);
       return true;
@@ -356,23 +452,213 @@ export default function SynqScreen() {
     return false;
   };
 
-  const showActionError = (message: string) => {
+  const showActionError = useCallback((message: string, title = "Something went wrong") => {
+    setContentAlertTitle(title);
     setContentAlertMessage(message);
     setContentAlertVisible(true);
-  };
-  const markChatRead = async (chatId: string) => {
-    if (!auth.currentUser) return;
-    const myId = auth.currentUser.uid;
+  }, []);
 
-    try {
-      await updateDoc(doc(db, 'chats', chatId), {
-        [`lastReadBy.${myId}`]: serverTimestamp(),
-      });
-    } catch {}
+  const {
+    serverMessages,
+    messagesReady,
+    listenerError,
+    hasEarlierMessages,
+    loadingEarlier,
+    messagesCacheByChatIdRef,
+    prepareChatSync,
+    hydrateChatMessages,
+    loadEarlierMessages,
+    markChatRead,
+    retryListener,
+    clearMessages,
+  } = useChatMessages({
+    activeChatId,
+    isChatPaneOpen,
+    pendingNewChat,
+  });
+
+  const moderationTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const serverMessagesRef = useRef<ReturnType<typeof useChatMessages>["serverMessages"]>([]);
+  const onMessageDeliveredRef = useRef<
+    (clientId: string, meta: { text: string; senderId: string; sentAt: number }) => void
+  >(() => {});
+
+  const {
+    pendingMessages,
+    sendMessage: sendMessageCore,
+    retryFailedMessage,
+    clearPendingMessages,
+    ensureChatFromPending,
+    recentlySentRef,
+    sendOrderByServerIdRef,
+  } = useSendMessage({
+    activeChatId,
+    pendingNewChat,
+    allChats,
+    serverMessages,
+    setActiveChatId,
+    setPendingNewChat,
+    resolveAvatar,
+    userAvatar: userProfile?.imageurl,
+    rejectIfObjectionable,
+    isBlocked,
+    onSendError: (msg) => showActionError(msg),
+    onMessageDelivered: (clientId, meta) => onMessageDeliveredRef.current(clientId, meta),
+  });
+
+  const messages = useMemo(() => {
+    const merged = mergeMessages(serverMessages, pendingMessages);
+    const orderHints = sendOrderByServerIdRef.current;
+    if (orderHints.size === 0) return merged;
+    return merged.map((message: ChatMessage & { sendOrder?: number }) => {
+      if (typeof message.sendOrder === "number") return message;
+      const sendOrder = orderHints.get(message.id);
+      return sendOrder != null ? { ...message, sendOrder } : message;
+    });
+  }, [serverMessages, pendingMessages]);
+
+  serverMessagesRef.current = serverMessages;
+
+  onMessageDeliveredRef.current = (clientId, meta) => {
+    const existing = moderationTimersRef.current.get(clientId);
+    if (existing) clearTimeout(existing);
+
+    const timer = setTimeout(() => {
+      moderationTimersRef.current.delete(clientId);
+      if (!recentlySentRef.current.has(clientId)) return;
+
+      const matched = serverMessagesRef.current.some((m) =>
+        pendingMatchesServer(
+          {
+            id: clientId,
+            clientId,
+            text: meta.text,
+            senderId: meta.senderId,
+            sendStatus: "sending",
+            createdAt: meta.sentAt,
+          },
+          m
+        )
+      );
+      recentlySentRef.current.delete(clientId);
+      if (!matched) {
+        showActionError(
+          "This message was removed because it isn't allowed on Synq.",
+          "Message removed"
+        );
+      }
+    }, 12_000);
+
+    moderationTimersRef.current.set(clientId, timer);
   };
+
+  useEffect(() => {
+    if (!messagesReady || recentlySentRef.current.size === 0) return;
+
+    for (const [clientId, meta] of [...recentlySentRef.current.entries()]) {
+      const matched = serverMessages.some((m) =>
+        pendingMatchesServer(
+          {
+            id: clientId,
+            clientId,
+            text: meta.text,
+            senderId: meta.senderId,
+            sendStatus: "sending",
+            createdAt: meta.sentAt,
+          },
+          m
+        )
+      );
+      if (matched) {
+        recentlySentRef.current.delete(clientId);
+        const pendingTimer = moderationTimersRef.current.get(clientId);
+        if (pendingTimer) clearTimeout(pendingTimer);
+        moderationTimersRef.current.delete(clientId);
+      }
+    }
+  }, [serverMessages, messagesReady, recentlySentRef]);
+
+  useEffect(() => {
+    return () => {
+      moderationTimersRef.current.forEach((timer) => clearTimeout(timer));
+      moderationTimersRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!messagesModalVisible) return;
+    for (const chat of inboxChats) {
+      if (messagesCacheByChatIdRef.current[chat.id]) continue;
+      void hydrateChatMessages(chat.id);
+    }
+  }, [messagesModalVisible, inboxChats, hydrateChatMessages]);
+
+  const prefetchChatOnPress = useCallback(
+    (chatId: string) => {
+      const chat = allChats.find((c) => c.id === chatId);
+      if (chat) prefetchParticipantAvatars(chat);
+      if (!messagesCacheByChatIdRef.current[chatId]) {
+        void hydrateChatMessages(chatId);
+      }
+    },
+    [allChats, hydrateChatMessages, messagesCacheByChatIdRef]
+  );
+
+  const beginOpeningChat = useCallback(
+    (chatId: string) => {
+      setPendingNewChat(null);
+      prepareChatSync(chatId);
+      setActiveChatId(chatId);
+      bumpChatOpenAnchor();
+      navigateMessagesPane("chat");
+      void markChatRead(chatId);
+    },
+    [
+      prepareChatSync,
+      bumpChatOpenAnchor,
+      navigateMessagesPane,
+      markChatRead,
+    ]
+  );
+
+  const openChatById = useCallback(
+    async (
+      chatId: string,
+      opts?: { messageId?: string | null; prefetchChatDoc?: boolean }
+    ) => {
+      if (opts?.prefetchChatDoc !== false) {
+        try {
+          const snap = await getDoc(doc(db, "chats", chatId));
+          if (snap.exists()) {
+            prefetchParticipantAvatars(snap.data() as { participantImages?: Record<string, unknown> });
+          }
+        } catch {}
+      }
+      setPendingNewChat(null);
+      beginOpeningChat(chatId);
+      setMessagesModalVisible(true);
+      const mid = opts?.messageId;
+      setPendingScrollToMessageId(
+        typeof mid === "string" && mid.trim() ? mid.trim() : null
+      );
+    },
+    [beginOpeningChat]
+  );
 
   const DOUBLE_TAP_MS = 320;
-  const onMessageBubblePress = (item: { id: string; reactions?: Record<string, string> }) => {
+  const onMessageBubblePress = (item: {
+    id: string;
+    text?: string;
+    clientId?: string;
+    sendStatus?: "sending" | "failed";
+    reactions?: Record<string, string>;
+  }) => {
+    if (item.sendStatus === "failed" && item.text) {
+      void retryFailedMessage(item.clientId || item.id, item.text);
+      return;
+    }
+    if (item.id.startsWith("pending-")) return;
+
     const now = Date.now();
     const last = lastTapRef.current[item.id] ?? 0;
     if (now - last < DOUBLE_TAP_MS) {
@@ -391,33 +677,18 @@ export default function SynqScreen() {
     const now = Date.now();
     const last = lastTapRef.current[item.id] ?? 0;
     if (now - last < DOUBLE_TAP_MS) {
-      const pending = ideaMapOpenTimerRef.current[item.id];
-      if (pending) clearTimeout(pending);
-      delete ideaMapOpenTimerRef.current[item.id];
       lastTapRef.current[item.id] = 0;
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       void toggleHeartReaction(item.id, item.reactions);
       return;
     }
     lastTapRef.current[item.id] = now;
-    const prev = ideaMapOpenTimerRef.current[item.id];
-    if (prev) clearTimeout(prev);
-    ideaMapOpenTimerRef.current[item.id] = setTimeout(() => {
-      delete ideaMapOpenTimerRef.current[item.id];
-      lastTapRef.current[item.id] = 0;
-      openInMaps(mapsPayload);
-    }, DOUBLE_TAP_MS);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    openInMaps(mapsPayload);
   };
 
   useEffect(() => {
-    if (isChatPaneOpen) return;
-    Object.values(ideaMapOpenTimerRef.current).forEach((t) => {
-      if (t) clearTimeout(t);
-    });
-    ideaMapOpenTimerRef.current = {};
-  }, [isChatPaneOpen]);
-
-  useEffect(() => {
+    if (!AI_PLACE_SUGGESTIONS_ENABLED) return;
     let index = 0;
 
     const interval = setInterval(() => {
@@ -467,74 +738,101 @@ export default function SynqScreen() {
     };
   }, [status, activePulseOpacity, activePulseScale]);
 
+  const openPendingChatFromNotification = useCallback(() => {
+    const pending = consumePendingChatOpen();
+    if (!pending) return;
+
+    if (pending.mode === "existing") {
+      void openChatById(pending.chatId, {
+        messageId: pending.messageId ?? null,
+        prefetchChatDoc: true,
+      });
+      return;
+    }
+
+    if (pending.chatId) {
+      const stableChat = allChats.find((chat) => chat.id === pending.chatId);
+      if (stableChat) {
+        void openChatById(pending.chatId, { prefetchChatDoc: true });
+        return;
+      }
+    }
+
+    const existing = allChats.find((chat) => {
+      if (pending.chatId && chat.id === pending.chatId) return true;
+      const chatParticipants = [...(chat.participants || [])].sort();
+      return (
+        JSON.stringify(chatParticipants) === JSON.stringify(pending.participants)
+      );
+    });
+
+    if (existing) {
+      void openChatById(existing.id, { prefetchChatDoc: true });
+      return;
+    }
+
+    setPendingNewChat({
+      chatId: pending.chatId,
+      participants: pending.participants,
+      participantNames: pending.participantNames,
+      participantImages: pending.participantImages,
+      communityGroupId: pending.communityGroupId,
+      communityGroupName: pending.communityGroupName,
+      communityPlanId: pending.communityPlanId,
+      communityPlanTitle: pending.communityPlanTitle,
+    });
+    setActiveChatId(null);
+    clearMessages();
+    bumpChatOpenAnchor();
+    setMessagesModalVisible(true);
+    navigateMessagesPane("chat");
+  }, [
+    allChats,
+    openChatById,
+    bumpChatOpenAnchor,
+    navigateMessagesPane,
+    clearMessages,
+  ]);
+
+  useFocusEffect(
+    useCallback(() => {
+      openPendingChatFromNotification();
+    }, [openPendingChatFromNotification])
+  );
+
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('openChat', async (data: { chatId?: string; messageId?: string }) => {
-      if (data.chatId) {
-        try {
-          const snap = await getDoc(doc(db, "chats", data.chatId));
-          if (snap.exists()) {
-            prefetchParticipantAvatars(snap.data() as any);
-          }
-        } catch {}
-        setPendingNewChat(null);
-        setActiveChatId(data.chatId);
-        setMessagesModalVisible(true);
-        setMessagesPane("chat");
-        const mid = typeof data.messageId === "string" && data.messageId.trim() ? data.messageId.trim() : null;
-        setPendingScrollToMessageId(mid);
-        await markChatRead(data.chatId);
+    const unsub = subscribePendingChatOpen(() => {
+      if (isIndexFocused) {
+        openPendingChatFromNotification();
       }
     });
-    return () => subscription.remove();
-  }, []);
+    return unsub;
+  }, [isIndexFocused, openPendingChatFromNotification]);
+
+  const openChatIdParam = useMemo(() => {
+    const raw = routeParams.openChatId;
+    if (typeof raw === "string") return raw.trim();
+    if (Array.isArray(raw)) return raw[0]?.trim() ?? "";
+    return "";
+  }, [routeParams.openChatId]);
 
   useEffect(() => {
-    const openFromNotificationData = async (data: Record<string, unknown> | undefined) => {
-      if (!data) return;
-      const rawChatId = data.chatId;
-      const chatId =
-        typeof rawChatId === "string"
-          ? rawChatId.trim()
-          : rawChatId != null
-            ? String(rawChatId).trim()
-            : "";
-      if (!chatId) return;
-      try {
-        const snap = await getDoc(doc(db, "chats", chatId));
-        if (snap.exists()) {
-          prefetchParticipantAvatars(snap.data() as any);
-        }
-      } catch {}
-      setPendingNewChat(null);
-      setActiveChatId(chatId);
-      setMessagesModalVisible(true);
-      setMessagesPane("chat");
-      const rawMid = data.messageId;
-      const mid =
-        typeof rawMid === "string" && rawMid.trim()
-          ? rawMid.trim()
-          : rawMid != null
-            ? String(rawMid).trim() || null
-            : null;
-      setPendingScrollToMessageId(mid);
-      await markChatRead(chatId);
-    };
-
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      openFromNotificationData(
-        response.notification.request.content.data as Record<string, unknown> | undefined
-      );
+    if (!openChatIdParam) return;
+    router.setParams({ openChatId: "" });
+    const task = InteractionManager.runAfterInteractions(() => {
+      void openChatById(openChatIdParam, { prefetchChatDoc: true });
     });
+    return () => task.cancel();
+  }, [openChatIdParam, openChatById, router]);
 
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (!response) return;
-      openFromNotificationData(
-        response.notification.request.content.data as Record<string, unknown> | undefined
-      );
+  useEffect(() => {
+    if (routeParams.openPendingChat !== "1") return;
+    router.setParams({ openPendingChat: "" });
+    const task = InteractionManager.runAfterInteractions(() => {
+      openPendingChatFromNotification();
     });
-
-    return () => sub.remove();
-  }, []);
+    return () => task.cancel();
+  }, [routeParams.openPendingChat, openPendingChatFromNotification, router]);
 
   useEffect(() => {
     if (!pendingScrollToMessageId) return;
@@ -634,13 +932,21 @@ export default function SynqScreen() {
   );
 
   useEffect(() => {
-    const uid = user?.uid;
-    if (!uid) return;
+    const effectUid = user?.uid;
+    if (!effectUid) return;
     let cancelled = false;
+
+    const cachedProfile = getCachedOwnProfile(effectUid);
+    if (cachedProfile) {
+      setUserProfile(cachedProfile);
+    }
+
     const init = async () => {
-      let nextStatus: SynqStatus = "idle";
+      let nextStatus: SynqStatus = getCachedSynqActiveSync(effectUid)
+        ? "active"
+        : "idle";
       try {
-        const userRef = doc(db, 'users', uid);
+        const userRef = doc(db, 'users', effectUid);
 
         const userSnap = await getDoc(userRef);
         if (userSnap.exists()) {
@@ -651,7 +957,7 @@ export default function SynqScreen() {
           }
           if (computeSynqActiveFromUserData(data)) {
             nextStatus = "active";
-            AsyncStorage.setItem(synqStatusStorageKey(uid), "active").catch(() => {});
+            writeCachedSynqActive(effectUid, true);
           } else {
             if (data.status === 'available' && data.synqStartedAt) {
               const startTime = data.synqStartedAt.toDate().getTime();
@@ -666,11 +972,13 @@ export default function SynqScreen() {
               }
             }
             nextStatus = "idle";
-            AsyncStorage.setItem(synqStatusStorageKey(uid), "idle").catch(() => {});
+            writeCachedSynqActive(effectUid, false);
           }
         }
       } catch {
-        nextStatus = "idle";
+        if (!getCachedSynqActiveSync(effectUid)) {
+          nextStatus = "idle";
+        }
       }
       if (!cancelled) {
         setSynq({ status: nextStatus, hydrated: true });
@@ -726,114 +1034,156 @@ export default function SynqScreen() {
 
   useEffect(() => {
     const myId = user?.uid;
-    if (!myId || status !== 'active') {
+    if (!myId || status !== "active") {
       setAvailableFriends([]);
       return;
     }
-    const friendsRef = collection(db, 'users', myId, 'friends');
-    const friendUnsubs = new Map<string, () => void>();
-    const friendState = new Map<string, any>();
 
-    const emit = () => {
-      setAvailableFriends(Array.from(friendState.values()));
-    };
-
-    const friendsUnsub = onSnapshot(
-      friendsRef,
-      (friendsSnap) => {
-      const friendIds = new Set(friendsSnap.docs.map((d) => d.id));
-
-      for (const [fid, unsub] of friendUnsubs.entries()) {
-        if (!friendIds.has(fid)) {
-          unsub();
-          friendUnsubs.delete(fid);
-          friendState.delete(fid);
-        }
-      }
-
-      friendsSnap.docs.forEach((fDoc) => {
-        const fid = fDoc.id;
-        if (friendUnsubs.has(fid)) return;
-
-        const uRef = doc(db, 'users', fid);
-        const uUnsub = onSnapshot(
-          uRef,
-          (uSnap) => {
-            if (!uSnap.exists()) {
-              friendState.delete(fid);
-              emit();
-              return;
-            }
-
-            const data = uSnap.data();
-
-            if (computeSynqActiveFromUserData(data)) {
-              friendState.set(fid, { id: fid, ...data });
-              const uri = resolveAvatar(data?.imageurl);
-              if (uri) {
-                ExpoImage.prefetch(uri).catch(() => {});
-              }
-            } else {
-              friendState.delete(fid);
-            }
-
-            emit();
-          },
-          ignoreSnapshotPermissionDenied
-        );
-
-        friendUnsubs.set(fid, uUnsub);
-      });
-      emit();
-    },
-      ignoreSnapshotPermissionDenied
-    );
-
-    return () => {
-      friendsUnsub();
-      friendUnsubs.forEach((unsub) => unsub());
-      friendUnsubs.clear();
-      friendState.clear();
-    };
-  }, [status, user?.uid]);
-
-  useEffect(() => {
-    if (!activeChatId || !isChatPaneOpen) {
-      setMessagesReady(false);
+    const friendIds = resolvedFriendIds;
+    if (!friendIds.length) {
+      setAvailableFriends([]);
       return;
     }
 
-    setMessages([]);
-    setMessagesReady(false);
-    const q = query(collection(db, 'chats', activeChatId, 'messages'), orderBy('createdAt', 'asc'));
+    let cancelled = false;
+    const refreshAvailable = async (force = false) => {
+      const next = await pollSynqActiveFriends(myId, friendIds, { force });
+      if (!cancelled) setAvailableFriends(next);
+    };
 
-    return onSnapshot(
-      q,
-      (snap) => {
-        const newMessages = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setMessages(newMessages);
-        setMessagesReady(true);
-      },
-      (error) => {
-        ignoreSnapshotPermissionDenied(error);
-        setMessages([]);
-        setMessagesReady(false);
-        setActiveChatId(null);
-        setMessagesPane("inbox");
-      }
-    );
-  }, [activeChatId, isChatPaneOpen]);
+    void refreshAvailable(true);
+    const interval = setInterval(() => {
+      void refreshAvailable(false);
+    }, SYNQ_FRIEND_POLL_TTL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [status, user?.uid, resolvedFriendIds]);
+
+  useEffect(() => {
+    if (activeChatId) {
+      chatOpenGraceRef.current.set(activeChatId, Date.now());
+    }
+  }, [activeChatId]);
 
   useEffect(() => {
     if (!messagesModalVisible || pendingNewChat) return;
     const activeChatMissing =
-      !!activeChatId && !allChats.some((c) => c.id === activeChatId);
-    if (activeChatMissing || (allChats.length === 0 && messagesPane === "chat")) {
-      setActiveChatId(null);
-      setMessages([]);
-      setMessagesPane("inbox");
+      !!activeChatId &&
+      allChats.length > 0 &&
+      !allChats.some((c) => c.id === activeChatId);
+    if (!activeChatMissing) return;
+
+    const openedAt = chatOpenGraceRef.current.get(activeChatId);
+    const inGracePeriod =
+      typeof openedAt === "number" && Date.now() - openedAt < 15_000;
+    const hasCachedMessages = !!messagesCacheByChatIdRef.current[activeChatId];
+
+    if (inGracePeriod || hasCachedMessages) return;
+
+    setActiveChatId(null);
+    clearMessages();
+    navigateMessagesPane("inbox");
+  }, [messagesModalVisible, activeChatId, allChats, pendingNewChat, navigateMessagesPane, clearMessages, messagesCacheByChatIdRef]);
+
+  const activeParticipantIds = useMemo(() => {
+    let ids: string[] = [];
+    if (pendingNewChat?.participants?.length) {
+      ids = pendingNewChat.participants.filter(Boolean);
+    } else {
+      const chat = allChats.find((c) => c.id === activeChatId);
+      ids = (chat?.participants ?? []).filter(Boolean);
     }
-  }, [messagesModalVisible, activeChatId, allChats, messagesPane, pendingNewChat]);
+    if (ids.length > 0) {
+      activeParticipantIdsRef.current = ids;
+      return ids;
+    }
+    return activeParticipantIdsRef.current;
+  }, [pendingNewChat, activeChatId, allChats]);
+
+  const activeParticipantIdsKey = activeParticipantIds.join("|");
+
+  const {
+    typingUserIds,
+    notifyInputChange,
+    stopTyping,
+    ingestChatTypingSnapshot,
+  } = useTypingIndicator({
+    chatId: activeChatId,
+    enabled: isChatPaneOpen && !pendingNewChat,
+    participantIds: activeParticipantIds,
+  });
+
+  useEffect(() => {
+    const chat = allChats.find((c) => c.id === activeChatId);
+    ingestChatTypingSnapshot(chat?.typingBy as Record<string, unknown> | undefined);
+  }, [allChats, activeChatId, ingestChatTypingSnapshot]);
+
+  const [liveParticipantImages, setLiveParticipantImages] = useState<
+    Record<string, string>
+  >({});
+
+  useEffect(() => {
+    if (!isChatPaneOpen || activeParticipantIds.length === 0) {
+      setLiveParticipantImages({});
+      return;
+    }
+
+    const unsubs = activeParticipantIds.map((uid: string) =>
+      onSnapshot(
+        doc(db, "users", uid),
+        (snap) => {
+          if (!snap.exists()) {
+            setLiveParticipantImages((prev) => {
+              if (!(uid in prev)) return prev;
+              const next = { ...prev };
+              delete next[uid];
+              return next;
+            });
+            return;
+          }
+          const resolved = resolveAvatar(snap.data()?.imageurl);
+          setLiveParticipantImages((prev) => {
+            if (prev[uid] === resolved) return prev;
+            return { ...prev, [uid]: resolved };
+          });
+          if (isCustomAvatar(resolved)) {
+            ExpoImage.prefetch(resolved).catch(() => {});
+          }
+        },
+        ignoreSnapshotPermissionDenied
+      )
+    );
+
+    return () => {
+      unsubs.forEach((unsub: () => any) => unsub());
+      setLiveParticipantImages({});
+    };
+  }, [isChatPaneOpen, activeParticipantIdsKey]);
+
+  const freshParticipantImages = useCallback(
+    (
+      base: Record<string, string>,
+      participants: string[]
+    ): Record<string, string> => {
+      const images = { ...base };
+      const myId = auth.currentUser?.uid;
+      for (const uid of participants) {
+        const resolved = resolveChatSenderAvatar(uid, {
+          participantImages: images,
+          liveImages: liveParticipantImages,
+          messageImageUrl: uid === myId ? userProfile?.imageurl : undefined,
+        });
+        if (isCustomAvatar(resolved)) {
+          images[uid] = resolved;
+        }
+      }
+      return images;
+    },
+    [liveParticipantImages, userProfile?.imageurl]
+  );
 
   useEffect(() => {
     if (!isChatPaneOpen) return;
@@ -842,7 +1192,11 @@ export default function SynqScreen() {
       if (uri) ExpoImage.prefetch(uri).catch(() => {});
     };
     if (pendingNewChat) {
-      Object.values(pendingNewChat.participantImages).forEach((u) => prefetchUri(u));
+      const images = freshParticipantImages(
+        pendingNewChat.participantImages,
+        pendingNewChat.participants
+      );
+      Object.values(images).forEach((u) => prefetchUri(u));
       return;
     }
     if (!activeChatId) return;
@@ -850,18 +1204,17 @@ export default function SynqScreen() {
     Object.values(chat?.participantImages || {}).forEach((u) => prefetchUri(u));
     const seen = new Set<string>();
     messages.forEach((m: any) => {
-      const url =
-        chat?.participantImages?.[m.senderId] || m.imageurl;
-      const uri = resolveAvatar(url);
-      if (uri && !seen.has(uri)) {
+      const uri = resolveChatSenderAvatar(m.senderId, {
+        participantImages: chat?.participantImages,
+        messageImageUrl: m.imageurl,
+        liveImages: liveParticipantImages,
+      });
+      if (isCustomAvatar(uri) && !seen.has(uri)) {
         seen.add(uri);
         ExpoImage.prefetch(uri).catch(() => {});
       }
-      if (typeof m.venueImage === "string" && m.venueImage.startsWith("http")) {
-        ExpoImage.prefetch(m.venueImage).catch(() => {});
-      }
     });
-  }, [activeChatId, isChatPaneOpen, pendingNewChat, allChats, messages]);
+  }, [activeChatId, isChatPaneOpen, pendingNewChat, allChats, messages, liveParticipantImages, freshParticipantImages]);
 
   const completeSynqLaunch = useCallback(() => {
     Vibration.vibrate(400);
@@ -869,50 +1222,186 @@ export default function SynqScreen() {
     setLaunchOverlay(false);
   }, [setSynq]);
 
+  const [chatAiLocationStatus, setChatAiLocationStatus] =
+    useState<ChatAiLocationStatus>("loading");
+  const [chatAiLocationPrompt, setChatAiLocationPrompt] = useState("");
+  const [chatParticipantsHaveCachedCity, setChatParticipantsHaveCachedCity] =
+    useState(false);
+  const chatAiParticipantsKeyRef = useRef("");
+
+  useEffect(() => {
+    if (messagesPane !== "chat" || activeParticipantIds.length === 0) {
+      setChatAiLocationStatus("loading");
+      setChatAiLocationPrompt("");
+      setChatParticipantsHaveCachedCity(false);
+      return;
+    }
+
+    let cancelled = false;
+    const participantsChanged =
+      chatAiParticipantsKeyRef.current !== activeParticipantIdsKey;
+    chatAiParticipantsKeyRef.current = activeParticipantIdsKey;
+    if (participantsChanged) {
+      setChatAiLocationStatus("loading");
+      setChatParticipantsHaveCachedCity(false);
+    }
+    void (async () => {
+      try {
+        const snaps = await Promise.all(
+          activeParticipantIds.map((uid: string) => getDoc(doc(db, "users", uid)))
+        );
+        if (cancelled) return;
+        const participantData = snaps
+          .filter((snap) => snap.exists())
+          .map((snap) => snap.data() as Record<string, unknown>);
+        const allHaveCachedCity =
+          allParticipantsHaveCachedCitySuggestions(participantData);
+        setChatParticipantsHaveCachedCity(allHaveCachedCity);
+
+        if (!participantData.every((data) => userHasLocation(data))) {
+          setChatAiLocationStatus("missing_location");
+          setChatAiLocationPrompt("");
+          return;
+        }
+
+        setChatAiLocationStatus("available");
+        setChatAiLocationPrompt(
+          buildLocationPrompt(uniqueLocationLabels(participantData))
+        );
+      } catch {
+        if (!cancelled) {
+          setChatAiLocationStatus("missing_location");
+          setChatAiLocationPrompt("");
+          setChatParticipantsHaveCachedCity(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messagesPane, activeParticipantIdsKey, activeParticipantIds.length]);
+
+  const showAISuggestions =
+    AI_PLACE_SUGGESTIONS_ENABLED &&
+    chatParticipantsHaveCachedCity &&
+    chatAiLocationStatus !== "loading" &&
+    chatAiLocationStatus !== "missing_location";
+  const showAIUnavailableMessage =
+    AI_PLACE_SUGGESTIONS_ENABLED &&
+    chatParticipantsHaveCachedCity &&
+    chatAiLocationStatus === "missing_location";
+
+  const openAISuggestions = useCallback(() => {
+    if (!showAISuggestions) return;
+    setAiExploreError(null);
+    setShowOptionsList(false);
+    setSelectedOption(null);
+    setIsExploreVisible(true);
+  }, [showAISuggestions]);
+
+  useEffect(() => {
+    if (!showAISuggestions && isExploreVisible && !isAILoading && !aiExploreError) {
+      setIsExploreVisible(false);
+      setShowOptionsList(false);
+      setAiExploreError(null);
+    }
+  }, [showAISuggestions, isExploreVisible, isAILoading, aiExploreError]);
+
   const triggerAISuggestion = async (category: string) => {
-    if ((!activeChatId && !pendingNewChat) || isAILoading) return;
+    if ((!activeChatId && !pendingNewChat) || isAILoading) {
+      return;
+    }
+
     setIsAILoading(true);
     setCurrentCategory(category);
+    setAiExploreError(null);
+    setShowOptionsList(false);
+    setSelectedOption(null);
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const functions = getFunctions();
-      const getSuggestions = httpsCallable(functions, 'getSynqSuggestions');
       const currentChat = pendingNewChat
         ? { participants: pendingNewChat.participants }
-        : visibleChats.find((c) => c.id === activeChatId);
-      if (!currentChat) return;
-      const city = userProfile?.city + ' ' + userProfile?.state;
-      const friendId = currentChat.participants.find((id: string) => id !== auth.currentUser?.uid);
-      const friendSnap = await getDoc(doc(db, 'users', friendId));
-      const friendInterests = friendSnap.exists() ? friendSnap.data()?.interests || [] : [];
-      const shared = (userProfile?.interests || []).filter((i: any) => friendInterests.includes(i));
+        : allChats.find((c) => c.id === activeChatId);
 
-      const payload = {
-        category: category,
-        shared: shared.length > 0 ? shared : ['exploring new spots'],
-        location: city
-      };
-
-      const result = await getSuggestions(payload);
-      const data = result.data as any;
-
-      if (data.suggestions) {
-        setAiOptions(data.suggestions);
-        setShowOptionsList(true);
-      } else {
-        setAiResponse(data.suggestion);
-        setIsExploreVisible(false);
-        setShowAICard(true);
+      if (!currentChat) {
+        setAiExploreError("Could not find this chat. Please try again.");
+        return;
       }
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      showActionError("Could not load suggestions. Please try again.");
+      const participantSnaps = await Promise.all(
+        currentChat.participants
+          .filter(Boolean)
+          .map((uid: string) => getDoc(doc(db, "users", uid)))
+      );
+      const participantData = participantSnaps
+        .filter((snap) => snap.exists())
+        .map((snap) => snap.data() as Record<string, unknown>);
+
+      const myId = auth.currentUser?.uid;
+      const mySnap = participantSnaps.find((snap) => snap.id === myId);
+      const senderLocationLabel = formatUserLocationLabel(
+        mySnap?.exists()
+          ? (mySnap.data() as Record<string, unknown>)
+          : userProfile
+      );
+      if (!senderLocationLabel) {
+        setAiExploreError("Add your city in profile to use Synq suggestions.");
+        return;
+      }
+      if (!hasCachedCitySuggestions(senderLocationLabel)) {
+        setAiExploreError("Synq suggestions aren't available for your city yet.");
+        return;
+      }
+      if (!allParticipantsHaveCachedCitySuggestions(participantData)) {
+        setAiExploreError(
+          "Synq suggestions are only available when everyone in the chat is in a supported city."
+        );
+        return;
+      }
+
+      const suggestions: SynqSuggestion[] = [];
+      const triedNames = new Set<string>();
+
+      while (suggestions.length < 3) {
+        const batch = getCachedCitySuggestions(senderLocationLabel, category, [
+          ...triedNames,
+        ]);
+        if (!batch || batch.length === 0) break;
+
+        let addedFromBatch = false;
+        for (const suggestion of batch) {
+          triedNames.add(suggestion.name);
+          suggestions.push(suggestion);
+          addedFromBatch = true;
+          if (suggestions.length >= 3) break;
+        }
+
+        if (!addedFromBatch) break;
+      }
+
+      if (suggestions.length > 0) {
+        setAiOptions(suggestions);
+        setShowOptionsList(true);
+        setAiExploreError(null);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setAiExploreError(
+          hasCachedCitySuggestions(senderLocationLabel)
+            ? "No spots found for this vibe. Try another."
+            : "Synq suggestions aren't available for your city yet."
+        );
+      }
+    } catch (err: unknown) {
+      setAiExploreError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not load suggestions. Please try again."
+      );
     } finally {
       setIsAILoading(false);
-      setIsThinking(false)
     }
   };
 
@@ -921,7 +1410,7 @@ export default function SynqScreen() {
     if (!pendingNewChat && !activeChatId) return;
 
     const textToSend = selectedOption
-      ? `${selectedOption.name}\n${selectedOption.location}`
+      ? `${selectedOption.name}\n${selectedOption.address || selectedOption.location}`
       : `✨ Synq AI Suggestion:\n\n${aiResponse}`;
 
     if (rejectIfObjectionable(textToSend)) return;
@@ -929,32 +1418,25 @@ export default function SynqScreen() {
     try {
       let chatId = activeChatId;
       if (pendingNewChat) {
-        const chatRef = await addDoc(collection(db, 'chats'), {
-          participants: pendingNewChat.participants,
-          participantNames: pendingNewChat.participantNames,
-          participantImages: pendingNewChat.participantImages,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          lastMessage: '',
-        });
-        chatId = chatRef.id;
-        setActiveChatId(chatId);
-        setPendingNewChat(null);
+        chatId = await ensureChatFromPending();
       }
       if (!chatId) return;
 
+      const myAvatar = resolveAvatar(userProfile?.imageurl);
+
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         text: textToSend,
+        type: 'aiSuggestion',
         senderId: auth.currentUser.uid,
-        imageurl: resolveAvatar(userProfile?.imageurl),
-        venueImage: selectedOption?.imageUrl || selectedOption?.imageurl || null,
+        imageurl: myAvatar,
         createdAt: serverTimestamp()
       });
 
       await updateDoc(doc(db, 'chats', chatId), {
         lastMessage: selectedOption ? `Shared: ${selectedOption.name}` : 'AI Suggestion shared',
         lastMessageSenderId: auth.currentUser.uid,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        [`participantImages.${auth.currentUser.uid}`]: myAvatar,
       });
 
       setIsExploreVisible(false);
@@ -1001,7 +1483,7 @@ export default function SynqScreen() {
         ...broadcast,
       });
       await saveSynqAudiencePreference(uid, audienceSelection);
-      AsyncStorage.setItem(synqStatusStorageKey(uid), "active").catch(() => {});
+      writeCachedSynqActive(uid, true);
       setUserProfile((prev: Record<string, unknown> | null) =>
         prev
           ? {
@@ -1014,6 +1496,7 @@ export default function SynqScreen() {
       );
       setLaunchOverlay(true);
       setSynqStatus(setSynq, "activating");
+      trackEvent("synq_started");
     } catch {
       showActionError("Could not start Synq. Check your connection and try again.");
     } finally {
@@ -1033,11 +1516,16 @@ export default function SynqScreen() {
 
   const executeConnection = async (participants: string[]) => {
     try {
-      const existing = allChats.find((c) => JSON.stringify(c.participants.sort()) === JSON.stringify(participants));
+      const existing = allChats.find((c) => {
+        const chatParticipants = [...(c.participants || [])].sort();
+        return JSON.stringify(chatParticipants) === JSON.stringify(participants);
+      });
       if (existing) {
         prefetchParticipantAvatars(existing);
         setPendingNewChat(null);
+        prepareChatSync(existing.id);
         setActiveChatId(existing.id);
+        void markChatRead(existing.id);
       } else {
         const nameMap: Record<string, string> = {};
         const imgMap: Record<string, string> = {};
@@ -1055,10 +1543,11 @@ export default function SynqScreen() {
           participantImages: imgMap,
         });
         setActiveChatId(null);
-        setMessages([]);
+        clearMessages();
       }
+      bumpChatOpenAnchor();
       setMessagesModalVisible(true);
-      setMessagesPane("chat");
+      navigateMessagesPane("chat");
       setSelectedFriends([]);
     } catch {
       showActionError("Could not open chat. Please try again.");
@@ -1067,66 +1556,19 @@ export default function SynqScreen() {
 
   const sendMessage = async () => {
     if (!inputText.trim() || !auth.currentUser) return;
-    if (!pendingNewChat && (!activeChatId || !allChats.find((c) => c.id === activeChatId))) return;
+    if (
+      !pendingNewChat &&
+      (!activeChatId || !allChats.find((c) => c.id === activeChatId))
+    ) {
+      return;
+    }
 
     const text = inputText.trim();
     if (rejectIfObjectionable(text)) return;
 
-    const myId = auth.currentUser.uid;
-    setInputText('');
-
-    try {
-      let chatId = activeChatId;
-      let otherParticipants: string[];
-
-      if (pendingNewChat) {
-        const chatRef = await addDoc(collection(db, 'chats'), {
-          participants: pendingNewChat.participants,
-          participantNames: pendingNewChat.participantNames,
-          participantImages: pendingNewChat.participantImages,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          lastMessage: '',
-        });
-        chatId = chatRef.id;
-        otherParticipants = pendingNewChat.participants.filter((pId: string) => pId !== myId);
-        setActiveChatId(chatId);
-        setPendingNewChat(null);
-      } else {
-        const currentChat = allChats.find((c) => c.id === activeChatId)!;
-        otherParticipants = currentChat.participants.filter((pId: string) => pId !== myId);
-      }
-
-      await addDoc(collection(db, 'chats', chatId!, 'messages'), {
-        text,
-        senderId: myId,
-        imageurl: resolveAvatar(userProfile?.imageurl),
-        createdAt: serverTimestamp()
-      });
-
-      await updateDoc(doc(db, 'chats', chatId!), {
-        lastMessage: text,
-        lastMessageSenderId: myId,
-        updatedAt: serverTimestamp()
-      });
-      otherParticipants.forEach(async (pId: string) => {
-        const mySideFriendDoc = doc(db, 'users', myId, 'friends', pId);
-        const theirSideFriendDoc = doc(db, 'users', pId, 'friends', myId);
-
-        await updateDoc(mySideFriendDoc, {
-          synqCount: increment(1),
-          lastSynqAt: serverTimestamp(),
-        }).catch(() => { });
-
-        await updateDoc(theirSideFriendDoc, {
-          synqCount: increment(1),
-          lastSynqAt: serverTimestamp(),
-        }).catch(() => { });
-      });
-    } catch {
-      setInputText(text);
-      showActionError("Message could not be sent. Please try again.");
-    }
+    setInputText("");
+    stopTyping();
+    await sendMessageCore(text);
   };
 
   const handleDeleteChat = async (chatId: string) => {
@@ -1140,48 +1582,118 @@ export default function SynqScreen() {
     setShowMergeConfirmModal(false);
   };
 
+  const goBackFromChat = useCallback(() => {
+    Keyboard.dismiss();
+    stopTyping();
+    navigateMessagesPane("inbox");
+    setShowAICard(false);
+    setShowOptionsList(false);
+    setPendingNewChat(null);
+    setIsExploreVisible(false);
+  }, [navigateMessagesPane, stopTyping]);
+
+  const openFriendProfileFromChat = useCallback((friendId: string) => {
+    if (!friendId || friendId === auth.currentUser?.uid) return;
+    Keyboard.dismiss();
+    setProfileFriendId(friendId);
+    navigateMessagesPane("profile");
+  }, [navigateMessagesPane]);
+
+  const closeProfileFromChat = useCallback(() => {
+    navigateMessagesPane("chat");
+    setProfileFriendId(null);
+  }, [navigateMessagesPane]);
+
+  const closeMessagesModal = useCallback(() => {
+    resetMergeSelect();
+    setInboxActionChat(null);
+    setSelectedFriends([]);
+    setMessagesModalVisible(false);
+    setMessagesPane("inbox");
+    setProfileFriendId(null);
+    setActiveChatId(null);
+    setPendingNewChat(null);
+    clearMessages();
+    clearPendingMessages();
+    setIsExploreVisible(false);
+    setShowOptionsList(false);
+    setShowAICard(false);
+  }, [clearMessages, clearPendingMessages]);
+
+  const dismissNavigationOverlays = useCallback(() => {
+    closeMessagesModal();
+    setIsEditModalVisible(false);
+    setReportModalVisible(false);
+    setReportTarget(null);
+    setShowEndSynqModal(false);
+    setChangeAudienceVisible(false);
+    setContentAlertVisible(false);
+    setShowMergeConfirmModal(false);
+    setShowDeleteChatModal(false);
+    setLaunchOverlay(false);
+  }, [closeMessagesModal]);
+
+  useEffect(() => {
+    return registerDismissNavigationOverlaysHandler(dismissNavigationOverlays);
+  }, [dismissNavigationOverlays]);
+
+  useEffect(() => {
+    if (!messagesModalVisible) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (mergeSelectMode) {
+        resetMergeSelect();
+        return true;
+      }
+      if (messagesPane === "profile") {
+        closeProfileFromChat();
+        return true;
+      }
+      if (messagesPane === "chat") {
+        goBackFromChat();
+        return true;
+      }
+      closeMessagesModal();
+      return true;
+    });
+    return () => sub.remove();
+  }, [
+    messagesModalVisible,
+    messagesPane,
+    mergeSelectMode,
+    closeMessagesModal,
+    closeProfileFromChat,
+    goBackFromChat,
+    resetMergeSelect,
+  ]);
+
   const startCombineWithChat = (chatId: string) => {
     setInboxActionChat(null);
     setMergeSelectMode(true);
     setSelectedMergeChatIds([chatId]);
   };
 
-  const togglePinChat = async (chatId: string) => {
+  const hideMergedSourceChats = async (sourceChatIds: string[]) => {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
-    const isPinned = pinnedChatIds.includes(chatId);
+    const ids = uniqueChatIds(sourceChatIds);
+    if (ids.length === 0) return;
 
-    setInboxActionChat(null);
     setUserProfile((prev: any) => {
-      const current = Array.isArray(prev?.pinnedChatIds)
-        ? prev.pinnedChatIds.filter(Boolean)
+      const currentHidden = Array.isArray(prev?.hiddenChatIds)
+        ? prev.hiddenChatIds.filter(Boolean)
         : [];
       return {
         ...prev,
-        pinnedChatIds: isPinned
-          ? current.filter((id: string) => id !== chatId)
-          : [...current, chatId],
+        hiddenChatIds: uniqueChatIds([...currentHidden, ...ids]),
       };
     });
 
     try {
       await updateDoc(doc(db, "users", myId), {
-        pinnedChatIds: isPinned ? arrayRemove(chatId) : arrayUnion(chatId),
+        hiddenChatIds: arrayUnion(...ids),
       });
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
-      setUserProfile((prev: any) => {
-        const current = Array.isArray(prev?.pinnedChatIds)
-          ? prev.pinnedChatIds.filter(Boolean)
-          : [];
-        return {
-          ...prev,
-          pinnedChatIds: isPinned
-            ? [...current, chatId]
-            : current.filter((id: string) => id !== chatId),
-        };
-      });
-      showActionError("Could not update pin. Please try again.");
+      // Merge succeeded; inbox hide is best-effort and will sync on next profile load.
     }
   };
 
@@ -1225,12 +1737,17 @@ export default function SynqScreen() {
   }, [selectedMergeChatIds, visibleChats]);
 
   const executeMergeChats = async () => {
+    if (isMergingChats) return;
     if (!auth.currentUser || selectedMergeChatIds.length !== 2) return;
 
     const myId = auth.currentUser.uid;
     const chatA = visibleChats.find((c) => c.id === selectedMergeChatIds[0]);
     const chatB = visibleChats.find((c) => c.id === selectedMergeChatIds[1]);
-    if (!chatA || !chatB) return;
+    if (!chatA || !chatB) {
+      showActionError("One of those conversations is no longer available.");
+      resetMergeSelect();
+      return;
+    }
 
     setIsMergingChats(true);
     try {
@@ -1241,9 +1758,12 @@ export default function SynqScreen() {
         resetMergeSelect();
         prefetchParticipantAvatars(existing);
         setPendingNewChat(null);
+        prepareChatSync(existing.id);
         setActiveChatId(existing.id);
-        setMessagesPane("chat");
-        await markChatRead(existing.id);
+        bumpChatOpenAnchor();
+        navigateMessagesPane("chat");
+        void markChatRead(existing.id);
+        void hideMergedSourceChats([chatA.id, chatB.id]);
         return;
       }
 
@@ -1292,9 +1812,12 @@ export default function SynqScreen() {
       resetMergeSelect();
       prefetchParticipantAvatars({ participantImages });
       setPendingNewChat(null);
+      prepareChatSync(chatRef.id);
       setActiveChatId(chatRef.id);
-      setMessagesPane("chat");
-      await markChatRead(chatRef.id);
+      bumpChatOpenAnchor();
+      navigateMessagesPane("chat");
+      void markChatRead(chatRef.id);
+      void hideMergedSourceChats([chatA.id, chatB.id]);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       showActionError("Could not create group chat. Please try again.");
@@ -1305,7 +1828,7 @@ export default function SynqScreen() {
   };
 
   const toggleHeartReaction = async (messageId: string, currentReactions: any) => {
-    if (!auth.currentUser || !activeChatId) return;
+    if (!auth.currentUser || !activeChatId || messageId.startsWith("pending-")) return;
 
     const userId = auth.currentUser.uid;
     const messageRef = doc(db, "chats", activeChatId, "messages", messageId);
@@ -1344,11 +1867,45 @@ export default function SynqScreen() {
         participants: pendingNewChat.participants,
         participantNames: pendingNewChat.participantNames,
         participantImages: pendingNewChat.participantImages,
+        communityGroupId: pendingNewChat.communityGroupId,
+        communityGroupName: pendingNewChat.communityGroupName,
+        communityPlanId: pendingNewChat.communityPlanId,
+        communityPlanTitle: pendingNewChat.communityPlanTitle,
       }
     : visibleChats.find((c) => c.id === activeChatId);
 
-  const renderAvatarStack = (images: any) => {
-    const stackUris = getStackAvatarUris(images, auth.currentUser?.uid);
+  const activeChatResolved = useMemo(() => {
+    if (!activeChat) return activeChat;
+    return {
+      ...activeChat,
+      participantImages: freshParticipantImages(
+        activeChat.participantImages || {},
+        activeParticipantIds
+      ),
+    };
+  }, [activeChat, activeParticipantIds, freshParticipantImages]);
+
+  const activeChatTitle = useMemo(() => {
+    if (!activeChat) return "Synq Chat";
+    return getChatTitle(activeChat);
+  }, [
+    activeChat?.id,
+    activeChat?.customName,
+    activeChat?.participantNames
+      ? Object.entries(activeChat.participantNames as Record<string, string>)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([uid, name]) => `${uid}:${name}`)
+          .join("|")
+      : "",
+  ]);
+
+  const renderAvatarStack = useCallback(
+    (images: any, participants?: string[]) => {
+      const stackUris = getStackAvatarUris(
+        images,
+        auth.currentUser?.uid,
+        participants
+      );
 
     if (stackUris.length === 0) {
       return (
@@ -1361,12 +1918,13 @@ export default function SynqScreen() {
     if (stackUris.length === 1) {
       return (
         <View style={styles.inboxSingleWrap}>
-          <ExpoImage
-            source={{ uri: stackUris[0] }}
-            style={styles.inboxSinglePhoto}
-            cachePolicy="memory-disk"
-            transition={0}
-          />
+        <ExpoImage
+          source={{ uri: stackUris[0] }}
+          style={styles.inboxSinglePhoto}
+          cachePolicy="memory-disk"
+          transition={0}
+          recyclingKey={stackUris[0]}
+        />
         </View>
       );
     }
@@ -1378,30 +1936,39 @@ export default function SynqScreen() {
           style={[styles.inboxStackPhoto, styles.inboxStackPhotoBack]}
           cachePolicy="memory-disk"
           transition={0}
+          recyclingKey={stackUris[0]}
         />
         <ExpoImage
           source={{ uri: stackUris[1] }}
           style={[styles.inboxStackPhoto, styles.inboxStackPhotoFront]}
           cachePolicy="memory-disk"
           transition={0}
+          recyclingKey={stackUris[1]}
         />
       </View>
     );
-  };
+  }, []);
 
-  const bootActive = synqBoot?.cachedSynqActive === true;
-  if (!hydrated && !bootActive) return <View style={styles.darkFill} />;
+  const bootActive =
+    synqBoot?.cachedSynqActive === true ||
+    (uid ? getCachedSynqActiveSync(uid) : false);
+  if (!hydrated && !bootActive) {
+    return (
+      <View style={[styles.darkFill, styles.bootLoading]}>
+        <ActivityIndicator size="large" color={ACCENT} accessibilityLabel="Loading Synq" />
+      </View>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={[styles.container, tabletContentStyle]}>
         <StatusBar barStyle="light-content" />
         {status === "active" && (
-          <Reanimated.View entering={FadeIn.duration(520)} style={styles.activeSynqLayer}>
+          <View style={styles.activeSynqLayer}>
             <ProfileTabHeaderOverlay variant="title" />
             <ActiveSynqSection
               styles={styles}
-              memo={memo}
               hasUnread={hasUnread}
               activePulseOpacity={activePulseOpacity}
               activePulseScale={activePulseScale}
@@ -1415,11 +1982,11 @@ export default function SynqScreen() {
               openChangeAudience={() => setChangeAudienceVisible(true)}
               openMessagesInbox={() => {
                 setMessagesModalVisible(true);
-                setMessagesPane("inbox");
               }}
               openEditModal={() => setIsEditModalVisible(true)}
+              userProfile={userProfile}
             />
-          </Reanimated.View>
+          </View>
         )}
         {status === "idle" && hydrated && (
           <View style={styles.synqHomeLayer}>
@@ -1454,160 +2021,208 @@ export default function SynqScreen() {
             <SynqActivatingView onComplete={completeSynqLaunch} />
           </Reanimated.View>
         )}
-        <Modal visible={messagesModalVisible} animationType="fade" presentationStyle="pageSheet">
-          <View style={styles.modalBg}>
-          {messagesPane === "inbox" ? (
-            <Reanimated.View
-              key="messages-inbox"
-              style={styles.messagesPaneFill}
-              entering={SlideInLeft.duration(300)}
-              exiting={SlideOutLeft.duration(280)}
-            >
-            <MessagesInboxPane
-              styles={styles}
-              allChats={inboxChats}
-              pinnedChatIds={pinnedChatIds}
-              currentUserId={auth.currentUser?.uid}
-              getChatTitle={getChatTitle}
-              renderAvatarStack={renderAvatarStack}
-              onCloseMessages={() => {
-                resetMergeSelect();
-                setInboxActionChat(null);
-                setMessagesModalVisible(false);
-                setMessagesPane("inbox");
-                setActiveChatId(null);
-                setPendingNewChat(null);
-                setMessages([]);
-              }}
-              onOpenChat={async (item) => {
-                prefetchParticipantAvatars(item);
-                setPendingNewChat(null);
-                setActiveChatId(item.id);
-                setMessagesPane("chat");
-                await markChatRead(item.id);
-              }}
-              onDeleteChat={handleDeleteChat}
-              onChatLongPress={(chat) => setInboxActionChat(chat)}
-              mergeSelectMode={mergeSelectMode}
-              selectedMergeChatIds={selectedMergeChatIds}
-              mergePreviewTitle={mergePreviewTitle}
-              mergeAnchorTitle={mergeAnchorTitle}
-              mergeBusy={isMergingChats}
-              onCancelMergeMode={resetMergeSelect}
-              onToggleMergeChatSelection={toggleMergeChatSelection}
-              onConfirmMerge={() => setShowMergeConfirmModal(true)}
-              inboxActionChat={inboxActionChat}
-              onCloseInboxAction={() => setInboxActionChat(null)}
-              onPinChat={(chatId) => void togglePinChat(chatId)}
-              onCombineChat={startCombineWithChat}
-              onDeleteFromAction={(chatId) => {
-                setInboxActionChat(null);
-                handleDeleteChat(chatId);
-              }}
-              renderMergeConfirmModal={
-                <ConfirmModal
-                  visible={showMergeConfirmModal}
-                  title="Create group chat"
-                  message={`Everyone from both conversations will be added to a chat with ${mergePreviewTitle}.`}
-                  confirmText="Create"
-                  onCancel={() => setShowMergeConfirmModal(false)}
-                  onConfirm={() => void executeMergeChats()}
-                />
-              }
-              renderDeleteConfirmModal={
-                <ConfirmModal
-                  visible={showDeleteChatModal}
-                  title="Delete Chat"
-                  message="Are you sure you want to delete this conversation?"
-                  confirmText="Delete"
-                  destructive
-                  onCancel={() => {
-                    setShowDeleteChatModal(false);
-                    setPendingDeleteChatId(null);
-                  }}
-                  onConfirm={async () => {
-                    const chatId = pendingDeleteChatId;
-                    setShowDeleteChatModal(false);
-                    setPendingDeleteChatId(null);
-                    if (!chatId) return;
-                    if (activeChatId === chatId) {
-                      setActiveChatId(null);
-                      setPendingNewChat(null);
-                      setMessages([]);
-                      setMessagesPane("inbox");
+        <Modal
+          visible={messagesModalVisible}
+          animationType="none"
+          presentationStyle="fullScreen"
+          allowSwipeDismissal={false}
+          onRequestClose={() => {
+            if (messagesPane === "profile") {
+              closeProfileFromChat();
+              return;
+            }
+            if (messagesPane === "chat") {
+              goBackFromChat();
+              return;
+            }
+            closeMessagesModal();
+          }}
+          onDismiss={closeMessagesModal}
+        >
+          <View style={styles.messagesModalRoot}>
+          <SafeAreaView style={styles.modalBg} edges={["bottom"]}>
+          <MessagesModalStack
+            visible={messagesModalVisible}
+            pane={messagesPane}
+            width={windowWidth}
+            inbox={
+              <MessagesInboxPane
+                styles={styles}
+                allChats={inboxChats}
+                currentUserId={auth.currentUser?.uid}
+                getChatTitle={getChatTitle}
+                renderAvatarStack={renderAvatarStack}
+                onCloseMessages={closeMessagesModal}
+                onOpenChat={async (item) => {
+                  prefetchParticipantAvatars(item);
+                  beginOpeningChat(item.id);
+                }}
+                onPrepareChatPress={(chatId) => prefetchChatOnPress(chatId)}
+                onDeleteChat={handleDeleteChat}
+                onChatLongPress={(chat) => setInboxActionChat(chat)}
+                mergeSelectMode={mergeSelectMode}
+                selectedMergeChatIds={selectedMergeChatIds}
+                mergePreviewTitle={mergePreviewTitle}
+                mergeAnchorTitle={mergeAnchorTitle}
+                mergeReady={!!mergePreviewChat}
+                mergeBusy={isMergingChats}
+                onCancelMergeMode={resetMergeSelect}
+                onToggleMergeChatSelection={toggleMergeChatSelection}
+                onConfirmMerge={() => setShowMergeConfirmModal(true)}
+                inboxActionChat={inboxActionChat}
+                onCloseInboxAction={() => setInboxActionChat(null)}
+                onCombineChat={startCombineWithChat}
+                onDeleteFromAction={(chatId) => {
+                  setInboxActionChat(null);
+                  handleDeleteChat(chatId);
+                }}
+                renderMergeConfirmModal={
+                  <ConfirmModal
+                    visible={showMergeConfirmModal}
+                    title="Create group chat"
+                    message={
+                      mergePreviewTitle
+                        ? `Everyone from both conversations will be added to a chat with ${mergePreviewTitle}.`
+                        : "Everyone from both conversations will be added to one group chat."
                     }
-                    setAllChats((prev) => prev.filter((c) => c.id !== chatId));
-                    try {
-                      await deleteDoc(doc(db, "chats", chatId));
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    } catch {
-                      showActionError("Could not delete chat. Please try again.");
-                    }
+                    confirmText="Create"
+                    confirmDisabled={isMergingChats || !mergePreviewChat}
+                    onCancel={() => setShowMergeConfirmModal(false)}
+                    onConfirm={() => void executeMergeChats()}
+                  />
+                }
+                renderDeleteConfirmModal={
+                  <ConfirmModal
+                    visible={showDeleteChatModal}
+                    title="Delete Chat"
+                    message="Are you sure you want to delete this conversation?"
+                    confirmText="Delete"
+                    destructive
+                    onCancel={() => {
+                      setShowDeleteChatModal(false);
+                      setPendingDeleteChatId(null);
+                    }}
+                    onConfirm={async () => {
+                      const chatId = pendingDeleteChatId;
+                      setShowDeleteChatModal(false);
+                      setPendingDeleteChatId(null);
+                      if (!chatId) return;
+                      if (activeChatId === chatId) {
+                        setActiveChatId(null);
+                        setPendingNewChat(null);
+                        clearMessages();
+                        navigateMessagesPane("inbox");
+                      }
+                      try {
+                        await deleteChat(chatId);
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      } catch {
+                        showActionError("Could not delete chat. Please try again.");
+                      }
+                    }}
+                  />
+                }
+              />
+            }
+            chat={
+              <>
+                <MessagesChatPane
+                  styles={styles}
+                  insetsTop={insets.top}
+                  activeChat={activeChatResolved}
+                  chatTitle={activeChatTitle}
+                  renderAvatarStack={renderAvatarStack}
+                  rotatingAIText={rotatingAIText}
+                  pendingScrollToMessageId={pendingScrollToMessageId}
+                  flatListRef={flatListRef}
+                  messages={messages}
+                  messagesReady={messagesReady}
+                  listenerError={listenerError}
+                  onRetryMessages={retryListener}
+                  hasEarlierMessages={hasEarlierMessages}
+                  loadingEarlier={loadingEarlier}
+                  onLoadEarlier={loadEarlierMessages}
+                  typingUserIds={typingUserIds}
+                  onComposerChange={(text) => {
+                    setInputText(text);
+                    notifyInputChange();
                   }}
+                  showAICard={showAICard}
+                  aiResponse={aiResponse}
+                  inputText={inputText}
+                  setInputText={setInputText}
+                  setMessagesPane={setMessagesPane}
+                  onBackFromChat={goBackFromChat}
+                  setShowAICard={setShowAICard}
+                  setShowOptionsList={setShowOptionsList}
+                  setPendingNewChat={setPendingNewChat}
+                  showAISuggestions={showAISuggestions}
+                  showAIUnavailableMessage={showAIUnavailableMessage}
+                  onOpenAISuggestions={openAISuggestions}
+                  onOpenFriendProfile={openFriendProfileFromChat}
+                  sendMessage={sendMessage}
+                  sendAISuggestionToChat={sendAISuggestionToChat}
+                  setPendingScrollToMessageId={setPendingScrollToMessageId}
+                  onMessageBubblePress={onMessageBubblePress}
+                  onMessageLongPress={(item) => {
+                    if (item.senderId === auth.currentUser?.uid) return;
+                    if (item.id.startsWith("pending-")) return;
+                    setReportTarget({
+                      reportedUserId: item.senderId,
+                      messageId: item.id,
+                      chatId: activeChatId || "",
+                    });
+                    setReportModalVisible(true);
+                  }}
+                  onIdeaBubblePress={onIdeaBubblePress}
+                  ChatMessageBubble={MemoChatMessageBubble}
+                  iMessageBubbleColumnMaxWidth={iMessageBubbleColumnMaxWidth}
+                  windowWidth={windowWidth}
+                  currentUserId={auth.currentUser?.uid}
+                  liveParticipantImages={liveParticipantImages}
+                  chatOpenAnchorKey={chatOpenAnchorKey}
                 />
+              </>
+            }
+            profile={
+              profileFriendId ? (
+                <FriendProfile
+                  key={profileFriendId}
+                  embeddedFriendId={profileFriendId}
+                  onEmbeddedBack={closeProfileFromChat}
+                />
+              ) : null
+            }
+            onInteractivePop={() => {
+              if (messagesPane === "profile") {
+                closeProfileFromChat();
+              } else if (messagesPane === "chat") {
+                goBackFromChat();
               }
-            />
-            </Reanimated.View>
-          ) : (
-            <Reanimated.View
-              key="messages-chat"
-              style={styles.messagesPaneFill}
-              entering={SlideInRight.duration(300)}
-              exiting={SlideOutRight.duration(280)}
-            >
-              <MessagesChatPane
-              styles={styles}
-              insetsTop={insets.top}
-              activeChat={activeChat}
-              getChatTitle={getChatTitle}
-              renderAvatarStack={renderAvatarStack}
-              rotatingAIText={rotatingAIText}
-              pendingScrollToMessageId={pendingScrollToMessageId}
-              flatListRef={flatListRef}
-              messages={messages}
-              messagesReady={messagesReady}
-              showAICard={showAICard}
-              aiResponse={aiResponse}
-              inputText={inputText}
-              setInputText={setInputText}
-              setMessagesPane={setMessagesPane}
-              setShowAICard={setShowAICard}
-              setShowOptionsList={setShowOptionsList}
-              setPendingNewChat={setPendingNewChat}
-              setIsExploreVisible={setIsExploreVisible}
-              sendMessage={sendMessage}
-              sendAISuggestionToChat={sendAISuggestionToChat}
-              setPendingScrollToMessageId={setPendingScrollToMessageId}
-              onMessageBubblePress={onMessageBubblePress}
-              onMessageLongPress={(item) => {
-                if (item.senderId === auth.currentUser?.uid) return;
-                setReportTarget({
-                  reportedUserId: item.senderId,
-                  messageId: item.id,
-                  chatId: activeChatId || "",
-                });
-                setReportModalVisible(true);
-              }}
-              onIdeaBubblePress={onIdeaBubblePress}
-              ChatMessageBubble={ChatMessageBubble}
-              iMessageBubbleColumnMaxWidth={iMessageBubbleColumnMaxWidth}
-              windowWidth={windowWidth}
-              currentUserId={auth.currentUser?.uid}
-            />
-              <ExploreModal
+            }}
+          />
+          <AlertModal
+            visible={contentAlertVisible}
+            title={contentAlertTitle}
+            message={contentAlertMessage}
+            onClose={() => setContentAlertVisible(false)}
+          />
+          </SafeAreaView>
+          {messagesPane === "chat" && isExploreVisible ? (
+            <ExploreModal
               visible={isExploreVisible}
               onClose={() => {
                 setIsExploreVisible(false);
                 setShowOptionsList(false);
+                setAiExploreError(null);
               }}
-              onBack={() => setShowOptionsList(false)}
+              onBack={() => {
+                setShowOptionsList(false);
+                setAiExploreError(null);
+              }}
               onSelectVibe={(label: string) => {
-                setIsThinking(true);
-                setTimeout(() => {
-                  triggerAISuggestion(label);
-                }, 600);
+                void triggerAISuggestion(label);
               }}
-              isThinking={isThinking}
               isAILoading={isAILoading}
               showOptionsList={showOptionsList}
               aiOptions={aiOptions}
@@ -1617,11 +2232,12 @@ export default function SynqScreen() {
                 sendAISuggestionToChat();
                 setIsExploreVisible(false);
                 setShowOptionsList(false);
+                setAiExploreError(null);
               }}
               currentCategory={currentCategory}
-              />
-            </Reanimated.View>
-          )}
+              errorMessage={aiExploreError}
+            />
+          ) : null}
           </View>
         </Modal>
 
@@ -1649,8 +2265,8 @@ export default function SynqScreen() {
           }}
         />
         <AlertModal
-          visible={contentAlertVisible}
-          title="Content not allowed"
+          visible={contentAlertVisible && !messagesModalVisible}
+          title={contentAlertTitle}
           message={contentAlertMessage}
           onClose={() => setContentAlertVisible(false)}
         />
@@ -1671,7 +2287,7 @@ export default function SynqScreen() {
               memo: "",
               ...clearSynqBroadcastFields,
             });
-            AsyncStorage.setItem(synqStatusStorageKey(auth.currentUser.uid), "idle").catch(() => {});
+            writeCachedSynqActive(auth.currentUser.uid, false);
 
             setMemo("");
             setSynqStatus(setSynq, "idle");
@@ -1694,7 +2310,8 @@ export default function SynqScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   darkFill: { flex: 1, backgroundColor: BG, justifyContent: 'center' },
-  activeSynqRoot: { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
+  bootLoading: { alignItems: 'center' },
+  activeSynqRoot: { flex: 1, backgroundColor: BG, paddingHorizontal: 26 },
   activeListFooterDock: {
     flex: 1,
     minHeight: 0,
@@ -1704,9 +2321,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 10,
-    marginBottom: 14,
+    marginBottom: 8,
     paddingVertical: 6,
     paddingLeft: 14,
+  },
+  sortBar: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 10,
   },
   activeFriendsList: { flex: 1 },
   activeListContent: { paddingHorizontal: 0 },
@@ -1865,11 +2489,12 @@ const styles = StyleSheet.create({
   },
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
   whiteBold: { color: 'white', fontSize: 17, fontFamily: fonts.medium },
-  grayText: { color: MUTED2, fontSize: 13, marginTop: 2 },
-  locationText: { color: MUTED2, fontSize: 12, marginTop: 2 },
+  grayText: { ...cardMetaText, marginTop: 2 },
+  communityChatMeta: { ...cardMetaText, fontSize: TYPE_FINE, marginTop: 1, color: MUTED2 },
+  locationText: { ...cardMetaText, fontSize: TYPE_FINE, marginTop: 2 },
   btn: {
     alignSelf: 'center',
-    width: PRIMARY_CTA_WIDTH,
+    width: '62%',
     height: PRIMARY_CTA_HEIGHT,
     backgroundColor: ACCENT,
     borderRadius: BUTTON_RADIUS,
@@ -1976,15 +2601,21 @@ const styles = StyleSheet.create({
     padding: 25,
   },
   modalBg: { flex: 1, backgroundColor: BG },
+  messagesModalRoot: {
+    flex: 1,
+    backgroundColor: BG,
+  },
   messagesPaneFill: { flex: 1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
+  inboxHeaderBlock: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
   inboxHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 10,
   },
   inboxTitleRow: {
     flexDirection: 'row',
@@ -1993,10 +2624,6 @@ const styles = StyleSheet.create({
   },
   inboxTitleText: {
     flexShrink: 1,
-  },
-  inboxPinIcon: {
-    marginLeft: 6,
-    transform: [{ rotate: '45deg' }],
   },
   inboxMergeHeader: {
     flexDirection: 'row',
@@ -2105,11 +2732,6 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT,
     borderColor: ACCENT,
   },
-  inboxSelectBadgeText: {
-    color: ON_ACCENT_TEXT,
-    fontFamily: fonts.heavy,
-    fontSize: 13,
-  },
   messagesHeaderDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: "rgba(255,255,255,0.16)",
@@ -2155,7 +2777,7 @@ const styles = StyleSheet.create({
   },
   inboxCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
   stackedPhoto: { width: 40, height: 40, borderRadius: 20, position: 'absolute', borderWidth: 2, borderColor: 'black' },
-  msgContainer: { marginBottom: 18 },
+  msgContainer: { marginBottom: 12 },
   chatAvatar: {
     width: 34,
     height: 34,
@@ -2169,15 +2791,26 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   bubble: {
-    minHeight: MESSAGE_BUBBLE_MIN_HEIGHT,
-    paddingVertical: IMESSAGE_BUBBLE_PADDING_V,
-    paddingHorizontal: IMESSAGE_BUBBLE_PADDING_H,
     borderRadius: IMESSAGE_BUBBLE_CORNER_RADIUS,
   },
   bubbleText: {
     fontSize: IMESSAGE_BUBBLE_FONT_SIZE,
     lineHeight: IMESSAGE_BUBBLE_LINE_HEIGHT,
     textAlign: "left",
+    letterSpacing: 0,
+    ...Platform.select({
+      ios: { fontFamily: "System" },
+      android: { fontFamily: "sans-serif", includeFontPadding: false },
+    }),
+  },
+  failedMessageHint: {
+    marginTop: 4,
+    fontSize: 11,
+    opacity: 0.85,
+    ...Platform.select({
+      ios: { fontFamily: "System" },
+      android: { fontFamily: "sans-serif" },
+    }),
   },
   myBubble: {
     backgroundColor: ACCENT,
@@ -2199,15 +2832,21 @@ const styles = StyleSheet.create({
   chatHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: 18,
-    paddingBottom: 14,
+    paddingBottom: 6,
+    overflow: 'visible',
   },
   chatHeaderMain: {
     flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+  },
+  chatHeaderIdentityRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
+    minWidth: 0,
   },
   chatHeaderAvatar: {
     width: 44,
@@ -2224,11 +2863,16 @@ const styles = StyleSheet.create({
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
   chatHeaderTextCol: {
     flex: 1,
     minWidth: 0,
-    paddingTop: 5,
+    justifyContent: 'center',
+    paddingTop: 2,
+  },
+  chatHeaderTextColCompact: {
+    paddingTop: 0,
   },
   chatTitle: {
     color: TEXT,
@@ -2245,32 +2889,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
   },
+  chatLoadingWrap: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   chatList: {
+    flex: 1,
+  },
+  chatListFill: {
     flex: 1,
   },
   chatListContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 12,
+    paddingBottom: 2,
   },
   chatListContentEmpty: {
     flexGrow: 1,
     justifyContent: "center",
   },
   composerDock: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: BORDER,
     backgroundColor: BG,
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 4,
   },
   composerShell: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#16181C',
+    backgroundColor: GROUP_SURFACE,
     borderRadius: 26,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: GROUP_BORDER,
     paddingLeft: 16,
     paddingRight: 5,
     paddingVertical: 5,
@@ -2321,11 +2971,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   explorePanel: { height: '85%', backgroundColor: '#0A0A0A', borderTopLeftRadius: MODAL_RADIUS + 8, borderTopRightRadius: MODAL_RADIUS + 8, overflow: 'hidden' },
-  sectionHeader: { color: 'white', fontSize: 18, fontFamily: 'Avenir-Black', marginBottom: 20, paddingHorizontal: 20 },
+  sectionHeader: { ...listSectionTitle, color: TEXT, marginBottom: 20, paddingHorizontal: 20 },
   scrollRow: { marginBottom: 30, paddingLeft: 20 },
   ideaCircle: { alignItems: 'center', marginRight: 25 },
   circlePlaceholder: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#333' },
-  circleText: { color: 'white', fontSize: 13, fontFamily: 'Avenir-Medium' },
+  circleText: { ...cardMetaText, color: TEXT },
   venueCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2347,9 +2997,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
   },
   venueName: {
-    color: 'white',
-    fontSize: 16,
-    fontFamily: 'Avenir-Heavy',
+    ...cardTitleText,
   },
   venueRating: {
     color: ACCENT,
@@ -2373,8 +3021,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(43,255,136,0.18)',
   },
   aiCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  aiCardTitleSmall: { color: ACCENT, fontSize: 14, fontFamily: 'Avenir-Heavy', letterSpacing: 0.5 },
-  aiCardBodySmall: { color: 'white', fontSize: 15, fontFamily: 'Avenir', lineHeight: 22, marginBottom: 15 },
+  aiCardTitleSmall: { color: ACCENT, fontSize: TYPE_LEAD, fontFamily: fonts.heavy, letterSpacing: 0.5 },
+  aiCardBodySmall: { ...cardMetaText, color: TEXT, fontSize: TYPE_BODY, lineHeight: 22, marginBottom: 15 },
   aiShareBtnSmall: { backgroundColor: ACCENT, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
   aiShareBtnText: { color: ON_ACCENT_TEXT, fontSize: 14, fontFamily: fonts.heavy },
   editPanel: {
@@ -2418,39 +3066,40 @@ const styles = StyleSheet.create({
     marginVertical: 15,
     width: '100%',
   },
-  ideaBubble: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: ACCENT,
-    padding: 12,
-    alignItems: 'stretch',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    overflow: "hidden",
+  ideaCardSlot: {
+    width: '88%',
+    alignSelf: 'center',
   },
   heartReaction: {
     position: "absolute",
-    bottom: -6,
-    right: -6,
+    bottom: -10,
+    right: -10,
     flexDirection: "row",
     alignItems: "center",
   },
-  ideaImage: {
-    width: '100%',
-    height: 150,
-    borderRadius: 12,
-    marginBottom: 10,
+  heartReactionBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#1C1C1E",
+    opacity: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.35,
+        shadowRadius: 2,
+      },
+      android: { elevation: 2 },
+    }),
   },
-  ideaText: {
-    color: 'white',
-    fontSize: 15,
-    textAlign: 'center',
-    fontWeight: '500',
-    lineHeight: 20,
+  heartReactionBadgeOverlap: {
+    marginLeft: -5,
   },
   locationRow: {
     flexDirection: "row",
@@ -2554,7 +3203,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    marginTop: 5,
+    marginTop: 3,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
@@ -2563,6 +3212,9 @@ const styles = StyleSheet.create({
     borderColor: "#1C1C1E",
     gap: 4,
     maxWidth: "92%",
+  },
+  aiChipPremiumDisabled: {
+    opacity: 0.4,
   },
   aiChipText: {
     color: "#aaa",
@@ -2576,6 +3228,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: fonts.medium,
     letterSpacing: 0.1,
+  },
+  aiUnavailableHint: {
+    color: MUTED2,
+    fontSize: 12,
+    fontFamily: fonts.book,
+    lineHeight: 16,
+    paddingRight: 8,
+  },
+  chatHeaderUnavailableHint: {
+    marginLeft: 56,
+    marginTop: 2,
   },
   suggestionSectionTitle: {
     color: "rgba(255,255,255,0.55)",

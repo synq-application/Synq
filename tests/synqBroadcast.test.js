@@ -122,6 +122,6 @@ describe("synqBroadcast", () => {
       synqBroadcastMode: "groups",
       synqBroadcastGroupIds: ["g1", "g2"],
     };
-    expect(formatSynqAudienceLabel(activeUser, groups)).toBe("Roommates · Work");
+    expect(formatSynqAudienceLabel(activeUser, groups)).toBe("Roommates & Work");
   });
 });

@@ -1,4 +1,4 @@
-import { getStackAvatarUris, resolveAvatar } from "@/app/helpers";
+import { getStackAvatarUris, resolveAvatar } from "@/src/lib/helpers";
 import { ACCENT } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
@@ -25,7 +25,7 @@ export default function GroupListAvatar({ memberIds, friends }: Props) {
       const friend = byId.get(id);
       images[id] = resolveAvatar(friend?.imageurl);
     }
-    return getStackAvatarUris(images);
+    return getStackAvatarUris(images, undefined, memberIds);
   }, [memberIds, friends]);
 
   if (memberIds.length === 0) {

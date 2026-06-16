@@ -1,17 +1,22 @@
-import { filterOutPastOpenPlans } from "@/src/lib/planEvents";
+import { filterOutPastOpenPlans, sortOpenPlansByDateTime } from "@/src/lib/planEvents";
+import { resolvePlanAttribution } from "@/src/lib/planAttribution";
+import {
+  GROUP_BORDER,
+  GROUP_SURFACE,
+} from "@/src/components/friends/groupsListStyles";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from "react-native";
 
 const PLAN_PILL_LAYOUT: ViewStyle = {
   marginLeft: "auto",
   minWidth: 88,
-  height: 32,
+  minHeight: 32,
   borderRadius: 12,
   borderWidth: 1,
   paddingHorizontal: 10,
+  paddingVertical: 6,
   alignItems: "center",
   justifyContent: "center",
-  overflow: "hidden",
 };
 
 type EventItem = {
@@ -23,13 +28,18 @@ type EventItem = {
   joinedFromFriendUid?: string;
   joinedFromId?: string;
   joinedFromIds?: string[];
+  joinedFromName?: string;
+  joinedFromNames?: string[];
   planHostUid?: string;
+  attendeeDisplayNames?: Record<string, string>;
 };
 
 type Props = {
   events: EventItem[];
   ACCENT: string;
   fonts: any;
+  viewerUid?: string;
+  profileSubjectUid?: string;
   onPressPlan?: (event: EventItem) => void;
   isPlanJoined?: (event: EventItem) => boolean;
   isViewerHostOfPlan?: (event: EventItem) => boolean;
@@ -41,36 +51,31 @@ export default function FriendOpenPlans({
   events,
   ACCENT,
   fonts,
+  viewerUid = "",
+  profileSubjectUid = "",
   onPressPlan,
   isPlanJoined,
   isViewerHostOfPlan,
   hostDisplayNameByUid,
-  profileFallbackFirstName,
 }: Props) {
-  const visibleEvents = useMemo(() => filterOutPastOpenPlans(events), [events]);
+  const visibleEvents = useMemo(
+    () => sortOpenPlansByDateTime(filterOutPastOpenPlans(events)),
+    [events]
+  );
 
   const parseDate = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);
     return new Date(y, m - 1, d);
   };
 
-  const firstName = (name: string) =>
-    String(name || "")
-      .trim()
-      .split(/\s+/)[0] || "";
-
   const planHostLabelForRow = (p: EventItem) => {
-    const hostUid =
-      String(p.planHostUid || "").trim() ||
-      String(p.joinedFromFriendUid || "").trim();
-    const hostFull = hostUid ? hostDisplayNameByUid[hostUid] : "";
-    if (hostUid) {
-      if (!hostFull) return null;
-      return `${firstName(hostFull)}'s plan`;
-    }
-    const fb = profileFallbackFirstName && String(profileFallbackFirstName).trim();
-    if (fb) return `${firstName(fb)}'s plan`;
-    return null;
+    const { primary } = resolvePlanAttribution(
+      p,
+      viewerUid,
+      hostDisplayNameByUid,
+      profileSubjectUid || viewerUid
+    );
+    return primary;
   };
 
   return (
@@ -201,8 +206,10 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     width: "100%",
     maxWidth: 340,
-    backgroundColor: "#0d0d0d",
+    backgroundColor: GROUP_SURFACE,
     borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: GROUP_BORDER,
     padding: 14,
     marginBottom: 14,
     flexDirection: "row",
@@ -276,9 +283,7 @@ const styles = StyleSheet.create({
   },
   interestText: {
     fontSize: 12,
-    lineHeight: 32,
     textAlign: "center",
-    textAlignVertical: "center",
     includeFontPadding: false,
   },
 });

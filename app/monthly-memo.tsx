@@ -5,23 +5,38 @@ import {
   BUTTON_RADIUS,
   fonts,
   MODAL_RADIUS,
+  MUTED2,
+  MUTED3,
   PRIMARY_CTA_WIDTH,
+  cardTitleText,
+  cardMetaText,
   profileScreenSectionTitle,
+  RADIUS_LG,
   TEXT,
 } from "@/constants/Variables";
 import PlanDateCalendar from "@/src/components/PlanDateCalendar";
 import PlanTimePicker from "@/src/components/PlanTimePicker";
+import {
+  GROUP_BORDER,
+  GROUP_SURFACE,
+} from "@/src/components/friends/groupsListStyles";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
-import { canEditOpenPlan, filterOutPastOpenPlans } from "@/src/lib/planEvents";
+import {
+  canEditOpenPlan,
+  collectPlanInterestedFriendIds,
+  filterOutPastOpenPlans,
+  sortOpenPlansByDateTime,
+} from "@/src/lib/planEvents";
 import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
+  InteractionManager,
   Keyboard,
   type KeyboardEvent,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -33,7 +48,17 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import PlanInviteFriendsSheet, {
+  type PlanInviteFriend,
+} from "@/src/components/plans/PlanInviteFriendsSheet";
+import PlanGoingPeopleSheet, {
+  type PlanGoingPerson,
+} from "@/src/components/plans/PlanGoingPeopleSheet";
+import { resolvePlanAttribution } from "@/src/lib/planAttribution";
 import ConfirmModal from "./confirm-modal";
+import AlertModal from "./alert-modal";
+import { router } from "expo-router";
 
 type EventItem = {
   id: string;
@@ -42,9 +67,13 @@ type EventItem = {
   time?: string;
   location?: string;
   joinedFromId?: string;
+  joinedFromIds?: string[];
   joinedFromName?: string;
   joinedFromNames?: string[];
+  joinedFromFriendUid?: string;
   planHostUid?: string;
+  attendeeDisplayNames?: Record<string, string>;
+  planInvitedIds?: string[];
 };
 
 type Props = {
@@ -63,6 +92,9 @@ type Props = {
   viewerUid?: string;
   hostDisplayNameByUid?: Record<string, string>;
   highlightEventId?: string | null;
+  friends?: PlanInviteFriend[];
+  onPlanInvited?: (eventId: string, friendIds: string[]) => void;
+  onPlanUninvited?: (eventId: string, friendId: string) => void;
 };
 
 const getInitialDate = () => {
@@ -85,69 +117,77 @@ export default function OpenPlans({
   viewerUid = "",
   hostDisplayNameByUid = {},
   highlightEventId = null,
+  friends = [],
+  onPlanInvited,
+  onPlanUninvited,
 }: Props) {
-  const firstName = (name: string) => String(name || "").trim().split(/\s+/)[0] || "";
+  const insets = useSafeAreaInsets();
+  const modalMaxHeight = useMemo(() => {
+    const windowH = Dimensions.get("window").height;
+    return windowH - insets.top - insets.bottom - 24;
+  }, [insets.top, insets.bottom]);
 
-  const formatOthersInterestedLine = (names: string[]) => {
-    if (names.length === 0) return null;
-    if (names.length === 1) return `${names[0]} is interested`;
-    if (names.length === 2) return `${names[0]} and ${names[1]} are interested`;
-    const head = names.slice(0, -1).join(", ");
-    const tail = names[names.length - 1];
-    return `${head}, and ${tail} are interested`;
-  };
-
-  const planAttributionLines = (event: EventItem): { primary: string | null; secondary: string | null } => {
-    const isJoinedPlan =
-      !!event.joinedFromId ||
-      !!event.joinedFromName ||
-      (Array.isArray(event.joinedFromNames) && event.joinedFromNames.length > 0);
-    if (!isJoinedPlan) return { primary: null, secondary: null };
-
-    const rawNames = (Array.isArray(event.joinedFromNames) && event.joinedFromNames.length > 0
-      ? event.joinedFromNames
-      : [event.joinedFromName].filter(Boolean)) as string[];
-    const nameFirsts = Array.from(
-      new Set(rawNames.map((n) => firstName(n)).filter(Boolean))
-    );
-    const hostUid = String(event.planHostUid || "").trim();
-    const viewerFn = viewerUid ? firstName(hostDisplayNameByUid[viewerUid] || "") : "";
-    const hostIsViewer = !!(hostUid && viewerUid && hostUid === viewerUid);
-
-    let hostFn: string | null = null;
-    if (hostUid && !hostIsViewer) {
-      const hostFull = String(hostDisplayNameByUid[hostUid] || "").trim();
-      hostFn = hostFull ? firstName(hostFull) : null;
-      if (!hostFn && nameFirsts.length > 0) {
-        hostFn = nameFirsts[0];
-      }
-      if (!hostFn) hostFn = "Friend";
+  const friendById = useMemo(() => {
+    const map = new Map<string, PlanInviteFriend>();
+    for (const friend of friends) {
+      if (friend.id) map.set(friend.id, friend);
     }
+    return map;
+  }, [friends]);
 
-    const othersFirsts = hostFn && !hostIsViewer
-      ? nameFirsts.filter((n) => n !== hostFn)
-      : nameFirsts.filter((n) => n !== viewerFn);
-
-    const primary =
-      hostIsViewer || !hostUid
-        ? null
-        : hostFn
-          ? `${hostFn}'s plan`
-          : null;
-
-    const secondary =
-      othersFirsts.length > 0 ? formatOthersInterestedLine(othersFirsts) : null;
-
-    return { primary, secondary };
+  const planAttributionLines = (event: EventItem) => {
+    const { primary, secondary, goingPeople } = resolvePlanAttribution(
+      event,
+      viewerUid,
+      hostDisplayNameByUid,
+      viewerUid
+    );
+    const peopleWithAvatars = goingPeople.map((person) => ({
+      ...person,
+      imageUrl: person.userId ? friendById.get(person.userId)?.imageurl || null : null,
+    }));
+    return { primary, secondary, goingPeople: peopleWithAvatars };
   };
+  const [goingPeopleSheet, setGoingPeopleSheet] = useState<{
+    planTitle: string;
+    people: PlanGoingPerson[];
+  } | null>(null);
   const [selectedDate, setSelectedDate] = useState(getInitialDate);
   const [activePicker, setActivePicker] = useState<"date" | "time" | null>(null);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
   const [pendingDeleteEvent, setPendingDeleteEvent] = useState<EventItem | null>(null);
+  const [inviteSheetVisible, setInviteSheetVisible] = useState(false);
+  const [draftPlanId, setDraftPlanId] = useState<string | null>(null);
+  const [createInviteFriendIds, setCreateInviteFriendIds] = useState<string[]>([]);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
   const isEditing = !!editingEvent;
+  const activePlanId = isEditing ? editingEvent?.id : draftPlanId;
+  const canInviteToPlan =
+    !!activePlanId &&
+    friends.length > 0 &&
+    (isEditing
+      ? canEditOpenPlan(editingEvent!, viewerUid)
+      : true);
+  const planInvitedIds = useMemo(() => {
+    if (isEditing) {
+      if (!editingEvent?.id) return editingEvent?.planInvitedIds;
+      return events.find((e) => e.id === editingEvent.id)?.planInvitedIds ?? editingEvent.planInvitedIds;
+    }
+    return createInviteFriendIds;
+  }, [events, editingEvent, isEditing, createInviteFriendIds]);
+  const planInterestedIds = useMemo(() => {
+    const event = editingEvent?.id
+      ? events.find((e) => e.id === editingEvent.id) ?? editingEvent
+      : editingEvent;
+    if (!event) return [];
+    return collectPlanInterestedFriendIds(event, viewerUid);
+  }, [events, editingEvent, viewerUid]);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const planScrollRef = useRef<ScrollView>(null);
   const locationInputRef = useRef<TextInput>(null);
+  const inviteAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const minimumSelectableDate = useMemo(() => {
     const d = new Date();
@@ -194,17 +234,29 @@ export default function OpenPlans({
 
   const openAddModal = () => {
     setEditingEvent(null);
+    setDraftPlanId(String(Date.now()));
+    setCreateInviteFriendIds([]);
     setSelectedDate(getInitialDate());
     setActivePicker(null);
+    setInviteSheetVisible(false);
     setNewEvent({ title: "", date: "", time: "", location: "" });
     setKeyboardInset(0);
     setShowEventModal(true);
   };
 
   const openEditModal = (event: EventItem) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (inviteAlertTimerRef.current) {
+      clearTimeout(inviteAlertTimerRef.current);
+      inviteAlertTimerRef.current = null;
+    }
+    setAlertVisible(false);
+    setDraftPlanId(null);
+    setCreateInviteFriendIds([]);
     setEditingEvent(event);
     setSelectedDate(parseTimeToDate(event.date, event.time));
     setActivePicker(null);
+    setInviteSheetVisible(false);
     setNewEvent({
       title: event.title,
       date: event.date,
@@ -215,14 +267,120 @@ export default function OpenPlans({
     setShowEventModal(true);
   };
 
-  const closeModal = () => {
+  const resetPlanEditorState = useCallback(() => {
+    if (inviteAlertTimerRef.current) {
+      clearTimeout(inviteAlertTimerRef.current);
+      inviteAlertTimerRef.current = null;
+    }
     Keyboard.dismiss();
     setActivePicker(null);
     setEditingEvent(null);
+    setDraftPlanId(null);
+    setCreateInviteFriendIds([]);
+    setInviteSheetVisible(false);
+    setKeyboardInset(0);
+    setAlertVisible(false);
     setShowEventModal(false);
+  }, [setShowEventModal]);
+
+  useEffect(() => {
+    if (showEventModal) return;
+    setInviteSheetVisible(false);
+    setActivePicker(null);
+    setEditingEvent(null);
+    setDraftPlanId(null);
+    setCreateInviteFriendIds([]);
+    setKeyboardInset(0);
+  }, [showEventModal]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        resetPlanEditorState();
+      };
+    }, [resetPlanEditorState])
+  );
+
+  useEffect(() => {
+    return () => {
+      if (inviteAlertTimerRef.current) {
+        clearTimeout(inviteAlertTimerRef.current);
+        inviteAlertTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const closeModal = () => {
+    if (inviteSheetVisible) {
+      setInviteSheetVisible(false);
+      return;
+    }
+    resetPlanEditorState();
+  };
+
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
+
+  const scheduleInviteAlert = useCallback((title: string, message: string) => {
+    if (inviteAlertTimerRef.current) {
+      clearTimeout(inviteAlertTimerRef.current);
+    }
+    InteractionManager.runAfterInteractions(() => {
+      inviteAlertTimerRef.current = setTimeout(() => {
+        inviteAlertTimerRef.current = null;
+        showAlert(title, message);
+      }, 400);
+    });
+  }, []);
+
+  const handlePlanInvited = useCallback(
+    (friendIds: string[]) => {
+      const eventId = activePlanId;
+      if (!eventId || friendIds.length === 0) return;
+      if (isEditing) {
+        onPlanInvited?.(eventId, friendIds);
+        setInviteSheetVisible(false);
+        return;
+      }
+      setCreateInviteFriendIds((prev) => {
+        const next = new Set(prev);
+        friendIds.forEach((id) => {
+          const uid = String(id || "").trim();
+          if (uid) next.add(uid);
+        });
+        return [...next];
+      });
+      setInviteSheetVisible(false);
+    },
+    [activePlanId, isEditing, onPlanInvited, resetPlanEditorState]
+  );
+
+  const handlePlanUninvited = useCallback(
+    (friendId: string) => {
+      const eventId = activePlanId;
+      const uid = String(friendId || "").trim();
+      if (!eventId || !uid) return;
+      if (isEditing) {
+        onPlanUninvited?.(eventId, uid);
+        return;
+      }
+      setCreateInviteFriendIds((prev) => prev.filter((id) => id !== uid));
+    },
+    [activePlanId, isEditing, onPlanUninvited]
+  );
+
+  const handleInviteError = (message: string) => {
+    scheduleInviteAlert("Could not invite", message);
   };
 
   const handleBackdropPress = () => {
+    if (inviteSheetVisible) {
+      setInviteSheetVisible(false);
+      return;
+    }
     if (keyboardInset > 0) {
       Keyboard.dismiss();
       return;
@@ -234,20 +392,27 @@ export default function OpenPlans({
     closeModal();
   };
 
-  const canPost = newEvent.title.trim().length > 0;
+  const openInviteSheet = () => {
+    Keyboard.dismiss();
+    setActivePicker(null);
+    setKeyboardInset(0);
+    setInviteSheetVisible(true);
+  };
 
   const dismissPickers = () => setActivePicker(null);
 
-  const popupScrollMaxHeight = useMemo(() => {
-    const windowH = Dimensions.get("window").height;
-    if (activePicker === "date" || activePicker === "time") {
-      return Math.min(200, windowH * 0.26);
-    }
-    return Math.min(420, windowH * 0.48);
-  }, [activePicker]);
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+  }, []);
 
   const collapseActivePicker = () => {
+    Keyboard.dismiss();
     if (activePicker) setActivePicker(null);
+  };
+
+  const togglePicker = (picker: "date" | "time") => {
+    Keyboard.dismiss();
+    setActivePicker((p) => (p === picker ? null : picker));
   };
 
   const handleCalendarSelect = (d: Date) => {
@@ -261,6 +426,23 @@ export default function OpenPlans({
 
   const formatTime = (d: Date) =>
     d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+  const isPlanDirty = useMemo(() => {
+    if (!isEditing || !editingEvent) return true;
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(selectedDate.getDate()).padStart(2, "0");
+    const localDate = `${year}-${month}-${day}`;
+    return (
+      newEvent.title.trim() !== editingEvent.title.trim() ||
+      localDate !== editingEvent.date ||
+      formatTime(selectedDate) !== (editingEvent.time || "") ||
+      (newEvent.location || "").trim() !== (editingEvent.location || "").trim()
+    );
+  }, [isEditing, editingEvent, newEvent, selectedDate]);
+
+  const canPost =
+    newEvent.title.trim().length > 0 && (!isEditing || isPlanDirty);
 
   const parseDate = (s: string) => {
     const [y, m, d] = s.split("-").map(Number);
@@ -310,11 +492,14 @@ export default function OpenPlans({
     if (isEditing && editingEvent?.id) {
       updateEvent(editingEvent.id, payload);
     } else {
-      saveEvent(payload);
+      saveEvent({
+        ...payload,
+        id: draftPlanId || undefined,
+        inviteFriendIds: createInviteFriendIds,
+      });
     }
 
-    setEditingEvent(null);
-    setShowEventModal(false);
+    resetPlanEditorState();
   };
 
   const handleDelete = (event: EventItem) => {
@@ -324,106 +509,120 @@ export default function OpenPlans({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Open plans</Text>
+      <Text style={styles.sectionTitle}>Your plans</Text>
 
       <View style={styles.plansBox}>
       {!visibleEvents.length && (
         <Text style={styles.empty}>Nothing planned… yet 👀</Text>
       )}
 
-      {[...visibleEvents]
-        .sort((a, b) => {
-          const baseA = parseDate(a.date);
-          const baseB = parseDate(b.date);
-
-          const getMinutes = (time?: string) => {
-            if (!time) return 0;
-            const [t, period] = time.split(" ");
-            let [hours, minutes] = t.split(":").map(Number);
-
-            if (period === "PM" && hours !== 12) hours += 12;
-            if (period === "AM" && hours === 12) hours = 0;
-
-            return hours * 60 + minutes;
-          };
-
-          const minutesA = getMinutes(a.time);
-          const minutesB = getMinutes(b.time);
-
-          return (
-            baseA.getTime() + minutesA * 60000 -
-            (baseB.getTime() + minutesB * 60000)
-          );
-        })
-        .map((p, index, arr) => {
+      {sortOpenPlansByDateTime(visibleEvents).map((p, index, arr) => {
           const isLast = index === arr.length - 1;
           const d = parseDate(p.date);
-          const isJoinedPlan =
-            !!p.joinedFromId ||
-            !!p.joinedFromName ||
-            (Array.isArray(p.joinedFromNames) && p.joinedFromNames.length > 0);
-          const { primary: hostLine, secondary: othersLine } = planAttributionLines(p);
-          const hasInterestLines =
-            isJoinedPlan && !!(hostLine || othersLine);
+          const isOwnPlan = canEditOpenPlan(p, viewerUid);
+          const { primary: hostLine, secondary: othersLine, goingPeople } =
+            planAttributionLines(p);
           const isHighlighted =
             !!highlightEventId && String(p.id) === String(highlightEventId);
-          const canEdit = canEditOpenPlan(p, viewerUid);
+
           return (
-            <TouchableOpacity
+            <View
               key={p.id}
               style={[
                 styles.card,
-                isJoinedPlan && styles.joinedCard,
-                isHighlighted && { borderColor: ACCENT, borderWidth: 2 },
+                isHighlighted && styles.cardHighlighted,
                 isLast && { marginBottom: 0 },
               ]}
-              onPress={canEdit ? () => openEditModal(p) : undefined}
-              onLongPress={() => handleDelete(p)}
-              delayLongPress={400}
+              accessibilityLabel={
+                isOwnPlan
+                  ? `Your plan, ${p.title}`
+                  : `${hostLine || "Joined plan"}, ${p.title}`
+              }
             >
-            <View style={styles.dateBlock}>
-              <Text style={styles.day}>
-                {d
-                  .toLocaleDateString("en-US", { weekday: "short" })
-                  .toUpperCase()}
-              </Text>
-              <View style={styles.dateNumberWrap}>
-                <Text style={styles.date}>{d.getDate()}</Text>
-              </View>
-              <Text style={styles.month}>
-                {d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()}
-              </Text>
-            </View>
-              <View
-                style={[
-                  styles.planBody,
-                  hasInterestLines && styles.planBodyWithInterest,
-                ]}
-              >
-                <Text style={styles.title}>{p.title}</Text>
-                <Text style={styles.meta}>
-                  {p.time}
-                  {p.location ? ` · ${p.location}` : ""}
-                </Text>
-                {hasInterestLines ? (
-                  <>
-                    {hostLine ? (
-                      <Text style={styles.hostPlanLine}>{hostLine}</Text>
-                    ) : null}
-                    {othersLine ? (
-                      <Text
-                        style={[
-                          styles.joinedMeta,
-                          { color: ACCENT, marginTop: hostLine ? 4 : 6 },
-                        ]}
-                      >
+              <View style={styles.cardMain}>
+                <View style={styles.dateBlock}>
+                  <Text style={styles.dateWeekday}>
+                    {d
+                      .toLocaleDateString("en-US", { weekday: "short" })
+                      .toUpperCase()}
+                  </Text>
+                  <Text style={styles.dateNumber}>{d.getDate()}</Text>
+                  <Text style={styles.dateMonth}>
+                    {d
+                      .toLocaleDateString("en-US", { month: "short" })
+                      .toUpperCase()}
+                  </Text>
+                </View>
+
+                <View style={styles.planBody}>
+                  <View style={styles.planHeaderRow}>
+                    <Text style={styles.title} numberOfLines={2}>
+                      {p.title}
+                    </Text>
+                    <View style={styles.cardActions}>
+                      {isOwnPlan ? (
+                        <>
+                          <Pressable
+                            onPress={() => openEditModal(p)}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Edit ${p.title}`}
+                          >
+                            <Text style={styles.actionEditText}>Edit</Text>
+                          </Pressable>
+                          <Text style={styles.actionSep}>·</Text>
+                          <Pressable
+                            onPress={() => handleDelete(p)}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Delete ${p.title}`}
+                          >
+                            <Text style={styles.actionDeleteText}>Delete</Text>
+                          </Pressable>
+                        </>
+                      ) : (
+                        <Pressable
+                          onPress={() => handleDelete(p)}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${p.title} from your plans`}
+                        >
+                          <Text style={styles.actionRemoveText}>Remove</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+                  {(p.time || p.location) ? (
+                    <Text style={styles.meta} numberOfLines={1}>
+                      {[p.time, p.location].filter(Boolean).join(" · ")}
+                    </Text>
+                  ) : null}
+                  {!isOwnPlan && hostLine ? (
+                    <Text style={styles.hostLine} numberOfLines={1}>
+                      {hostLine}
+                    </Text>
+                  ) : null}
+                  {othersLine && goingPeople.length > 0 ? (
+                    <Pressable
+                      onPress={() =>
+                        setGoingPeopleSheet({
+                          planTitle: p.title,
+                          people: goingPeople,
+                        })
+                      }
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="See everyone going to this plan"
+                      style={styles.goingPressable}
+                    >
+                      <Text style={styles.goingText}>
                         {othersLine}
                       </Text>
-                    ) : null}
-                  </>
-                ) : null}
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
-            </TouchableOpacity>
+            </View>
           );
         })}
       </View>
@@ -436,51 +635,67 @@ export default function OpenPlans({
         />
       </View>
 
+      {showEventModal ? (
       <Modal
-        visible={showEventModal}
+        visible
         transparent
         animationType="fade"
         onRequestClose={closeModal}
       >
-        <Pressable style={styles.popupOverlay} onPress={handleBackdropPress}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.popupAvoid}
+        <View
+          style={[
+            styles.popupOverlay,
+            {
+              paddingTop: insets.top + 12,
+              paddingBottom: Math.max(insets.bottom, 12),
+            },
+          ]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleBackdropPress}
+            accessibilityRole="button"
+            accessibilityLabel="Close plan editor"
+          />
+          <View
+            style={[
+              styles.popupAvoid,
+              { maxHeight: modalMaxHeight },
+              keyboardInset > 0 ? { marginBottom: keyboardInset } : null,
+            ]}
+            pointerEvents={inviteSheetVisible ? "none" : "box-none"}
           >
-            <View style={styles.popupCard}>
-              <View style={styles.popupTitleRow}>
-                <Text style={styles.popupTitle}>
-                  {isEditing ? "Edit plan" : "Add a plan"}
-                </Text>
-                <CloseButton onPress={closeModal} accessibilityLabel="Close" />
-              </View>
-
+            <View style={[styles.popupCard, { maxHeight: modalMaxHeight }]}>
               <TouchableWithoutFeedback
-                onPress={Keyboard.dismiss}
+                onPress={dismissKeyboard}
                 accessible={false}
               >
                 <View>
-                  <Text style={styles.sheetSub}>
-                    {isEditing
-                      ? "Update your plan details."
-                      : "Tell friends what you're doing, they can join."}
-                  </Text>
+                  <View style={styles.popupTitleRow}>
+                    <Text style={styles.popupTitle}>
+                      {isEditing ? "Edit plan" : "Add a plan"}
+                    </Text>
+                    <CloseButton onPress={closeModal} accessibilityLabel="Close" />
+                  </View>
                 </View>
               </TouchableWithoutFeedback>
 
               <ScrollView
                 ref={planScrollRef}
-                style={{ maxHeight: popupScrollMaxHeight }}
-                contentContainerStyle={[
-                  styles.popupScrollContent,
-                  keyboardInset > 0 ? { paddingBottom: 16 } : null,
-                ]}
+                style={styles.popupScroll}
+                contentContainerStyle={styles.popupScrollContent}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="interactive"
                 onScrollBeginDrag={Keyboard.dismiss}
                 showsVerticalScrollIndicator={false}
                 bounces={false}
+                nestedScrollEnabled
               >
+              <TouchableWithoutFeedback
+                onPress={dismissKeyboard}
+                accessible={false}
+              >
+              <View>
               <TextInput
                 placeholder="What's the plan?"
                 placeholderTextColor="#555"
@@ -503,6 +718,7 @@ export default function OpenPlans({
                         selected={isToday}
                         accentColor={ACCENT}
                         onPress={() => {
+                          Keyboard.dismiss();
                           setActivePicker(null);
                           setDate(new Date());
                         }}
@@ -512,6 +728,7 @@ export default function OpenPlans({
                         selected={isTomorrow}
                         accentColor={ACCENT}
                         onPress={() => {
+                          Keyboard.dismiss();
                           setActivePicker(null);
                           setDate(new Date(Date.now() + 86400000));
                         }}
@@ -520,9 +737,7 @@ export default function OpenPlans({
                         label="Other"
                         selected={isCustomDate}
                         accentColor={ACCENT}
-                        onPress={() =>
-                          setActivePicker((p) => (p === "date" ? null : "date"))
-                        }
+                        onPress={() => togglePicker("date")}
                       />
                     </View>
 
@@ -532,9 +747,7 @@ export default function OpenPlans({
                           styles.dateTimeField,
                           activePicker === "date" && styles.dateTimeFieldActive,
                         ]}
-                        onPress={() =>
-                          setActivePicker((p) => (p === "date" ? null : "date"))
-                        }
+                        onPress={() => togglePicker("date")}
                       >
                         <Ionicons
                           name="calendar-outline"
@@ -553,9 +766,7 @@ export default function OpenPlans({
                           styles.dateTimeField,
                           activePicker === "time" && styles.dateTimeFieldActive,
                         ]}
-                        onPress={() =>
-                          setActivePicker((p) => (p === "time" ? null : "time"))
-                        }
+                        onPress={() => togglePicker("time")}
                       >
                         <Ionicons
                           name="time-outline"
@@ -572,7 +783,6 @@ export default function OpenPlans({
                   </View>
                 </TouchableWithoutFeedback>
               </View>
-              </ScrollView>
 
               {activePicker === "date" ? (
                 <View style={styles.calendarWrap}>
@@ -608,6 +818,22 @@ export default function OpenPlans({
                 />
               </View>
 
+              {canInviteToPlan ? (
+                <TouchableOpacity
+                  style={styles.inviteFriendsBtn}
+                  onPress={openInviteSheet}
+                  accessibilityRole="button"
+                  accessibilityLabel="Invite friends to this plan"
+                >
+                  <Ionicons name="person-add-outline" size={18} color={ACCENT} />
+                  <Text style={styles.inviteFriendsBtnText}>
+                    {createInviteFriendIds.length > 0 && !isEditing
+                      ? `Invite friends (${createInviteFriendIds.length})`
+                      : "Invite friends"}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
               <TouchableOpacity
                 style={[styles.popupPostBtn, !canPost && styles.popupPostBtnDisabled]}
                 disabled={!canPost}
@@ -617,12 +843,59 @@ export default function OpenPlans({
                   {isEditing ? "Save" : "Post"}
                 </Text>
               </TouchableOpacity>
+              </View>
+              </TouchableWithoutFeedback>
+              </ScrollView>
             </View>
-          </KeyboardAvoidingView>
-        </Pressable>
+          </View>
+
+          {inviteSheetVisible ? (
+            <PlanInviteFriendsSheet
+              embedded
+              visible
+              friends={friends}
+              eventId={activePlanId || ""}
+              planTitle={editingEvent?.title || newEvent.title}
+              alreadyInvitedIds={planInvitedIds}
+              alreadyInterestedIds={planInterestedIds}
+              deferInviteSend={!isEditing}
+              onClose={() => setInviteSheetVisible(false)}
+              onInvited={handlePlanInvited}
+              onUninvited={handlePlanUninvited}
+              onError={handleInviteError}
+            />
+          ) : null}
+        </View>
       </Modal>
+      ) : null}
+
+      {alertVisible ? (
+        <AlertModal
+          visible
+          title={alertTitle}
+          message={alertMessage}
+          onClose={() => setAlertVisible(false)}
+        />
+      ) : null}
+
+      <PlanGoingPeopleSheet
+        visible={!!goingPeopleSheet}
+        planTitle={goingPeopleSheet?.planTitle}
+        people={goingPeopleSheet?.people ?? []}
+        onClose={() => setGoingPeopleSheet(null)}
+        onPressPerson={(person) => {
+          if (!person.userId || person.userId === viewerUid) return;
+          setGoingPeopleSheet(null);
+          router.push({
+            pathname: "/friend-profile",
+            params: { friendId: person.userId },
+          });
+        }}
+      />
+
+      {pendingDeleteEvent ? (
       <ConfirmModal
-        visible={!!pendingDeleteEvent}
+        visible
         title={
           pendingDeleteEvent?.planHostUid &&
           viewerUid &&
@@ -634,8 +907,8 @@ export default function OpenPlans({
           pendingDeleteEvent?.planHostUid &&
           viewerUid &&
           pendingDeleteEvent.planHostUid !== viewerUid
-            ? "This removes it from your open plans and updates interest for this friend."
-            : "Are you sure?"
+            ? "This removes it from your open plans and updates this for your friend."
+            : "This deletes the plan for you and anyone who joined."
         }
         confirmText={
           pendingDeleteEvent?.planHostUid &&
@@ -651,6 +924,7 @@ export default function OpenPlans({
           setPendingDeleteEvent(null);
         }}
       />
+      ) : null}
     </View>
   );
 }
@@ -706,72 +980,114 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
   },
   card: {
-    alignSelf: "flex-start",
-    width: "86%",
+    alignSelf: "stretch",
+    width: "100%",
     maxWidth: 340,
-    backgroundColor: "#0d0d0d",
-    borderRadius: 14,
+    borderRadius: RADIUS_LG,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: GROUP_BORDER,
+    backgroundColor: GROUP_SURFACE,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  cardHighlighted: {
+    borderColor: "rgba(0,255,133,0.45)",
     borderWidth: 1,
-    borderColor: BORDER,
-    paddingVertical: 10,
-    paddingLeft: 10,
-    paddingRight: 12,
-    marginBottom: 6,
+  },
+  cardMain: {
     flexDirection: "row",
-    alignItems: "stretch",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  dateBlock: {
+    width: 40,
+    alignItems: "center",
+    marginRight: 10,
+  },
+  dateWeekday: {
+    color: MUTED3,
+    fontSize: 9,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.5,
+  },
+  dateNumber: {
+    color: TEXT,
+    fontSize: 20,
+    fontFamily: fonts.heavy,
+    lineHeight: 22,
+    letterSpacing: -0.5,
+    marginTop: 1,
+  },
+  dateMonth: {
+    color: MUTED3,
+    fontSize: 9,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.4,
+    marginTop: 1,
   },
   planBody: {
     flex: 1,
-    alignSelf: "stretch",
-    justifyContent: "center",
+    minWidth: 0,
   },
-  planBodyWithInterest: {
-    justifyContent: "flex-start",
+  planHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
   },
-  joinedCard: {
-    borderColor: "rgba(43,255,136,0.35)",
-    backgroundColor: "rgba(43,255,136,0.07)",
-  },
-  dateBlock: {
-    width: 52,
-    marginRight: 12,
-    alignSelf: "stretch",
-    flexDirection: "column",
+  cardActions: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-start",
+    flexShrink: 0,
+    paddingTop: 1,
   },
-  dateNumberWrap: {
-    flex: 1,
-    width: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: 0,
-  },
-  day: {
-    color: "#888",
+  actionSep: {
+    color: "rgba(255,255,255,0.2)",
     fontSize: 11,
-    fontFamily: fonts.heavy,
-    letterSpacing: 0.3,
-    width: "100%",
-    textAlign: "center",
+    marginHorizontal: 4,
   },
-  date: {
-    color: "white",
-    fontSize: 19,
-    fontFamily: fonts.heavy,
-    lineHeight: 23,
-    letterSpacing: -0.5,
-    textAlign: "center",
-    width: "100%",
-  },
-  title: { color: "white", fontSize: 15 },
-  meta: { color: "#777", marginTop: 3, fontSize: 13 },
-  joinedMeta: { marginTop: 6, fontSize: 12.5, fontFamily: fonts.medium },
-  hostPlanLine: {
-    color: "rgba(255,255,255,0.45)",
+  actionEditText: {
+    color: MUTED2,
     fontSize: 12,
-    marginTop: 5,
     fontFamily: fonts.medium,
+  },
+  actionDeleteText: {
+    color: "rgba(255,255,255,0.32)",
+    fontSize: 12,
+    fontFamily: fonts.medium,
+  },
+  actionRemoveText: {
+    color: MUTED3,
+    fontSize: 12,
+    fontFamily: fonts.medium,
+  },
+  title: {
+    flex: 1,
+    minWidth: 0,
+    ...cardTitleText,
+  },
+  meta: {
+    ...cardMetaText,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  hostLine: {
+    color: MUTED3,
+    marginTop: 3,
+    fontSize: 11,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.1,
+  },
+  goingPressable: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+  },
+  goingText: {
+    color: ACCENT,
+    fontSize: 11,
+    fontFamily: fonts.medium,
+    letterSpacing: 0.05,
+    lineHeight: 15,
   },
   addBtnRow: {
     width: "100%",
@@ -781,7 +1097,7 @@ const styles = StyleSheet.create({
   popupOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.78)",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingHorizontal: 20,
   },
@@ -797,7 +1113,11 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
     paddingHorizontal: 20,
     paddingTop: 18,
-    paddingBottom: 18,
+    paddingBottom: 12,
+  },
+  popupScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   popupTitleRow: {
     flexDirection: "row",
@@ -838,13 +1158,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 2,
   },
-  sheetSub: {
-    color: "rgba(255,255,255,0.62)",
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 14,
-  },
   planInput: {
     backgroundColor: "#0c0c0c",
     borderWidth: 1,
@@ -858,6 +1171,26 @@ const styles = StyleSheet.create({
   },
   locationFieldWrap: {
     marginTop: 10,
+  },
+  inviteFriendsBtn: {
+    marginTop: 12,
+    marginBottom: 4,
+    alignSelf: "center",
+    width: PRIMARY_CTA_WIDTH,
+    height: 50,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: BUTTON_RADIUS,
+    borderWidth: 1,
+    borderColor: "rgba(43,255,136,0.35)",
+    backgroundColor: "rgba(43,255,136,0.08)",
+  },
+  inviteFriendsBtnText: {
+    color: ACCENT,
+    fontSize: 16,
+    fontFamily: fonts.heavy,
   },
   planInputSecondary: {
     backgroundColor: "#0c0c0c",

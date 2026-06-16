@@ -6,16 +6,25 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import SynqOptionsSheet from "../../../app/synq-screens/SynqOptionsSheet";
-import React, { useMemo, useState } from "react";
+import type { Friend } from "@/constants/Variables";
+import {
+  FriendsSortMenu,
+  FriendsSortTrigger,
+  type FriendsSortMode,
+} from "@/src/components/friends/FriendsSortControls";
+import { useSortedFriendsList } from "@/src/lib/useSortedFriendsList";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Animated,
+  DeviceEventEmitter,
   FlatList,
   Pressable,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { friendLocationLine, resolveAvatar } from "../../../app/helpers";
+import { SYNQ_TAB_LONG_PRESS } from "@/src/lib/synqTabEvents";
+import { friendLocationLine, resolveAvatar } from "@/src/lib/helpers";
 import {
   ACCENT,
   BG,
@@ -24,7 +33,7 @@ import {
   TAB_BAR_SCROLL_INSET,
 } from "../../../constants/Variables";
 
-/** Matches memo + audience lead icons on the active Synq screen. */
+/** Matches audience lead icon on the active Synq screen. */
 const ACTIVE_LEAD_ICON_SIZE = 20;
 /** Fade strip sitting just above the Select friends button. */
 const ACTIVE_LIST_BOTTOM_FADE_HEIGHT = 52;
@@ -33,7 +42,6 @@ const ACTIVE_CTA_BOTTOM_NUDGE = 48;
 
 type Props = {
   styles: any;
-  memo: string;
   hasUnread: boolean;
   activePulseOpacity: Animated.Value;
   activePulseScale: Animated.Value;
@@ -47,11 +55,11 @@ type Props = {
   openEditModal: () => void;
   openChangeAudience?: () => void;
   audienceLabel?: string | null;
+  userProfile?: Record<string, unknown> | null;
 };
 
 export default function ActiveSynqSection({
   styles,
-  memo,
   hasUnread,
   activePulseOpacity,
   activePulseScale,
@@ -65,9 +73,25 @@ export default function ActiveSynqSection({
   openEditModal,
   openChangeAudience,
   audienceLabel,
+  userProfile,
 }: Props) {
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [sortMode, setSortMode] = useState<FriendsSortMode>("distance");
+  const [sortMenuVisible, setSortMenuVisible] = useState(false);
   const headerLayout = useTabHeaderLayout();
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(SYNQ_TAB_LONG_PRESS, () => {
+      setOptionsVisible(true);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const sortedAvailableFriends = useSortedFriendsList(
+    availableFriends as Friend[],
+    sortMode,
+    userProfile
+  );
 
   const footerLayout = useMemo(() => {
     const ctaPadTop = 12;
@@ -126,22 +150,6 @@ export default function ActiveSynqSection({
       >
       <View style={styles.headerDivider} />
 
-      {memo.trim() !== "" ? (
-        <View style={styles.activeMemoRow}>
-          <View style={styles.activeMemoCard}>
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={ACTIVE_LEAD_ICON_SIZE}
-              color={ACCENT}
-              style={styles.activeSynqLeadIcon}
-            />
-            <Text style={styles.activeMemoText} numberOfLines={6}>
-              {memo.trim()}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-
       <View style={styles.activeListFooterDock}>
         {audienceLabel ? (
           <Pressable
@@ -172,9 +180,18 @@ export default function ActiveSynqSection({
           </Pressable>
         ) : null}
 
+        {availableFriends.length > 0 ? (
+          <View style={styles.sortBar}>
+            <FriendsSortTrigger
+              sortMode={sortMode}
+              onPress={() => setSortMenuVisible(true)}
+            />
+          </View>
+        ) : null}
+
         <FlatList
           style={styles.activeFriendsList}
-          data={availableFriends}
+          data={sortedAvailableFriends}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={null}
@@ -241,7 +258,7 @@ export default function ActiveSynqSection({
           contentContainerStyle={[
             styles.activeListContent,
             {
-              paddingTop: audienceLabel ? 8 : 12,
+              paddingTop: audienceLabel ? 4 : 8,
               paddingBottom:
                 availableFriends.length > 0
                   ? footerLayout.listBottomPad
@@ -298,6 +315,13 @@ export default function ActiveSynqSection({
         ) : null}
       </View>
       </View>
+
+      <FriendsSortMenu
+        visible={sortMenuVisible}
+        sortMode={sortMode}
+        onSelect={setSortMode}
+        onClose={() => setSortMenuVisible(false)}
+      />
 
       <SynqOptionsSheet
         visible={optionsVisible}
