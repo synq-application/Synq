@@ -40,13 +40,13 @@ export const FRIEND_PROFILE_TTL_MS = 30 * 60 * 1000;
 /** How long before rebuilding the mutual-friends index. */
 export const MUTUAL_INDEX_TTL_MS = 60 * 60 * 1000;
 /** How long before repeating a full friends warm when friend ids are unchanged. */
-export const FRIENDS_WARM_TTL_MS = 5 * 60 * 1000;
+export const FRIENDS_WARM_TTL_MS = 20 * 60 * 1000;
 /** How long before refreshing suggested friends. */
 export const SUGGESTED_CACHE_TTL_MS = 30 * 60 * 1000;
 /** How long before re-reading a friend's friends subcollection. */
 export const FRIENDS_OF_FRIEND_TTL_MS = 60 * 60 * 1000;
 /** Poll interval for Synq-active friend availability (replaces per-friend listeners). */
-export const SYNQ_FRIEND_POLL_TTL_MS = 45 * 1000;
+export const SYNQ_FRIEND_POLL_TTL_MS = 90 * 1000;
 
 type SocialWarmMeta = {
   friendIdsKey: string;

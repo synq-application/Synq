@@ -1,3 +1,4 @@
+/** Chat to open after navigating to the Synq tab (e.g. from a push notification or community page). */
 export type PendingChatOpenExisting = {
   mode: "existing";
   chatId: string;
@@ -29,7 +30,6 @@ function notifyPendingChatOpen() {
   }
 }
 
-/** Chat to open after navigating to the Synq tab (e.g. from a push notification or community page). */
 export function setPendingChatOpen(value: PendingChatOpen | string, messageId?: string) {
   if (typeof value === "string") {
     pending = { mode: "existing", chatId: value, messageId };
@@ -39,10 +39,19 @@ export function setPendingChatOpen(value: PendingChatOpen | string, messageId?: 
   notifyPendingChatOpen();
 }
 
+export function peekPendingChatOpen(): PendingChatOpen | null {
+  return pending;
+}
+
+/** Removes and returns the pending chat open request (call only after handling). */
 export function consumePendingChatOpen(): PendingChatOpen | null {
   const value = pending;
   pending = null;
   return value;
+}
+
+export function clearPendingChatOpen() {
+  pending = null;
 }
 
 export function subscribePendingChatOpen(listener: () => void): () => void {
