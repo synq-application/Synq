@@ -21,6 +21,8 @@ function matchesPlanEvent(e, target, siblingEvents) {
 
   const hostE = String(e?.planHostUid || "").trim();
   const hostT = String(target?.planHostUid || "").trim();
+  if (hostE && hostT && hostE !== hostT) return false;
+
   if (hostE && hostT && hostE === hostT && eventKeyLoose(e) === eventKeyLoose(target)) {
     const sameHostLoose = siblingEvents.filter(
       (x) =>
@@ -41,9 +43,7 @@ function matchesPlanEvent(e, target, siblingEvents) {
     if (withHost.length === 1 && withHost[0] === e) return true;
   }
 
-  if (eventKeyLoose(e) !== eventKeyLoose(target)) return false;
-  const sameLoose = siblingEvents.filter((x) => eventKeyLoose(x) === eventKeyLoose(target));
-  return sameLoose.length === 1;
+  return false;
 }
 
 function collectJoinedIds(e) {
@@ -61,6 +61,7 @@ function collectJoinedIds(e) {
 
 function findHostPlanIndex(hostEvents, joinCopy, hostUid) {
   const looseT = eventKeyLoose(joinCopy);
+  const strictT = eventKey(joinCopy);
   const titleT = String(joinCopy.title || "").trim().toLowerCase();
   const candidates = hostEvents
     .map((e, i) => ({ e, i }))
@@ -72,8 +73,116 @@ function findHostPlanIndex(hostEvents, joinCopy, hostUid) {
       if (ph && ph !== hostUid) return false;
       return true;
     });
-  if (candidates.length !== 1) return -1;
-  return candidates[0].i;
+  if (candidates.length === 0) return -1;
+  if (candidates.length === 1) return candidates[0].i;
+  const strictMatches = candidates.filter(({ e }) => eventKey(e) === strictT);
+  if (strictMatches.length === 1) return strictMatches[0].i;
+  return -1;
+}
+
+function planInviteNotifId(hostUid, recipientUid, eventId) {
+  const safeEventId = String(eventId || "")
+    .trim()
+    .replace(/[/\s]/g, "_");
+  return `plan_invite_${hostUid}_${recipientUid}_${safeEventId}`.slice(0, 1400);
+}
+
+function collectInvitedIds(e) {
+  const ids = new Set();
+  if (Array.isArray(e?.planInvitedIds)) {
+    e.planInvitedIds.forEach((id) => {
+      const s = String(id || "").trim();
+      if (s) ids.add(s);
+    });
+  }
+  return ids;
+}
+
+function joinerStillOnHostedPlan(joinerUid, beforeCopy, afterEvents) {
+  const hostUid = String(beforeCopy?.planHostUid || "").trim();
+  if (!hostUid || hostUid === joinerUid) return true;
+
+  for (const ae of afterEvents) {
+    const aeHost = String(ae?.planHostUid || "").trim();
+    if (aeHost !== hostUid) continue;
+    if (!matchesPlanEvent(ae, beforeCopy, afterEvents)) continue;
+    if (collectJoinedIds(ae).has(joinerUid)) return true;
+  }
+  return false;
+}
+
+/**
+ * When a friend leaves a hosted plan, remove them from the host's joinedFromIds.
+ */
+async function syncUnjoinFromHosts(db, joinerUid, beforeEvents, afterEvents) {
+  const beforeJoinCopies = beforeEvents.filter((e) => {
+    const host = String(e?.planHostUid || "").trim();
+    return host && host !== joinerUid;
+  });
+  if (beforeJoinCopies.length === 0) return;
+
+  for (const beforeCopy of beforeJoinCopies) {
+    if (joinerStillOnHostedPlan(joinerUid, beforeCopy, afterEvents)) continue;
+
+    const hostUid = String(beforeCopy.planHostUid).trim();
+    try {
+      const hostRef = db.collection("users").doc(hostUid);
+      const hostSnap = await hostRef.get();
+      if (!hostSnap.exists) continue;
+
+      let hostEvents = Array.isArray(hostSnap.data()?.events) ? [...hostSnap.data().events] : [];
+      const idx = findHostPlanIndex(hostEvents, beforeCopy, hostUid);
+      if (idx < 0) continue;
+
+      const hostEv = hostEvents[idx];
+      const existingIds = collectJoinedIds(hostEv);
+      if (!existingIds.has(joinerUid)) continue;
+
+      existingIds.delete(joinerUid);
+      const mergedIds = Array.from(existingIds);
+      const displayNameById = await loadDisplayNames(db, mergedIds);
+      const otherNames = mergedIds
+        .filter((id) => id !== hostUid)
+        .map((id) => displayNameById[id])
+        .filter(Boolean);
+
+      hostEvents[idx] = {
+        ...hostEv,
+        joinedFromIds: mergedIds,
+        joinedFromId: mergedIds[0] || "",
+        joinedFromNames: otherNames,
+        joinedFromName: otherNames.join(", "),
+      };
+
+      await hostRef.update({ events: hostEvents });
+      logInfo("openPlanSync_unjoin_merged", { hostUid, joinerUid });
+    } catch (e) {
+      logError("openPlanSync_unjoin", e, { hostUid, joinerUid });
+    }
+  }
+}
+
+async function revokePendingInvitesForPlan(db, hostUid, removedEv) {
+  const eventId = String(removedEv?.id || "").trim();
+  const invited = collectInvitedIds(removedEv);
+  if (!eventId || invited.size === 0) return;
+
+  const deletes = [];
+  for (const recipientUid of invited) {
+    const notifId = planInviteNotifId(hostUid, recipientUid, eventId);
+    deletes.push(
+      db.collection("users").doc(recipientUid).collection("notifications").doc(notifId).delete()
+    );
+    deletes.push(
+      db
+        .collection("users")
+        .doc(recipientUid)
+        .collection("notificationLocks")
+        .doc(notifId)
+        .delete()
+    );
+  }
+  await Promise.allSettled(deletes);
 }
 
 function findRemovedHostedPlans(hostUid, beforeEvents, afterEvents) {
@@ -157,9 +266,10 @@ async function syncJoinerInterestToHosts(db, joinerUid, beforeEvents, afterEvent
         .filter((id) => id !== hostUid)
         .map((id) => displayNameById[id])
         .filter(Boolean);
+      const orderedIds = [hostUid, ...mergedIds.filter((id) => id !== hostUid)];
 
       const prevKey = [...collectJoinedIds(hostEv)].map(String).sort().join("|");
-      const nextKey = mergedIds.slice().sort().join("|");
+      const nextKey = orderedIds.slice().sort().join("|");
       const prevNamesStr = (Array.isArray(hostEv.joinedFromNames)
         ? hostEv.joinedFromNames
         : [hostEv.joinedFromName]
@@ -174,11 +284,12 @@ async function syncJoinerInterestToHosts(db, joinerUid, beforeEvents, afterEvent
       hostEvents[idx] = {
         ...hostEv,
         planHostUid: hostUid,
-        joinedFromIds: mergedIds,
-        joinedFromId: mergedIds[0] || "",
+        joinedFromIds: orderedIds,
+        joinedFromId: hostUid,
         joinedFromNames: otherNames,
         joinedFromName: otherNames.join(", "),
       };
+      delete hostEvents[idx].joinedFromFriendUid;
 
       await hostRef.update({ events: hostEvents });
       logInfo("openPlanSync_interest_merged", { hostUid, joinerUid });
@@ -200,6 +311,7 @@ async function cascadeDeletedPlans(db, hostUid, beforeEvents, afterEvents) {
     for (const id of collectJoinedIds(ev)) {
       if (id !== hostUid) targetUids.add(id);
     }
+    await revokePendingInvitesForPlan(db, hostUid, ev);
   }
 
   try {
@@ -241,6 +353,7 @@ async function cascadeDeletedPlans(db, hostUid, beforeEvents, afterEvents) {
 async function handleUserEventsChange(db, userId, beforeEvents, afterEvents) {
   if (JSON.stringify(beforeEvents) === JSON.stringify(afterEvents)) return;
 
+  await syncUnjoinFromHosts(db, userId, beforeEvents, afterEvents);
   await syncJoinerInterestToHosts(db, userId, beforeEvents, afterEvents);
   await cascadeDeletedPlans(db, userId, beforeEvents, afterEvents);
 }
