@@ -71,6 +71,7 @@ const BACKGROUND = BG;
 type ActivityFeedKind =
   | "friend_accepted"
   | "open_plan_interest"
+  | "community_plan_join"
   | "friend_synq_active"
   | "synq_nudge";
 
@@ -118,6 +119,9 @@ type StandardActivityFeedItem = {
   read: boolean;
   eventId?: string | null;
   planHostUid?: string | null;
+  groupId?: string | null;
+  planId?: string | null;
+  groupName?: string | null;
   raw: Record<string, unknown>;
 };
 
@@ -294,6 +298,10 @@ export default function NotificationsScreen() {
         body = planTitle
           ? `${firstName(actorName)} wants you to join their plan ${planTitle}`
           : `${firstName(actorName)} wants you to join their plan`;
+      } else if (type === "community_plan_join") {
+        body = planTitle
+          ? `${firstName(actorName)} is in for ${planTitle}`
+          : `${firstName(actorName)} joined a community plan`;
       } else if (type === "friend_synq_active") {
         body = `${firstName(actorName)} just activated Synq.`;
       } else if (type === "synq_nudge") {
@@ -315,6 +323,8 @@ export default function NotificationsScreen() {
             ? "Open plan"
             : type === "plan_invite"
               ? "Plan invite"
+            : type === "community_plan_join"
+              ? "Community plan"
             : type === "synq_nudge"
               ? "Are you free?"
               : "Friend active on Synq"),
@@ -323,6 +333,9 @@ export default function NotificationsScreen() {
       read: item.read === true,
       eventId: item.eventId ? String(item.eventId) : null,
       planHostUid: item.planHostUid ? String(item.planHostUid) : null,
+      groupId: item.groupId ? String(item.groupId) : null,
+      planId: item.planId ? String(item.planId) : null,
+      groupName: item.groupName ? String(item.groupName) : null,
     };
   };
 
@@ -347,7 +360,7 @@ export default function NotificationsScreen() {
     const legacyList = legacySnap.docs
       .map((d) => ({ id: d.id, ...d.data() } as LegacyNotificationLockRow))
       .filter((row) =>
-        ["friend_accepted", "open_plan_interest", "plan_invite"].includes(String(row.type || ""))
+        ["friend_accepted", "open_plan_interest", "plan_invite", "community_plan_join"].includes(String(row.type || ""))
       );
 
     const groupInviteList: CommunityGroupInvite[] = groupInviteSnap.docs.map((d) => {
@@ -488,7 +501,7 @@ export default function NotificationsScreen() {
         const list = snapshot.docs
           .map((d) => ({ id: d.id, ...d.data() } as LegacyNotificationLockRow))
           .filter((row) =>
-            ["friend_accepted", "open_plan_interest", "plan_invite"].includes(String(row.type || ""))
+            ["friend_accepted", "open_plan_interest", "plan_invite", "community_plan_join"].includes(String(row.type || ""))
           );
         const resolved = await Promise.all(
           list.map((row) =>
@@ -568,6 +581,7 @@ export default function NotificationsScreen() {
           "friend_accepted",
           "open_plan_interest",
           "plan_invite",
+          "community_plan_join",
           "friend_synq_active",
           "synq_nudge",
         ].includes(a.type)
@@ -589,6 +603,9 @@ export default function NotificationsScreen() {
           read: a.read,
           eventId: a.eventId,
           planHostUid: a.planHostUid,
+          groupId: a.groupId,
+          planId: a.planId,
+          groupName: a.groupName,
           raw: a,
         };
 
@@ -849,6 +866,17 @@ export default function NotificationsScreen() {
       } else {
         router.push("/(tabs)/me");
       }
+      return;
+    }
+
+    if (item.kind === "community_plan_join" && item.groupId) {
+      router.push({
+        pathname: "/community-group/[id]",
+        params: {
+          id: item.groupId,
+          ...(item.planId ? { planId: item.planId } : {}),
+        },
+      });
     }
   }, []);
 
@@ -862,6 +890,8 @@ export default function NotificationsScreen() {
         return "Friend going";
       case "plan_invite":
         return "Plan invite";
+      case "community_plan_join":
+        return "Community plan";
       case "community_group_invite":
         return "Group invite";
       case "friend_synq_active":

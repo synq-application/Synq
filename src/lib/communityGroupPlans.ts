@@ -3,8 +3,6 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  orderBy,
-  query,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -66,14 +64,13 @@ export function subscribeCommunityGroupPlans(
   onData: (plans: CommunityGroupPlan[]) => void,
   onError?: (err: unknown) => void
 ): Unsubscribe {
-  const q = query(communityPlansCollection(groupId), orderBy("date", "asc"));
   return onSnapshot(
-    q,
+    communityPlansCollection(groupId),
     (snap) => {
       const plans = snap.docs.map((d) =>
         mapPlanDoc(groupId, d.id, d.data() as Record<string, unknown>)
       );
-      onData(plans);
+      onData(sortOpenPlansByDateTime(plans));
     },
     (err) => onError?.(err)
   );
@@ -201,7 +198,7 @@ export function formatCommunitySynqCardMeta(
 
 export function formatCommunitySynqGoingCount(count: number): string {
   const n = Math.max(0, count);
-  return n === 1 ? "1 person in" : `${n} people in`;
+  return n === 1 ? "1 person going" : `${n} people going`;
 }
 
 export function isCommunityPlanGoing(plan: CommunityGroupPlan, uid: string): boolean {

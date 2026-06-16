@@ -8,7 +8,11 @@ import {
   DESTRUCTIVE,
   fonts,
   Friend,
+  getTabHeaderLayout,
+  HEADER_BLACK,
   MUTED2,
+  PROFILE_HEADER_FADE_GRADIENT,
+  PROFILE_HEADER_FADE_LOCATIONS,
   RADIUS_MD,
   SPACE_2,
   SPACE_3,
@@ -32,6 +36,8 @@ import AddMembersToGroupSheet from "@/src/components/friends/AddMembersToGroupSh
 import { groupsPageStyles, GROUP_BORDER } from "@/src/components/friends/groupsListStyles";
 import BackButton from "@/src/components/BackButton";
 import CommunityPlansSection from "@/src/components/community/CommunityPlansSection";
+import type { CommunityPlanMemberProfile } from "@/src/lib/communityPlanMembers";
+import type { CommunityGroupPlan } from "@/src/lib/communityGroupPlans";
 import HeaderIconButton from "@/src/components/HeaderIconButton";
 import StackScreenHeader from "@/src/components/StackScreenHeader";
 import { auth } from "@/src/lib/firebase";
@@ -59,7 +65,7 @@ import { Image as ExpoImage } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/src/lib/firebase";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -107,13 +113,6 @@ const COVER_HERO_GRADIENT = [
   BG,
 ] as const;
 const COVER_HERO_GRADIENT_LOCATIONS = [0, 0.42, 0.82, 1] as const;
-const COVER_TOP_NAV_GRADIENT = [
-  "rgba(0,0,0,0.82)",
-  "rgba(0,0,0,0.45)",
-  "rgba(0,0,0,0)",
-] as const;
-const COVER_TOP_NAV_GRADIENT_LOCATIONS = [0, 0.45, 1] as const;
-const COVER_TOP_NAV_GRADIENT_HEIGHT = 96;
 
 type MemberRow = {
   id: string;
@@ -125,7 +124,10 @@ type MemberRow = {
 export default function CommunityGroupDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id: groupId } = useLocalSearchParams<{ id?: string }>();
+  const { id: groupId, planId: initialPlanId } = useLocalSearchParams<{
+    id?: string;
+    planId?: string;
+  }>();
   const uid = auth.currentUser?.uid ?? "";
   const friends = uid ? friendsListCacheByUser[uid] ?? [] : [];
 
@@ -255,6 +257,30 @@ export default function CommunityGroupDetailScreen() {
       };
     });
   }, [group, memberProfiles]);
+
+  const friendIds = useMemo(
+    () => new Set(friends.map((friend) => friend.id)),
+    [friends]
+  );
+
+  const viewerDisplayName = auth.currentUser?.displayName?.trim() || "You";
+
+  const openGoerProfile = useCallback(
+    (target: CommunityPlanMemberProfile, plan: CommunityGroupPlan) => {
+      router.push({
+        pathname: "/friend-profile",
+        params: {
+          friendId: target.id,
+          from: "community",
+          communityGroupId: group?.id || "",
+          communityGroupName: group?.name || "",
+          communityPlanId: plan.id,
+          communityPlanTitle: plan.title,
+        },
+      });
+    },
+    [router, group?.id, group?.name]
+  );
 
   const handleJoin = async () => {
     if (!uid || !group || joinBusy) return;
@@ -401,6 +427,7 @@ export default function CommunityGroupDetailScreen() {
   const coverPhotoUrl = group?.coverPhotoUrl?.trim() || "";
   const hasCover = coverPhotoUrl.length > 0;
   const coverHeight = insets.top + COVER_HERO_HEIGHT;
+  const coverNavLayout = getTabHeaderLayout(insets.top);
 
   const renderMemberAvatar = (member: MemberRow, showAdmin = false) => (
     <TouchableOpacity
@@ -425,9 +452,6 @@ export default function CommunityGroupDetailScreen() {
             cachePolicy="memory-disk"
           />
         </View>
-        {member.synqActive ? (
-          <View style={styles.memberTileActiveDot} />
-        ) : null}
       </View>
       <Text style={styles.memberTileName} numberOfLines={1}>
         {member.displayName.split(" ")[0]}
@@ -514,14 +538,18 @@ export default function CommunityGroupDetailScreen() {
                   cachePolicy="memory-disk"
                   recyclingKey={coverPhotoUrl}
                 />
+                <View
+                  pointerEvents="none"
+                  style={[styles.coverStatusBarFill, { height: insets.top }]}
+                />
                 <LinearGradient
-                  colors={[...COVER_TOP_NAV_GRADIENT]}
-                  locations={[...COVER_TOP_NAV_GRADIENT_LOCATIONS]}
+                  colors={[...PROFILE_HEADER_FADE_GRADIENT]}
+                  locations={[...PROFILE_HEADER_FADE_LOCATIONS]}
                   start={{ x: 0.5, y: 0 }}
                   end={{ x: 0.5, y: 1 }}
                   style={[
                     styles.coverTopNavGradient,
-                    { height: insets.top + COVER_TOP_NAV_GRADIENT_HEIGHT },
+                    { height: coverNavLayout.gradientHeight },
                   ]}
                   pointerEvents="none"
                 />
@@ -534,7 +562,7 @@ export default function CommunityGroupDetailScreen() {
                   pointerEvents="none"
                 />
                 <View
-                  style={[styles.coverNavOverlay, { paddingTop: insets.top + 4 }]}
+                  style={[styles.coverNavOverlay, { paddingTop: coverNavLayout.top }]}
                   pointerEvents="box-none"
                 >
                   <BackButton onPress={goBack} style={styles.coverBackBtn} />
@@ -619,9 +647,16 @@ export default function CommunityGroupDetailScreen() {
               groupId={group.id}
               groupName={group.name}
               uid={uid}
-              viewerDisplayName={auth.currentUser?.displayName?.trim() || "You"}
+              viewerDisplayName={viewerDisplayName}
               isMember={isMember}
               isCreator={isCreator}
+              memberProfiles={memberProfiles}
+              friendIds={friendIds}
+              initialPlanId={
+                typeof initialPlanId === "string" ? initialPlanId : undefined
+              }
+              onAddFriend={openGoerProfile}
+              onViewGoer={openGoerProfile}
             />
 
             <SectionDelimiter />
@@ -665,7 +700,12 @@ export default function CommunityGroupDetailScreen() {
                       onPress={() =>
                         router.push({
                           pathname: "/friend-profile",
-                          params: { friendId: item.id, from: "friends" },
+                          params: {
+                            friendId: item.id,
+                            from: "community",
+                            communityGroupId: group.id,
+                            communityGroupName: group.name,
+                          },
                         })
                       }
                     >
@@ -963,6 +1003,14 @@ const styles = StyleSheet.create({
   coverHeroGradient: {
     ...StyleSheet.absoluteFillObject,
   },
+  coverStatusBarFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: HEADER_BLACK,
+    zIndex: 2,
+  },
   coverTopNavGradient: {
     position: "absolute",
     top: 0,
@@ -1062,17 +1110,6 @@ const styles = StyleSheet.create({
     width: MEMBER_AVATAR_SIZE,
     height: MEMBER_AVATAR_SIZE,
   },
-  memberTileActiveDot: {
-    position: "absolute",
-    right: 1,
-    bottom: 1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: ACCENT,
-    borderWidth: 2,
-    borderColor: BG,
-  },
   memberTileName: {
     fontFamily: fonts.medium,
     fontSize: TYPE_CAPTION,
@@ -1161,6 +1198,13 @@ const styles = StyleSheet.create({
   memberName: {
     flex: 1,
     ...listRowTitleText,
+  },
+  messageMemberBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginRight: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   removeMemberBtn: {
     paddingHorizontal: 12,

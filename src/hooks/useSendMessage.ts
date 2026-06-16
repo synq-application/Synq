@@ -6,6 +6,7 @@ import {
   getDoc,
   increment,
   serverTimestamp,
+  setDoc,
   updateDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/src/lib/firebase";
@@ -51,9 +52,14 @@ async function resolveOtherParticipants(
 type Params = {
   activeChatId: string | null;
   pendingNewChat: {
+    chatId?: string;
     participants: string[];
     participantNames: Record<string, string>;
     participantImages: Record<string, string>;
+    communityGroupId?: string;
+    communityGroupName?: string;
+    communityPlanId?: string;
+    communityPlanTitle?: string;
   } | null;
   allChats: { id: string; participants: string[] }[];
   serverMessages: ChatMessage[];
@@ -101,16 +107,38 @@ export function useSendMessage({
     const participants = pendingNewChat.participants;
     const participantNames = pendingNewChat.participantNames;
     const participantImages = pendingNewChat.participantImages;
+    const communityGroupId = pendingNewChat.communityGroupId?.trim();
+    const communityGroupName = pendingNewChat.communityGroupName?.trim();
+    const communityPlanId = pendingNewChat.communityPlanId?.trim();
+    const communityPlanTitle = pendingNewChat.communityPlanTitle?.trim();
+    const predeterminedChatId = pendingNewChat.chatId?.trim();
 
     const promise = (async () => {
-      const chatRef = await addDoc(collection(db, "chats"), {
+      const payload: Record<string, unknown> = {
         participants,
         participantNames,
         participantImages,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastMessage: "",
-      });
+      };
+      if (communityGroupId) {
+        payload.communityGroupId = communityGroupId;
+        payload.source = "community";
+        if (communityGroupName) payload.communityGroupName = communityGroupName;
+        if (communityPlanId) payload.communityPlanId = communityPlanId;
+        if (communityPlanTitle) payload.communityPlanTitle = communityPlanTitle;
+      }
+
+      if (predeterminedChatId) {
+        const chatRef = doc(db, "chats", predeterminedChatId);
+        await setDoc(chatRef, payload, { merge: true });
+        setActiveChatId(predeterminedChatId);
+        setPendingNewChat(null);
+        return predeterminedChatId;
+      }
+
+      const chatRef = await addDoc(collection(db, "chats"), payload);
       const chatId = chatRef.id;
       setActiveChatId(chatId);
       setPendingNewChat(null);

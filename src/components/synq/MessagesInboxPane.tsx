@@ -2,6 +2,7 @@ import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
 import ChatInboxActionSheet from "@/src/components/synq/ChatInboxActionSheet";
 import { MUTED2 } from "@/constants/Variables";
+import { getCommunityChatInboxSubtitle } from "@/src/lib/helpers";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React from "react";
@@ -152,6 +153,15 @@ export default function MessagesInboxPane({
                 {getChatTitle(item)}
               </Text>
             </View>
+            {(() => {
+              const subtitle = getCommunityChatInboxSubtitle(item);
+              if (!subtitle) return null;
+              return (
+                <Text style={styles.communityChatMeta} numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              );
+            })()}
             {(() => {
               const lm =
                 typeof item.lastMessage === "string"

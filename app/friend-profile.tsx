@@ -137,9 +137,20 @@ export default function FriendProfile({
   embeddedFriendId,
   onEmbeddedBack,
 }: FriendProfileProps = {}) {
-  const { friendId, from } = useLocalSearchParams<{
+  const {
+    friendId,
+    from,
+    communityGroupId,
+    communityGroupName,
+    communityPlanId,
+    communityPlanTitle,
+  } = useLocalSearchParams<{
     friendId?: string | string[];
     from?: string;
+    communityGroupId?: string;
+    communityGroupName?: string;
+    communityPlanId?: string;
+    communityPlanTitle?: string;
   }>();
   const router = useRouter();
 
@@ -158,6 +169,17 @@ export default function FriendProfile({
   const handleBack = () => {
     goBackOrHome();
   };
+
+  const communityContextLabel = useMemo(() => {
+    if (from !== "community") return null;
+    const planTitle = String(communityPlanTitle || "").trim();
+    const groupName = String(communityGroupName || "").trim();
+    if (planTitle && groupName) {
+      return `You were both in for ${planTitle} in ${groupName}.`;
+    }
+    if (groupName) return `You met in ${groupName}.`;
+    return "You met through a community.";
+  }, [from, communityPlanTitle, communityGroupName]);
 
   const viewerId = auth.currentUser?.uid ?? "";
   const routeFriendId = Array.isArray(friendId) ? friendId[0] : friendId || "";
@@ -693,6 +715,20 @@ export default function FriendProfile({
         senderImageUrl,
         status: "pending",
         sentAt: serverTimestamp(),
+        ...(from === "community" && communityGroupId
+          ? {
+              metVia: {
+                communityGroupId: String(communityGroupId),
+                ...(communityGroupName
+                  ? { communityGroupName: String(communityGroupName) }
+                  : {}),
+                ...(communityPlanId ? { communityPlanId: String(communityPlanId) } : {}),
+                ...(communityPlanTitle
+                  ? { communityPlanTitle: String(communityPlanTitle) }
+                  : {}),
+              },
+            }
+          : {}),
       });
       batch.set(doc(db, "users", user.uid, "outgoingFriendRequests", friendKey), {
         to: friendKey,
@@ -1165,6 +1201,9 @@ export default function FriendProfile({
           </View>
         ) : !isFriend ? (
           <View style={styles.profileActionWrap}>
+            {communityContextLabel ? (
+              <Text style={styles.communityContextText}>{communityContextLabel}</Text>
+            ) : null}
             <TouchableOpacity
               activeOpacity={0.8}
               style={[synqOutlineAddBtn, requestSent && synqOutlineAddBtnDisabled]}
@@ -1705,6 +1744,15 @@ const styles = StyleSheet.create({
     marginTop: 22,
     marginBottom: 4,
     alignItems: "center",
+    gap: 12,
+  },
+  communityContextText: {
+    color: MUTED2,
+    fontFamily: fonts.book,
+    fontSize: TYPE_CAPTION + 1,
+    lineHeight: 20,
+    textAlign: "center",
+    paddingHorizontal: 24,
   },
 
   profileSectionLabel: profileScreenSectionTitle,

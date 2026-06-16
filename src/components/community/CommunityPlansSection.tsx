@@ -18,20 +18,26 @@ import {
 } from "@/constants/Variables";
 import AlertModal from "@/app/alert-modal";
 import ConfirmModal from "@/app/confirm-modal";
+import CommunityPlanDetailSheet from "@/src/components/community/CommunityPlanDetailSheet";
+import CommunityPlanGoerAvatars from "@/src/components/community/CommunityPlanGoerAvatars";
 import CreateCommunityPlanModal from "@/src/components/community/CreateCommunityPlanModal";
 import {
   addCommunityPlanToUserEvents,
   createCommunityGroupPlan,
   deleteCommunityGroupPlan,
-  getCommunitySynqCardMetaParts,
   formatCommunitySynqGoingCount,
+  getCommunitySynqCardMetaParts,
   isCommunityPlanGoing,
   isCommunityPlanOnUserEvents,
   removeCommunityPlanFromUserEvents,
   subscribeCommunityGroupPlans,
   type CommunityGroupPlan,
 } from "@/src/lib/communityGroupPlans";
-import { filterOutPastOpenPlans, isOpenPlanPast, sortOpenPlansByDateTime } from "@/src/lib/planEvents";
+import {
+  resolvePlanGoers,
+  type CommunityPlanMemberProfile,
+} from "@/src/lib/communityPlanMembers";
+import { filterOutPastOpenPlans, isOpenPlanDatePast, isOpenPlanPast, sortOpenPlansByDateTime } from "@/src/lib/planEvents";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -53,6 +59,11 @@ type Props = {
   viewerDisplayName: string;
   isMember: boolean;
   isCreator: boolean;
+  memberProfiles: Record<string, CommunityPlanMemberProfile>;
+  friendIds: Set<string>;
+  initialPlanId?: string;
+  onAddFriend: (target: CommunityPlanMemberProfile, plan: CommunityGroupPlan) => void;
+  onViewGoer?: (target: CommunityPlanMemberProfile, plan: CommunityGroupPlan) => void;
 };
 
 type ConfirmKind = "delete";
@@ -64,6 +75,11 @@ export default function CommunityPlansSection({
   viewerDisplayName,
   isMember,
   isCreator,
+  memberProfiles,
+  friendIds,
+  initialPlanId,
+  onAddFriend,
+  onViewGoer,
 }: Props) {
   const [plans, setPlans] = useState<CommunityGroupPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,12 +88,15 @@ export default function CommunityPlansSection({
   const [createBusy, setCreateBusy] = useState(false);
   const [joiningPlanId, setJoiningPlanId] = useState<string | null>(null);
   const [showAllPlans, setShowAllPlans] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<CommunityGroupPlan | null>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<CommunityGroupPlan | null>(null);
   const [confirmKind, setConfirmKind] = useState<ConfirmKind | null>(null);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
   const prunedPastPlanIdsRef = useRef(new Set<string>());
+  const openedInitialPlanRef = useRef<string | null>(null);
 
   const PLAN_PREVIEW_COUNT = 3;
 
@@ -90,6 +109,16 @@ export default function CommunityPlansSection({
   const closeConfirm = useCallback(() => {
     setConfirmKind(null);
     setPendingPlan(null);
+  }, []);
+
+  const openPlanSheet = useCallback((plan: CommunityGroupPlan) => {
+    setSelectedPlan(plan);
+    setSheetVisible(true);
+  }, []);
+
+  const closePlanSheet = useCallback(() => {
+    setSheetVisible(false);
+    setSelectedPlan(null);
   }, []);
 
   useEffect(() => {
@@ -127,7 +156,7 @@ export default function CommunityPlansSection({
   useEffect(() => {
     if (!groupId || loading) return;
 
-    const pastPlans = plans.filter((plan) => isOpenPlanPast(plan));
+    const pastPlans = plans.filter((plan) => isOpenPlanDatePast(plan.date));
     for (const plan of pastPlans) {
       if (prunedPastPlanIdsRef.current.has(plan.id)) continue;
       prunedPastPlanIdsRef.current.add(plan.id);
@@ -137,9 +166,30 @@ export default function CommunityPlansSection({
     }
   }, [groupId, loading, plans]);
 
+  useEffect(() => {
+    if (!initialPlanId || loading || openedInitialPlanRef.current === initialPlanId) return;
+    const plan = visiblePlans.find((row) => row.id === initialPlanId);
+    if (!plan) return;
+    openedInitialPlanRef.current = initialPlanId;
+    openPlanSheet(plan);
+  }, [initialPlanId, loading, visiblePlans, openPlanSheet]);
+
   const displayedPlans = showAllPlans
     ? visiblePlans
     : visiblePlans.slice(0, PLAN_PREVIEW_COUNT);
+
+  const selectedGoers = useMemo(
+    () => (selectedPlan ? resolvePlanGoers(selectedPlan, memberProfiles) : []),
+    [selectedPlan, memberProfiles]
+  );
+
+  const selectedIsGoing = useMemo(() => {
+    if (!selectedPlan || !uid) return false;
+    return (
+      isCommunityPlanGoing(selectedPlan, uid) ||
+      isCommunityPlanOnUserEvents(selectedPlan, userEvents)
+    );
+  }, [selectedPlan, uid, userEvents]);
 
   const handleCreate = useCallback(
     async (input: { title: string; date: string; time: string; location: string }) => {
@@ -158,7 +208,7 @@ export default function CommunityPlansSection({
   );
 
   const handleJoin = useCallback(
-    async (plan: CommunityGroupPlan) => {
+    async (plan: CommunityGroupPlan, openSheetAfter = false) => {
       if (!uid) return;
       if (!isMember) {
         showAlert("Join community", `Join ${groupName} to see who's going.`);
@@ -167,14 +217,16 @@ export default function CommunityPlansSection({
       setJoiningPlanId(plan.id);
       try {
         await addCommunityPlanToUserEvents(uid, plan, viewerDisplayName);
-        showAlert("Joined!");
+        if (openSheetAfter) {
+          openPlanSheet(plan);
+        }
       } catch (err: unknown) {
         showAlert("Could not update", err instanceof Error ? err.message : "Try again.");
       } finally {
         setJoiningPlanId(null);
       }
     },
-    [uid, isMember, groupName, viewerDisplayName, showAlert]
+    [uid, isMember, groupName, viewerDisplayName, showAlert, openPlanSheet]
   );
 
   const handleLeave = useCallback(
@@ -183,14 +235,14 @@ export default function CommunityPlansSection({
       setJoiningPlanId(plan.id);
       try {
         await removeCommunityPlanFromUserEvents(uid, plan);
-        showAlert("Left!");
+        closePlanSheet();
       } catch (err: unknown) {
         showAlert("Could not update", err instanceof Error ? err.message : "Try again.");
       } finally {
         setJoiningPlanId(null);
       }
     },
-    [uid, showAlert]
+    [uid, showAlert, closePlanSheet]
   );
 
   const openDeleteConfirm = useCallback((plan: CommunityGroupPlan) => {
@@ -205,10 +257,13 @@ export default function CommunityPlansSection({
 
     try {
       await deleteCommunityGroupPlan(groupId, plan.id);
+      if (selectedPlan?.id === plan.id) {
+        closePlanSheet();
+      }
     } catch {
       showAlert("Error", "Could not remove this synq.");
     }
-  }, [pendingPlan, closeConfirm, uid, groupId, showAlert]);
+  }, [pendingPlan, closeConfirm, uid, groupId, showAlert, selectedPlan?.id, closePlanSheet]);
 
   const confirmCopy = useMemo(() => {
     if (!pendingPlan || confirmKind !== "delete") return null;
@@ -220,6 +275,12 @@ export default function CommunityPlansSection({
       destructive: true,
     };
   }, [pendingPlan, confirmKind, groupName]);
+
+  const planIsGoing = useCallback(
+    (plan: CommunityGroupPlan) =>
+      isCommunityPlanGoing(plan, uid) || isCommunityPlanOnUserEvents(plan, userEvents),
+    [uid, userEvents]
+  );
 
   return (
     <>
@@ -241,26 +302,23 @@ export default function CommunityPlansSection({
         {loading ? (
           <ActivityIndicator color={ACCENT} style={styles.loader} />
         ) : displayedPlans.length === 0 ? (
-          isMember ? null : (
-            <Text style={styles.empty}>Nothing upcoming yet.</Text>
-          )
+          <Text style={styles.empty}>Nothing upcoming yet.</Text>
         ) : (
           <View style={styles.list}>
             {displayedPlans.map((plan) => {
-            const isGoing =
-              isCommunityPlanGoing(plan, uid) ||
-              isCommunityPlanOnUserEvents(plan, userEvents);
+            const isGoing = planIsGoing(plan);
             const canDelete = plan.creatorId === uid || isCreator;
-            const goingCount = Math.max(plan.goingMemberIds.length, isGoing ? 1 : 0);
+            const goers = resolvePlanGoers(plan, memberProfiles);
             const metaParts = getCommunitySynqCardMetaParts(plan.date, plan.time, plan.location);
             const metaLabel = metaParts.join(" • ");
-            const peopleInLabel = formatCommunitySynqGoingCount(goingCount);
+            const peopleGoingLabel = formatCommunitySynqGoingCount(goers.length);
             const busy = joiningPlanId === plan.id;
 
             return (
               <Pressable
                 key={plan.id}
                 style={styles.card}
+                onPress={() => openPlanSheet(plan)}
                 onLongPress={
                   canDelete
                     ? () => {
@@ -271,7 +329,7 @@ export default function CommunityPlansSection({
                 }
                 delayLongPress={400}
                 accessibilityRole="button"
-                accessibilityLabel={`${plan.title}, ${metaLabel}, ${peopleInLabel}`}
+                accessibilityLabel={`${plan.title}, ${metaLabel}, ${peopleGoingLabel}`}
                 accessibilityHint={
                   canDelete ? "Long press to remove this synq" : undefined
                 }
@@ -297,17 +355,20 @@ export default function CommunityPlansSection({
                           </React.Fragment>
                         ))}
                       </Text>
-                      <Text style={styles.peopleIn} numberOfLines={1}>
-                        {peopleInLabel}
-                      </Text>
+                      <CommunityPlanGoerAvatars goers={goers} size={24} />
                     </View>
 
                     <View style={styles.cardAside}>
                       <TouchableOpacity
-                        style={[styles.pill, busy && styles.pillDisabled]}
-                        onPress={() =>
-                          isGoing ? void handleLeave(plan) : void handleJoin(plan)
-                        }
+                        style={[styles.pill, isGoing && styles.pillJoined, busy && styles.pillDisabled]}
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          if (isGoing) {
+                            void handleLeave(plan);
+                          } else {
+                            void handleJoin(plan, true);
+                          }
+                        }}
                         disabled={busy || !isMember}
                         activeOpacity={0.85}
                         accessibilityRole="button"
@@ -320,7 +381,7 @@ export default function CommunityPlansSection({
                         {busy ? (
                           <ActivityIndicator color={ACCENT} size="small" />
                         ) : (
-                          <Text style={styles.pillText}>
+                          <Text style={[styles.pillText, isGoing && styles.pillTextJoined]}>
                             {isGoing ? "Joined" : "Join"}
                           </Text>
                         )}
@@ -352,6 +413,31 @@ export default function CommunityPlansSection({
           </TouchableOpacity>
         ) : null}
       </View>
+
+      <CommunityPlanDetailSheet
+        visible={sheetVisible}
+        plan={selectedPlan}
+        goers={selectedGoers}
+        uid={uid}
+        isMember={isMember}
+        isGoing={selectedIsGoing}
+        busy={!!selectedPlan && joiningPlanId === selectedPlan.id}
+        friendIds={friendIds}
+        groupName={groupName}
+        onClose={closePlanSheet}
+        onJoin={() => {
+          if (selectedPlan) void handleJoin(selectedPlan, true);
+        }}
+        onLeave={() => {
+          if (selectedPlan) void handleLeave(selectedPlan);
+        }}
+        onAddFriend={(target) => {
+          if (selectedPlan) onAddFriend(target, selectedPlan);
+        }}
+        onViewGoer={(target) => {
+          if (selectedPlan) onViewGoer?.(target, selectedPlan);
+        }}
+      />
 
       <CreateCommunityPlanModal
         visible={createVisible}
@@ -496,17 +582,10 @@ const styles = StyleSheet.create({
     color: MUTED2,
     lineHeight: 18,
   },
-  peopleIn: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION,
-    color: ACCENT,
-    lineHeight: 18,
-    marginTop: 2,
-  },
   pill: {
     minWidth: 72,
     minHeight: 34,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: ACCENT,
@@ -514,10 +593,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  pillJoined: {
+    backgroundColor: "rgba(0,255,133,0.12)",
+  },
   pillText: {
     fontFamily: fonts.medium,
     fontSize: TYPE_CAPTION,
     color: ACCENT,
+  },
+  pillTextJoined: {
+    color: TEXT,
   },
   pillDisabled: {
     opacity: 0.6,

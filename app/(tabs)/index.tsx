@@ -33,10 +33,11 @@ import {
   type SynqAudienceSelection,
 } from '@/src/lib/synqBroadcast';
 import { useSynqBoot } from '@/src/lib/synqBootContext';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from 'expo-haptics';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ExpoImage } from "expo-image";
 import {
   addDoc,
@@ -61,6 +62,7 @@ import {
   DeviceEventEmitter,
   Easing,
   FlatList,
+  InteractionManager,
   Keyboard,
   Modal,
   PixelRatio,
@@ -289,6 +291,12 @@ const MemoChatMessageBubble = React.memo(ChatMessageBubble);
 export default function SynqScreen() {
   const { user } = useAuthRefresh();
   const synqBoot = useSynqBoot();
+  const router = useRouter();
+  const routeParams = useLocalSearchParams<{
+    openChatId?: string | string[];
+    openPendingChat?: string;
+  }>();
+  const isIndexFocused = useIsFocused();
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const tabletContentStyle =
@@ -322,9 +330,14 @@ export default function SynqScreen() {
     setChatOpenAnchorKey((key) => key + 1);
   }, []);
   const [pendingNewChat, setPendingNewChat] = useState<{
+    chatId?: string;
     participants: string[];
     participantNames: Record<string, string>;
     participantImages: Record<string, string>;
+    communityGroupId?: string;
+    communityGroupName?: string;
+    communityPlanId?: string;
+    communityPlanTitle?: string;
   } | null>(null);
   const [allChats, setAllChats] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
@@ -728,11 +741,58 @@ export default function SynqScreen() {
   const openPendingChatFromNotification = useCallback(() => {
     const pending = consumePendingChatOpen();
     if (!pending) return;
-    void openChatById(pending.chatId, {
-      messageId: pending.messageId ?? null,
-      prefetchChatDoc: true,
+
+    if (pending.mode === "existing") {
+      void openChatById(pending.chatId, {
+        messageId: pending.messageId ?? null,
+        prefetchChatDoc: true,
+      });
+      return;
+    }
+
+    if (pending.chatId) {
+      const stableChat = allChats.find((chat) => chat.id === pending.chatId);
+      if (stableChat) {
+        void openChatById(pending.chatId, { prefetchChatDoc: true });
+        return;
+      }
+    }
+
+    const existing = allChats.find((chat) => {
+      if (pending.chatId && chat.id === pending.chatId) return true;
+      const chatParticipants = [...(chat.participants || [])].sort();
+      return (
+        JSON.stringify(chatParticipants) === JSON.stringify(pending.participants)
+      );
     });
-  }, [openChatById]);
+
+    if (existing) {
+      void openChatById(existing.id, { prefetchChatDoc: true });
+      return;
+    }
+
+    setPendingNewChat({
+      chatId: pending.chatId,
+      participants: pending.participants,
+      participantNames: pending.participantNames,
+      participantImages: pending.participantImages,
+      communityGroupId: pending.communityGroupId,
+      communityGroupName: pending.communityGroupName,
+      communityPlanId: pending.communityPlanId,
+      communityPlanTitle: pending.communityPlanTitle,
+    });
+    setActiveChatId(null);
+    clearMessages();
+    bumpChatOpenAnchor();
+    setMessagesModalVisible(true);
+    navigateMessagesPane("chat");
+  }, [
+    allChats,
+    openChatById,
+    bumpChatOpenAnchor,
+    navigateMessagesPane,
+    clearMessages,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -741,10 +801,38 @@ export default function SynqScreen() {
   );
 
   useEffect(() => {
-    const unsub = subscribePendingChatOpen(openPendingChatFromNotification);
-    openPendingChatFromNotification();
+    const unsub = subscribePendingChatOpen(() => {
+      if (isIndexFocused) {
+        openPendingChatFromNotification();
+      }
+    });
     return unsub;
-  }, [openPendingChatFromNotification]);
+  }, [isIndexFocused, openPendingChatFromNotification]);
+
+  const openChatIdParam = useMemo(() => {
+    const raw = routeParams.openChatId;
+    if (typeof raw === "string") return raw.trim();
+    if (Array.isArray(raw)) return raw[0]?.trim() ?? "";
+    return "";
+  }, [routeParams.openChatId]);
+
+  useEffect(() => {
+    if (!openChatIdParam) return;
+    router.setParams({ openChatId: "" });
+    const task = InteractionManager.runAfterInteractions(() => {
+      void openChatById(openChatIdParam, { prefetchChatDoc: true });
+    });
+    return () => task.cancel();
+  }, [openChatIdParam, openChatById, router]);
+
+  useEffect(() => {
+    if (routeParams.openPendingChat !== "1") return;
+    router.setParams({ openPendingChat: "" });
+    const task = InteractionManager.runAfterInteractions(() => {
+      openPendingChatFromNotification();
+    });
+    return () => task.cancel();
+  }, [routeParams.openPendingChat, openPendingChatFromNotification, router]);
 
   useEffect(() => {
     if (!pendingScrollToMessageId) return;
@@ -1779,6 +1867,10 @@ export default function SynqScreen() {
         participants: pendingNewChat.participants,
         participantNames: pendingNewChat.participantNames,
         participantImages: pendingNewChat.participantImages,
+        communityGroupId: pendingNewChat.communityGroupId,
+        communityGroupName: pendingNewChat.communityGroupName,
+        communityPlanId: pendingNewChat.communityPlanId,
+        communityPlanTitle: pendingNewChat.communityPlanTitle,
       }
     : visibleChats.find((c) => c.id === activeChatId);
 
@@ -2398,6 +2490,7 @@ const styles = StyleSheet.create({
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
   whiteBold: { color: 'white', fontSize: 17, fontFamily: fonts.medium },
   grayText: { ...cardMetaText, marginTop: 2 },
+  communityChatMeta: { ...cardMetaText, fontSize: TYPE_FINE, marginTop: 1, color: MUTED2 },
   locationText: { ...cardMetaText, fontSize: TYPE_FINE, marginTop: 2 },
   btn: {
     alignSelf: 'center',

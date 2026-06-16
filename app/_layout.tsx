@@ -228,7 +228,7 @@ export default function RootLayout() {
     | { kind: "chat"; chatId: string; messageId?: string }
     | { kind: "notifications" }
     | { kind: "friend_profile"; friendId: string }
-    | { kind: "community_group"; groupId: string }
+    | { kind: "community_group"; groupId: string; planId?: string }
     | {
         kind: "synq_home";
         fromUserId?: string;
@@ -822,7 +822,10 @@ export default function RootLayout() {
     if (pending.kind === "community_group") {
       router.push({
         pathname: "/community-group/[id]",
-        params: { id: pending.groupId },
+        params: {
+          id: pending.groupId,
+          ...(pending.planId ? { planId: pending.planId } : {}),
+        },
       });
       return;
     }

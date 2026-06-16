@@ -13,6 +13,7 @@ import {
 import CloseButton from "@/src/components/CloseButton";
 import PlanTimePicker from "@/src/components/PlanTimePicker";
 import { filterOrReject } from "@/src/lib/contentFilter";
+import { formatPlanTimeForStorage } from "@/src/lib/planEvents";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -55,7 +56,7 @@ function formatDateValue(d: Date): string {
 }
 
 function formatTime(d: Date) {
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return formatPlanTimeForStorage(d);
 }
 
 function isSameCalendarDay(a: Date, b: Date) {
@@ -251,7 +252,7 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
                 <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
                   <View>
                     <TextInput
-                      placeholder="What are you up for?"
+                      placeholder="What's the plan?"
                       placeholderTextColor="#555"
                       style={styles.planInput}
                       value={title}
