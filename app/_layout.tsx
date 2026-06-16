@@ -735,6 +735,8 @@ export default function RootLayout() {
             PENDING_INVITE_FROM_UID_KEY,
             PENDING_INVITE_CODE_KEY,
           ]);
+        } else {
+          inviteAttemptsRef.current.delete(attemptKey);
         }
       } finally {
         inviteProcessingRef.current = false;
@@ -758,14 +760,17 @@ export default function RootLayout() {
         await AsyncStorage.getItem(PENDING_FRIEND_PROFILE_ID_KEY)
       );
       if (!friendId || cancelled) return;
-      await AsyncStorage.removeItem(PENDING_FRIEND_PROFILE_ID_KEY);
-      if (friendId === user.uid) return;
+      if (friendId === user.uid) {
+        await AsyncStorage.removeItem(PENDING_FRIEND_PROFILE_ID_KEY);
+        return;
+      }
       if (segments[0] === "friend-profile") return;
       requestDismissNavigationOverlays();
       router.push({
         pathname: "/friend-profile",
         params: { friendId },
       });
+      await AsyncStorage.removeItem(PENDING_FRIEND_PROFILE_ID_KEY);
       requestAnimationFrame(() => requestDismissNavigationOverlays());
     };
 
@@ -799,16 +804,19 @@ export default function RootLayout() {
         await AsyncStorage.getItem(PENDING_PROFILE_SHARE_CODE_KEY)
       );
       if (!shareCode || cancelled) return;
-      await AsyncStorage.removeItem(PENDING_PROFILE_SHARE_CODE_KEY);
       const friendId = await resolveProfileShareCodeToFriendId(shareCode);
       if (!friendId || cancelled) return;
-      if (friendId === user.uid) return;
+      if (friendId === user.uid) {
+        await AsyncStorage.removeItem(PENDING_PROFILE_SHARE_CODE_KEY);
+        return;
+      }
       if (segments[0] === "friend-profile") return;
       requestDismissNavigationOverlays();
       router.push({
         pathname: "/friend-profile",
         params: { friendId },
       });
+      await AsyncStorage.removeItem(PENDING_PROFILE_SHARE_CODE_KEY);
       requestAnimationFrame(() => requestDismissNavigationOverlays());
     };
 

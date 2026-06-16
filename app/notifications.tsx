@@ -9,6 +9,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -58,6 +59,10 @@ import { auth, db } from "../src/lib/firebase";
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
 import { prefetchResolvedAvatar, resolveAvatar } from "@/src/lib/helpers";
+import {
+  FRIEND_REQUESTS_LISTENER_LIMIT,
+  NOTIFICATIONS_LISTENER_LIMIT,
+} from "@/src/lib/listenerLimits";
 
 function prefetchActorAvatars(items: { actorImageUrl: string | null }[]) {
   items.forEach((item) => {
@@ -411,11 +416,15 @@ export default function NotificationsScreen() {
     if (!auth.currentUser) return;
     const myId = auth.currentUser.uid;
 
-    const reqRef = collection(db, "users", myId, "friendRequests");
+    const reqRef = query(
+      collection(db, "users", myId, "friendRequests"),
+      limit(FRIEND_REQUESTS_LISTENER_LIMIT)
+    );
     const groupInviteRef = collection(db, "users", myId, "communityGroupInvites");
     const activityRef = query(
       collection(db, "users", myId, "notifications"),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(NOTIFICATIONS_LISTENER_LIMIT)
     );
     const legacyRef = collection(db, "users", myId, "notificationLocks");
 

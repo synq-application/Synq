@@ -43,7 +43,6 @@ export function BlockedUsersProvider({ children }: { children: React.ReactNode }
       },
       (err) => {
         ignoreSnapshotPermissionDenied(err);
-        setBlockedSet(new Set());
         setReady(true);
       }
     );

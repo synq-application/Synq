@@ -51,7 +51,16 @@ import {
   shareProfileLink,
 } from "@/src/lib/shareProfileCard";
 import { router, useLocalSearchParams } from "expo-router";
-import { collection, doc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  updateDoc,
+} from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
@@ -96,12 +105,19 @@ import { filterOutPastOpenPlans, matchesPlanEvent, sortOpenPlansByDateTime } fro
 import { sendPlanInvites } from "../../src/lib/planInvite";
 import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
-  friendRelationCacheByUser,
   friendsListCacheByUser,
   pruneSocialCachesToFriendIds,
   warmFriendsAndConnectionsCache,
 } from "../../src/lib/socialCache";
+import {
+  FRIEND_REQUESTS_LISTENER_LIMIT,
+  NOTIFICATIONS_LISTENER_LIMIT,
+} from "../../src/lib/listenerLimits";
 import { registerDismissNavigationOverlaysHandler } from "../../src/lib/navigationOverlayEvents";
+import {
+  subscribeFriendsIdsMultiplexed,
+  subscribeUserDocMultiplexed,
+} from "../../src/lib/socialListenerHub";
 import { useAuthRefresh } from "../_layout";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
@@ -635,52 +651,53 @@ export default function ProfileScreen() {
 
     const userDocRef = doc(db, "users", myId);
 
-    const unsubscribeProfile = onSnapshot(
-      userDocRef,
-      (userDocSnap) => {
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          const nextCity = userData.city || null;
-          const stateAbbr =
-            stateAbbreviations[userData.state] || userData.state || null;
-          const rawEvents = (userData.events || []) as OpenPlanEvent[];
-          const prunedEvents = filterOutPastOpenPlans(rawEvents);
-          if (prunedEvents.length < rawEvents.length) {
-            updateDoc(userDocRef, { events: prunedEvents }).catch(() => {});
-          }
-          const nextInterests = userData.interests || [];
-          const nextImage = userData?.imageurl || null;
-          const nextInviteCode = String(userData.inviteCode || "")
-            .trim()
-            .toUpperCase();
-          if (nextInviteCode) {
-            setInviteCode(nextInviteCode);
-          }
+    const unsubscribeProfile = subscribeUserDocMultiplexed(myId, (userData) => {
+      if (!userData) return;
+      const nextCity = userData.city || null;
+      const stateAbbr =
+        stateAbbreviations[userData.state] || userData.state || null;
+      const rawEvents = (userData.events || []) as OpenPlanEvent[];
+      const prunedEvents = filterOutPastOpenPlans(rawEvents);
+      if (prunedEvents.length < rawEvents.length) {
+        updateDoc(userDocRef, { events: prunedEvents }).catch(() => {});
+      }
+      const nextInterests = userData.interests || [];
+      const nextImage = userData?.imageurl || null;
+      const nextInviteCode = String(userData.inviteCode || "")
+        .trim()
+        .toUpperCase();
+      if (nextInviteCode) {
+        setInviteCode(nextInviteCode);
+      }
 
-          const prevOwn = getCachedOwnProfile(myId);
-          setCachedOwnProfile(myId, {
-            imageurl: nextImage,
-            interests: nextInterests,
-            events: prunedEvents,
-            city: nextCity,
-            state: stateAbbr,
-            topSynqs: prevOwn?.topSynqs ?? [],
-          });
+      const prevOwn = getCachedOwnProfile(myId);
+      setCachedOwnProfile(myId, {
+        imageurl: nextImage,
+        interests: nextInterests,
+        events: prunedEvents,
+        city: nextCity,
+        state: stateAbbr,
+        topSynqs: prevOwn?.topSynqs ?? [],
+      });
 
-          setCity(nextCity);
-          setState(stateAbbr);
-          setEvents(prunedEvents);
-          setInterests(nextInterests);
-          setSelectedInterests(nextInterests);
-          setProfileImage(nextImage);
-          prefetchResolvedAvatar(nextImage);
-        }
-      },
-      ignoreSnapshotPermissionDenied
+      setCity(nextCity);
+      setState(stateAbbr);
+      setEvents(prunedEvents);
+      setInterests(nextInterests);
+      setSelectedInterests(nextInterests);
+      setProfileImage(nextImage);
+      prefetchResolvedAvatar(nextImage);
+    });
+
+    const reqRef = query(
+      collection(db, "users", myId, "friendRequests"),
+      limit(FRIEND_REQUESTS_LISTENER_LIMIT)
     );
-
-    const reqRef = collection(db, "users", myId, "friendRequests");
-    const notifRef = collection(db, "users", myId, "notifications");
+    const notifRef = query(
+      collection(db, "users", myId, "notifications"),
+      orderBy("createdAt", "desc"),
+      limit(NOTIFICATIONS_LISTENER_LIMIT)
+    );
     const unsubscribeRequests = onSnapshot(
       reqRef,
       (snap) => {
@@ -714,23 +731,9 @@ export default function ProfileScreen() {
       ignoreSnapshotPermissionDenied
     );
 
-    const friendsCol = collection(db, "users", myId, "friends");
-    const unsubscribeFriends = onSnapshot(
-      friendsCol,
-      async (snapshot) => {
-        const friendIds = new Set(snapshot.docs.map((d) => d.id));
+    const unsubscribeFriends = subscribeFriendsIdsMultiplexed(myId, async (friendIdList) => {
+        const friendIds = new Set(friendIdList);
         pruneSocialCachesToFriendIds(myId, friendIds);
-
-        if (!friendRelationCacheByUser[myId]) {
-          friendRelationCacheByUser[myId] = {};
-        }
-        snapshot.docs.forEach((d) => {
-          const data = d.data();
-          friendRelationCacheByUser[myId][d.id] = {
-            synqCount: data.synqCount || 0,
-            lastSynqAt: data.lastSynqAt,
-          };
-        });
 
         const cachedList = friendsListCacheByUser[myId] ?? [];
         const friendsCacheMatches =
@@ -765,9 +768,7 @@ export default function ProfileScreen() {
         } finally {
           setTopSynqsReady(true);
         }
-      },
-      ignoreSnapshotPermissionDenied
-    );
+    });
 
     return () => {
       unsubscribeProfile();
@@ -803,13 +804,17 @@ export default function ProfileScreen() {
     return () => sub.remove();
   }, [prunePastEventsToFirestore]);
 
+  const reconcileDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!auth.currentUser?.uid) return;
     const myUid = auth.currentUser.uid;
-    const t = setTimeout(() => {
+    if (reconcileDebounceRef.current) clearTimeout(reconcileDebounceRef.current);
+    reconcileDebounceRef.current = setTimeout(() => {
       reconcileHostOpenPlansFromFriends(myUid).catch(() => {});
-    }, 1200);
-    return () => clearTimeout(t);
+    }, 3000);
+    return () => {
+      if (reconcileDebounceRef.current) clearTimeout(reconcileDebounceRef.current);
+    };
   }, [events]);
 
   const handleDeleteInterest = (interestName: string) => {

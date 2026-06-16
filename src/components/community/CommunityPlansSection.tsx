@@ -83,6 +83,8 @@ export default function CommunityPlansSection({
 }: Props) {
   const [plans, setPlans] = useState<CommunityGroupPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [plansLoadError, setPlansLoadError] = useState(false);
+  const [initialPlanMissed, setInitialPlanMissed] = useState(false);
   const [userEvents, setUserEvents] = useState<unknown[]>([]);
   const [createVisible, setCreateVisible] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
@@ -123,13 +125,20 @@ export default function CommunityPlansSection({
 
   useEffect(() => {
     if (!groupId) return;
+    setPlansLoadError(false);
+    setInitialPlanMissed(false);
+    openedInitialPlanRef.current = null;
     const unsub = subscribeCommunityGroupPlans(
       groupId,
       (next) => {
         setPlans(next);
         setLoading(false);
+        setPlansLoadError(false);
       },
-      () => setLoading(false)
+      () => {
+        setPlansLoadError(true);
+        setLoading(false);
+      }
     );
     return unsub;
   }, [groupId]);
@@ -169,10 +178,20 @@ export default function CommunityPlansSection({
   useEffect(() => {
     if (!initialPlanId || loading || openedInitialPlanRef.current === initialPlanId) return;
     const plan = visiblePlans.find((row) => row.id === initialPlanId);
-    if (!plan) return;
+    if (!plan) {
+      openedInitialPlanRef.current = initialPlanId;
+      setInitialPlanMissed(true);
+      return;
+    }
     openedInitialPlanRef.current = initialPlanId;
     openPlanSheet(plan);
   }, [initialPlanId, loading, visiblePlans, openPlanSheet]);
+
+  useEffect(() => {
+    if (!initialPlanMissed) return;
+    showAlert("Plan unavailable", "That plan may have ended or been removed.");
+    setInitialPlanMissed(false);
+  }, [initialPlanMissed, showAlert]);
 
   const displayedPlans = showAllPlans
     ? visiblePlans
@@ -301,6 +320,8 @@ export default function CommunityPlansSection({
 
         {loading ? (
           <ActivityIndicator color={ACCENT} style={styles.loader} />
+        ) : plansLoadError ? (
+          <Text style={styles.empty}>Could not load plans. Pull to refresh the group.</Text>
         ) : displayedPlans.length === 0 ? (
           <Text style={styles.empty}>Nothing upcoming yet.</Text>
         ) : (

@@ -429,9 +429,11 @@ export default function FriendsScreen() {
     }
     const friendsRef = collection(db, "users", myId, "friends");
 
+    let cancelled = false;
     const unsubFriends = onSnapshot(
       friendsRef,
       async (snapshot) => {
+      if (cancelled) return;
       const friendIds = snapshot.docs.map((d) => d.id);
       const profileCache = friendProfileCacheByUser[myId];
 
@@ -467,12 +469,14 @@ export default function FriendsScreen() {
         );
 
         const sortedFriends = sortFriendsByName(fetchedFriends);
+        if (cancelled) return;
         sortedFriends.forEach((friend) => {
           profileCache[friend.id] = friend;
           ExpoImage.prefetch(resolveAvatar((friend as any)?.imageurl)).catch(() => {});
         });
 
         friendsListCacheByUser[myId] = sortedFriends;
+        if (cancelled) return;
         setFriends(sortedFriends);
         setFriendsLoadError(false);
       } catch (err) {
@@ -486,6 +490,7 @@ export default function FriendsScreen() {
     );
 
     return () => {
+      cancelled = true;
       unsubFriends();
     };
   }, [myId]);

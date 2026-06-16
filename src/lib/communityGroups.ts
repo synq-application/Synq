@@ -8,6 +8,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -311,15 +312,8 @@ export async function updateCommunityGroupDetails(
 export async function joinCommunityGroup(
   uid: string,
   groupId: string,
-  currentMemberIds: string[]
+  _currentMemberIds?: string[]
 ): Promise<string[]> {
-  if (currentMemberIds.includes(uid)) {
-    return currentMemberIds;
-  }
-  if (currentMemberIds.length >= MAX_COMMUNITY_GROUP_MEMBERS) {
-    throw new Error("This group is full.");
-  }
-
   const joinedSnap = await getDocs(
     query(communityGroupsCollection(), where("memberIds", "array-contains", uid))
   );
@@ -327,27 +321,53 @@ export async function joinCommunityGroup(
     throw new Error(`You can join at most ${MAX_COMMUNITY_GROUPS_JOINED} community groups.`);
   }
 
-  const next = normalizeMemberIds([...currentMemberIds, uid]);
-  await updateDoc(communityGroupRef(groupId), {
-    memberIds: next,
-    updatedAt: serverTimestamp(),
+  return runTransaction(db, async (transaction) => {
+    const ref = communityGroupRef(groupId);
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) {
+      throw new Error("This group no longer exists.");
+    }
+    const data = snap.data() as Record<string, unknown>;
+    const currentMemberIds = normalizeMemberIds(
+      Array.isArray(data.memberIds) ? (data.memberIds as string[]) : []
+    );
+    if (currentMemberIds.includes(uid)) {
+      return currentMemberIds;
+    }
+    if (currentMemberIds.length >= MAX_COMMUNITY_GROUP_MEMBERS) {
+      throw new Error("This group is full.");
+    }
+    const next = normalizeMemberIds([...currentMemberIds, uid]);
+    transaction.update(ref, {
+      memberIds: next,
+      updatedAt: serverTimestamp(),
+    });
+    return next;
   });
-  return next;
 }
 
 export async function leaveCommunityGroup(
   uid: string,
   groupId: string,
-  currentMemberIds: string[]
+  _currentMemberIds?: string[]
 ): Promise<void> {
-  const next = currentMemberIds.filter((id) => id !== uid);
-  if (next.length === 0) {
-    await deleteDoc(communityGroupRef(groupId));
-    return;
-  }
-  await updateDoc(communityGroupRef(groupId), {
-    memberIds: next,
-    updatedAt: serverTimestamp(),
+  await runTransaction(db, async (transaction) => {
+    const ref = communityGroupRef(groupId);
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) return;
+    const data = snap.data() as Record<string, unknown>;
+    const currentMemberIds = normalizeMemberIds(
+      Array.isArray(data.memberIds) ? (data.memberIds as string[]) : []
+    );
+    const next = currentMemberIds.filter((id) => id !== uid);
+    if (next.length === 0) {
+      transaction.delete(ref);
+      return;
+    }
+    transaction.update(ref, {
+      memberIds: next,
+      updatedAt: serverTimestamp(),
+    });
   });
 }
 
@@ -376,32 +396,52 @@ export function mergeCommunityGroupMemberIds(
 
 export async function addMembersToCommunityGroup(
   groupId: string,
-  currentMemberIds: string[],
+  _currentMemberIds: string[],
   newMemberIds: string[]
 ): Promise<string[]> {
-  const merged = mergeCommunityGroupMemberIds(currentMemberIds, newMemberIds);
-  if (merged.length === currentMemberIds.length) {
+  return runTransaction(db, async (transaction) => {
+    const ref = communityGroupRef(groupId);
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) {
+      throw new Error("This group no longer exists.");
+    }
+    const data = snap.data() as Record<string, unknown>;
+    const currentMemberIds = normalizeMemberIds(
+      Array.isArray(data.memberIds) ? (data.memberIds as string[]) : []
+    );
+    const merged = mergeCommunityGroupMemberIds(currentMemberIds, newMemberIds);
+    if (merged.length === currentMemberIds.length) {
+      return merged;
+    }
+    transaction.update(ref, {
+      memberIds: merged,
+      updatedAt: serverTimestamp(),
+    });
     return merged;
-  }
-  await updateDoc(communityGroupRef(groupId), {
-    memberIds: merged,
-    updatedAt: serverTimestamp(),
   });
-  return merged;
 }
 
 export async function removeMemberFromCommunityGroup(
   groupId: string,
-  currentMemberIds: string[],
+  _currentMemberIds: string[],
   memberId: string
 ): Promise<void> {
-  const next = currentMemberIds.filter((id) => id !== memberId);
-  if (next.length === 0) {
-    await deleteDoc(communityGroupRef(groupId));
-    return;
-  }
-  await updateDoc(communityGroupRef(groupId), {
-    memberIds: next,
-    updatedAt: serverTimestamp(),
+  await runTransaction(db, async (transaction) => {
+    const ref = communityGroupRef(groupId);
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) return;
+    const data = snap.data() as Record<string, unknown>;
+    const currentMemberIds = normalizeMemberIds(
+      Array.isArray(data.memberIds) ? (data.memberIds as string[]) : []
+    );
+    const next = currentMemberIds.filter((id) => id !== memberId);
+    if (next.length === 0) {
+      transaction.delete(ref);
+      return;
+    }
+    transaction.update(ref, {
+      memberIds: next,
+      updatedAt: serverTimestamp(),
+    });
   });
 }

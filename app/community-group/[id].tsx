@@ -133,6 +133,7 @@ export default function CommunityGroupDetailScreen() {
 
   const [group, setGroup] = useState<CommunityGroup | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<"not_found" | "permission" | null>(null);
   const [memberProfiles, setMemberProfiles] = useState<Record<string, MemberRow>>({});
   const [addSheetVisible, setAddSheetVisible] = useState(false);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -170,9 +171,11 @@ export default function CommunityGroupDetailScreen() {
       (snap) => {
         if (!snap.exists()) {
           setGroup(null);
+          setLoadError("not_found");
           setLoading(false);
           return;
         }
+        setLoadError(null);
         const data = snap.data() as Record<string, unknown>;
         const serverMemberIds = Array.isArray(data.memberIds)
           ? [...new Set((data.memberIds as string[]).filter(Boolean))]
@@ -190,7 +193,12 @@ export default function CommunityGroupDetailScreen() {
         setGroup({ ...mapCommunityGroupDoc(snap.id, data), memberIds });
         setLoading(false);
       },
-      () => setLoading(false)
+      (err) => {
+        const code = (err as { code?: string }).code;
+        setLoadError(code === "permission-denied" ? "permission" : "not_found");
+        setGroup(null);
+        setLoading(false);
+      }
     );
     return unsub;
   }, [groupId]);
@@ -520,7 +528,11 @@ export default function CommunityGroupDetailScreen() {
           </View>
         ) : !group ? (
           <View style={styles.loading}>
-            <Text style={styles.errorText}>This group no longer exists.</Text>
+            <Text style={styles.errorText}>
+              {loadError === "permission"
+                ? "You don't have access to this group."
+                : "This group no longer exists."}
+            </Text>
           </View>
         ) : (
           <ScrollView

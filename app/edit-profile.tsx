@@ -47,6 +47,7 @@ import {
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
 import { filterOrReject } from "@/src/lib/contentFilter";
+import { buildUserSearchFields } from "@/src/lib/userSearchFields";
 import {
   fetchCurrentCityState,
   foregroundLocationAccessGranted,
@@ -345,6 +346,10 @@ export default function EditProfileScreen() {
         lat: coords?.lat ?? null,
         lng: coords?.lng ?? null,
         locationUpdatedAt: new Date().toISOString(),
+        ...buildUserSearchFields({
+          displayName: displayName.trim(),
+          email: auth.currentUser.email,
+        }),
       });
 
       setBaseline({

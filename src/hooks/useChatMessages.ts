@@ -237,10 +237,11 @@ export function useChatMessages({
     if (!isChatPaneOpen) return;
     if (pendingNewChat || !activeChatId) return;
 
+    const listenerChatId = activeChatId;
     oldestDocRef.current = null;
 
     const q = query(
-      collection(db, "chats", activeChatId, "messages"),
+      collection(db, "chats", listenerChatId, "messages"),
       orderBy("createdAt", "desc"),
       limit(MESSAGE_PAGE_SIZE)
     );
@@ -248,6 +249,7 @@ export function useChatMessages({
     return onSnapshot(
       q,
       (snap) => {
+        if (boundChatIdRef.current !== listenerChatId) return;
         const page = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as ChatMessage[];
         if (!oldestDocRef.current && snap.docs.length > 0) {
           oldestDocRef.current = snap.docs[snap.docs.length - 1];
@@ -266,10 +268,10 @@ export function useChatMessages({
           }
           writeCache(
             messagesCacheByChatIdRef.current,
-            activeChatId,
+            listenerChatId,
             merged,
             pageHasEarlier ||
-              messagesCacheByChatIdRef.current[activeChatId]?.hasEarlier ||
+              messagesCacheByChatIdRef.current[listenerChatId]?.hasEarlier ||
               merged.length >= MESSAGE_PAGE_SIZE
           );
           return merged;
@@ -281,7 +283,7 @@ export function useChatMessages({
         ignoreSnapshotPermissionDenied(error);
         const code = (error as { code?: string }).code;
         if (code === "permission-denied") {
-          if (boundChatIdRef.current === activeChatId) {
+          if (boundChatIdRef.current === listenerChatId) {
             setServerMessages([]);
             setMessagesReady(true);
             setListenerError("You don't have access to this conversation.");

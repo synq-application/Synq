@@ -50,6 +50,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  limit,
   serverTimestamp,
   updateDoc,
   where
@@ -136,7 +137,12 @@ import {
   writeCachedSynqActive,
 } from "../../src/lib/synqSession";
 import { registerDismissNavigationOverlaysHandler } from "../../src/lib/navigationOverlayEvents";
-import { consumePendingChatOpen, subscribePendingChatOpen } from "../../src/lib/pendingChatOpen";
+import { consumePendingChatOpen, peekPendingChatOpen, subscribePendingChatOpen } from "../../src/lib/pendingChatOpen";
+import { CHATS_LISTENER_LIMIT } from "../../src/lib/listenerLimits";
+import {
+  subscribeFriendsIdsMultiplexed,
+  subscribeUserDocMultiplexed,
+} from "../../src/lib/socialListenerHub";
 import { getCachedOwnProfile } from "../../src/lib/ownProfileCache";
 import { userHasLocation } from "../../src/lib/userProfile";
 import { useAuthRefresh } from '../_layout';
@@ -350,6 +356,7 @@ export default function SynqScreen() {
   const [currentCategory, setCurrentCategory] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const chatOpenGraceRef = useRef<Map<string, number>>(new Map());
+  const chatsHydratedRef = useRef(false);
   const [pendingScrollToMessageId, setPendingScrollToMessageId] = useState<string | null>(null);
   const lastTapRef = useRef<{ [key: string]: number }>({});
   const [hasUnread, setHasUnread] = useState(false);
@@ -739,10 +746,13 @@ export default function SynqScreen() {
   }, [status, activePulseOpacity, activePulseScale]);
 
   const openPendingChatFromNotification = useCallback(() => {
-    const pending = consumePendingChatOpen();
+    const pending = peekPendingChatOpen();
     if (!pending) return;
 
+    const finish = () => consumePendingChatOpen();
+
     if (pending.mode === "existing") {
+      finish();
       void openChatById(pending.chatId, {
         messageId: pending.messageId ?? null,
         prefetchChatDoc: true,
@@ -753,9 +763,14 @@ export default function SynqScreen() {
     if (pending.chatId) {
       const stableChat = allChats.find((chat) => chat.id === pending.chatId);
       if (stableChat) {
+        finish();
         void openChatById(pending.chatId, { prefetchChatDoc: true });
         return;
       }
+    }
+
+    if (!chatsHydratedRef.current && allChats.length === 0) {
+      return;
     }
 
     const existing = allChats.find((chat) => {
@@ -767,10 +782,12 @@ export default function SynqScreen() {
     });
 
     if (existing) {
+      finish();
       void openChatById(existing.id, { prefetchChatDoc: true });
       return;
     }
 
+    finish();
     setPendingNewChat({
       chatId: pending.chatId,
       participants: pending.participants,
@@ -878,34 +895,21 @@ export default function SynqScreen() {
   useEffect(() => {
     const uid = user?.uid;
     if (!uid) return;
-    const friendsRef = collection(db, "users", uid, "friends");
-    const unsub = onSnapshot(
-      friendsRef,
-      (snap) => {
-        setFriendIds(snap.docs.map((d) => d.id));
-      },
-      ignoreSnapshotPermissionDenied
-    );
-    return unsub;
+    return subscribeFriendsIdsMultiplexed(uid, (ids) => {
+      setFriendIds(ids);
+    });
   }, [user?.uid]);
 
   useEffect(() => {
     const uid = user?.uid;
     if (!uid) return;
-    const userRef = doc(db, "users", uid);
-    const unsub = onSnapshot(
-      userRef,
-      (snap) => {
-        if (!snap.exists()) return;
-        const data = snap.data();
-        setUserProfile(data);
-        if (computeSynqActiveFromUserData(data)) {
-          setAudienceSelection(selectionFromUserBroadcastFields(data));
-        }
-      },
-      ignoreSnapshotPermissionDenied
-    );
-    return unsub;
+    return subscribeUserDocMultiplexed(uid, (data) => {
+      if (!data) return;
+      setUserProfile(data);
+      if (computeSynqActiveFromUserData(data)) {
+        setAudienceSelection(selectionFromUserBroadcastFields(data));
+      }
+    });
   }, [user?.uid]);
 
   const resolvedFriendIds = useMemo(() => {
@@ -934,6 +938,7 @@ export default function SynqScreen() {
   useEffect(() => {
     const effectUid = user?.uid;
     if (!effectUid) return;
+    chatsHydratedRef.current = false;
     let cancelled = false;
 
     const cachedProfile = getCachedOwnProfile(effectUid);
@@ -963,11 +968,13 @@ export default function SynqScreen() {
               const startTime = data.synqStartedAt.toDate().getTime();
               const hoursElapsed = (new Date().getTime() - startTime) / (1000 * 60 * 60);
               if (hoursElapsed > EXPIRATION_HOURS) {
-                await updateDoc(userRef, {
-                  status: "inactive",
-                  memo: "",
-                  ...clearSynqBroadcastFields,
-                });
+                if (!cancelled && auth.currentUser?.uid === effectUid) {
+                  await updateDoc(userRef, {
+                    status: "inactive",
+                    memo: "",
+                    ...clearSynqBroadcastFields,
+                  });
+                }
                 if (!cancelled) setMemo("");
               }
             }
@@ -990,12 +997,14 @@ export default function SynqScreen() {
     const q = query(
       collection(db, "chats"),
       where("participants", "array-contains", uid),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(CHATS_LISTENER_LIMIT)
     );
 
     const unsubChats = onSnapshot(
       q,
       (snap) => {
+      chatsHydratedRef.current = true;
       const chats = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
 
       chats.sort((a, b) => {
@@ -1022,6 +1031,7 @@ export default function SynqScreen() {
       });
 
       setHasUnread(anyUnread);
+      openPendingChatFromNotification();
     },
       ignoreSnapshotPermissionDenied
     );

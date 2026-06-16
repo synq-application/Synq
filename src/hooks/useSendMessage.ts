@@ -195,6 +195,14 @@ export function useSendMessage({
 
       setPendingMessages((prev) => [...prev, optimistic]);
 
+      const markOptimisticFailed = () => {
+        setPendingMessages((prev) =>
+          prev.map((p) =>
+            p.clientId === clientId ? { ...p, sendStatus: "failed" as const } : p
+          )
+        );
+      };
+
       try {
         let chatId = activeChatId;
         let otherParticipants: string[];
@@ -202,7 +210,11 @@ export function useSendMessage({
         if (pendingNewChat) {
           const pendingParticipants = pendingNewChat.participants;
           chatId = await ensureChatFromPending();
-          if (!chatId) return false;
+          if (!chatId) {
+            markOptimisticFailed();
+            onSendError("Message could not be sent. Please try again.");
+            return false;
+          }
           otherParticipants = await resolveOtherParticipants(
             chatId,
             myId,

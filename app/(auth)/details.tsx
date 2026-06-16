@@ -22,6 +22,7 @@ import {
   View
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
+import { buildUserSearchFields } from "@/src/lib/userSearchFields";
 import { filterOrReject } from "@/src/lib/contentFilter";
 import {
   getPhotoLibraryPermission,
@@ -168,9 +169,15 @@ export default function Details() {
           displayName: fullName,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
-          imageurl: image ?? null, 
+          imageurl: image ?? null,
           status: "inactive",
           createdAt: new Date().toISOString(),
+          ...buildUserSearchFields({
+            displayName: fullName,
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            email: auth.currentUser.email,
+          }),
         },
         { merge: true }
       );
