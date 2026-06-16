@@ -221,7 +221,7 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
             style={StyleSheet.absoluteFill}
             onPress={handleBackdropPress}
             accessibilityRole="button"
-            accessibilityLabel="Close community Synq editor"
+            accessibilityLabel="Close plan editor"
           />
           <View
             style={[
@@ -234,7 +234,7 @@ export default function CreateCommunityPlanModal({ visible, busy, onClose, onCre
             <View style={[styles.popupCard, { maxHeight: modalMaxHeight }]}>
               <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
                 <View style={styles.popupTitleRow}>
-                  <Text style={styles.popupTitle}>Share a community Synq</Text>
+                  <Text style={styles.popupTitle}>Share a plan</Text>
                   <CloseButton onPress={handleClose} accessibilityLabel="Close" />
                 </View>
               </TouchableWithoutFeedback>

@@ -217,7 +217,7 @@ export async function createCommunityGroupPlan(
   if (!title) throw new Error("Synq title is required.");
   if (!date) throw new Error("Synq date is required.");
   if (!isSpontaneousCommunitySynqDate(date)) {
-    throw new Error("Community synqs can only be shared for today or tomorrow.");
+    throw new Error("Plans can only be shared for today or tomorrow.");
   }
 
   const ref = doc(communityPlansCollection(groupId));

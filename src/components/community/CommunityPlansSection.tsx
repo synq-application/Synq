@@ -199,7 +199,7 @@ export default function CommunityPlansSection({
         await createCommunityGroupPlan(groupId, uid, viewerDisplayName, input);
         setCreateVisible(false);
       } catch (err: unknown) {
-        showAlert("Could not share synq", err instanceof Error ? err.message : "Try again.");
+        showAlert("Could not share plan", err instanceof Error ? err.message : "Try again.");
       } finally {
         setCreateBusy(false);
       }
@@ -261,7 +261,7 @@ export default function CommunityPlansSection({
         closePlanSheet();
       }
     } catch {
-      showAlert("Error", "Could not remove this synq.");
+      showAlert("Error", "Could not remove this plan.");
     }
   }, [pendingPlan, closeConfirm, uid, groupId, showAlert, selectedPlan?.id, closePlanSheet]);
 
@@ -269,7 +269,7 @@ export default function CommunityPlansSection({
     if (!pendingPlan || confirmKind !== "delete") return null;
 
     return {
-      title: "Remove synq?",
+      title: "Remove plan?",
       message: `Remove "${pendingPlan.title}" from ${groupName}?`,
       confirmText: "Remove",
       destructive: true,
@@ -331,7 +331,7 @@ export default function CommunityPlansSection({
                 accessibilityRole="button"
                 accessibilityLabel={`${plan.title}, ${metaLabel}, ${peopleGoingLabel}`}
                 accessibilityHint={
-                  canDelete ? "Long press to remove this synq" : undefined
+                  canDelete ? "Long press to remove this plan" : undefined
                 }
               >
                 <View style={styles.cardAccent} />
@@ -408,7 +408,7 @@ export default function CommunityPlansSection({
             </View>
             <View style={styles.startSynqCopy}>
               <Text style={styles.startSynqTitle}>Share a plan</Text>
-              <Text style={styles.startSynqSubtitle}>Invite others in the group</Text>
+              <Text style={styles.startSynqSubtitle}>Anyone in the group can join</Text>
             </View>
           </TouchableOpacity>
         ) : null}
