@@ -77,7 +77,7 @@ export default function TabsLayout() {
           tabBarAccessibilityLabel: "Synq home",
           tabBarButton: (props) => (
             <Pressable
-              {...props}
+              {...(props as React.ComponentProps<typeof Pressable>)}
               onLongPress={() => DeviceEventEmitter.emit(SYNQ_TAB_LONG_PRESS)}
               delayLongPress={400}
             />

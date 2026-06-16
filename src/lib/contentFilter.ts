@@ -1,4 +1,4 @@
-/** Copy pattern for contentFilter.ts — terms live in contentFilterTerms.ts. */
+/** Client-side objectionable content filter for UGC (messages, profiles, plans). */
 import { BLOCKED_TERMS as BLOCKED_TERMS_LIST } from "./contentFilterTerms";
 
 const BLOCKED_TERMS: string[] = [...BLOCKED_TERMS_LIST];

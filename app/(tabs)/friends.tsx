@@ -46,7 +46,6 @@ import GroupsListPane from "@/src/components/friends/GroupsListPane";
 import ProfileTabHeaderOverlay, {
   useTabHeaderLayout,
 } from "@/src/components/ProfileTabHeaderOverlay";
-import SynqRefreshControl from "@/src/components/SynqRefreshControl";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import TabHeaderIconRow from "@/src/components/TabHeaderIconRow";
 import { useBlockedUsers } from "@/src/lib/blockedUsers";
@@ -311,7 +310,6 @@ export default function FriendsScreen() {
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [isFriendsInitialLoading, setIsFriendsInitialLoading] = useState(cachedFriends.length === 0);
   const [friendsLoadError, setFriendsLoadError] = useState(false);
-  const [refreshingFriends, setRefreshingFriends] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [sortMode, setSortMode] = useState<FriendsSortMode>("alphabetical");
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
@@ -495,10 +493,7 @@ export default function FriendsScreen() {
   const refreshFriends = useCallback(async () => {
     if (!myId || friendsRefreshInFlightRef.current) return;
     friendsRefreshInFlightRef.current = true;
-    setRefreshingFriends(true);
     setFriendsLoadError(false);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const startedAt = Date.now();
     try {
       await warmFriendsAndConnectionsCache(myId, { force: true });
       const nextFriends = sortFriendsByName(friendsListCacheByUser[myId] ?? []);
@@ -506,12 +501,6 @@ export default function FriendsScreen() {
     } catch {
       setFriendsLoadError(true);
     } finally {
-      const elapsed = Date.now() - startedAt;
-      const minVisibleMs = 520;
-      if (elapsed < minVisibleMs) {
-        await new Promise((resolve) => setTimeout(resolve, minVisibleMs - elapsed));
-      }
-      setRefreshingFriends(false);
       friendsRefreshInFlightRef.current = false;
     }
   }, [myId]);
@@ -712,13 +701,6 @@ export default function FriendsScreen() {
           ref={friendsListRef}
           style={styles.friendsList}
           scrollIndicatorInsets={{ right: 0 }}
-          refreshControl={
-            <SynqRefreshControl
-              refreshing={refreshingFriends}
-              onRefresh={() => void refreshFriends()}
-              enabled={!isFriendsInitialLoading}
-            />
-          }
           data={displayFriends}
           keyExtractor={(item) => item.id}
           renderItem={renderFriendRow}

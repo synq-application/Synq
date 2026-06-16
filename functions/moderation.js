@@ -3,7 +3,13 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
 const axios = require("axios");
-const { containsObjectionableContent } = require("./contentFilter");
+const { containsObjectionableContent } = (() => {
+  try {
+    return require("./contentFilter");
+  } catch {
+    return require("./contentFilter.example");
+  }
+})();
 const { logError, logInfo, logWarn } = require("./serverLog");
 
 const MODERATION_EMAIL_TO = "synqapp@gmail.com";
@@ -187,9 +193,32 @@ function registerModerationExports() {
       if (!snap) return;
       const data = snap.data();
       const text = String(data?.text || "");
-      if (!text || !containsObjectionableContent(text)) return;
-
       const { chatId, messageId } = event.params;
+      const senderId = String(data?.senderId || "").trim();
+
+      if (senderId) {
+        try {
+          const chatSnap = await db.doc(`chats/${chatId}`).get();
+          const participants = Array.isArray(chatSnap.data()?.participants)
+            ? chatSnap.data().participants.map((id) => String(id || "").trim()).filter(Boolean)
+            : [];
+          for (const participantId of participants) {
+            if (!participantId || participantId === senderId) continue;
+            const blockedSnap = await db
+              .doc(`users/${participantId}/blocked/${senderId}`)
+              .get();
+            if (blockedSnap.exists) {
+              await snap.ref.delete();
+              logInfo("onMessageBlockedRecipient", { chatId, messageId, senderId, participantId });
+              return;
+            }
+          }
+        } catch (e) {
+          logWarn("onMessageBlockCheck", { chatId, messageId, err: String(e?.message || e) });
+        }
+      }
+
+      if (!text || !containsObjectionableContent(text)) return;
       try {
         await snap.ref.delete();
         const queueId = await enqueueModerationItem(db, {

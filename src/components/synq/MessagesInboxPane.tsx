@@ -213,7 +213,7 @@ export default function MessagesInboxPane({
         <>
           <View style={[styles.inboxMergeHeader, { paddingTop: inboxMergeHeaderPaddingTop }]}>
             <BackButton
-              onPress={onCancelMergeMode}
+              onPress={onCancelMergeMode ?? (() => {})}
               style={styles.inboxMergeBackBtn}
               accessibilityLabel="Cancel combining chats"
             />

@@ -1,7 +1,5 @@
-const BLOCKED_TERMS = [
-  // Added terms locally
-];
-
+/** Copy to functions/contentFilter.js locally (gitignored). Do not commit real terms here. */
+const BLOCKED_TERMS = [];
 const LEET_MAP = {
   "@": "a",
   "4": "a",

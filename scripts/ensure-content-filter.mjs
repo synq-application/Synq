@@ -1,45 +1,30 @@
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const termsPath = join(root, "src/lib/contentFilterTerms.ts");
 
-const pairs = [
-  ["src/lib/contentFilter.example.ts", "src/lib/contentFilter.ts"],
-  ["functions/contentFilter.example.js", "functions/contentFilter.js"],
-];
-
-for (const [example, target] of pairs) {
-  const examplePath = join(root, example);
-  const targetPath = join(root, target);
-  if (existsSync(targetPath)) continue;
-  if (!existsSync(examplePath)) {
-    console.warn(`[ensure-content-filter] missing template: ${example}`);
-    continue;
+function loadCommittedTerms() {
+  if (!existsSync(termsPath)) {
+    console.warn("[ensure-content-filter] missing src/lib/contentFilterTerms.ts");
+    return [];
   }
-  copyFileSync(examplePath, targetPath);
-  console.log(`[ensure-content-filter] created ${target} from ${example}`);
+  const source = readFileSync(termsPath, "utf8");
+  const match = source.match(/export const BLOCKED_TERMS = \[([\s\S]*?)\]\s*(?:as const)?;/);
+  if (!match) {
+    console.warn("[ensure-content-filter] could not parse BLOCKED_TERMS from contentFilterTerms.ts");
+    return [];
+  }
+  return [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 }
 
-const tsPath = join(root, "src/lib/contentFilter.ts");
+const terms = loadCommittedTerms();
 const jsPath = join(root, "functions/contentFilter.js");
 
-if (!existsSync(tsPath)) {
-  console.warn("[ensure-content-filter] no src/lib/contentFilter.ts — skip server sync");
-  process.exit(0);
-}
+const termsJs = terms.map((t) => `  "${t.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",\n");
 
-const tsSource = readFileSync(tsPath, "utf8");
-const match = tsSource.match(/const BLOCKED_TERMS = \[([\s\S]*?)\];/);
-if (!match) {
-  console.warn("[ensure-content-filter] could not parse BLOCKED_TERMS from contentFilter.ts");
-  process.exit(0);
-}
-
-const terms = [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
-const termsJs = terms.map((t) => `  "${t}"`).join(",\n");
-
-const jsBody = `/** Server-side content filter (synced from src/lib/contentFilter.ts). */
+const jsBody = `/** Server-side content filter (synced from src/lib/contentFilterTerms.ts). */
 
 const BLOCKED_TERMS = [
 ${termsJs},
@@ -96,8 +81,14 @@ console.log(`[ensure-content-filter] synced ${terms.length} terms to functions/c
 
 if (process.env.EAS_BUILD === "true" && terms.length === 0) {
   console.error(
-    "[ensure-content-filter] EAS build aborted: src/lib/contentFilter.ts has an empty BLOCKED_TERMS list. " +
-      "Populate the file locally before running eas build (see docs/APP_STORE_REVIEW_NOTES.md)."
+    "[ensure-content-filter] EAS build aborted: contentFilterTerms.ts is empty. " +
+      "Populate the list before running eas build."
   );
   process.exit(1);
+}
+
+if (terms.length === 0) {
+  console.warn(
+    "[ensure-content-filter] WARNING: BLOCKED_TERMS is empty. Populate contentFilterTerms.ts before release."
+  );
 }

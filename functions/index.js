@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const {
   onDocumentCreated,
@@ -10,10 +10,28 @@ const axios = require("axios");
 const admin = require("firebase-admin");
 const { logError, logWarn, logInfo } = require("./serverLog");
 const { registerModerationExports } = require("./moderation");
-const { handleUserEventsChange } = require("./openPlanSync");
+const { handleUserEventsChange, matchesPlanEvent } = require("./openPlanSync");
+const {
+  buildSuggestionCacheKey,
+  readSuggestionListCache,
+  writeSuggestionListCache,
+  readVenueCache,
+  writeVenueCache,
+} = require("./synqSuggestionsCache");
 
 if (admin.apps.length === 0) {
     admin.initializeApp();
+}
+
+async function deleteCollectionInChunks(db, colRef, chunkSize = 400) {
+  while (true) {
+    const snap = await colRef.limit(chunkSize).get();
+    if (snap.empty) break;
+
+    const batch = db.batch();
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
 }
 
 const INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -39,6 +57,18 @@ async function reserveUniqueInviteCode(db, maxAttempts = 25) {
     if (snap.empty) return code;
   }
   throw new HttpsError("resource-exhausted", "Could not reserve invite code.");
+}
+
+async function friendIdForInviteCode(db, rawCode) {
+  const code = String(rawCode || "").trim().toUpperCase();
+  if (!code) return null;
+  const snap = await db
+    .collection("users")
+    .where("inviteCode", "==", code)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  return snap.docs[0].id;
 }
 
 /**
@@ -268,17 +298,6 @@ exports.deleteMyAccount = onCall(
     const uid = request.auth.uid;
     const db = admin.firestore();
 
-    const deleteCollectionInChunks = async (colRef, chunkSize = 400) => {
-      while (true) {
-        const snap = await colRef.limit(chunkSize).get();
-        if (snap.empty) break;
-
-        const batch = db.batch();
-        snap.docs.forEach((d) => batch.delete(d.ref));
-        await batch.commit();
-      }
-    };
-
     try {
       const myFriendsRef = db.collection("users").doc(uid).collection("friends");
       const myFriendsSnap = await myFriendsRef.get();
@@ -304,14 +323,14 @@ exports.deleteMyAccount = onCall(
       for (const chatDoc of chatsSnap.docs) {
         const chatId = chatDoc.id;
         const msgsRef = db.collection("chats").doc(chatId).collection("messages");
-        await deleteCollectionInChunks(msgsRef, 400);
+        await deleteCollectionInChunks(db, msgsRef, 400);
         await db.collection("chats").doc(chatId).delete();
       }
-      await deleteCollectionInChunks(db.collection("users").doc(uid).collection("friendRequests"), 400);
-      await deleteCollectionInChunks(db.collection("users").doc(uid).collection("outgoingFriendRequests"), 400);
-      await deleteCollectionInChunks(db.collection("users").doc(uid).collection("notificationLocks"), 400);
-      await deleteCollectionInChunks(db.collection("users").doc(uid).collection("notifications"), 400);
-      await deleteCollectionInChunks(db.collection("users").doc(uid).collection("friendGroups"), 400);
+      await deleteCollectionInChunks(db, db.collection("users").doc(uid).collection("friendRequests"), 400);
+      await deleteCollectionInChunks(db, db.collection("users").doc(uid).collection("outgoingFriendRequests"), 400);
+      await deleteCollectionInChunks(db, db.collection("users").doc(uid).collection("notificationLocks"), 400);
+      await deleteCollectionInChunks(db, db.collection("users").doc(uid).collection("notifications"), 400);
+      await deleteCollectionInChunks(db, db.collection("users").doc(uid).collection("friendGroups"), 400);
       await db.collection("users").doc(uid).delete();
       await admin.auth().deleteUser(uid);
 
@@ -319,6 +338,62 @@ exports.deleteMyAccount = onCall(
     } catch (error) {
       logError("deleteMyAccount", error, { uid });
       throw new HttpsError("internal", error?.message || "Failed to delete account.");
+    }
+  }
+);
+
+exports.deleteChat = onCall(
+  { region: "us-central1", invoker: "public" },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Must be logged in.");
+    }
+    const uid = request.auth.uid;
+    const chatId = request.data?.chatId;
+    if (!chatId || typeof chatId !== "string") {
+      throw new HttpsError("invalid-argument", "Invalid chat id.");
+    }
+
+    const db = admin.firestore();
+    const chatRef = db.collection("chats").doc(chatId);
+
+    try {
+      const chatSnap = await chatRef.get();
+      if (!chatSnap.exists) {
+        throw new HttpsError("not-found", "Chat not found.");
+      }
+
+      const participants = Array.isArray(chatSnap.data()?.participants)
+        ? chatSnap.data().participants.filter(Boolean)
+        : [];
+      if (!participants.includes(uid)) {
+        throw new HttpsError("permission-denied", "Not a chat participant.");
+      }
+
+      await deleteCollectionInChunks(
+        db,
+        chatRef.collection("messages"),
+        400
+      );
+      await chatRef.delete();
+
+      await Promise.all(
+        participants.map((participantUid) =>
+          db
+            .collection("users")
+            .doc(participantUid)
+            .update({
+              pinnedChatIds: admin.firestore.FieldValue.arrayRemove(chatId),
+            })
+            .catch(() => {})
+        )
+      );
+
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      logError("deleteChat", error, { uid, chatId });
+      throw new HttpsError("internal", error?.message || "Failed to delete chat.");
     }
   }
 );
@@ -407,6 +482,157 @@ exports.getOrCreateInviteCode = onCall(
       { merge: true }
     );
     return { inviteCode };
+  }
+);
+
+/** Public lookup for masked profile share links (`/u/{inviteCode}`). */
+exports.resolveProfileShareCodeHttp = onRequest(
+  { region: "us-central1", cors: true },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+    const code = String(req.query.code || "").trim().toUpperCase();
+    if (!code) {
+      res.status(400).json({ error: "invalid_code" });
+      return;
+    }
+    try {
+      const friendId = await friendIdForInviteCode(admin.firestore(), code);
+      if (!friendId) {
+        res.status(404).json({ error: "not_found" });
+        return;
+      }
+      res.status(200).json({ friendId, inviteCode: code });
+    } catch (e) {
+      logError("resolveProfileShareCodeHttp", e, { code });
+      res.status(500).json({ error: "internal" });
+    }
+  }
+);
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function extractProfileShareCodeFromPath(pathname) {
+  const match = String(pathname || "").match(/\/u\/([^/?#]+)/i);
+  return match ? decodeURIComponent(match[1] || "").trim().toUpperCase() : "";
+}
+
+async function profileShareCardImageUrl(friendId) {
+  const bucket = admin.storage().bucket();
+  const objectPath = `profileShareCards/${friendId}/card.png`;
+  const file = bucket.file(objectPath);
+  const [exists] = await file.exists();
+  if (!exists) return "";
+  const [metadata] = await file.getMetadata();
+  const token = metadata.metadata?.firebaseStorageDownloadTokens;
+  if (typeof token === "string" && token.trim()) {
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(objectPath)}?alt=media&token=${encodeURIComponent(token.trim())}`;
+  }
+  const [signedUrl] = await file.getSignedUrl({
+    action: "read",
+    expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
+  });
+  return signedUrl || "";
+}
+
+/** HTML landing page for /u/{inviteCode} with Open Graph card preview. */
+exports.profileSharePageHttp = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    const code = extractProfileShareCodeFromPath(req.path);
+    if (!code) {
+      res.status(404).send("Not found");
+      return;
+    }
+
+    try {
+      const db = admin.firestore();
+      const friendId = await friendIdForInviteCode(db, code);
+      if (!friendId) {
+        res.status(404).send("This profile link is no longer available.");
+        return;
+      }
+
+      let ogImage = "";
+      try {
+        ogImage = await profileShareCardImageUrl(friendId);
+      } catch (e) {
+        logError("profileSharePageHttp_card_image", e, { friendId, code });
+      }
+
+      const deepLink = `synq://friend-profile?friendId=${encodeURIComponent(friendId)}`;
+      const iosStore =
+        "https://apps.apple.com/us/app/synq-see-whos-free/id6757319173";
+      const androidStore =
+        "https://play.google.com/store/search?q=Synq&c=apps";
+      const ogImageTag = ogImage
+        ? `<meta property="og:image" content="${escapeHtml(ogImage)}" />`
+        : "";
+
+      res.set("Cache-Control", "public, max-age=60");
+      res.status(200).send(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Join me on Synq!</title>
+    <meta property="og:title" content="Join me on Synq!" />
+    <meta property="og:description" content="Connect with me on Synq." />
+    <meta property="og:type" content="website" />
+    ${ogImageTag}
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #090a0b;
+        color: #f5f5f5;
+        text-align: center;
+        padding: 24px;
+      }
+      a { color: #7c5cff; }
+    </style>
+  </head>
+  <body>
+    <div>
+      <p>Opening Synq…</p>
+      <p><a id="store-link" href="#">Get Synq in the app store</a></p>
+    </div>
+    <script>
+      (function () {
+        var deepLink = ${JSON.stringify(deepLink)};
+        var iosStore = ${JSON.stringify(iosStore)};
+        var androidStore = ${JSON.stringify(androidStore)};
+        var ua = navigator.userAgent || "";
+        var isIOS = /iPad|iPhone|iPod/i.test(ua);
+        var isAndroid = /Android/i.test(ua);
+        var storeUrl = isIOS ? iosStore : isAndroid ? androidStore : iosStore;
+        var storeLink = document.getElementById("store-link");
+        if (storeLink) storeLink.href = storeUrl;
+        window.location.replace(deepLink);
+        window.setTimeout(function () {
+          window.location.replace(storeUrl);
+        }, 1200);
+      })();
+    </script>
+  </body>
+</html>`);
+    } catch (e) {
+      logError("profileSharePageHttp", e, { code });
+      res.status(500).send("Something went wrong.");
+    }
   }
 );
 
@@ -710,6 +936,69 @@ exports.onFriendRequestSent = onDocumentCreated({
     }
 });
 
+exports.onCommunityGroupInviteCreated = onDocumentCreated({
+    document: "users/{userId}/communityGroupInvites/{groupId}",
+    region: "us-central1",
+}, async (event) => {
+    const inviteData = event.data?.data();
+    if (!inviteData) return;
+
+    const { userId, groupId } = event.params;
+
+    try {
+        const recipientDoc = await admin.firestore().collection("users").doc(userId).get();
+        const recipientData = recipientDoc.data();
+        const token = recipientData?.pushToken;
+        if (!token) return;
+
+        const inviterId = String(inviteData.fromUserId || "").trim();
+        let inviterPushToken = null;
+        if (inviterId) {
+            const inviterDoc = await admin.firestore().collection("users").doc(inviterId).get();
+            inviterPushToken = inviterDoc.data()?.pushToken || null;
+        }
+
+        if (inviterPushToken && token === inviterPushToken) {
+            logWarn("onCommunityGroupInviteCreated_skip_same_device_token", {
+                userId,
+                groupId,
+                inviterId,
+            });
+            return;
+        }
+
+        const inviterName =
+            String(inviteData.fromUserName || "").trim() || "A friend";
+        const groupName =
+            String(inviteData.groupName || "").trim() || "a community group";
+
+        await axios.post("https://exp.host/--/api/v2/push/send", {
+            to: token,
+            sound: "default",
+            title: "Group invite",
+            body: `${inviterName} invited you to join ${groupName}`,
+            data: {
+                type: "community_group_invite",
+                groupId: String(groupId),
+                fromUserId: inviterId || undefined,
+            },
+        });
+    } catch (error) {
+        logError("onCommunityGroupInviteCreated", error, { userId, groupId });
+    }
+});
+
+function collectInvitedIds(e) {
+  const ids = new Set();
+  if (Array.isArray(e?.planInvitedIds)) {
+    e.planInvitedIds.forEach((id) => {
+      const s = String(id || "").trim();
+      if (s) ids.add(s);
+    });
+  }
+  return ids;
+}
+
 function collectJoinedIds(e) {
   const ids = new Set();
   if (Array.isArray(e?.joinedFromIds)) {
@@ -757,6 +1046,45 @@ async function writeInAppNotification(recipientUid, docId, fields) {
     },
     { merge: true }
   );
+}
+
+function friendSynqActiveNotifId(activatedUserId, recipientId) {
+  return `synq_active_${activatedUserId}_${recipientId}`.slice(0, 1400);
+}
+
+/** Removes "friend activated Synq" in-app notifications when that friend goes inactive. */
+async function clearFriendSynqActiveNotifications(activatedUserId, recipientIds) {
+  const db = admin.firestore();
+  for (const recipientId of recipientIds) {
+    try {
+      const notifCol = db.collection("users").doc(recipientId).collection("notifications");
+      const canonicalId = friendSynqActiveNotifId(activatedUserId, recipientId);
+      await notifCol.doc(canonicalId).delete().catch(() => {});
+
+      const legacySnap = await notifCol.where("fromUserId", "==", activatedUserId).get();
+      if (legacySnap.empty) continue;
+
+      let batch = db.batch();
+      let n = 0;
+      for (const doc of legacySnap.docs) {
+        if (doc.data()?.type !== "friend_synq_active") continue;
+        if (doc.id === canonicalId) continue;
+        batch.delete(doc.ref);
+        n += 1;
+        if (n >= 500) {
+          await batch.commit();
+          batch = db.batch();
+          n = 0;
+        }
+      }
+      if (n > 0) await batch.commit();
+    } catch (err) {
+      logError("clearFriendSynqActiveNotifications", err, {
+        activatedUserId,
+        recipientId,
+      });
+    }
+  }
 }
 
 /** Must match app `EXPIRATION_HOURS` in constants/Variables.ts */
@@ -963,8 +1291,8 @@ exports.onOpenPlanInterest = onDocumentUpdated(
 
         const planTitle = String(ev?.title || "").trim();
         const body = planTitle
-          ? `${firstNameFromDisplay(joinerName)} is interested in your plan ${planTitle}`
-          : `${firstNameFromDisplay(joinerName)} is interested in your plan`;
+          ? `${firstNameFromDisplay(joinerName)} is going to ${planTitle}`
+          : `${firstNameFromDisplay(joinerName)} is going to your plan`;
 
         const eventIdForClient =
           String(ev?.id || "").trim() ||
@@ -989,6 +1317,7 @@ exports.onOpenPlanInterest = onDocumentUpdated(
               planHostUid: hostUid,
               fromUserId: joinerId,
               eventId: eventIdForClient,
+              notificationId: lockId,
             },
           });
           await lockRef.set({
@@ -1008,6 +1337,151 @@ exports.onOpenPlanInterest = onDocumentUpdated(
           });
         } catch (error) {
           logError("onOpenPlanInterest_push", error, { hostUid, joinerId });
+        }
+      }
+    }
+  }
+);
+
+/** When someone joins a community plan, notify the creator and other goers. */
+exports.onCommunityPlanGoing = onDocumentUpdated(
+  {
+    document: "communityGroups/{groupId}/plans/{planId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const { groupId, planId } = event.params;
+    const before = event.data.before.data() || {};
+    const after = event.data.after.data() || {};
+    const beforeIds = new Set(
+      (Array.isArray(before.goingMemberIds) ? before.goingMemberIds : [])
+        .map((id) => String(id || "").trim())
+        .filter(Boolean)
+    );
+    const afterIds = (Array.isArray(after.goingMemberIds) ? after.goingMemberIds : [])
+      .map((id) => String(id || "").trim())
+      .filter(Boolean);
+    const newJoiners = afterIds.filter((id) => !beforeIds.has(id));
+    if (newJoiners.length === 0) return;
+
+    const creatorId = String(after.creatorId || before.creatorId || "").trim();
+    const planTitle = String(after.title || before.title || "").trim();
+    const groupName = await admin
+      .firestore()
+      .collection("communityGroups")
+      .doc(groupId)
+      .get()
+      .then((snap) => (snap.exists ? String(snap.data()?.name || "").trim() : ""))
+      .catch(() => "");
+
+    for (const joinerId of newJoiners) {
+      let joinerName = "Someone";
+      let joinerPushToken = null;
+      try {
+        const joinerDoc = await admin.firestore().collection("users").doc(joinerId).get();
+        if (joinerDoc.exists) {
+          const jd = joinerDoc.data();
+          joinerName = jd?.displayName || joinerName;
+          joinerPushToken = jd?.pushToken || null;
+        }
+      } catch (e) {
+        logError("onCommunityPlanGoing_joiner_profile", e, { groupId, planId, joinerId });
+      }
+
+      const recipients = new Set(
+        [creatorId, ...afterIds].filter((id) => id && id !== joinerId)
+      );
+
+      for (const recipientId of recipients) {
+        const lockId =
+          `community_plan_join_${groupId}_${planId}_${joinerId}_${recipientId}`.slice(0, 1400);
+        const lockRef = admin
+          .firestore()
+          .collection("users")
+          .doc(recipientId)
+          .collection("notificationLocks")
+          .doc(lockId);
+        const alreadySent = await lockRef.get();
+        if (alreadySent.exists) continue;
+
+        let recipientPushToken = null;
+        try {
+          const recipientDoc = await admin.firestore().collection("users").doc(recipientId).get();
+          if (recipientDoc.exists) {
+            recipientPushToken = recipientDoc.data()?.pushToken || null;
+          }
+        } catch (e) {
+          logError("onCommunityPlanGoing_recipient_profile", e, {
+            groupId,
+            planId,
+            recipientId,
+          });
+        }
+
+        const title = groupName || "Community plan";
+        const body = planTitle
+          ? `${firstNameFromDisplay(joinerName)} is in for ${planTitle}`
+          : `${firstNameFromDisplay(joinerName)} joined a plan`;
+
+        if (recipientPushToken && joinerPushToken && recipientPushToken === joinerPushToken) {
+          logWarn("onCommunityPlanGoing_skip_same_device_token", {
+            recipientId,
+            joinerId,
+          });
+          continue;
+        }
+
+        if (recipientPushToken) {
+          try {
+            await axios.post("https://exp.host/--/api/v2/push/send", {
+              to: recipientPushToken,
+              sound: "default",
+              title,
+              body,
+              data: {
+                type: "community_plan_join",
+                groupId,
+                planId,
+                fromUserId: joinerId,
+                notificationId: lockId,
+              },
+            });
+          } catch (pushErr) {
+            logError("onCommunityPlanGoing_push", pushErr, {
+              groupId,
+              planId,
+              recipientId,
+              joinerId,
+            });
+          }
+        }
+
+        try {
+          await lockRef.set({
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            type: "community_plan_join",
+            groupId,
+            planId,
+            joinerId,
+            planTitle: planTitle || null,
+          });
+          await writeInAppNotification(recipientId, lockId, {
+            type: "community_plan_join",
+            groupId,
+            planId,
+            fromUserId: joinerId,
+            planTitle: planTitle || null,
+            groupName: groupName || null,
+            title,
+            body,
+          });
+        } catch (notifErr) {
+          logError("onCommunityPlanGoing_in_app", notifErr, {
+            groupId,
+            planId,
+            recipientId,
+            joinerId,
+          });
         }
       }
     }
@@ -1193,7 +1667,395 @@ exports.sendSynqNudge = onCall({ region: "us-central1" }, async (request) => {
   return { ok: true };
 });
 
-/** Notify active friends when a friend activates Synq (only to recipients also active). */
+function planInviteNotifId(hostUid, recipientUid, eventId) {
+  const safeEventId = String(eventId || "")
+    .trim()
+    .replace(/[/\s]/g, "_");
+  return `plan_invite_${hostUid}_${recipientUid}_${safeEventId}`.slice(0, 1400);
+}
+
+function planInviteBody(hostDisplayName, planTitle) {
+  const fn = firstNameFromDisplay(hostDisplayName);
+  const title = String(planTitle || "").trim();
+  return title
+    ? `${fn} wants you to join their plan ${title}`
+    : `${fn} wants you to join their plan`;
+}
+
+/** Host invites a friend to join one of their open plans. */
+exports.sendPlanInvite = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "Must be logged in.");
+  }
+
+  const hostUid = request.auth.uid;
+  const toUserId = String(request.data?.toUserId || "").trim();
+  const eventId = String(request.data?.eventId || "").trim();
+  if (!toUserId || toUserId === hostUid) {
+    throw new HttpsError("invalid-argument", "Invalid recipient.");
+  }
+  if (!eventId) {
+    throw new HttpsError("invalid-argument", "Missing plan id.");
+  }
+
+  const db = admin.firestore();
+  const friendSnap = await db
+    .collection("users")
+    .doc(hostUid)
+    .collection("friends")
+    .doc(toUserId)
+    .get();
+  if (!friendSnap.exists) {
+    throw new HttpsError("permission-denied", "You can only invite friends.");
+  }
+
+  const [hostDoc, recipientDoc] = await Promise.all([
+    db.collection("users").doc(hostUid).get(),
+    db.collection("users").doc(toUserId).get(),
+  ]);
+
+  if (!hostDoc.exists) {
+    throw new HttpsError("failed-precondition", "Your profile is missing.");
+  }
+  if (!recipientDoc.exists) {
+    throw new HttpsError("not-found", "Friend not found.");
+  }
+
+  const hostData = hostDoc.data() || {};
+  const recipientData = recipientDoc.data() || {};
+  const hostEvents = Array.isArray(hostData.events) ? hostData.events : [];
+  const hostPlan = hostEvents.find((e) => String(e?.id || "").trim() === eventId);
+  if (!hostPlan) {
+    throw new HttpsError("not-found", "Plan not found.");
+  }
+  if (String(hostPlan?.planHostUid || hostUid).trim() !== hostUid) {
+    throw new HttpsError("permission-denied", "You can only invite friends to your own plans.");
+  }
+
+  const planTarget = { ...hostPlan, planHostUid: hostUid };
+  const recipientEvents = Array.isArray(recipientData.events) ? recipientData.events : [];
+  if (recipientEvents.some((e) => matchesPlanEvent(e, planTarget, recipientEvents))) {
+    throw new HttpsError("failed-precondition", "This friend already has this plan.");
+  }
+
+  const hostJoinedIds = collectJoinedIds(hostPlan);
+  if (hostJoinedIds.has(toUserId)) {
+    throw new HttpsError("failed-precondition", "This friend is already on this plan.");
+  }
+
+  const invitedIds = collectInvitedIds(hostPlan);
+  if (invitedIds.has(toUserId)) {
+    return { ok: true, alreadyInvited: true };
+  }
+
+  const planTitle = String(hostPlan.title || "").trim();
+  const hostName = String(hostData.displayName || "Your friend").trim() || "Your friend";
+  const body = planInviteBody(hostName, planTitle);
+  const notifId = planInviteNotifId(hostUid, toUserId, eventId);
+  const recipientToken = recipientData.pushToken || null;
+  const hostToken = hostData.pushToken || null;
+
+  if (recipientToken && hostToken && recipientToken === hostToken) {
+    logWarn("sendPlanInvite_skip_same_device_token", { hostUid, toUserId });
+  } else if (recipientToken) {
+    try {
+      await axios.post("https://exp.host/--/api/v2/push/send", {
+        to: recipientToken,
+        sound: "default",
+        title: "Plan invite",
+        body,
+        data: {
+          type: "plan_invite",
+          fromUserId: hostUid,
+          eventId,
+          planHostUid: hostUid,
+          notificationId: notifId,
+        },
+      });
+    } catch (pushErr) {
+      logError("sendPlanInvite_push", pushErr, { hostUid, toUserId, eventId });
+    }
+  }
+
+  const lockRef = db.collection("users").doc(toUserId).collection("notificationLocks").doc(notifId);
+  await lockRef.set({
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    type: "plan_invite",
+    fromUserId: hostUid,
+    eventId,
+    planHostUid: hostUid,
+    planTitle: planTitle || null,
+  });
+
+  await writeInAppNotification(toUserId, notifId, {
+    type: "plan_invite",
+    fromUserId: hostUid,
+    eventId,
+    planHostUid: hostUid,
+    planTitle: planTitle || null,
+    planDate: String(hostPlan.date || "").trim() || null,
+    planTime: String(hostPlan.time || "").trim() || null,
+    planLocation: String(hostPlan.location || "").trim() || null,
+    title: "Plan invite",
+    body,
+  });
+
+  const hostRef = db.collection("users").doc(hostUid);
+  await db.runTransaction(async (t) => {
+    const hostSnap = await t.get(hostRef);
+    if (!hostSnap.exists) return;
+    const hostDataTx = hostSnap.data() || {};
+    const events = Array.isArray(hostDataTx.events) ? [...hostDataTx.events] : [];
+    const idx = events.findIndex((e) => String(e?.id || "").trim() === eventId);
+    if (idx === -1) return;
+    const plan = { ...(events[idx] || {}) };
+    const nextInvited = collectInvitedIds(plan);
+    nextInvited.add(toUserId);
+    plan.planInvitedIds = [...nextInvited];
+    events[idx] = plan;
+    t.update(hostRef, { events });
+  });
+
+  return { ok: true };
+});
+
+/** Host revokes a pending plan invite before the friend accepts. */
+exports.revokePlanInvite = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "Must be logged in.");
+  }
+
+  const hostUid = request.auth.uid;
+  const toUserId = String(request.data?.toUserId || "").trim();
+  const eventId = String(request.data?.eventId || "").trim();
+  if (!toUserId || toUserId === hostUid) {
+    throw new HttpsError("invalid-argument", "Invalid recipient.");
+  }
+  if (!eventId) {
+    throw new HttpsError("invalid-argument", "Missing plan id.");
+  }
+
+  const db = admin.firestore();
+  const hostRef = db.collection("users").doc(hostUid);
+  const hostSnap = await hostRef.get();
+  if (!hostSnap.exists) {
+    throw new HttpsError("not-found", "Plan not found.");
+  }
+
+  const hostData = hostSnap.data() || {};
+  const events = Array.isArray(hostData.events) ? hostData.events : [];
+  const planIdx = events.findIndex((e) => String(e?.id || "").trim() === eventId);
+  if (planIdx === -1) {
+    throw new HttpsError("not-found", "Plan not found.");
+  }
+
+  const plan = events[planIdx] || {};
+  if (String(plan?.planHostUid || hostUid).trim() !== hostUid) {
+    throw new HttpsError("permission-denied", "You can only manage invites on your own plans.");
+  }
+
+  const invitedIds = collectInvitedIds(plan);
+  if (!invitedIds.has(toUserId)) {
+    return { ok: true, alreadyRevoked: true };
+  }
+
+  const notifId = planInviteNotifId(hostUid, toUserId, eventId);
+  const notifRef = db.collection("users").doc(toUserId).collection("notifications").doc(notifId);
+  const lockRef = db.collection("users").doc(toUserId).collection("notificationLocks").doc(notifId);
+
+  await db.runTransaction(async (t) => {
+    const snap = await t.get(hostRef);
+    if (!snap.exists) return;
+    const data = snap.data() || {};
+    const evs = Array.isArray(data.events) ? [...data.events] : [];
+    const idx = evs.findIndex((e) => String(e?.id || "").trim() === eventId);
+    if (idx === -1) return;
+    const row = { ...(evs[idx] || {}) };
+    const nextInvited = collectInvitedIds(row);
+    nextInvited.delete(toUserId);
+    row.planInvitedIds = [...nextInvited];
+    evs[idx] = row;
+    t.update(hostRef, { events: evs });
+  });
+
+  await Promise.allSettled([notifRef.delete(), lockRef.delete()]);
+  return { ok: true };
+});
+
+/** Accept a plan invite and add the plan to the recipient's open plans. */
+exports.acceptPlanInvite = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "Must be logged in.");
+  }
+
+  const recipientUid = request.auth.uid;
+  const notificationId = String(request.data?.notificationId || "").trim();
+  if (!notificationId) {
+    throw new HttpsError("invalid-argument", "Missing invite id.");
+  }
+
+  const db = admin.firestore();
+  const notifRef = db
+    .collection("users")
+    .doc(recipientUid)
+    .collection("notifications")
+    .doc(notificationId);
+  const notifSnap = await notifRef.get();
+  if (!notifSnap.exists) {
+    throw new HttpsError("not-found", "Invite no longer available.");
+  }
+
+  const notif = notifSnap.data() || {};
+  if (notif.type !== "plan_invite") {
+    throw new HttpsError("failed-precondition", "Invalid invite.");
+  }
+
+  const hostUid = String(notif.planHostUid || notif.fromUserId || "").trim();
+  const eventId = String(notif.eventId || "").trim();
+  if (!hostUid || !eventId) {
+    throw new HttpsError("failed-precondition", "Invite is missing plan details.");
+  }
+
+  const [hostDoc, recipientDoc] = await Promise.all([
+    db.collection("users").doc(hostUid).get(),
+    db.collection("users").doc(recipientUid).get(),
+  ]);
+
+  if (!hostDoc.exists) {
+    throw new HttpsError("not-found", "This plan was removed.");
+  }
+  if (!recipientDoc.exists) {
+    throw new HttpsError("failed-precondition", "Your profile is missing.");
+  }
+
+  const hostEvents = Array.isArray(hostDoc.data()?.events) ? hostDoc.data().events : [];
+  const hostPlan = hostEvents.find((e) => String(e?.id || "").trim() === eventId);
+  if (!hostPlan) {
+    throw new HttpsError("not-found", "This plan was removed.");
+  }
+
+  const hostName = String(hostDoc.data()?.displayName || "Friend").trim() || "Friend";
+  const joinerName = String(recipientDoc.data()?.displayName || "Friend").trim() || "Friend";
+  const planTarget = { ...hostPlan, planHostUid: hostUid };
+  let recipientEvents = Array.isArray(recipientDoc.data()?.events)
+    ? [...recipientDoc.data().events]
+    : [];
+
+  const alreadyJoined = recipientEvents.some((e) =>
+    matchesPlanEvent(e, planTarget, recipientEvents)
+  );
+
+  if (!alreadyJoined) {
+    const sourceIds = Array.from(
+      new Set([hostUid, recipientUid, ...collectJoinedIds(hostPlan)].map(String).filter(Boolean))
+    );
+    const sourceNames = Array.from(new Set([hostName, joinerName].filter(Boolean)));
+
+    const newEvent = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      title: String(hostPlan.title || "").trim(),
+      date: String(hostPlan.date || "").trim(),
+      time: String(hostPlan.time || "").trim(),
+      location: String(hostPlan.location || "").trim(),
+      planHostUid: hostUid,
+      joinedFromId: hostUid,
+      joinedFromIds: sourceIds,
+      joinedFromName: sourceNames.join(", "),
+      joinedFromNames: sourceNames,
+      mergedIntoExisting: false,
+      joinedFromFriendUid: hostUid,
+    };
+
+    recipientEvents = [...recipientEvents, newEvent];
+    await db.collection("users").doc(recipientUid).update({ events: recipientEvents });
+  }
+
+  const batch = db.batch();
+  batch.delete(notifRef);
+  batch.delete(
+    db.collection("users").doc(recipientUid).collection("notificationLocks").doc(notificationId)
+  );
+  await batch.commit();
+
+  const hostRef = db.collection("users").doc(hostUid);
+  await db.runTransaction(async (t) => {
+    const snap = await t.get(hostRef);
+    if (!snap.exists) return;
+    const data = snap.data() || {};
+    const evs = Array.isArray(data.events) ? [...data.events] : [];
+    const idx = evs.findIndex((e) => String(e?.id || "").trim() === eventId);
+    if (idx === -1) return;
+    const row = { ...(evs[idx] || {}) };
+    const nextInvited = collectInvitedIds(row);
+    nextInvited.delete(recipientUid);
+    row.planInvitedIds = [...nextInvited];
+    evs[idx] = row;
+    t.update(hostRef, { events: evs });
+  });
+
+  return { ok: true, status: alreadyJoined ? "already_joined" : "joined" };
+});
+
+/** Decline a plan invite and clear the pending invite on the host's plan. */
+exports.declinePlanInvite = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "Must be logged in.");
+  }
+
+  const recipientUid = request.auth.uid;
+  const notificationId = String(request.data?.notificationId || "").trim();
+  if (!notificationId) {
+    throw new HttpsError("invalid-argument", "Missing invite id.");
+  }
+
+  const db = admin.firestore();
+  const notifRef = db
+    .collection("users")
+    .doc(recipientUid)
+    .collection("notifications")
+    .doc(notificationId);
+  const notifSnap = await notifRef.get();
+  if (!notifSnap.exists) {
+    return { ok: true, alreadyDeclined: true };
+  }
+
+  const notif = notifSnap.data() || {};
+  if (notif.type !== "plan_invite") {
+    throw new HttpsError("failed-precondition", "Invalid invite.");
+  }
+
+  const hostUid = String(notif.planHostUid || notif.fromUserId || "").trim();
+  const eventId = String(notif.eventId || "").trim();
+
+  const batch = db.batch();
+  batch.delete(notifRef);
+  batch.delete(
+    db.collection("users").doc(recipientUid).collection("notificationLocks").doc(notificationId)
+  );
+  await batch.commit();
+
+  if (hostUid && eventId) {
+    const hostRef = db.collection("users").doc(hostUid);
+    await db.runTransaction(async (t) => {
+      const snap = await t.get(hostRef);
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      const evs = Array.isArray(data.events) ? [...data.events] : [];
+      const idx = evs.findIndex((e) => String(e?.id || "").trim() === eventId);
+      if (idx === -1) return;
+      const row = { ...(evs[idx] || {}) };
+      const nextInvited = collectInvitedIds(row);
+      nextInvited.delete(recipientUid);
+      row.planInvitedIds = [...nextInvited];
+      evs[idx] = row;
+      t.update(hostRef, { events: evs });
+    });
+  }
+
+  return { ok: true };
+});
+
+/** Notify active friends when a friend activates Synq; clear those notifications on deactivate. */
 exports.onFriendSynqActivated = onDocumentUpdated(
   {
     document: "users/{userId}",
@@ -1206,10 +2068,7 @@ exports.onFriendSynqActivated = onDocumentUpdated(
 
     const wasActive = isSynqActive(before);
     const isActive = isSynqActive(after);
-    if (wasActive || !isActive) return;
-
-    const activatedPushToken = after?.pushToken || null;
-    const activatedName = String(after?.displayName || "Your friend").trim() || "Your friend";
+    if (wasActive === isActive) return;
 
     try {
       const friendsSnap = await admin
@@ -1223,6 +2082,14 @@ exports.onFriendSynqActivated = onDocumentUpdated(
 
       const friendIds = friendsSnap.docs.map((d) => String(d.id || "").trim()).filter(Boolean);
       if (!friendIds.length) return;
+
+      if (wasActive && !isActive) {
+        await clearFriendSynqActiveNotifications(activatedUserId, friendIds);
+        return;
+      }
+
+      const activatedPushToken = after?.pushToken || null;
+      const activatedName = String(after?.displayName || "Your friend").trim() || "Your friend";
 
       const friendDocs = await Promise.all(
         friendIds.map((fid) => admin.firestore().collection("users").doc(fid).get())
@@ -1257,16 +2124,16 @@ exports.onFriendSynqActivated = onDocumentUpdated(
               fromUserId: activatedUserId,
             },
           });
-          const synqNotifId = `synq_active_${activatedUserId}_${recipientId}_${Date.now()}`.slice(
-            0,
-            1400
+          await writeInAppNotification(
+            recipientId,
+            friendSynqActiveNotifId(activatedUserId, recipientId),
+            {
+              type: "friend_synq_active",
+              fromUserId: activatedUserId,
+              title: "Friend active on Synq",
+              body: synqBody,
+            }
           );
-          await writeInAppNotification(recipientId, synqNotifId, {
-            type: "friend_synq_active",
-            fromUserId: activatedUserId,
-            title: "Friend active on Synq",
-            body: synqBody,
-          });
         } catch (pushErr) {
           logError("onFriendSynqActivated_push", pushErr, {
             activatedUserId,
@@ -1283,19 +2150,209 @@ exports.onFriendSynqActivated = onDocumentUpdated(
 const PLACES_FIELD_MASK =
     "places.displayName,places.rating,places.photos,places.shortFormattedAddress,places.formattedAddress";
 
+/** Kill switch for client AI UI — backend returns immediately when false. */
+const AI_SUGGESTIONS_PUBLIC_ENABLED = true;
+
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
+
+function normalizeSuggestion(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const name = String(raw.name || raw.title || "").trim();
+    if (!name) return null;
+    const location = String(raw.location || raw.address || "").trim();
+    const address = String(raw.address || raw.location || "").trim();
+    const imageUrl =
+        typeof raw.imageUrl === "string"
+            ? raw.imageUrl
+            : typeof raw.imageurl === "string"
+              ? raw.imageurl
+              : null;
+    return {
+        name,
+        rating: raw.rating ? String(raw.rating) : "4.0",
+        imageUrl,
+        location: location || address,
+        address: address || location,
+    };
+}
+
+function normalizeSuggestionList(list) {
+    if (!Array.isArray(list)) return [];
+    return list.map(normalizeSuggestion).filter(Boolean);
+}
+
+function normalizeLocationToken(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s*,\s*/g, ", ")
+        .replace(/\s+/g, " ");
+}
+
+function venueDisplayName(venue) {
+    return String(venue?.name || venue?.title || "").trim();
+}
+
+function suggestionHasStreetAddress(venue, searchLocation) {
+    const address = String(venue?.address || venue?.location || "").trim();
+    if (!address) return false;
+    const searchNorm = normalizeLocationToken(searchLocation);
+    const addressNorm = normalizeLocationToken(address);
+    return addressNorm !== searchNorm && address.includes(",");
+}
+
+function suggestionHasPhoto(venue) {
+    const imageUrl = venue?.imageUrl || venue?.imageurl;
+    return typeof imageUrl === "string" && imageUrl.startsWith("http");
+}
+
+function needsVenueEnrichment(venue, searchLocation) {
+    if (!venueDisplayName(venue)) return true;
+    return !suggestionHasStreetAddress(venue, searchLocation) || !suggestionHasPhoto(venue);
+}
+
+function withLocationFallback(suggestions, location) {
+    return suggestions.map((item) => ({
+        ...item,
+        location: item.location || item.address || location,
+        address: item.address || item.location || location,
+    }));
+}
+
+async function enrichSuggestionsList(suggestions, location, googleKey, db) {
+    const list = Array.isArray(suggestions) ? suggestions : [];
+    const normalizedInput = normalizeSuggestionList(list);
+    if (list.length === 0) return [];
+
+    const enriched = await Promise.all(
+        list.map((venue) =>
+            needsVenueEnrichment(venue, location)
+                ? enrichVenueFromPlaces(venue, location, googleKey, db)
+                : Promise.resolve(normalizeSuggestion(venue) || venue)
+        )
+    );
+    const result = normalizeSuggestionList(enriched);
+    if (result.length > 0) return result;
+    if (normalizedInput.length > 0) {
+        return withLocationFallback(normalizedInput, location);
+    }
+    return [];
+}
+
+function normalizeCategory(category) {
+    const key = String(category || "").trim().toLowerCase();
+    const aliases = {
+        "surprise me": "restaurants, bars, and local activities",
+        drinks: "bars and nightlife",
+        dinner: "restaurants",
+        "coffee spots": "cafes and coffee shops",
+        outdoors: "parks and outdoor activities",
+    };
+    return aliases[key] || String(category || "local spots").trim();
+}
+
+async function generateVenueNames(geminiKey, location, interests, category) {
+    const multiArea = /\band\b/i.test(String(location || ""));
+    const areaPhrase = multiArea
+        ? `near ${location}`
+        : `in ${location}`;
+    const prompt = `You are a local expert for ${location}. Based on interests: ${interests.join(
+        ", "
+    )}, suggest 3 real, well-known ${category} venues ${areaPhrase}. Prefer spots that are convenient for people across all of these areas. Use exact business names locals would recognize. Return ONLY a JSON array: [{"name":"Venue Name"}]`;
+
+    let lastError;
+    for (const modelName of GEMINI_MODELS) {
+        try {
+            const genAI = new GoogleGenerativeAI(geminiKey);
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            const rawText = result?.response?.text?.() || "";
+            const cleaned = rawText.replace(/```json|```/g, "").trim();
+            const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
+            if (!jsonMatch) {
+                throw new Error("Gemini returned an invalid venue list.");
+            }
+
+            const venues = JSON.parse(jsonMatch[0]);
+            if (!Array.isArray(venues) || venues.length === 0) {
+                throw new Error("Gemini returned no venues.");
+            }
+            return venues;
+        } catch (error) {
+            lastError = error;
+            logWarn("generateVenueNames_model_failed", {
+                modelName,
+                message: error?.message,
+            });
+        }
+    }
+
+    throw lastError || new Error("Could not generate venue suggestions.");
+}
+
+function placesApiErrorDetails(err) {
+    return {
+        message: err?.message,
+        status: err?.response?.status,
+        statusText: err?.response?.statusText,
+        apiMessage:
+            err?.response?.data?.error?.message ||
+            err?.response?.data?.error_message ||
+            null,
+    };
+}
+
+async function searchPlaceFromGoogle(fallbackName, location, googleKey) {
+    const url = `https://places.googleapis.com/v1/places:searchText?key=${encodeURIComponent(
+        googleKey
+    )}`;
+    const googleRes = await axios.post(
+        url,
+        {
+            textQuery: `${fallbackName}, ${location}`,
+            regionCode: "US",
+        },
+        {
+            headers: {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": googleKey,
+                "X-Goog-FieldMask": PLACES_FIELD_MASK,
+            },
+            timeout: 12000,
+        }
+    );
+    return googleRes.data.places?.[0] || null;
+}
+
 async function resolvePlacePhotoUrl(photoName, googleKey) {
     if (!photoName) return null;
+    const mediaUrl = `https://places.googleapis.com/v1/${photoName}/media`;
     try {
-        const res = await axios.get(
-            `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=400`,
-            {
-                headers: { "X-Goog-Api-Key": googleKey },
-                maxRedirects: 0,
-                validateStatus: (status) => status === 302 || status === 200,
-            }
-        );
-        if (res.status === 302 && res.headers.location) {
-            return res.headers.location;
+        const redirectRes = await axios.get(mediaUrl, {
+            params: { maxWidthPx: 400, maxHeightPx: 400 },
+            headers: { "X-Goog-Api-Key": googleKey },
+            maxRedirects: 0,
+            validateStatus: (status) => status === 302 || status === 200,
+            timeout: 10000,
+        });
+        if (redirectRes.status === 302 && redirectRes.headers.location) {
+            return redirectRes.headers.location;
+        }
+    } catch (e) {
+        if (e?.response?.status === 302 && e.response.headers?.location) {
+            return e.response.headers.location;
+        }
+        logWarn("resolvePlacePhotoUrl_redirect", { message: e?.message });
+    }
+
+    try {
+        const res = await axios.get(mediaUrl, {
+            params: { maxWidthPx: 400, maxHeightPx: 400, skipHttpRedirect: true },
+            headers: { "X-Goog-Api-Key": googleKey },
+            timeout: 10000,
+        });
+        if (res.data?.photoUri) {
+            return res.data.photoUri;
         }
     } catch (e) {
         logWarn("resolvePlacePhotoUrl", { message: e?.message });
@@ -1303,8 +2360,8 @@ async function resolvePlacePhotoUrl(photoName, googleKey) {
     return null;
 }
 
-async function enrichVenueFromPlaces(venue, location, googleKey) {
-    const fallbackName = String(venue?.name || "").trim();
+async function enrichVenueFromPlaces(venue, location, googleKey, db) {
+    const fallbackName = venueDisplayName(venue);
     const base = {
         name: fallbackName,
         rating: "4.0",
@@ -1314,21 +2371,20 @@ async function enrichVenueFromPlaces(venue, location, googleKey) {
     };
     if (!fallbackName) return base;
 
-    try {
-        const googleRes = await axios.post(
-            "https://places.googleapis.com/v1/places:searchText",
-            { textQuery: `${fallbackName}, ${location}` },
-            {
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Goog-Api-Key": googleKey,
-                    "X-Goog-FieldMask": PLACES_FIELD_MASK,
-                },
-                timeout: 12000,
+    if (db) {
+        try {
+            const cached = await readVenueCache(db, fallbackName, location);
+            if (cached && !needsVenueEnrichment(cached, location)) {
+                return normalizeSuggestion(cached) || cached;
             }
-        );
+        } catch (e) {
+            logWarn("enrichVenueFromPlaces_cache_read", { message: e?.message });
+        }
+    }
 
-        const place = googleRes.data.places?.[0];
+    let enriched = base;
+    try {
+        const place = await searchPlaceFromGoogle(fallbackName, location, googleKey);
         if (!place) return base;
 
         const resolvedName =
@@ -1341,7 +2397,7 @@ async function enrichVenueFromPlaces(venue, location, googleKey) {
             googleKey
         );
 
-        return {
+        enriched = {
             name: resolvedName,
             rating: place.rating ? Number(place.rating).toFixed(1) : "4.0",
             imageUrl,
@@ -1351,16 +2407,29 @@ async function enrichVenueFromPlaces(venue, location, googleKey) {
     } catch (e) {
         logWarn("enrichVenueFromPlaces", {
             venue: fallbackName,
-            message: e?.message,
+            ...placesApiErrorDetails(e),
         });
         return base;
     }
+
+    if (db) {
+        try {
+            await writeVenueCache(db, fallbackName, location, enriched);
+        } catch (e) {
+            logWarn("enrichVenueFromPlaces_cache_write", { message: e?.message });
+        }
+    }
+
+    return enriched;
 }
 
 exports.getSynqSuggestions = onCall(
     {
         secrets: ["GEMINI_API_KEY", "GOOGLE_MAPS_API_KEY"],
         region: "us-central1",
+        invoker: "public",
+        timeoutSeconds: 120,
+        memory: "512MiB",
     },
     async (request) => {
         if (!request.auth) {
@@ -1368,6 +2437,13 @@ exports.getSynqSuggestions = onCall(
         }
 
         try {
+            if (!AI_SUGGESTIONS_PUBLIC_ENABLED) {
+                throw new HttpsError(
+                    "failed-precondition",
+                    "Place suggestions are temporarily unavailable."
+                );
+            }
+
             const geminiKey = process.env.GEMINI_API_KEY;
             const googleKey = process.env.GOOGLE_MAPS_API_KEY;
             if (!geminiKey || !googleKey) {
@@ -1386,32 +2462,106 @@ exports.getSynqSuggestions = onCall(
             }
 
             const interests = Array.isArray(shared) ? shared : ["exploring new spots"];
-            const genAI = new GoogleGenerativeAI(geminiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            const normalizedCategory = normalizeCategory(category);
+            const db = admin.firestore();
+            const listCacheKey = buildSuggestionCacheKey(location, category, interests);
 
-            const prompt = `You are a local expert in ${location}. Based on interests: ${interests.join(
-                ", "
-            )}, suggest 3 real, well-known ${category} venues in ${location}. Use exact business names locals would recognize. Return ONLY a JSON array: [{"name":"Venue Name"}]`;
-
-            const result = await model.generateContent(prompt);
-            const rawText = result?.response?.text?.() || "";
-            const cleaned = rawText.replace(/```json|```/g, "").trim();
-            const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
-            if (!jsonMatch) {
-                throw new Error("Gemini returned an invalid venue list.");
+            try {
+                const cachedSuggestions = await readSuggestionListCache(db, listCacheKey);
+                if (cachedSuggestions) {
+                    const normalizedCache =
+                        normalizeSuggestionList(cachedSuggestions);
+                    if (normalizedCache.length > 0) {
+                        const needsRefresh = cachedSuggestions.some((venue) =>
+                            needsVenueEnrichment(venue, location)
+                        );
+                        let suggestions = normalizedCache;
+                        if (needsRefresh) {
+                            try {
+                                const enrichedFromCache = await enrichSuggestionsList(
+                                    cachedSuggestions,
+                                    location,
+                                    googleKey,
+                                    db
+                                );
+                                if (enrichedFromCache.length > 0) {
+                                    suggestions = enrichedFromCache;
+                                }
+                            } catch (e) {
+                                logWarn("getSynqSuggestions_cache_enrich", {
+                                    message: e?.message,
+                                });
+                            }
+                        }
+                        logInfo("getSynqSuggestions_cache_hit", {
+                            uid: request.auth.uid,
+                            category,
+                            location,
+                            count: suggestions.length,
+                            refreshed: needsRefresh,
+                        });
+                        if (needsRefresh && suggestions !== normalizedCache) {
+                            try {
+                                await writeSuggestionListCache(
+                                    db,
+                                    listCacheKey,
+                                    suggestions
+                                );
+                            } catch (e) {
+                                logWarn("getSynqSuggestions_cache_refresh", {
+                                    message: e?.message,
+                                });
+                            }
+                        }
+                        return { suggestions, cached: true };
+                    }
+                }
+            } catch (e) {
+                logWarn("getSynqSuggestions_cache_read", { message: e?.message });
             }
 
-            let venues = JSON.parse(jsonMatch[0]);
-            if (!Array.isArray(venues) || venues.length === 0) {
-                throw new Error("Gemini returned no venues.");
-            }
-            const enrichedSuggestions = await Promise.all(
-                venues.map((venue) => enrichVenueFromPlaces(venue, location, googleKey))
+            const venues = await generateVenueNames(
+                geminiKey,
+                location,
+                interests,
+                normalizedCategory
             );
+            const enrichedSuggestions = await enrichSuggestionsList(
+                venues,
+                location,
+                googleKey,
+                db
+            );
+            const fallbackSuggestions = withLocationFallback(
+                normalizeSuggestionList(venues),
+                location
+            );
+            const suggestions =
+                enrichedSuggestions.length > 0
+                    ? enrichedSuggestions
+                    : fallbackSuggestions;
 
-            return { suggestions: enrichedSuggestions };
+            if (suggestions.length === 0) {
+                throw new Error("No venue suggestions could be prepared.");
+            }
+
+            try {
+                await writeSuggestionListCache(db, listCacheKey, suggestions);
+            } catch (e) {
+                logWarn("getSynqSuggestions_cache_write", { message: e?.message });
+            }
+
+            logInfo("getSynqSuggestions_fresh", {
+                uid: request.auth.uid,
+                category,
+                location,
+                count: suggestions.length,
+            });
+
+            return { suggestions, cached: false };
         } catch (error) {
             logError("getSynqSuggestions", error, { uid: request.auth?.uid });
+            if (error instanceof HttpsError) throw error;
             throw new HttpsError("internal", error?.message || "Unknown error");
         }
     }

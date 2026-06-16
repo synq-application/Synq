@@ -191,7 +191,7 @@ export function useSendMessage({
         senderId: myId,
         imageurl: myAvatar,
         sendOrder: ++sendOrderRef.current,
-      });
+      }) as PendingMessage;
 
       setPendingMessages((prev) => [...prev, optimistic]);
 

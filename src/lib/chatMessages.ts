@@ -29,6 +29,7 @@ export type PendingMessage = ChatMessage & {
   clientId: string;
   sendStatus: MessageSendStatus;
   createdAt: number;
+  sendOrder?: number;
 };
 
 export function isPendingMessageId(id: string): boolean {
