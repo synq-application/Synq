@@ -1,5 +1,9 @@
 import { filterOutPastOpenPlans, sortOpenPlansByDateTime } from "@/src/lib/planEvents";
 import { resolvePlanAttribution } from "@/src/lib/planAttribution";
+import {
+  GROUP_BORDER,
+  GROUP_SURFACE,
+} from "@/src/components/friends/groupsListStyles";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from "react-native";
 
@@ -202,8 +206,10 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     width: "100%",
     maxWidth: 340,
-    backgroundColor: "#0d0d0d",
+    backgroundColor: GROUP_SURFACE,
     borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: GROUP_BORDER,
     padding: 14,
     marginBottom: 14,
     flexDirection: "row",

@@ -13,7 +13,9 @@ import {
   PRIMARY_CTA_WIDTH,
   profileInterestPillText,
   profileInterestPillTextActive,
+  profileNameText,
   profileScreenSectionTitle,
+  profileLocationText,
   SPACE_6,
   SURFACE,
   TAB_BAR_SCROLL_INSET,
@@ -1652,10 +1654,8 @@ const styles = StyleSheet.create({
   qrToggle: { position: "absolute", bottom: 10, right: 10, backgroundColor: ACCENT, padding: 10, borderRadius: 25, zIndex: 2 },
   qrToggleInner: { alignItems: "center", justifyContent: "center" },
   nameAccent: {
+    ...profileNameText,
     color: ACCENT,
-    fontSize: 24,
-    lineHeight: 32,
-    fontFamily: fonts.heavy,
     letterSpacing: 0.2,
     marginTop: 14,
     textAlign: "center",
@@ -1671,9 +1671,8 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   locationText: {
+    ...profileLocationText,
     color: MUTED,
-    fontSize: 14,
-    fontFamily: fonts.book,
     flexShrink: 1,
   },
   editProfileBtn: {

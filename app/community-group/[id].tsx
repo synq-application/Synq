@@ -18,8 +18,15 @@ import {
   SURFACE,
   stackNavigationBackBtn,
   TEXT,
-  TYPE_BODY,
+  cardMetaText,
+  detailSectionTitle,
+  profileNameText,
+  profileLocationText,
+  listRowTitleText,
+  sectionLinkText,
   TYPE_CAPTION,
+  TYPE_LEAD,
+  TYPE_BODY,
 } from "@/constants/Variables";
 import AddMembersToGroupSheet from "@/src/components/friends/AddMembersToGroupSheet";
 import { groupsPageStyles } from "@/src/components/friends/groupsListStyles";
@@ -864,15 +871,12 @@ const styles = StyleSheet.create({
     paddingTop: SPACE_4,
   },
   sectionTitle: {
-    ...groupsPageStyles.subsectionTitle,
-    fontSize: 16,
+    ...detailSectionTitle,
     marginTop: 0,
     marginBottom: 0,
   },
   sectionLink: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION + 1,
-    color: ACCENT,
+    ...sectionLinkText,
   },
   sectionMetaInline: {
     fontFamily: fonts.book,
@@ -989,16 +993,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   profileName: {
-    fontFamily: fonts.heavy,
-    fontSize: 26,
-    color: TEXT,
-    letterSpacing: 0.04,
-    lineHeight: 30,
+    ...profileNameText,
   },
   profileMeta: {
-    fontFamily: fonts.book,
-    fontSize: TYPE_CAPTION + 1,
-    lineHeight: 19,
+    ...profileLocationText,
+    fontSize: TYPE_LEAD,
   },
   profileMetaMuted: {
     color: MUTED2,
@@ -1133,10 +1132,7 @@ const styles = StyleSheet.create({
   },
   memberName: {
     flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 15,
-    color: TEXT,
-    letterSpacing: 0.05,
+    ...listRowTitleText,
   },
   removeMemberBtn: {
     paddingHorizontal: 12,

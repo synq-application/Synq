@@ -104,7 +104,12 @@ import {
   SURFACE,
   tabScreenMainHeaderTitle,
   TEXT,
+  cardMetaText,
+  cardTitleText,
+  listSectionTitle,
   TYPE_BODY,
+  TYPE_FINE,
+  TYPE_LEAD,
 } from '../../constants/Variables';
 import ActiveSynqSection from '../../src/components/synq/ActiveSynqSection';
 import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
@@ -136,6 +141,10 @@ import { useAuthRefresh } from '../_layout';
 import AlertModal from '../alert-modal';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
+import {
+  GROUP_BORDER,
+  GROUP_SURFACE,
+} from '../../src/components/friends/groupsListStyles';
 import FriendProfile from '../friend-profile';
 import {
   getChatTitle as buildChatTitle,
@@ -1938,6 +1947,7 @@ export default function SynqScreen() {
           }}
           onDismiss={closeMessagesModal}
         >
+          <View style={styles.messagesModalRoot}>
           <SafeAreaView style={styles.modalBg} edges={["bottom"]}>
           <MessagesModalStack
             visible={messagesModalVisible}
@@ -2080,36 +2090,6 @@ export default function SynqScreen() {
                   liveParticipantImages={liveParticipantImages}
                   chatOpenAnchorKey={chatOpenAnchorKey}
                 />
-                {(showAISuggestions || isExploreVisible) && (
-                  <ExploreModal
-                    visible={isExploreVisible}
-                    onClose={() => {
-                      setIsExploreVisible(false);
-                      setShowOptionsList(false);
-                      setAiExploreError(null);
-                    }}
-                    onBack={() => {
-                      setShowOptionsList(false);
-                      setAiExploreError(null);
-                    }}
-                    onSelectVibe={(label: string) => {
-                      void triggerAISuggestion(label);
-                    }}
-                    isAILoading={isAILoading}
-                    showOptionsList={showOptionsList}
-                    aiOptions={aiOptions}
-                    selectedOption={selectedOption}
-                    setSelectedOption={setSelectedOption}
-                    sendAISuggestionToChat={() => {
-                      sendAISuggestionToChat();
-                      setIsExploreVisible(false);
-                      setShowOptionsList(false);
-                      setAiExploreError(null);
-                    }}
-                    currentCategory={currentCategory}
-                    errorMessage={aiExploreError}
-                  />
-                )}
               </>
             }
             profile={
@@ -2136,6 +2116,37 @@ export default function SynqScreen() {
             onClose={() => setContentAlertVisible(false)}
           />
           </SafeAreaView>
+          {messagesPane === "chat" && isExploreVisible ? (
+            <ExploreModal
+              visible={isExploreVisible}
+              onClose={() => {
+                setIsExploreVisible(false);
+                setShowOptionsList(false);
+                setAiExploreError(null);
+              }}
+              onBack={() => {
+                setShowOptionsList(false);
+                setAiExploreError(null);
+              }}
+              onSelectVibe={(label: string) => {
+                void triggerAISuggestion(label);
+              }}
+              isAILoading={isAILoading}
+              showOptionsList={showOptionsList}
+              aiOptions={aiOptions}
+              selectedOption={selectedOption}
+              setSelectedOption={setSelectedOption}
+              sendAISuggestionToChat={() => {
+                sendAISuggestionToChat();
+                setIsExploreVisible(false);
+                setShowOptionsList(false);
+                setAiExploreError(null);
+              }}
+              currentCategory={currentCategory}
+              errorMessage={aiExploreError}
+            />
+          ) : null}
+          </View>
         </Modal>
 
         <EditSynqModal
@@ -2386,8 +2397,8 @@ const styles = StyleSheet.create({
   },
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
   whiteBold: { color: 'white', fontSize: 17, fontFamily: fonts.medium },
-  grayText: { color: MUTED2, fontSize: 13, marginTop: 2 },
-  locationText: { color: MUTED2, fontSize: 12, marginTop: 2 },
+  grayText: { ...cardMetaText, marginTop: 2 },
+  locationText: { ...cardMetaText, fontSize: TYPE_FINE, marginTop: 2 },
   btn: {
     alignSelf: 'center',
     width: '62%',
@@ -2497,6 +2508,10 @@ const styles = StyleSheet.create({
     padding: 25,
   },
   modalBg: { flex: 1, backgroundColor: BG },
+  messagesModalRoot: {
+    flex: 1,
+    backgroundColor: BG,
+  },
   messagesPaneFill: { flex: 1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#111' },
   inboxHeaderBlock: {
@@ -2802,8 +2817,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   composerDock: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: BORDER,
     backgroundColor: BG,
     paddingHorizontal: 16,
     paddingTop: 4,
@@ -2811,10 +2824,10 @@ const styles = StyleSheet.create({
   composerShell: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#16181C',
+    backgroundColor: GROUP_SURFACE,
     borderRadius: 26,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: GROUP_BORDER,
     paddingLeft: 16,
     paddingRight: 5,
     paddingVertical: 5,
@@ -2865,11 +2878,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   explorePanel: { height: '85%', backgroundColor: '#0A0A0A', borderTopLeftRadius: MODAL_RADIUS + 8, borderTopRightRadius: MODAL_RADIUS + 8, overflow: 'hidden' },
-  sectionHeader: { color: 'white', fontSize: 18, fontFamily: 'Avenir-Black', marginBottom: 20, paddingHorizontal: 20 },
+  sectionHeader: { ...listSectionTitle, color: TEXT, marginBottom: 20, paddingHorizontal: 20 },
   scrollRow: { marginBottom: 30, paddingLeft: 20 },
   ideaCircle: { alignItems: 'center', marginRight: 25 },
   circlePlaceholder: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#333' },
-  circleText: { color: 'white', fontSize: 13, fontFamily: 'Avenir-Medium' },
+  circleText: { ...cardMetaText, color: TEXT },
   venueCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2891,9 +2904,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
   },
   venueName: {
-    color: 'white',
-    fontSize: 16,
-    fontFamily: 'Avenir-Heavy',
+    ...cardTitleText,
   },
   venueRating: {
     color: ACCENT,
@@ -2917,8 +2928,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(43,255,136,0.18)',
   },
   aiCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  aiCardTitleSmall: { color: ACCENT, fontSize: 14, fontFamily: 'Avenir-Heavy', letterSpacing: 0.5 },
-  aiCardBodySmall: { color: 'white', fontSize: 15, fontFamily: 'Avenir', lineHeight: 22, marginBottom: 15 },
+  aiCardTitleSmall: { color: ACCENT, fontSize: TYPE_LEAD, fontFamily: fonts.heavy, letterSpacing: 0.5 },
+  aiCardBodySmall: { ...cardMetaText, color: TEXT, fontSize: TYPE_BODY, lineHeight: 22, marginBottom: 15 },
   aiShareBtnSmall: { backgroundColor: ACCENT, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
   aiShareBtnText: { color: ON_ACCENT_TEXT, fontSize: 14, fontFamily: fonts.heavy },
   editPanel: {

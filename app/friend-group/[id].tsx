@@ -9,7 +9,7 @@ import {
   fonts,
   Friend,
   MUTED2,
-  profileScreenSectionTitle,
+  detailSectionTitle,
   RADIUS_MD,
   SPACE_3,
   SPACE_4,
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     paddingBottom: SPACE_3,
   },
   sectionTitle: {
-    ...profileScreenSectionTitle,
+    ...detailSectionTitle,
     marginBottom: 0,
   },
   sectionMeta: {

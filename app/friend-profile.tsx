@@ -11,8 +11,11 @@ import {
   synqOutlineAddBtnDisabled,
   synqOutlineAddBtnText,
   synqOutlineAddBtnTextDisabled,
+  profileNameText,
+  profileLocationText,
   profileScreenSectionTitle,
   TEXT,
+  TYPE_CAPTION,
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
 import { Image as ExpoImage } from "expo-image";
@@ -1661,10 +1664,7 @@ const styles = StyleSheet.create({
   },
 
   name: {
-    color: TEXT,
-    fontSize: 24,
-    lineHeight: 30,
-    fontFamily: fonts.heavy,
+    ...profileNameText,
     includeFontPadding: false,
   },
 
@@ -1675,18 +1675,15 @@ const styles = StyleSheet.create({
   },
 
   locationText: {
-    color: MUTED2,
+    ...profileLocationText,
     marginLeft: 4,
-    fontFamily: fonts.book,
-    fontSize: 15,
-    lineHeight: 20,
   },
 
   lastSynqText: {
     color: "rgba(255,255,255,0.4)",
     marginTop: 6,
-    fontFamily: fonts.medium,
-    fontSize: 13,
+    fontFamily: fonts.book,
+    fontSize: TYPE_CAPTION,
     lineHeight: 18,
     textAlign: "center",
   },
