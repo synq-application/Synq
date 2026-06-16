@@ -342,7 +342,9 @@ export default function CommunityPlansSection({
             accessibilityRole="button"
             accessibilityLabel="Share a plan"
           >
-            <Ionicons name="add" size={20} color={ACCENT} />
+            <View style={styles.startSynqIconWrap}>
+              <Ionicons name="add" size={16} color={ACCENT} />
+            </View>
             <View style={styles.startSynqCopy}>
               <Text style={styles.startSynqTitle}>Share a plan</Text>
               <Text style={styles.startSynqSubtitle}>Invite others in the group</Text>
@@ -402,15 +404,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: SPACE_3,
-    marginHorizontal: SPACE_5,
+    marginLeft: SPACE_5,
+    marginRight: SPACE_5 + SPACE_4,
     marginTop: SPACE_2,
     marginBottom: SPACE_2,
     paddingHorizontal: SPACE_4,
-    minHeight: 58,
+    minHeight: 54,
     borderRadius: RADIUS_MD,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(0,255,133,0.28)",
     backgroundColor: "rgba(0,255,133,0.06)",
+  },
+  startSynqIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: ACCENT,
+    alignItems: "center",
+    justifyContent: "center",
   },
   startSynqCopy: {
     flex: 1,

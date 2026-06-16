@@ -143,7 +143,7 @@ export const listSectionTitle: TextStyle = {
   letterSpacing: 0.06,
 };
 
-/** Subsections on detail screens (Members, Community Synqs). */
+/** Subsections on detail screens (Members, Upcoming). */
 export const detailSectionTitle: TextStyle = {
   color: TEXT,
   fontFamily: fonts.heavy,
