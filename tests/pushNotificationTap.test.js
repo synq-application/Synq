@@ -43,16 +43,18 @@ describe("parsePushNotificationTap", () => {
     });
   });
 
-  test("routes community group invites to the group page", () => {
+  test("routes community plan join notifications to the group plan", () => {
     expect(
       parsePushNotificationTap({
-        type: "community_group_invite",
-        groupId: "cg-42",
-        fromUserId: "user-1",
+        type: "community_plan_join",
+        groupId: "cg-9",
+        planId: "plan-3",
+        fromUserId: "user-2",
       })
     ).toEqual({
       kind: "community_group",
-      groupId: "cg-42",
+      groupId: "cg-9",
+      planId: "plan-3",
     });
   });
 });

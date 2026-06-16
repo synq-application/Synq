@@ -51,6 +51,14 @@ export const getChatTitle = (chat: any, myId?: string) => {
   return `${firstNames.join(", ")} & ${lastFriend}`;
 };
 
+/** Secondary line under the title in the messages inbox for community chats. */
+export const getCommunityChatInboxSubtitle = (chat: any): string | null => {
+  if (!chat) return null;
+  const planTitle = String(chat.communityPlanTitle || "").trim();
+  const groupName = String(chat.communityGroupName || "").trim();
+  return planTitle || groupName || null;
+};
+
 export const getLeadingEmoji = (text: string) => {
   if (!text) return null;
   const firstChar = Array.from(text.trim())[0];

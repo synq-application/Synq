@@ -69,11 +69,25 @@ export function isOpenPlanDatePast(eventDateStr: string, now: Date = new Date())
   return todayStart.getTime() > eventDayStart.getTime();
 }
 
-export function filterOutPastOpenPlans<T extends { date?: string }>(
+/** True when the event date/time is in the past (date-only events expire after that day). */
+export function isOpenPlanPast(
+  event: { date?: string; time?: string },
+  now: Date = new Date()
+): boolean {
+  const dateStr = String(event?.date || "").trim();
+  if (!dateStr) return false;
+  const timeStr = String(event?.time || "").trim();
+  if (!timeStr) {
+    return isOpenPlanDatePast(dateStr, now);
+  }
+  return parseOpenPlanDateTime(dateStr, timeStr).getTime() < now.getTime();
+}
+
+export function filterOutPastOpenPlans<T extends { date?: string; time?: string }>(
   events: T[] | null | undefined
 ): T[] {
   if (!Array.isArray(events)) return [];
-  return events.filter((e) => !isOpenPlanDatePast(String(e?.date || "")));
+  return events.filter((e) => !isOpenPlanPast(e));
 }
 
 export function parseOpenPlanDateTime(dateStr: string, timeStr?: string): Date {
@@ -84,17 +98,42 @@ export function parseOpenPlanDateTime(dateStr: string, timeStr?: string): Date {
   const d = parts[2] || 1;
   const date = new Date(y, m - 1, d);
 
-  if (!timeStr) {
+  const timeRaw = String(timeStr || "").trim();
+  if (!timeRaw) {
     date.setHours(12, 0, 0, 0);
     return date;
   }
 
-  const [t, period] = String(timeStr).split(" ");
-  let [hours, minutes] = t.split(":").map(Number);
-  if (period === "PM" && hours !== 12) hours += 12;
-  if (period === "AM" && hours === 12) hours = 0;
-  date.setHours(hours, minutes || 0, 0, 0);
+  const cleaned = timeRaw.replace(/\u202f/g, " ").trim();
+  const match12 = cleaned.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = parseInt(match12[2], 10);
+    const period = match12[3].toUpperCase();
+    if (period === "PM" && hours !== 12) hours += 12;
+    if (period === "AM" && hours === 12) hours = 0;
+    date.setHours(hours, minutes || 0, 0, 0);
+    return date;
+  }
+
+  const match24 = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    date.setHours(parseInt(match24[1], 10), parseInt(match24[2], 10), 0, 0);
+    return date;
+  }
+
+  // Unrecognized format — keep on the calendar day instead of treating as midnight/past.
+  date.setHours(23, 59, 59, 999);
   return date;
+}
+
+/** Canonical 12-hour time string for Firestore (avoids locale-specific spaces). */
+export function formatPlanTimeForStorage(date: Date): string {
+  const hours24 = date.getHours();
+  const minutes = date.getMinutes();
+  const period = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 || 12;
+  return `${hours12}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
 /** Sort key for when a plan happens (earliest first). */

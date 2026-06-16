@@ -1,44 +1,6 @@
-import { readFileSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
+import { getFirebaseCliAccessToken } from "./lib/firebase-cli-access-token.mjs";
 
 const PROJECT_ID = "new-synq-main";
-const FIREBASE_CLIENT_ID =
-  "563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com";
-
-function loadFirebaseCliTokens() {
-  const configPath = join(homedir(), ".config", "configstore", "firebase-tools.json");
-  const config = JSON.parse(readFileSync(configPath, "utf8"));
-  if (!config?.tokens?.refresh_token) {
-    throw new Error("No Firebase CLI tokens found. Run: firebase login");
-  }
-  return config.tokens;
-}
-
-async function getAccessToken(tokens) {
-  if (tokens.access_token && tokens.expires_at > Date.now() + 60_000) {
-    return tokens.access_token;
-  }
-
-  const body = new URLSearchParams({
-    client_id: FIREBASE_CLIENT_ID,
-    grant_type: "refresh_token",
-    refresh_token: tokens.refresh_token,
-  });
-
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-
-  if (!res.ok) {
-    throw new Error(`Token refresh failed (${res.status}). Run: firebase login`);
-  }
-
-  const data = await res.json();
-  return data.access_token;
-}
 
 function fieldString(fields, key) {
   const value = fields?.[key];
@@ -83,8 +45,7 @@ async function fetchAllUsers(accessToken) {
   return users;
 }
 
-const tokens = loadFirebaseCliTokens();
-const accessToken = await getAccessToken(tokens);
+const accessToken = await getFirebaseCliAccessToken();
 const documents = await fetchAllUsers(accessToken);
 
 const cityCounts = new Map();
