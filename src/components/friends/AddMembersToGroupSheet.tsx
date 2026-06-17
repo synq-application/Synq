@@ -2,8 +2,8 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  Friend,
   fonts,
+  Friend,
   MUTED2,
   ON_ACCENT_TEXT,
   TEXT,
@@ -11,9 +11,10 @@ import {
   TYPE_CAPTION,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
+import { resolveAvatar } from "@/src/lib/helpers";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -31,7 +32,6 @@ import {
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { resolveAvatar } from "@/src/lib/helpers";
 
 type Props = {
   visible: boolean;
@@ -158,9 +158,6 @@ export default function AddMembersToGroupSheet({
               <Text style={styles.title}>{mode === "invite" ? "Invite friends" : "Add members"}</Text>
               <CloseButton onPress={handleClose} />
             </View>
-            {mode === "add" ? (
-              <Text style={styles.subtitle}>Search friends to add to this group</Text>
-            ) : null}
             <View style={styles.searchBar}>
               <Ionicons name="search-outline" size={17} color={MUTED2} />
               <TextInput

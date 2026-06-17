@@ -1,15 +1,14 @@
 import ConfirmModal from "@/app/confirm-modal";
-import { resolveAvatar } from "@/src/lib/helpers";
 import {
   ACCENT,
   BG,
   BORDER,
   BUTTON_RADIUS,
   DESTRUCTIVE,
+  detailSectionTitle,
   fonts,
   Friend,
   MUTED2,
-  detailSectionTitle,
   RADIUS_MD,
   SPACE_3,
   SPACE_4,
@@ -36,14 +35,15 @@ import {
   renameFriendGroup,
   type FriendGroup,
 } from "@/src/lib/friendGroups";
+import { resolveAvatar } from "@/src/lib/helpers";
 import { friendsListCacheByUser } from "@/src/lib/socialCache";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { onSnapshot } from "firebase/firestore";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -489,6 +489,7 @@ const styles = StyleSheet.create({
     paddingBottom: SPACE_3,
   },
   sectionTitle: {
+    fontSize: 20,
     ...detailSectionTitle,
     marginBottom: 0,
   },
