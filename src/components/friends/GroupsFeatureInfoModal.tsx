@@ -39,7 +39,7 @@ const COPY: Record<
 },
 
 community: {
-  title: "Community",
+  title: "Communities",
   body: "Meet new people through shared interests.",
 },
 };
