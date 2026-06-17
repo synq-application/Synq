@@ -2,15 +2,13 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  MODAL_RADIUS,
-  ON_ACCENT_TEXT,
   fonts,
+  MODAL_RADIUS,
   MUTED2,
+  ON_ACCENT_TEXT,
   TEXT,
   TYPE_BODY,
 } from "@/constants/Variables";
-import { Ionicons } from "@expo/vector-icons";
-import React from "react";
 import {
   Modal,
   Pressable,
@@ -32,20 +30,18 @@ const COPY: Record<
   GroupsFeatureInfoVariant,
   {
     title: string;
-    icon: keyof typeof Ionicons.glyphMap;
     body: string;
   }
 > = {
-  circles: {
-    title: "Circles",
-    icon: "lock-closed-outline",
-    body: "Private groups only you control. Add friends to a circle to choose exactly who sees when you're available.",
-  },
-  community: {
-    title: "Community",
-    icon: "earth-outline",
-    body: "Open groups anyone can find and join. Discover people who share your interests and grow beyond your existing circles.",
-  },
+ circles: {
+  title: "Circles",
+  body: "Choose exactly who sees when you're available.",
+},
+
+community: {
+  title: "Community",
+  body: "Meet new people through shared interests.",
+},
 };
 
 export default function GroupsFeatureInfoModal({ visible, variant, onClose }: Props) {
@@ -56,10 +52,6 @@ export default function GroupsFeatureInfoModal({ visible, variant, onClose }: Pr
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Dismiss" />
         <View style={styles.card}>
-          <View style={styles.iconRing}>
-            <Ionicons name={content.icon} size={24} color={ACCENT} />
-          </View>
-
           <Text style={styles.title}>{content.title}</Text>
           <Text style={styles.body}>{content.body}</Text>
 
@@ -96,17 +88,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.1)",
     alignItems: "center",
-  },
-  iconRing: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,255,133,0.1)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,255,133,0.22)",
-    marginBottom: 16,
   },
   title: {
     fontFamily: fonts.heavy,
