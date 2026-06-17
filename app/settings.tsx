@@ -1,29 +1,26 @@
 import StackScreenHeader from "@/src/components/StackScreenHeader";
+import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
+import { prefetchResolvedAvatar, resolveAvatar } from "@/src/lib/helpers";
+import { clearPushTokenOnSignOut } from "@/src/lib/pushToken";
 import { Ionicons } from "@expo/vector-icons";
-import { Image as ExpoImage } from "expo-image";
 import Constants from "expo-constants";
+import { Image as ExpoImage } from "expo-image";
 import { router } from "expo-router";
 import { doc, onSnapshot } from "firebase/firestore";
-import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
-import { clearPushTokenOnSignOut } from "@/src/lib/pushToken";
-import { useAuthRefresh } from "./_layout";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Linking,
-  Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import {
   BG,
   BORDER,
-  BUTTON_RADIUS,
-  MODAL_RADIUS,
   fonts,
   MUTED,
   MUTED2,
@@ -35,10 +32,10 @@ import {
   SPACE_6,
   SURFACE,
   TYPE_BODY,
-  TYPE_CAPTION,
+  TYPE_CAPTION
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
-import { prefetchResolvedAvatar, resolveAvatar } from "@/src/lib/helpers";
+import { useAuthRefresh } from "./_layout";
 
 import AlertModal from "./alert-modal";
 import ConfirmModal from "./confirm-modal";
@@ -332,6 +329,6 @@ const styles = StyleSheet.create({
 
   dangerText: {
     color: "#FF5A5F",
-    fontFamily: fonts.heavy,
+    fontFamily: fonts.medium,
   },
 });

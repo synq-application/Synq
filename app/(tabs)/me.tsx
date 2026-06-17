@@ -13,9 +13,9 @@ import {
   PRIMARY_CTA_WIDTH,
   profileInterestPillText,
   profileInterestPillTextActive,
+  profileLocationText,
   profileNameText,
   profileScreenSectionTitle,
-  profileLocationText,
   SPACE_6,
   SURFACE,
   TAB_BAR_SCROLL_INSET,
@@ -25,6 +25,7 @@ import {
 import CloseButton from "@/src/components/CloseButton";
 import HeaderIconButton from "@/src/components/HeaderIconButton";
 import NotificationBadge from "@/src/components/NotificationBadge";
+import ProfileShareCard from "@/src/components/profile/ProfileShareCard";
 import ProfilePhotoActionSheet from "@/src/components/ProfilePhotoActionSheet";
 import ProfileTabHeaderOverlay, {
   useTabHeaderLayout,
@@ -32,24 +33,25 @@ import ProfileTabHeaderOverlay, {
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
 import { filterOrReject } from "@/src/lib/contentFilter";
 import { ignoreSnapshotPermissionDenied } from "@/src/lib/firestoreListeners";
+import { prefetchResolvedAvatar, resolveAvatar } from "@/src/lib/helpers";
 import { setPendingProfilePhotoSource } from "@/src/lib/pendingProfilePhoto";
-import { clearPushTokenOnSignOut } from "@/src/lib/pushToken";
 import {
   getPhotoLibraryPermission,
   launchProfilePhotoPicker,
   photoLibraryAccessGranted,
   requestPhotoLibraryAccess,
 } from "@/src/lib/profilePhotoPicker";
+import { buildProfileShareWebUrl } from "@/src/lib/profileShareUrl";
+import { clearPushTokenOnSignOut } from "@/src/lib/pushToken";
+import {
+  captureAndShareProfileCard,
+  shareProfileLink,
+} from "@/src/lib/shareProfileCard";
 import { removeProfilePhoto } from "@/src/lib/uploadProfilePhoto";
 import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
-import ProfileShareCard from "@/src/components/profile/ProfileShareCard";
-import {
-  captureAndShareProfileCard,
-  shareProfileLink,
-} from "@/src/lib/shareProfileCard";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   collection,
@@ -68,7 +70,6 @@ import {
   ActivityIndicator,
   AppState,
   AppStateStatus,
-  DeviceEventEmitter,
   Keyboard,
   Modal,
   Pressable,
@@ -79,17 +80,21 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { buildProfileShareWebUrl } from "@/src/lib/profileShareUrl";
 import QRCode from "react-native-qrcode-svg";
-import ViewShot from "react-native-view-shot";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import ViewShot from "react-native-view-shot";
 import { presetActivities, stateAbbreviations } from "../../assets/Mocks";
 import { auth, db } from "../../src/lib/firebase";
+import {
+  FRIEND_REQUESTS_LISTENER_LIMIT,
+  NOTIFICATIONS_LISTENER_LIMIT,
+} from "../../src/lib/listenerLimits";
+import { registerDismissNavigationOverlaysHandler } from "../../src/lib/navigationOverlayEvents";
 import {
   computeTopSynqRows,
   getCachedOwnProfile,
@@ -110,18 +115,12 @@ import {
   warmFriendsAndConnectionsCache,
 } from "../../src/lib/socialCache";
 import {
-  FRIEND_REQUESTS_LISTENER_LIMIT,
-  NOTIFICATIONS_LISTENER_LIMIT,
-} from "../../src/lib/listenerLimits";
-import { registerDismissNavigationOverlaysHandler } from "../../src/lib/navigationOverlayEvents";
-import {
   subscribeFriendsIdsMultiplexed,
   subscribeUserDocMultiplexed,
 } from "../../src/lib/socialListenerHub";
 import { useAuthRefresh } from "../_layout";
 import AlertModal from "../alert-modal";
 import ConfirmModal from "../confirm-modal";
-import { prefetchResolvedAvatar, resolveAvatar } from "@/src/lib/helpers";
 import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
@@ -1751,7 +1750,7 @@ const styles = StyleSheet.create({
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap" },
   interestRectOuter: { marginRight: 8, marginBottom: 8 },
   interestRect: {
-    backgroundColor: SURFACE,
+    backgroundColor: "#0A0B0D",
     borderWidth: 1,
     borderColor: BORDER,
     borderRadius: 999,
@@ -1808,7 +1807,7 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   interestPill: {
-    backgroundColor: SURFACE,
+    backgroundColor: "#0A0B0D",
     borderWidth: 1,
     borderColor: BORDER,
     borderRadius: 999,
