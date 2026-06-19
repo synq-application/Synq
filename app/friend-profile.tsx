@@ -98,6 +98,7 @@ import {
 } from "@/src/lib/synqNudge";
 import {
   addMembersToFriendGroup,
+  removeMemberFromFriendGroup,
   subscribeFriendGroups,
   type FriendGroup,
 } from "@/src/lib/friendGroups";
@@ -260,8 +261,7 @@ export default function FriendProfile({
   const [removingFriend, setRemovingFriend] = useState(false);
   const [friendGroups, setFriendGroups] = useState<FriendGroup[]>([]);
   const [addToGroupSheetVisible, setAddToGroupSheetVisible] = useState(false);
-  const [pendingAddGroup, setPendingAddGroup] = useState<FriendGroup | null>(null);
-  const [showAddToGroupConfirm, setShowAddToGroupConfirm] = useState(false);
+  const [addToGroupBusy, setAddToGroupBusy] = useState(false);
   const [joinedPlanKeys, setJoinedPlanKeys] = useState<Record<string, boolean>>({});
   const [showUnjoinModal, setShowUnjoinModal] = useState(false);
   const [pendingUnjoinEvent, setPendingUnjoinEvent] = useState<any>(null);
@@ -1464,39 +1464,55 @@ export default function FriendProfile({
       />
       <AddFriendToGroupSheet
         visible={addToGroupSheetVisible}
+        busy={addToGroupBusy}
         groups={friendGroups}
         friendName={friend?.displayName || "Friend"}
         memberId={friendKey}
         onClose={() => setAddToGroupSheetVisible(false)}
-        onSelectGroup={(group) => {
-          setAddToGroupSheetVisible(false);
-          setPendingAddGroup(group);
-          setShowAddToGroupConfirm(true);
-        }}
-      />
-      <ConfirmModal
-        visible={showAddToGroupConfirm}
-        title="Confirm add to group"
-        message={`Add ${friend?.displayName || "this friend"} to ${pendingAddGroup?.name || "this group"}?`}
-        confirmText="Add"
-        onCancel={() => {
-          setShowAddToGroupConfirm(false);
-          setPendingAddGroup(null);
-        }}
-        onConfirm={async () => {
-          const group = pendingAddGroup;
-          setShowAddToGroupConfirm(false);
-          setPendingAddGroup(null);
-          if (!viewerId || !friendKey || !group) return;
+        onSave={async ({ addedGroupIds, removedGroupIds }) => {
+          if (!viewerId || !friendKey) return;
+          setAddToGroupBusy(true);
           try {
-            await addMembersToFriendGroup(viewerId, group.id, group.memberIds, [friendKey]);
-            setAlertTitle("Added to group");
-            setAlertMessage(`Added to ${group.name}.`);
+            const groupById = new Map(friendGroups.map((group) => [group.id, group]));
+            await Promise.all([
+              ...addedGroupIds.map((groupId) => {
+                const group = groupById.get(groupId);
+                if (!group) return Promise.resolve();
+                return addMembersToFriendGroup(viewerId, groupId, group.memberIds, [friendKey]);
+              }),
+              ...removedGroupIds.map((groupId) => {
+                const group = groupById.get(groupId);
+                if (!group) return Promise.resolve();
+                return removeMemberFromFriendGroup(viewerId, groupId, group.memberIds, friendKey);
+              }),
+            ]);
+            setAddToGroupSheetVisible(false);
+            const friendLabel = friend?.displayName || "Friend";
+            if (addedGroupIds.length > 0 && removedGroupIds.length > 0) {
+              setAlertTitle("Groups updated");
+              setAlertMessage(`${friendLabel}'s groups were updated.`);
+            } else if (addedGroupIds.length === 1) {
+              const groupName = groupById.get(addedGroupIds[0])?.name || "the group";
+              setAlertTitle("Added to group");
+              setAlertMessage(`Added to ${groupName}.`);
+            } else if (addedGroupIds.length > 1) {
+              setAlertTitle("Added to groups");
+              setAlertMessage(`Added to ${addedGroupIds.length} groups.`);
+            } else if (removedGroupIds.length === 1) {
+              const groupName = groupById.get(removedGroupIds[0])?.name || "the group";
+              setAlertTitle("Removed from group");
+              setAlertMessage(`Removed from ${groupName}.`);
+            } else if (removedGroupIds.length > 1) {
+              setAlertTitle("Removed from groups");
+              setAlertMessage(`Removed from ${removedGroupIds.length} groups.`);
+            }
             setAlertVisible(true);
           } catch (err) {
             setAlertTitle("Error");
-            setAlertMessage(err instanceof Error ? err.message : "Could not add to group.");
+            setAlertMessage(err instanceof Error ? err.message : "Could not update groups.");
             setAlertVisible(true);
+          } finally {
+            setAddToGroupBusy(false);
           }
         }}
       />

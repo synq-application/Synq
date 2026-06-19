@@ -4,6 +4,7 @@ import {
   BUTTON_RADIUS,
   fonts,
   MUTED2,
+  ON_ACCENT_TEXT,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
@@ -11,8 +12,9 @@ import {
 import { FriendGroup } from "@/src/lib/friendGroups";
 import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Modal,
   Pressable,
@@ -21,72 +23,122 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Props = {
   visible: boolean;
+  busy?: boolean;
   groups: FriendGroup[];
   friendName: string;
   memberId: string;
   onClose: () => void;
-  onSelectGroup: (group: FriendGroup) => void;
+  onSave: (changes: {
+    addedGroupIds: string[];
+    removedGroupIds: string[];
+  }) => void | Promise<void>;
 };
+
+function saveCtaLabel(changeCount: number): string {
+  if (changeCount === 0) return "Save";
+  if (changeCount === 1) return "Save change";
+  return `Save changes (${changeCount})`;
+}
 
 export default function AddFriendToGroupSheet({
   visible,
+  busy,
   groups,
   friendName,
   memberId,
   onClose,
-  onSelectGroup,
+  onSave,
 }: Props) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const memberGroupIds = useMemo(
+    () => new Set(groups.filter((g) => g.memberIds.includes(memberId)).map((g) => g.id)),
+    [groups, memberId]
+  );
+
+  useEffect(() => {
+    if (visible) {
+      setSelected(new Set(memberGroupIds));
+    }
+  }, [visible, memberGroupIds]);
+
+  const sortedGroups = useMemo(
+    () => [...groups].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
+    [groups]
+  );
+
+  const { addedGroupIds, removedGroupIds, changeCount } = useMemo(() => {
+    const added = [...selected].filter((id) => !memberGroupIds.has(id));
+    const removed = [...memberGroupIds].filter((id) => !selected.has(id));
+    return {
+      addedGroupIds: added,
+      removedGroupIds: removed,
+      changeCount: added.length + removed.length,
+    };
+  }, [selected, memberGroupIds]);
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleClose = () => {
-    setSelectedId(null);
+    setSelected(new Set(memberGroupIds));
     onClose();
   };
 
-  const eligible = groups.filter((g) => !g.memberIds.includes(memberId));
+  const handleSave = () => {
+    if (changeCount === 0 || busy) return;
+    void onSave({ addedGroupIds, removedGroupIds });
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(24, insets.bottom) }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>Select group</Text>
+            <Text style={styles.title}>Add to group</Text>
             <CloseButton onPress={handleClose} />
           </View>
           <Text style={styles.subtitle}>
-            Add {friendName || "this friend"} to a group
+            Choose groups for {friendName || "this friend"}
           </Text>
-          {eligible.length === 0 ? (
+          {sortedGroups.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>
-                {groups.length === 0
-                  ? "Create a group from the Friends tab first."
-                  : "This friend is already in all of your groups."}
-              </Text>
+              <Text style={styles.emptyText}>Create a group from the Friends tab first.</Text>
             </View>
           ) : (
             <FlatList
-              data={eligible}
+              data={sortedGroups}
               keyExtractor={(item) => item.id}
               style={styles.list}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => {
-                const selected = selectedId === item.id;
+                const checked = selected.has(item.id);
                 return (
                   <TouchableOpacity
-                    style={[styles.row, selected && styles.rowSelected]}
-                    onPress={() => setSelectedId(item.id)}
+                    style={styles.row}
+                    onPress={() => toggle(item.id)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked }}
                   >
                     <Text style={styles.rowName} numberOfLines={1}>
                       {item.name}
                     </Text>
                     <Ionicons
-                      name={selected ? "radio-button-on" : "radio-button-off"}
+                      name={checked ? "checkbox" : "square-outline"}
                       size={22}
-                      color={selected ? ACCENT : MUTED2}
+                      color={checked ? ACCENT : MUTED2}
                     />
                   </TouchableOpacity>
                 );
@@ -94,16 +146,15 @@ export default function AddFriendToGroupSheet({
             />
           )}
           <TouchableOpacity
-            style={[styles.cta, !selectedId && styles.ctaDisabled]}
-            disabled={!selectedId}
-            onPress={() => {
-              const group = eligible.find((g) => g.id === selectedId);
-              if (!group) return;
-              onSelectGroup(group);
-              setSelectedId(null);
-            }}
+            style={[styles.cta, (changeCount === 0 || busy) && styles.ctaDisabled]}
+            disabled={changeCount === 0 || busy}
+            onPress={handleSave}
           >
-            <Text style={styles.ctaText}>Continue</Text>
+            {busy ? (
+              <ActivityIndicator color={ON_ACCENT_TEXT} />
+            ) : (
+              <Text style={styles.ctaText}>{saveCtaLabel(changeCount)}</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -118,13 +169,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.55)",
   },
   sheet: {
-    maxHeight: "70%",
+    maxHeight: "88%",
     backgroundColor: BG,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 24,
   },
   header: {
     flexDirection: "row",
@@ -134,7 +184,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.medium,
-    fontSize: 18,
+    fontSize: 20,
     color: TEXT,
   },
   subtitle: {
@@ -144,28 +194,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   list: {
-    maxHeight: 280,
+    maxHeight: 340,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderRadius: BUTTON_RADIUS,
-  },
-  rowSelected: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+    paddingVertical: 10,
+    gap: 12,
   },
   rowName: {
     flex: 1,
     fontFamily: fonts.book,
     fontSize: 16,
     color: TEXT,
-    marginRight: 8,
   },
   empty: {
     paddingVertical: 24,
+    alignItems: "center",
   },
   emptyText: {
     fontFamily: fonts.book,
@@ -175,6 +220,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   cta: {
+    alignSelf: "center",
+    width: "62%",
     marginTop: 12,
     minHeight: 48,
     borderRadius: BUTTON_RADIUS,
@@ -188,6 +235,6 @@ const styles = StyleSheet.create({
   ctaText: {
     fontFamily: fonts.medium,
     fontSize: 16,
-    color: "#0A0B0D",
+    color: ON_ACCENT_TEXT,
   },
 });
