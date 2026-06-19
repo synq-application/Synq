@@ -363,6 +363,7 @@ module.exports = {
   eventKeyLoose,
   matchesPlanEvent,
   collectJoinedIds,
+  findHostPlanIndex,
   findRemovedHostedPlans,
   handleUserEventsChange,
 };
