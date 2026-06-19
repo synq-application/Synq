@@ -43,6 +43,7 @@ import {
   type FriendsSortMode,
 } from "@/src/components/friends/FriendsSortControls";
 import GroupsListPane from "@/src/components/friends/GroupsListPane";
+import ProfileQrScannerModal from "@/src/components/friends/ProfileQrScannerModal";
 import ProfileTabHeaderOverlay, {
   useTabHeaderLayout,
 } from "@/src/components/ProfileTabHeaderOverlay";
@@ -945,6 +946,7 @@ function SearchModal({
     message: string;
   } | null>(null);
   const [pendingCancelTarget, setPendingCancelTarget] = useState<any | null>(null);
+  const [qrScannerVisible, setQrScannerVisible] = useState(false);
   const [mutualCountsByUserId, setMutualCountsByUserId] = useState<
     Record<string, number>
   >({});
@@ -970,6 +972,7 @@ function SearchModal({
     if (!visible) {
       setPendingCancelTarget(null);
       setMutualCountsByUserId({});
+      setQrScannerVisible(false);
       return;
     }
     setQueryText("");
@@ -1575,6 +1578,29 @@ function SearchModal({
     onOpenProfile(user.id);
   };
 
+  const handleQrFound = (friendId: string) => {
+    const myId = auth.currentUser?.uid ?? "";
+    setQrScannerVisible(false);
+    if (friendId && myId && friendId === myId) {
+      setAlertConfig({
+        title: "That's your QR code",
+        message: "Scan someone else's profile QR code to add them.",
+      });
+      setAlertVisible(true);
+      return;
+    }
+    Keyboard.dismiss();
+    onOpenProfile(friendId);
+  };
+
+  const handleInvalidQr = () => {
+    setAlertConfig({
+      title: "Invalid QR code",
+      message: "This doesn't look like a Synq profile QR code. Try scanning the code on their profile.",
+    });
+    setAlertVisible(true);
+  };
+
   const renderAddActionButton = (
     item: any,
     label: string,
@@ -1753,6 +1779,17 @@ function SearchModal({
           ) : null}
         </View>
 
+        <TouchableOpacity
+          style={styles.qrScanRow}
+          onPress={() => setQrScannerVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Add user by QR code"
+        >
+          <Ionicons name="qr-code-outline" size={20} color={ACCENT} />
+          <Text style={styles.qrScanRowText}>Add user by QR code</Text>
+          <Ionicons name="chevron-forward" size={18} color={MUTED2} />
+        </TouchableOpacity>
+
         {!queryText ? (
           <View style={styles.addFriendsListWrap}>
             {addFriendsListEmpty ? (
@@ -1859,6 +1896,12 @@ function SearchModal({
         title={alertConfig?.title}
         message={alertConfig?.message || ""}
         onClose={() => setAlertVisible(false)}
+      />
+      <ProfileQrScannerModal
+        visible={qrScannerVisible}
+        onClose={() => setQrScannerVisible(false)}
+        onFound={handleQrFound}
+        onInvalidCode={handleInvalidQr}
       />
     </>
   );
@@ -2231,7 +2274,25 @@ const styles = StyleSheet.create({
   },
   addFriendsSearchSpacing: {
     marginTop: 0,
+    marginBottom: 12,
+  },
+  qrScanRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     marginBottom: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: RADIUS_MD,
+    backgroundColor: FRIENDS_SEARCH_BG,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: FRIENDS_SEARCH_BORDER,
+  },
+  qrScanRowText: {
+    flex: 1,
+    color: TEXT,
+    fontFamily: fonts.book,
+    fontSize: 16,
   },
   addFriendsTitle: {
     ...stackScreenHeaderTitle,
