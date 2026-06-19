@@ -5,7 +5,13 @@ import {
   BUTTON_RADIUS,
   MODAL_RADIUS,
   MUTED2,
+  ON_ACCENT_TEXT,
   TEXT,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_CTA,
+  TYPE_LEAD,
+  TYPE_MODAL_TITLE,
   fonts,
 } from "@/constants/Variables";
 import * as Location from "expo-location";
@@ -242,20 +248,20 @@ const styles = StyleSheet.create({
   },
   mainTitle: {
     color: TEXT,
-    fontSize: 22,
+    fontSize: TYPE_MODAL_TITLE,
     fontFamily: fonts.heavy,
     marginBottom: 6,
   },
   body: {
     color: MUTED2,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     fontFamily: fonts.book,
     lineHeight: 22,
     marginBottom: 10,
   },
   privacy: {
     color: "rgba(255,255,255,0.42)",
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     fontFamily: fonts.book,
     lineHeight: 18,
     marginBottom: 20,
@@ -269,7 +275,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  saveBtnText: { color: "#061006", fontFamily: fonts.heavy, fontSize: 15 },
+  saveBtnText: { color: ON_ACCENT_TEXT, fontFamily: fonts.heavy, fontSize: TYPE_BUTTON },
   cancelBtn: {
     marginTop: 12,
     alignSelf: "center",
@@ -279,7 +285,7 @@ const styles = StyleSheet.create({
   cancelText: {
     color: MUTED2,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
   },
   alertLayer: {
     ...StyleSheet.absoluteFillObject,
@@ -301,14 +307,14 @@ const styles = StyleSheet.create({
   },
   alertTitle: {
     color: TEXT,
-    fontSize: 18,
+    fontSize: TYPE_CTA,
     fontFamily: fonts.heavy,
     marginBottom: 6,
     textAlign: "center",
   },
   alertMessage: {
     color: MUTED2,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     fontFamily: fonts.book,
     textAlign: "center",
     marginBottom: 20,
@@ -321,8 +327,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
   alertButtonText: {
-    color: "#061006",
+    color: ON_ACCENT_TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
   },
 });

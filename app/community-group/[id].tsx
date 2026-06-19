@@ -6,9 +6,7 @@ import {
   BORDER,
   BUTTON_RADIUS,
   DESTRUCTIVE,
-  fonts,
   Friend,
-  getTabHeaderLayout,
   HEADER_BLACK,
   MUTED2,
   PROFILE_HEADER_FADE_GRADIENT,
@@ -20,17 +18,22 @@ import {
   SPACE_5,
   SPACE_6,
   SURFACE,
-  stackNavigationBackBtn,
   TEXT,
+  TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_FINE,
+  TYPE_LEAD,
+  TYPE_NANO,
+  TYPE_SUBHEAD,
   cardMetaText,
-  profileNameText,
-  profileLocationText,
+  fonts,
+  getTabHeaderLayout,
   listRowTitleText,
   listSectionTitle,
+  profileLocationText,
+  profileNameText,
   sectionLinkText,
-  TYPE_CAPTION,
-  TYPE_LEAD,
-  TYPE_BODY,
+  stackNavigationBackBtn,
 } from "@/constants/Variables";
 import AddMembersToGroupSheet from "@/src/components/friends/AddMembersToGroupSheet";
 import { groupsPageStyles, GROUP_BORDER } from "@/src/components/friends/groupsListStyles";
@@ -1091,7 +1094,7 @@ const styles = StyleSheet.create({
     color: MUTED2,
   },
   profileMetaBullet: {
-    fontSize: 9,
+    fontSize: TYPE_NANO,
     color: MUTED2,
     lineHeight: 19,
   },
@@ -1137,7 +1140,7 @@ const styles = StyleSheet.create({
   },
   adminBadgeText: {
     fontFamily: fonts.medium,
-    fontSize: 10,
+    fontSize: TYPE_FINE,
     color: ACCENT,
   },
   moreTile: {
@@ -1158,7 +1161,7 @@ const styles = StyleSheet.create({
   },
   moreTileText: {
     fontFamily: fonts.medium,
-    fontSize: 10,
+    fontSize: TYPE_FINE,
     color: MUTED2,
     textAlign: "center",
     lineHeight: 13,
@@ -1282,7 +1285,7 @@ const styles = StyleSheet.create({
   },
   optionsRowText: {
     fontFamily: fonts.medium,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     color: TEXT,
   },
   optionsDestructive: {
@@ -1305,7 +1308,7 @@ const styles = StyleSheet.create({
   },
   optionsCancelText: {
     fontFamily: fonts.heavy,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     color: TEXT,
   },
 });

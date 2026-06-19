@@ -3,7 +3,6 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
-  fonts,
   Friend,
   MODAL_RADIUS,
   MUTED,
@@ -11,16 +10,21 @@ import {
   ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
+  SPACE_6,
+  SURFACE,
+  SURFACE_INPUT,
+  TAB_BAR_SCROLL_INSET,
+  TEXT,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_CTA,
+  fonts,
   profileInterestPillText,
   profileInterestPillTextActive,
   profileLocationText,
   profileNameText,
   profileScreenSectionTitle,
-  SPACE_6,
-  SURFACE,
-  TAB_BAR_SCROLL_INSET,
   tabScreenMainHeaderTitle,
-  TEXT,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
 import HeaderIconButton from "@/src/components/HeaderIconButton";
@@ -1880,7 +1884,7 @@ const styles = StyleSheet.create({
   editProfileBtnText: {
     color: TEXT,
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     letterSpacing: 0.1,
   },
   synqsContainer: { flexDirection: "row", justifyContent: "flex-start", gap: 14 },
@@ -1907,7 +1911,7 @@ const styles = StyleSheet.create({
   },
   profileHelperText: {
     color: MUTED2,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     lineHeight: 19,
     fontFamily: fonts.book,
     textAlign: "left",
@@ -1929,7 +1933,7 @@ const styles = StyleSheet.create({
   interestsWrapper: { flexDirection: "row", flexWrap: "wrap" },
   interestRectOuter: { marginRight: 8, marginBottom: 8 },
   interestRect: {
-    backgroundColor: "#0A0B0D",
+    backgroundColor: SURFACE_INPUT,
     borderWidth: 1,
     borderColor: BORDER,
     borderRadius: 999,
@@ -1967,7 +1971,7 @@ const styles = StyleSheet.create({
   },
   interestSubtitle: {
     color: MUTED2,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     lineHeight: 19,
     fontFamily: fonts.book,
     marginBottom: 16,
@@ -1986,7 +1990,7 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   interestPill: {
-    backgroundColor: "#0A0B0D",
+    backgroundColor: SURFACE_INPUT,
     borderWidth: 1,
     borderColor: BORDER,
     borderRadius: 999,
@@ -2015,8 +2019,8 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   interestSaveBtnText: {
-    color: "black",
-    fontSize: 18,
+    color: ON_ACCENT_TEXT,
+    fontSize: TYPE_CTA,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },
@@ -2037,7 +2041,7 @@ const styles = StyleSheet.create({
   },
   signOutBtnText: {
     color: MUTED,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     fontFamily: fonts.medium,
     letterSpacing: 0.1,
   },

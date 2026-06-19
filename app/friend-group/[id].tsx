@@ -5,8 +5,6 @@ import {
   BORDER,
   BUTTON_RADIUS,
   DESTRUCTIVE,
-  detailSectionTitle,
-  fonts,
   Friend,
   MUTED2,
   RADIUS_MD,
@@ -15,11 +13,15 @@ import {
   SPACE_5,
   SPACE_6,
   SURFACE,
-  synqOutlineAddBtnCompact,
-  synqOutlineAddBtnText,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
+  TYPE_SECTION,
+  TYPE_SUBHEAD,
+  detailSectionTitle,
+  fonts,
+  synqOutlineAddBtnCompact,
+  synqOutlineAddBtnText,
 } from "@/constants/Variables";
 import AddMembersToGroupSheet from "@/src/components/friends/AddMembersToGroupSheet";
 import CreateGroupModal from "@/src/components/friends/CreateGroupModal";
@@ -489,7 +491,7 @@ const styles = StyleSheet.create({
     paddingBottom: SPACE_3,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     ...detailSectionTitle,
     marginBottom: 0,
   },
@@ -544,7 +546,7 @@ const styles = StyleSheet.create({
   memberName: {
     flex: 1,
     fontFamily: fonts.heavy,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     color: TEXT,
     letterSpacing: 0.05,
   },
@@ -636,7 +638,7 @@ const styles = StyleSheet.create({
   },
   optionsRowText: {
     fontFamily: fonts.medium,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     color: TEXT,
   },
   optionsDestructive: {
@@ -659,7 +661,7 @@ const styles = StyleSheet.create({
   },
   optionsCancelText: {
     fontFamily: fonts.heavy,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     color: TEXT,
   },
 });

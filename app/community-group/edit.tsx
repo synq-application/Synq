@@ -2,7 +2,6 @@ import AlertModal from "@/app/alert-modal";
 import {
   ACCENT,
   BG,
-  fonts,
   MUTED2,
   MUTED3,
   RADIUS_MD,
@@ -13,6 +12,8 @@ import {
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
+  TYPE_CTA,
+  fonts,
 } from "@/constants/Variables";
 import StackScreenHeader from "@/src/components/StackScreenHeader";
 import { auth } from "@/src/lib/firebase";
@@ -370,7 +371,7 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     fontFamily: fonts.heavy,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     color: ACCENT,
     letterSpacing: 0.06,
   },
@@ -405,7 +406,7 @@ const styles = StyleSheet.create({
     backgroundColor: FIELD_SURFACE,
     color: TEXT,
     fontFamily: fonts.book,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     paddingHorizontal: 14,
     paddingVertical: 14,
     minHeight: 52,
@@ -423,7 +424,7 @@ const styles = StyleSheet.create({
   },
   selectText: {
     fontFamily: fonts.book,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     color: TEXT,
   },
   selectPlaceholder: {
@@ -486,7 +487,7 @@ const styles = StyleSheet.create({
   },
   categorySheetTitle: {
     fontFamily: fonts.heavy,
-    fontSize: 18,
+    fontSize: TYPE_CTA,
     color: TEXT,
     marginBottom: 12,
   },

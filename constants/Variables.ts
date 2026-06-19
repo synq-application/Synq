@@ -126,13 +126,34 @@ export const navigationBackBtn: ViewStyle = {
   backgroundColor: "transparent",
 };
 export const TYPE_DISPLAY = 34;
+export const TYPE_TAB_HEADER = 28;
 export const TYPE_TITLE = 26;
+export const TYPE_MODAL_TITLE = 22;
 export const TYPE_SECTION = 20;
 export const TYPE_BODY = 16;
-export const TYPE_CAPTION = 13;
-export const TYPE_LEAD = 14;
 export const TYPE_SUBHEAD = 17;
+export const TYPE_CTA = 18;
+export const TYPE_BUTTON = 15;
+export const TYPE_LEAD = 14;
+export const TYPE_CAPTION = 13;
 export const TYPE_FINE = 12;
+export const TYPE_MICRO = 11;
+export const TYPE_NANO = 9;
+
+/** Raised cards and group list surfaces. */
+export const SURFACE_RAISED = "#0E1012";
+/** Elevated chips, avatars, and input wells. */
+export const SURFACE_ELEVATED = "#1C1C1E";
+/** Memo and input field backgrounds. */
+export const SURFACE_INPUT = "#0A0B0D";
+export const BORDER_STRONG = "#222";
+export const BORDER_MUTED = "#333";
+export const TEXT_MUTED_HEX = "#A8A8A8";
+export const MODAL_OVERLAY = "rgba(0,0,0,0.75)";
+export const ACCENT_SUBTLE = "rgba(0,255,133,0.28)";
+export const STATUS_AVAILABLE = "#34D399";
+/** Standard horizontal inset for scrollable screen content. */
+export const SCREEN_H_PADDING = SPACE_5;
 
 /** In-scroll section titles (Groups, Me, Friends, plan lists). */
 export const listSectionTitle: TextStyle = {
@@ -242,20 +263,65 @@ export const profileInterestPillTextActive: TextStyle = {
   fontSize: TYPE_CAPTION,
 };
 
+/** Uppercase muted labels for form/settings field groups. */
+export const formSectionLabel: TextStyle = {
+  color: MUTED,
+  fontSize: TYPE_LEAD,
+  fontFamily: fonts.medium,
+  textTransform: "uppercase",
+  letterSpacing: 1,
+};
+
+/** Modal and sheet titles. */
+export const modalTitleText: TextStyle = {
+  color: TEXT,
+  fontSize: TYPE_MODAL_TITLE,
+  fontFamily: fonts.heavy,
+  letterSpacing: 0.15,
+};
+
+/** Modal body and explanatory copy. */
+export const modalBodyText: TextStyle = {
+  color: MUTED2,
+  fontSize: TYPE_LEAD,
+  fontFamily: fonts.book,
+  lineHeight: 20,
+};
+
+/** Primary filled button label (accent background). */
+export const primaryButtonText: TextStyle = {
+  color: ON_ACCENT_TEXT,
+  fontSize: TYPE_BODY,
+  fontFamily: fonts.heavy,
+};
+
+/** Large CTA label (auth, onboarding). */
+export const ctaButtonText: TextStyle = {
+  color: ON_ACCENT_TEXT,
+  fontSize: TYPE_CTA,
+  fontFamily: fonts.heavy,
+};
+
+/** Eyebrow kicker above hero copy (inactive Synq, empty states). */
+export const eyebrowLabel: TextStyle = {
+  color: MUTED,
+  fontSize: TYPE_LEAD,
+  fontFamily: fonts.heavy,
+  textTransform: "uppercase",
+  letterSpacing: 1.2,
+};
+
 /** Main tab headings: Friends, Synq active state — identical scale and weight. */
 export const tabScreenMainHeaderTitle: TextStyle = {
   color: TEXT,
-  fontSize: 28,
+  fontSize: TYPE_TAB_HEADER,
   fontFamily: fonts.heavy,
   letterSpacing: 0.2,
 };
 
 /** Stack screen titles (settings, notifications, profile settings). */
 export const stackScreenHeaderTitle: TextStyle = {
-  color: TEXT,
-  fontSize: 22,
-  fontFamily: fonts.heavy,
-  letterSpacing: 0.15,
+  ...modalTitleText,
 };
 
 /** Compact back control for stack headers (chevron sits closer to the left edge). */
@@ -274,14 +340,14 @@ export const destructiveActionBtn: ViewStyle = {
   paddingHorizontal: 60,
   borderRadius: BUTTON_RADIUS + 8,
   borderWidth: 1.5,
-  borderColor: "#222",
-  backgroundColor: "#0a0a0a",
+  borderColor: BORDER_STRONG,
+  backgroundColor: SURFACE_INPUT,
 };
 
 export const destructiveActionBtnText: TextStyle = {
   color: MUTED,
   fontFamily: fonts.heavy,
-  fontSize: 13,
+  fontSize: TYPE_CAPTION,
   letterSpacing: 2,
   textTransform: "uppercase",
 };
@@ -313,13 +379,13 @@ export const synqOutlineAddBtnCompact: ViewStyle = {
 export const synqOutlineAddBtnText: TextStyle = {
   color: ACCENT,
   fontFamily: fonts.heavy,
-  fontSize: 15,
+  fontSize: TYPE_BUTTON,
 };
 
 export const synqOutlineAddBtnTextCompact: TextStyle = {
   color: ACCENT,
   fontFamily: fonts.heavy,
-  fontSize: 13,
+  fontSize: TYPE_CAPTION,
   letterSpacing: 0.15,
 };
 
@@ -372,7 +438,7 @@ export const synqPlusAddBtnIcon: ViewStyle = {
 export const synqPlusAddBtnText: TextStyle = {
   color: ACCENT,
   fontFamily: fonts.heavy,
-  fontSize: 13,
+  fontSize: TYPE_CAPTION,
   letterSpacing: 0.15,
 };
 
