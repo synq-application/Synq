@@ -3,34 +3,42 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
+  cardMetaText,
+  cardTitleText,
   fonts,
   MODAL_RADIUS,
   MUTED2,
   MUTED3,
   PRIMARY_CTA_WIDTH,
-  cardTitleText,
-  cardMetaText,
   profileScreenSectionTitle,
   RADIUS_LG,
   TEXT,
 } from "@/constants/Variables";
-import PlanDateCalendar from "@/src/components/PlanDateCalendar";
-import PlanTimePicker from "@/src/components/PlanTimePicker";
+import CloseButton from "@/src/components/CloseButton";
 import {
   GROUP_BORDER,
   GROUP_SURFACE,
 } from "@/src/components/friends/groupsListStyles";
+import PlanDateCalendar from "@/src/components/PlanDateCalendar";
+import PlanGoingPeopleSheet, {
+  type PlanGoingPerson,
+} from "@/src/components/plans/PlanGoingPeopleSheet";
+import PlanInviteFriendsSheet, {
+  type PlanInviteFriend,
+} from "@/src/components/plans/PlanInviteFriendsSheet";
+import PlanTimePicker from "@/src/components/PlanTimePicker";
 import SynqPlusAddButton from "@/src/components/SynqPlusAddButton";
+import { resolvePlanAttribution } from "@/src/lib/planAttribution";
 import {
   canEditOpenPlan,
   collectPlanInterestedFriendIds,
   filterOutPastOpenPlans,
   sortOpenPlansByDateTime,
 } from "@/src/lib/planEvents";
-import CloseButton from "@/src/components/CloseButton";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
@@ -49,16 +57,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import PlanInviteFriendsSheet, {
-  type PlanInviteFriend,
-} from "@/src/components/plans/PlanInviteFriendsSheet";
-import PlanGoingPeopleSheet, {
-  type PlanGoingPerson,
-} from "@/src/components/plans/PlanGoingPeopleSheet";
-import { resolvePlanAttribution } from "@/src/lib/planAttribution";
-import ConfirmModal from "./confirm-modal";
 import AlertModal from "./alert-modal";
-import { router } from "expo-router";
+import ConfirmModal from "./confirm-modal";
 
 type EventItem = {
   id: string;
@@ -712,35 +712,6 @@ export default function OpenPlans({
               <View style={styles.scheduleBlock}>
                 <TouchableWithoutFeedback onPress={collapseActivePicker}>
                   <View>
-                    <View style={styles.quickDateRow}>
-                      <DateBtn
-                        label="Today"
-                        selected={isToday}
-                        accentColor={ACCENT}
-                        onPress={() => {
-                          Keyboard.dismiss();
-                          setActivePicker(null);
-                          setDate(new Date());
-                        }}
-                      />
-                      <DateBtn
-                        label="Tomorrow"
-                        selected={isTomorrow}
-                        accentColor={ACCENT}
-                        onPress={() => {
-                          Keyboard.dismiss();
-                          setActivePicker(null);
-                          setDate(new Date(Date.now() + 86400000));
-                        }}
-                      />
-                      <DateBtn
-                        label="Other"
-                        selected={isCustomDate}
-                        accentColor={ACCENT}
-                        onPress={() => togglePicker("date")}
-                      />
-                    </View>
-
                     <View style={styles.dateTimeRow}>
                       <TouchableOpacity
                         style={[
