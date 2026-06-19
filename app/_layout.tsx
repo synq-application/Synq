@@ -1024,13 +1024,6 @@ export default function RootLayout() {
                     }}
                   />
                   <Stack.Screen
-                    name="community-group/create"
-                    options={{
-                      animation: "slide_from_right",
-                      gestureEnabled: true,
-                    }}
-                  />
-                  <Stack.Screen
                     name="community-group/edit"
                     options={{
                       animation: "slide_from_right",

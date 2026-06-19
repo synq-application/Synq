@@ -5,11 +5,15 @@ import {
 } from "@/constants/Variables";
 import CommunityGroupListAvatar from "@/src/components/friends/CommunityGroupListAvatar";
 import CommunityGroupSearchSheet from "@/src/components/friends/CommunityGroupSearchSheet";
+import CreateCommunityModal, {
+  type CreateCommunityInput,
+} from "@/src/components/community/CreateCommunityModal";
 import GroupsFeatureInfoModal from "@/src/components/friends/GroupsFeatureInfoModal";
 import GroupsSectionHeader from "@/src/components/friends/GroupsSectionHeader";
 import { groupsPageStyles } from "@/src/components/friends/groupsListStyles";
 import {
   CommunityGroup,
+  createCommunityGroup,
   subscribeJoinedCommunityGroups,
 } from "@/src/lib/communityGroups";
 import { communityGroupsCacheByUser } from "@/src/lib/socialCache";
@@ -18,6 +22,7 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Text,
   TouchableOpacity,
   View,
@@ -37,6 +42,8 @@ export default function CommunitySection({ userId, friends = [] }: Props) {
   const cached = userId ? communityGroupsCacheByUser[userId] ?? [] : [];
   const [joined, setJoined] = useState<CommunityGroup[]>(cached);
   const [searchVisible, setSearchVisible] = useState(false);
+  const [createVisible, setCreateVisible] = useState(false);
+  const [createBusy, setCreateBusy] = useState(false);
   const [communityInfoVisible, setCommunityInfoVisible] = useState(false);
 
   const joinedIds = useMemo(() => new Set(joined.map((g) => g.id)), [joined]);
@@ -66,7 +73,34 @@ export default function CommunitySection({ userId, friends = [] }: Props) {
 
   const openCreate = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push("/community-group/create");
+    setCreateVisible(true);
+  };
+
+  const handleCreate = async (input: CreateCommunityInput) => {
+    if (!userId) return;
+    setCreateBusy(true);
+    try {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const id = await createCommunityGroup(
+        userId,
+        {
+          name: input.name,
+          category: input.category,
+          location: input.location,
+          about: input.about,
+        },
+        input.coverUri ?? undefined
+      );
+      setCreateVisible(false);
+      router.push({ pathname: "/community-group/[id]", params: { id } });
+    } catch (err: unknown) {
+      Alert.alert(
+        "Could not create community",
+        err instanceof Error ? err.message : "Try again."
+      );
+    } finally {
+      setCreateBusy(false);
+    }
   };
 
   return (
@@ -130,6 +164,13 @@ export default function CommunitySection({ userId, friends = [] }: Props) {
         onClose={() => setSearchVisible(false)}
         onJoined={() => {}}
         onOpenGroup={openGroup}
+      />
+
+      <CreateCommunityModal
+        visible={createVisible}
+        busy={createBusy}
+        onClose={() => setCreateVisible(false)}
+        onCreate={handleCreate}
       />
 
       <GroupsFeatureInfoModal
