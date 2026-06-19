@@ -33,6 +33,8 @@ import {
   canEditOpenPlan,
   collectPlanInterestedFriendIds,
   filterOutPastOpenPlans,
+  formatPlanTimeForStorage,
+  parseOpenPlanDateTime,
   sortOpenPlansByDateTime,
 } from "@/src/lib/planEvents";
 import { Ionicons } from "@expo/vector-icons";
@@ -82,11 +84,12 @@ type Props = {
   setShowEventModal: (val: boolean) => void;
   newEvent: { title: string; date: string; time: string; location: string };
   setNewEvent: React.Dispatch<any>;
-  saveEvent: (event?: any) => void;
+  saveEvent: (event?: any) => void | Promise<boolean>;
   updateEvent: (
     id: string,
-    fields: { title: string; date: string; time: string; location: string }
-  ) => void;
+    fields: { title: string; date: string; time: string; location: string },
+    options?: { inviteFriendIds?: string[]; uninviteFriendIds?: string[] }
+  ) => void | Promise<boolean>;
   deleteEvent: (id: string) => void;
   events: EventItem[];
   viewerUid?: string;
@@ -103,6 +106,8 @@ const getInitialDate = () => {
   d.setHours(d.getHours() + 1);
   return d;
 };
+
+const EMPTY_PLAN_INVITED_IDS: string[] = [];
 
 export default function OpenPlans({
   ACCENT,
@@ -159,6 +164,8 @@ export default function OpenPlans({
   const [inviteSheetVisible, setInviteSheetVisible] = useState(false);
   const [draftPlanId, setDraftPlanId] = useState<string | null>(null);
   const [createInviteFriendIds, setCreateInviteFriendIds] = useState<string[]>([]);
+  const [editInviteFriendIds, setEditInviteFriendIds] = useState<string[]>([]);
+  const [editUninviteFriendIds, setEditUninviteFriendIds] = useState<string[]>([]);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
@@ -170,19 +177,30 @@ export default function OpenPlans({
     (isEditing
       ? canEditOpenPlan(editingEvent!, viewerUid)
       : true);
-  const planInvitedIds = useMemo(() => {
-    if (isEditing) {
-      if (!editingEvent?.id) return editingEvent?.planInvitedIds;
-      return events.find((e) => e.id === editingEvent.id)?.planInvitedIds ?? editingEvent.planInvitedIds;
-    }
-    return createInviteFriendIds;
-  }, [events, editingEvent, isEditing, createInviteFriendIds]);
-  const planInterestedIds = useMemo(() => {
+  const savedPlanInvitedIds = useMemo((): string[] => {
+    if (!isEditing) return EMPTY_PLAN_INVITED_IDS;
+    const raw = !editingEvent?.id
+      ? editingEvent?.planInvitedIds
+      : events.find(
+          (e) => String(e.id || "").trim() === String(editingEvent.id || "").trim()
+        )?.planInvitedIds ?? editingEvent.planInvitedIds;
+    if (!Array.isArray(raw) || raw.length === 0) return EMPTY_PLAN_INVITED_IDS;
+    return raw.map((id) => String(id || "").trim()).filter(Boolean);
+  }, [events, editingEvent, isEditing]);
+  const displayedSavedInvitedIds = useMemo((): string[] => {
+    if (!isEditing || savedPlanInvitedIds.length === 0) return savedPlanInvitedIds;
+    if (editUninviteFriendIds.length === 0) return savedPlanInvitedIds;
+    const revoke = new Set(editUninviteFriendIds);
+    return savedPlanInvitedIds.filter((id) => !revoke.has(id));
+  }, [isEditing, savedPlanInvitedIds, editUninviteFriendIds]);
+  const pendingInviteFriendIds = isEditing ? editInviteFriendIds : createInviteFriendIds;
+  const planInterestedIds = useMemo((): string[] => {
     const event = editingEvent?.id
       ? events.find((e) => e.id === editingEvent.id) ?? editingEvent
       : editingEvent;
-    if (!event) return [];
-    return collectPlanInterestedFriendIds(event, viewerUid);
+    if (!event) return EMPTY_PLAN_INVITED_IDS;
+    const ids = collectPlanInterestedFriendIds(event, viewerUid);
+    return ids.length > 0 ? ids : EMPTY_PLAN_INVITED_IDS;
   }, [events, editingEvent, viewerUid]);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const planScrollRef = useRef<ScrollView>(null);
@@ -218,24 +236,12 @@ export default function OpenPlans({
 
   const visibleEvents = useMemo(() => filterOutPastOpenPlans(events), [events]);
 
-  const parseTimeToDate = (dateStr: string, timeStr?: string) => {
-    const d = parseDate(dateStr);
-    if (!timeStr) {
-      d.setHours(12, 0, 0, 0);
-      return d;
-    }
-    const [t, period] = timeStr.split(" ");
-    let [hours, minutes] = t.split(":").map(Number);
-    if (period === "PM" && hours !== 12) hours += 12;
-    if (period === "AM" && hours === 12) hours = 0;
-    d.setHours(hours, minutes || 0, 0, 0);
-    return d;
-  };
-
   const openAddModal = () => {
     setEditingEvent(null);
     setDraftPlanId(String(Date.now()));
     setCreateInviteFriendIds([]);
+    setEditInviteFriendIds([]);
+    setEditUninviteFriendIds([]);
     setSelectedDate(getInitialDate());
     setActivePicker(null);
     setInviteSheetVisible(false);
@@ -253,8 +259,10 @@ export default function OpenPlans({
     setAlertVisible(false);
     setDraftPlanId(null);
     setCreateInviteFriendIds([]);
+    setEditInviteFriendIds([]);
+    setEditUninviteFriendIds([]);
     setEditingEvent(event);
-    setSelectedDate(parseTimeToDate(event.date, event.time));
+    setSelectedDate(parseOpenPlanDateTime(event.date, event.time));
     setActivePicker(null);
     setInviteSheetVisible(false);
     setNewEvent({
@@ -277,6 +285,8 @@ export default function OpenPlans({
     setEditingEvent(null);
     setDraftPlanId(null);
     setCreateInviteFriendIds([]);
+    setEditInviteFriendIds([]);
+    setEditUninviteFriendIds([]);
     setInviteSheetVisible(false);
     setKeyboardInset(0);
     setAlertVisible(false);
@@ -290,6 +300,8 @@ export default function OpenPlans({
     setEditingEvent(null);
     setDraftPlanId(null);
     setCreateInviteFriendIds([]);
+    setEditInviteFriendIds([]);
+    setEditUninviteFriendIds([]);
     setKeyboardInset(0);
   }, [showEventModal]);
 
@@ -340,22 +352,25 @@ export default function OpenPlans({
     (friendIds: string[]) => {
       const eventId = activePlanId;
       if (!eventId || friendIds.length === 0) return;
-      if (isEditing) {
-        onPlanInvited?.(eventId, friendIds);
-        setInviteSheetVisible(false);
-        return;
-      }
-      setCreateInviteFriendIds((prev) => {
+      const addPending = (prev: string[]) => {
         const next = new Set(prev);
         friendIds.forEach((id) => {
           const uid = String(id || "").trim();
           if (uid) next.add(uid);
         });
         return [...next];
-      });
+      };
+      if (isEditing) {
+        setEditInviteFriendIds(addPending);
+        setEditUninviteFriendIds((prev) =>
+          prev.filter((id) => !friendIds.map((f) => String(f || "").trim()).includes(id))
+        );
+      } else {
+        setCreateInviteFriendIds(addPending);
+      }
       setInviteSheetVisible(false);
     },
-    [activePlanId, isEditing, onPlanInvited, resetPlanEditorState]
+    [activePlanId, isEditing]
   );
 
   const handlePlanUninvited = useCallback(
@@ -364,12 +379,20 @@ export default function OpenPlans({
       const uid = String(friendId || "").trim();
       if (!eventId || !uid) return;
       if (isEditing) {
-        onPlanUninvited?.(eventId, uid);
+        if (editInviteFriendIds.includes(uid)) {
+          setEditInviteFriendIds((prev) => prev.filter((id) => id !== uid));
+          return;
+        }
+        if (savedPlanInvitedIds.includes(uid)) {
+          setEditUninviteFriendIds((prev) =>
+            prev.includes(uid) ? prev : [...prev, uid]
+          );
+        }
         return;
       }
       setCreateInviteFriendIds((prev) => prev.filter((id) => id !== uid));
     },
-    [activePlanId, isEditing, onPlanUninvited]
+    [activePlanId, isEditing, editInviteFriendIds, savedPlanInvitedIds]
   );
 
   const handleInviteError = (message: string) => {
@@ -424,22 +447,26 @@ export default function OpenPlans({
     setSelectedDate(d);
   }, []);
 
-  const formatTime = (d: Date) =>
-    d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-
   const isPlanDirty = useMemo(() => {
     if (!isEditing || !editingEvent) return true;
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
     const day = String(selectedDate.getDate()).padStart(2, "0");
     const localDate = `${year}-${month}-${day}`;
+    const storedTime = editingEvent.time
+      ? formatPlanTimeForStorage(
+          parseOpenPlanDateTime(editingEvent.date, editingEvent.time)
+        )
+      : "";
     return (
       newEvent.title.trim() !== editingEvent.title.trim() ||
       localDate !== editingEvent.date ||
-      formatTime(selectedDate) !== (editingEvent.time || "") ||
-      (newEvent.location || "").trim() !== (editingEvent.location || "").trim()
+      formatPlanTimeForStorage(selectedDate) !== storedTime ||
+      (newEvent.location || "").trim() !== (editingEvent.location || "").trim() ||
+      editInviteFriendIds.length > 0 ||
+      editUninviteFriendIds.length > 0
     );
-  }, [isEditing, editingEvent, newEvent, selectedDate]);
+  }, [isEditing, editingEvent, newEvent, selectedDate, editInviteFriendIds, editUninviteFriendIds]);
 
   const canPost =
     newEvent.title.trim().length > 0 && (!isEditing || isPlanDirty);
@@ -477,7 +504,7 @@ export default function OpenPlans({
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canPost) return;
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
@@ -486,20 +513,26 @@ export default function OpenPlans({
     const payload = {
       ...newEvent,
       date: localDate,
-      time: formatTime(selectedDate),
+      time: formatPlanTimeForStorage(selectedDate),
     };
 
+    let ok = false;
     if (isEditing && editingEvent?.id) {
-      updateEvent(editingEvent.id, payload);
+      ok =
+        (await updateEvent(editingEvent.id, payload, {
+          inviteFriendIds: editInviteFriendIds,
+          uninviteFriendIds: editUninviteFriendIds,
+        })) !== false;
     } else {
-      saveEvent({
-        ...payload,
-        id: draftPlanId || undefined,
-        inviteFriendIds: createInviteFriendIds,
-      });
+      ok =
+        (await saveEvent({
+          ...payload,
+          id: draftPlanId || undefined,
+          inviteFriendIds: createInviteFriendIds,
+        })) !== false;
     }
 
-    resetPlanEditorState();
+    if (ok) resetPlanEditorState();
   };
 
   const handleDelete = (event: EventItem) => {
@@ -746,7 +779,7 @@ export default function OpenPlans({
                         />
                         <View style={styles.dateTimeTextWrap}>
                           <Text style={styles.dateTimeValue}>
-                            {formatTime(selectedDate)}
+                            {formatPlanTimeForStorage(selectedDate)}
                           </Text>
                         </View>
                       </TouchableOpacity>
@@ -798,8 +831,8 @@ export default function OpenPlans({
                 >
                   <Ionicons name="person-add-outline" size={18} color={ACCENT} />
                   <Text style={styles.inviteFriendsBtnText}>
-                    {createInviteFriendIds.length > 0 && !isEditing
-                      ? `Invite friends (${createInviteFriendIds.length})`
+                    {pendingInviteFriendIds.length > 0
+                      ? `Invite friends (${pendingInviteFriendIds.length})`
                       : "Invite friends"}
                   </Text>
                 </TouchableOpacity>
@@ -808,7 +841,7 @@ export default function OpenPlans({
               <TouchableOpacity
                 style={[styles.popupPostBtn, !canPost && styles.popupPostBtnDisabled]}
                 disabled={!canPost}
-                onPress={handleSave}
+                onPress={() => void handleSave()}
               >
                 <Text style={styles.popupPostBtnText}>
                   {isEditing ? "Save" : "Post"}
@@ -827,9 +860,10 @@ export default function OpenPlans({
               friends={friends}
               eventId={activePlanId || ""}
               planTitle={editingEvent?.title || newEvent.title}
-              alreadyInvitedIds={planInvitedIds}
+              alreadyInvitedIds={displayedSavedInvitedIds}
+              pendingInviteIds={pendingInviteFriendIds}
               alreadyInterestedIds={planInterestedIds}
-              deferInviteSend={!isEditing}
+              deferInviteSend
               onClose={() => setInviteSheetVisible(false)}
               onInvited={handlePlanInvited}
               onUninvited={handlePlanUninvited}

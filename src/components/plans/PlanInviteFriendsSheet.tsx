@@ -40,7 +40,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { Image as ExpoImage } from "expo-image";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -63,6 +63,8 @@ import {
 } from "react-native";
 
 import { resolveAvatar } from "@/src/lib/helpers";
+
+const EMPTY_FRIEND_ID_LIST: string[] = [];
 
 
 
@@ -89,6 +91,9 @@ type Props = {
   planTitle: string;
 
   alreadyInvitedIds?: string[];
+
+  /** Invites selected but not saved/sent yet (create or edit draft). */
+  pendingInviteIds?: string[];
 
   alreadyInterestedIds?: string[];
 
@@ -134,9 +139,11 @@ export default function PlanInviteFriendsSheet({
 
   planTitle,
 
-  alreadyInvitedIds = [],
+  alreadyInvitedIds = EMPTY_FRIEND_ID_LIST,
 
-  alreadyInterestedIds = [],
+  pendingInviteIds = EMPTY_FRIEND_ID_LIST,
+
+  alreadyInterestedIds = EMPTY_FRIEND_ID_LIST,
 
   onClose,
 
@@ -168,7 +175,25 @@ export default function PlanInviteFriendsSheet({
 
   const [sessionInvitedIds, setSessionInvitedIds] = useState<Set<string>>(() => new Set());
 
+  const initialInvitedRef = useRef<Set<string>>(new Set());
 
+  const pendingInviteSet = useMemo(
+    () =>
+      new Set(
+        pendingInviteIds.map((id) => String(id || "").trim()).filter(Boolean)
+      ),
+    [pendingInviteIds]
+  );
+
+  const invitedKey = useMemo(
+    () =>
+      [...alreadyInvitedIds, ...pendingInviteIds]
+        .map((id) => String(id || "").trim())
+        .filter(Boolean)
+        .sort()
+        .join("|"),
+    [alreadyInvitedIds, pendingInviteIds]
+  );
 
   useEffect(() => {
 
@@ -182,7 +207,11 @@ export default function PlanInviteFriendsSheet({
 
     setSessionInvitedIds(new Set());
 
-  }, [visible, eventId]);
+    initialInvitedRef.current = new Set(
+      alreadyInvitedIds.map((id) => String(id || "").trim()).filter(Boolean)
+    );
+
+  }, [visible, eventId, invitedKey]);
 
 
 
@@ -194,11 +223,13 @@ export default function PlanInviteFriendsSheet({
 
     );
 
+    pendingInviteSet.forEach((id) => ids.add(id));
+
     sessionInvitedIds.forEach((id) => ids.add(id));
 
     return ids;
 
-  }, [alreadyInvitedIds, sessionInvitedIds]);
+  }, [alreadyInvitedIds, pendingInviteSet, sessionInvitedIds]);
 
 
 

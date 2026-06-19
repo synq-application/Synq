@@ -9,6 +9,77 @@ export function eventKeyLoose(event: any): string {
   return `${String(event?.title || "").trim().toLowerCase()}|${String(event?.date || "").trim()}`;
 }
 
+/** Locate a host's open plan row by stored id, then by content match. */
+export function findHostOpenPlanIndex(
+  events: any[] | null | undefined,
+  planId: string,
+  snapshot: any,
+  options?: {
+    hostUid?: string;
+    fields?: { title?: string; date?: string; time?: string; location?: string };
+  }
+): number {
+  if (!Array.isArray(events)) return -1;
+  const id = String(planId || "").trim();
+  if (!id) return -1;
+
+  const byId = events.findIndex((e) => String(e?.id ?? "").trim() === id);
+  if (byId >= 0) return byId;
+
+  const hostUid = String(options?.hostUid || snapshot?.planHostUid || "").trim();
+  const snapshots = [
+    snapshot ? { ...snapshot, planHostUid: hostUid || snapshot?.planHostUid } : null,
+    options?.fields
+      ? {
+          ...(snapshot || {}),
+          ...options.fields,
+          planHostUid: hostUid || snapshot?.planHostUid,
+        }
+      : null,
+    options?.fields ? { ...options.fields, planHostUid: hostUid } : null,
+  ].filter(Boolean);
+
+  for (const snap of snapshots) {
+    const idx = events.findIndex((e) => matchesPlanEvent(e, snap, events));
+    if (idx >= 0) return idx;
+  }
+
+  const title = String(
+    options?.fields?.title || snapshot?.title || ""
+  )
+    .trim()
+    .toLowerCase();
+  const date = String(options?.fields?.date || snapshot?.date || "").trim();
+  if (title && date && hostUid) {
+    const candidates = events
+      .map((e, i) => ({ e, i }))
+      .filter(({ e }) => {
+        if (String(e?.title || "").trim().toLowerCase() !== title) return false;
+        if (String(e?.date || "").trim() !== date) return false;
+        const rowHost = String(e?.planHostUid || "").trim();
+        return !rowHost || rowHost === hostUid;
+      });
+    if (candidates.length === 1) return candidates[0].i;
+  }
+
+  return -1;
+}
+
+/** Ensure hosted plan rows keep a stable id for invite lookups. */
+export function hostPlanRowWithIdentity(
+  row: any,
+  planId: string,
+  hostUid: string
+): Record<string, unknown> {
+  const id = String(planId || row?.id || "").trim();
+  const host = String(row?.planHostUid || hostUid).trim() || hostUid;
+  return {
+    ...row,
+    id,
+    planHostUid: host,
+  };
+}
+
 export function matchesPlanEvent(e: any, target: any, siblingEvents: any[]): boolean {
   if (eventKey(e) === eventKey(target)) return true;
 

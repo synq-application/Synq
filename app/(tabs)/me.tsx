@@ -106,8 +106,8 @@ import {
   topSynqRowsToCache,
   type TopSynqRow,
 } from "../../src/lib/ownProfileCache";
-import { filterOutPastOpenPlans, matchesPlanEvent, sortOpenPlansByDateTime } from "../../src/lib/planEvents";
-import { sendPlanInvites } from "../../src/lib/planInvite";
+import { filterOutPastOpenPlans, findHostOpenPlanIndex, hostPlanRowWithIdentity, matchesPlanEvent, sortOpenPlansByDateTime } from "../../src/lib/planEvents";
+import { revokePlanInvite, revokePlanInviteErrorMessage, sendPlanInvites, type PlanInviteHint } from "../../src/lib/planInvite";
 import { reconcileHostOpenPlansFromFriends } from "../../src/lib/reconcileHostOpenPlans";
 import {
   friendsListCacheByUser,
@@ -124,6 +124,130 @@ import ConfirmModal from "../confirm-modal";
 import MonthlyMemo from "../monthly-memo";
 
 const allActivities = Object.values(presetActivities).flat();
+
+type OpenPlanFields = {
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+};
+
+type FirestorePlanRow = {
+  id?: string;
+  date?: string;
+  time?: string;
+  title?: string;
+  location?: string;
+  planHostUid?: string;
+  [key: string]: unknown;
+};
+
+async function ensureHostPlanReadyForInvite(
+  hostUid: string,
+  planId: string,
+  snapshot: Record<string, unknown>,
+  fields?: OpenPlanFields
+): Promise<{ planId: string; hint: PlanInviteHint } | null> {
+  const ref = doc(db, "users", hostUid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+
+  const evs: FirestorePlanRow[] = Array.isArray((snap.data() as { events?: unknown }).events)
+    ? [...((snap.data() as { events: FirestorePlanRow[] }).events)]
+    : [];
+
+  const lookupOptions = { hostUid, fields };
+  let idx = findHostOpenPlanIndex(evs, planId, snapshot, lookupOptions);
+  if (idx < 0) {
+    idx = findHostOpenPlanIndex(evs, planId, { ...snapshot, planHostUid: hostUid }, lookupOptions);
+  }
+  if (idx < 0) return null;
+
+  const merged: FirestorePlanRow = fields ? { ...evs[idx], ...fields } : { ...evs[idx] };
+  const nextRow = hostPlanRowWithIdentity(merged, planId, hostUid);
+  const storedId = String(evs[idx]?.id || "").trim();
+  const storedHost = String(evs[idx]?.planHostUid || "").trim();
+  evs[idx] = nextRow as FirestorePlanRow;
+
+  const needsWrite =
+    storedId !== planId || !storedHost || storedHost !== hostUid || !!fields;
+  if (needsWrite) {
+    await updateDoc(ref, { events: sortOpenPlansByDateTime(evs) });
+  }
+
+  const canonicalId = String(nextRow.id || planId).trim();
+  if (!canonicalId) return null;
+
+  return {
+    planId: canonicalId,
+    hint: {
+      title: String(nextRow.title || "").trim(),
+      date: String(nextRow.date || "").trim(),
+      time: String(nextRow.time || "").trim(),
+      location: String(nextRow.location || "").trim(),
+    },
+  };
+}
+
+async function sendPlanInvitesWhenReady(
+  hostUid: string,
+  planId: string,
+  snapshot: Record<string, unknown>,
+  inviteFriendIds: string[],
+  fields: OpenPlanFields,
+  onInvited: (eventId: string, friendIds: string[]) => void,
+  showAlert: (title: string, message: string) => void,
+  savedWord: "saved" | "posted" = "saved"
+): Promise<void> {
+  if (inviteFriendIds.length === 0) return;
+
+  const ready = await ensureHostPlanReadyForInvite(hostUid, planId, snapshot, fields);
+  const invitePlanId = ready?.planId || planId;
+  const hint: PlanInviteHint = ready?.hint ?? {
+    title: fields.title,
+    date: fields.date,
+    time: fields.time || "",
+    location: fields.location || "",
+  };
+
+  if (!invitePlanId || !hint.title || !hint.date) {
+    showAlert(
+      "Invites not sent",
+      "Could not find your plan to invite friends. Try again from Edit plan."
+    );
+    return;
+  }
+
+  try {
+    const { invitedIds, alreadyInvitedIds, errors } = await sendPlanInvites(
+      inviteFriendIds,
+      invitePlanId,
+      hint
+    );
+    const sent = [...invitedIds, ...alreadyInvitedIds];
+    if (sent.length > 0) {
+      onInvited(invitePlanId, sent);
+    }
+    if (errors.length > 0) {
+      showAlert(
+        "Some invites failed",
+        sent.length > 0
+          ? `Your plan was ${savedWord}, but some invites could not be sent.`
+          : errors[0] || `Your plan was ${savedWord}, but invites could not be sent.`
+      );
+    } else if (!ready && sent.length === 0) {
+      showAlert(
+        "Invites not sent",
+        "Could not find your plan to invite friends. Try again from Edit plan."
+      );
+    }
+  } catch {
+    showAlert(
+      "Invites not sent",
+      `Your plan was ${savedWord}, but invites could not be sent. Try again from Edit plan.`
+    );
+  }
+}
 
 type ProfilePressableProps = {
   onPress: () => void;
@@ -400,9 +524,11 @@ export default function ProfileScreen() {
   };
 
   const markPlanInvited = useCallback((eventId: string, friendIds: string[]) => {
+    const targetId = String(eventId || "").trim();
+    if (!targetId) return;
     setEvents((prev) =>
       prev.map((e) => {
-        if (e.id !== eventId) return e;
+        if (String(e.id || "").trim() !== targetId) return e;
         const invited = new Set(
           (Array.isArray(e.planInvitedIds) ? e.planInvitedIds : [])
             .map((id) => String(id || "").trim())
@@ -418,11 +544,12 @@ export default function ProfileScreen() {
   }, []);
 
   const unmarkPlanInvited = useCallback((eventId: string, friendId: string) => {
+    const targetId = String(eventId || "").trim();
     const uid = String(friendId || "").trim();
-    if (!uid) return;
+    if (!targetId || !uid) return;
     setEvents((prev) =>
       prev.map((e) => {
-        if (e.id !== eventId) return e;
+        if (String(e.id || "").trim() !== targetId) return e;
         const invited = (Array.isArray(e.planInvitedIds) ? e.planInvitedIds : [])
           .map((id) => String(id || "").trim())
           .filter(Boolean)
@@ -442,14 +569,14 @@ export default function ProfileScreen() {
     }
   };
 
-  const saveEvent = async (eventOverride?: any) => {
-    if (!auth.currentUser) return;
+  const saveEvent = async (eventOverride?: any): Promise<boolean> => {
+    if (!auth.currentUser) return false;
 
     const eventToSave = eventOverride || newEvent;
 
     if (!eventToSave.title) {
       showAlert("Missing info", "Add a title");
-      return;
+      return false;
     }
 
     for (const field of [eventToSave.title, eventToSave.location]) {
@@ -457,7 +584,7 @@ export default function ProfileScreen() {
       const check = filterOrReject(String(field));
       if (!check.ok) {
         showAlert("Content not allowed", check.reason);
-        return;
+        return false;
       }
     }
 
@@ -489,58 +616,55 @@ export default function ProfileScreen() {
         events: updatedEvents,
       });
 
-      if (inviteFriendIds.length > 0) {
-        try {
-          const { invitedIds, alreadyInvitedIds, errors } = await sendPlanInvites(
-            inviteFriendIds,
-            newItem.id
-          );
-          const sent = [...invitedIds, ...alreadyInvitedIds];
-          if (sent.length > 0) {
-            markPlanInvited(newItem.id, sent);
-          }
-          if (errors.length > 0) {
-            showAlert(
-              "Some invites failed",
-              sent.length > 0
-                ? "Your plan was posted, but some invites could not be sent."
-                : errors[0] || "Your plan was posted, but invites could not be sent."
-            );
-          }
-        } catch {
-          showAlert(
-            "Invites not sent",
-            "Your plan was posted, but invites could not be sent. Try again from Edit plan."
-          );
-        }
-      }
+      await sendPlanInvitesWhenReady(
+        auth.currentUser.uid,
+        newItem.id,
+        newItem,
+        inviteFriendIds,
+        {
+          title: newItem.title,
+          date: newItem.date,
+          time: newItem.time,
+          location: newItem.location,
+        },
+        markPlanInvited,
+        showAlert,
+        "posted"
+      );
 
       setShowEventModal(false);
       setNewEvent({ title: "", date: "", time: "", location: "" });
+      return true;
     } catch (e) {
       showAlert("Error", "Could not save event.");
+      return false;
     }
   };
 
   const updateEvent = async (
     id: string,
-    fields: { title: string; date: string; time: string; location: string }
-  ) => {
-    if (!auth.currentUser) return;
+    fields: { title: string; date: string; time: string; location: string },
+    options?: { inviteFriendIds?: string[]; uninviteFriendIds?: string[] }
+  ): Promise<boolean> => {
+    if (!auth.currentUser) return false;
 
-    const existing = events.find((e) => e.id === id);
-    if (!existing) return;
+    const planId = String(id || "").trim();
+    const existing = events.find((e) => String(e.id || "").trim() === planId);
+    if (!existing) {
+      showAlert("Error", "Could not find this plan to update.");
+      return false;
+    }
 
     const myUid = auth.currentUser.uid;
     const host = String(existing.planHostUid || myUid).trim();
     if (host !== myUid) {
       showAlert("Can't edit", "You can only edit plans you created.");
-      return;
+      return false;
     }
 
     if (!fields.title.trim()) {
       showAlert("Missing info", "Add a title");
-      return;
+      return false;
     }
 
     for (const field of [fields.title, fields.location]) {
@@ -548,7 +672,7 @@ export default function ProfileScreen() {
       const check = filterOrReject(String(field));
       if (!check.ok) {
         showAlert("Content not allowed", check.reason);
-        return;
+        return false;
       }
     }
 
@@ -559,7 +683,11 @@ export default function ProfileScreen() {
       location: fields.location || "",
     };
 
-    const oldSnapshot = { ...existing };
+    const oldSnapshot = {
+      ...existing,
+      id: planId,
+      planHostUid: myUid,
+    };
     const attendeeIds = new Set<string>();
     attendeeIds.add(myUid);
     if (host) attendeeIds.add(host);
@@ -576,10 +704,18 @@ export default function ProfileScreen() {
       if (!snap.exists()) return;
       const evs = (snap.data() as any).events || [];
       let changed = false;
-      const next = evs.map((e: any) => {
-        if (uid === myUid && String(e?.id || "") === String(id)) {
+      const hostIdx =
+        uid === myUid
+          ? findHostOpenPlanIndex(evs, planId, oldSnapshot, {
+              hostUid: myUid,
+              fields: updatedPayload,
+            })
+          : -1;
+      const next = evs.map((e: any, i: number) => {
+        if (uid === myUid) {
+          if (i !== hostIdx) return e;
           changed = true;
-          return { ...e, ...updatedPayload };
+          return hostPlanRowWithIdentity({ ...e, ...updatedPayload }, planId, myUid);
         }
         if (!matchesPlanEvent(e, oldSnapshot, evs)) return e;
         changed = true;
@@ -593,14 +729,58 @@ export default function ProfileScreen() {
       await patchOnUserCalendar(myUid);
     } catch {
       showAlert("Error", "Could not update event.");
-      return;
+      return false;
     }
 
     const otherAttendeeIds = [...attendeeIds].filter((uid) => uid !== myUid);
     await Promise.allSettled(otherAttendeeIds.map((uid) => patchOnUserCalendar(uid)));
 
+    const inviteFriendIds = Array.isArray(options?.inviteFriendIds)
+      ? options.inviteFriendIds
+          .map((friendId) => String(friendId || "").trim())
+          .filter(Boolean)
+      : [];
+    const uninviteFriendIds = Array.isArray(options?.uninviteFriendIds)
+      ? options.uninviteFriendIds
+          .map((friendId) => String(friendId || "").trim())
+          .filter(Boolean)
+      : [];
+
+    if (uninviteFriendIds.length > 0) {
+      const revokeErrors: string[] = [];
+      let revokedCount = 0;
+      for (const friendId of uninviteFriendIds) {
+        try {
+          await revokePlanInvite(friendId, planId);
+          unmarkPlanInvited(planId, friendId);
+          revokedCount += 1;
+        } catch (err) {
+          revokeErrors.push(revokePlanInviteErrorMessage(err));
+        }
+      }
+      if (revokeErrors.length > 0) {
+        showAlert(
+          "Some invites not removed",
+          revokedCount > 0
+            ? "Your plan was saved, but some invites could not be removed."
+            : revokeErrors[0] || "Your plan was saved, but invites could not be removed."
+        );
+      }
+    }
+
+    await sendPlanInvitesWhenReady(
+      myUid,
+      planId,
+      oldSnapshot,
+      inviteFriendIds,
+      updatedPayload,
+      markPlanInvited,
+      showAlert
+    );
+
     setShowEventModal(false);
     setNewEvent({ title: "", date: "", time: "", location: "" });
+    return true;
   };
 
   const deleteEvent = async (id: string) => {
@@ -1283,7 +1463,6 @@ export default function ProfileScreen() {
           hostDisplayNameByUid={hostDisplayNameByUid}
           highlightEventId={planHighlightId}
           friends={friendsForHostNames}
-          onPlanInvited={markPlanInvited}
           onPlanUninvited={unmarkPlanInvited}
         />
       </View>

@@ -4,8 +4,22 @@ import { app } from "./firebase";
 
 const functions = getFunctions(app, "us-central1");
 
+export type PlanInviteHint = {
+  title?: string;
+  date?: string;
+  time?: string;
+  location?: string;
+};
+
 const sendPlanInviteFn = httpsCallable<
-  { toUserId: string; eventId: string },
+  {
+    toUserId: string;
+    eventId: string;
+    planTitle?: string;
+    planDate?: string;
+    planTime?: string;
+    planLocation?: string;
+  },
   { ok: boolean; alreadyInvited?: boolean }
 >(functions, "sendPlanInvite");
 
@@ -73,15 +87,24 @@ export function acceptPlanInviteErrorMessage(err: unknown): string {
 
 export async function sendPlanInvite(
   toUserId: string,
-  eventId: string
+  eventId: string,
+  hint?: PlanInviteHint
 ): Promise<{ alreadyInvited: boolean }> {
-  const result = await sendPlanInviteFn({ toUserId, eventId });
+  const result = await sendPlanInviteFn({
+    toUserId,
+    eventId,
+    planTitle: hint?.title,
+    planDate: hint?.date,
+    planTime: hint?.time,
+    planLocation: hint?.location,
+  });
   return { alreadyInvited: !!result.data?.alreadyInvited };
 }
 
 export async function sendPlanInvites(
   toUserIds: string[],
-  eventId: string
+  eventId: string,
+  hint?: PlanInviteHint
 ): Promise<{ invitedIds: string[]; alreadyInvitedIds: string[]; errors: string[] }> {
   const invitedIds: string[] = [];
   const alreadyInvitedIds: string[] = [];
@@ -94,7 +117,7 @@ export async function sendPlanInvites(
   const results = await Promise.all(
     ids.map(async (id) => {
       try {
-        const { alreadyInvited } = await sendPlanInvite(id, eventId);
+        const { alreadyInvited } = await sendPlanInvite(id, eventId, hint);
         return { id, alreadyInvited, error: null as string | null };
       } catch (err) {
         return { id, alreadyInvited: false, error: planInviteErrorMessage(err) };
