@@ -3,12 +3,14 @@ import {
   ACCENT,
   BORDER,
   BUTTON_RADIUS,
-  fonts,
   ON_ACCENT_TEXT,
   SPACE_4,
   SPACE_5,
   SPACE_6,
   TEXT,
+  TYPE_BODY,
+  TYPE_SUBHEAD,
+  fonts,
 } from "@/constants/Variables";
 import type { FriendGroup } from "@/src/lib/friendGroups";
 import type { SynqAudienceSelection } from "@/src/lib/synqBroadcast";
@@ -96,7 +98,7 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.heavy,
     textAlign: "center",
     paddingTop: SPACE_4 + 2,
@@ -128,7 +130,7 @@ const styles = StyleSheet.create({
   },
   doneText: {
     color: ON_ACCENT_TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.heavy,
     letterSpacing: 0.15,
   },

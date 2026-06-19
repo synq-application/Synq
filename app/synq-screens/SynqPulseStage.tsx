@@ -1,4 +1,10 @@
-import { ACCENT, BG, fonts, synqSvg } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  TYPE_MODAL_TITLE,
+  fonts,
+  synqSvg,
+} from "@/constants/Variables";
 import { Image as ExpoImage } from "expo-image";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -243,7 +249,7 @@ const styles = StyleSheet.create({
   title: {
     marginTop: 28,
     color: "rgba(255,255,255,0.72)",
-    fontSize: 22,
+    fontSize: TYPE_MODAL_TITLE,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },

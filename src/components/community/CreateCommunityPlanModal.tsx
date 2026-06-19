@@ -4,11 +4,17 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
-  fonts,
   MODAL_RADIUS,
   MUTED2,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_WIDTH,
   TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_FINE,
+  TYPE_LEAD,
+  TYPE_MODAL_TITLE,
+  fonts,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
 import PlanTimePicker from "@/src/components/PlanTimePicker";
@@ -394,7 +400,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 22,
+    fontSize: TYPE_MODAL_TITLE,
     letterSpacing: -0.2,
   },
   popupScrollContent: {
@@ -414,9 +420,9 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   popupPostBtnText: {
-    color: "#061006",
+    color: ON_ACCENT_TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
   },
   planInput: {
     backgroundColor: "#0c0c0c",
@@ -425,7 +431,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: BUTTON_RADIUS,
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     marginBottom: 10,
   },
@@ -439,7 +445,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: BUTTON_RADIUS,
     color: TEXT,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     fontFamily: fonts.medium,
     marginBottom: 0,
   },
@@ -477,12 +483,12 @@ const styles = StyleSheet.create({
   },
   timeFieldLabel: {
     color: MUTED2,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     fontFamily: fonts.book,
   },
   timeFieldValue: {
     color: TEXT,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     fontFamily: fonts.heavy,
   },
   dateBtn: {
@@ -495,8 +501,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#050505",
   },
   dateBtnText: {
-    color: "white",
-    fontSize: 14,
+    color: TEXT,
+    fontSize: TYPE_LEAD,
     fontFamily: fonts.medium,
   },
   dateBtnTextSelected: {

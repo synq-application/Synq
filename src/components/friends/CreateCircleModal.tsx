@@ -3,12 +3,13 @@ import {
   BG,
   BUTTON_RADIUS,
   Friend,
-  fonts,
   MUTED2,
   ON_ACCENT_TEXT,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
+  TYPE_SECTION,
+  fonts,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
 import { resolveAvatar } from "@/src/lib/helpers";
@@ -278,7 +279,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.medium,
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     color: TEXT,
   },
   fieldBlock: {
@@ -298,7 +299,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.04)",
     color: TEXT,
     fontFamily: fonts.book,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     paddingHorizontal: 14,
     paddingVertical: 14,
     minHeight: 52,
@@ -317,7 +318,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: TEXT,
     fontFamily: fonts.book,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     paddingVertical: 0,
   },
   friendList: {
@@ -343,7 +344,7 @@ const styles = StyleSheet.create({
   rowName: {
     flex: 1,
     fontFamily: fonts.book,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     color: TEXT,
   },
   empty: {
@@ -378,7 +379,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     color: ON_ACCENT_TEXT,
   },
 });

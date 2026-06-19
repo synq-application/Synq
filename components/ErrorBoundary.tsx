@@ -1,6 +1,13 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { ACCENT, BG, fonts, TYPE_BODY, TYPE_TITLE } from "../constants/Variables";
+import {
+  ACCENT,
+  BG,
+  TEXT,
+  TYPE_BODY,
+  TYPE_TITLE,
+  fonts,
+} from "../constants/Variables";
 import { captureClientError } from "../src/lib/sentryInit";
 
 type Props = { children: ReactNode };
@@ -56,7 +63,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   title: {
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.heavy,
     fontSize: TYPE_TITLE,
     marginBottom: 12,

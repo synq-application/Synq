@@ -3,19 +3,22 @@ import {
   BG,
   BUTTON_RADIUS,
   DESTRUCTIVE,
-  fonts,
   MODAL_RADIUS,
   MUTED2,
   RADIUS_MD,
+  TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_LEAD,
+  fonts,
+  profileLocationText,
+  profileNameText,
+  profileScreenSectionTitle,
   synqOutlineAddBtn,
   synqOutlineAddBtnDisabled,
   synqOutlineAddBtnText,
   synqOutlineAddBtnTextDisabled,
-  profileNameText,
-  profileLocationText,
-  profileScreenSectionTitle,
-  TEXT,
-  TYPE_CAPTION,
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
 import { Image as ExpoImage } from "expo-image";
@@ -1602,7 +1605,7 @@ const styles = StyleSheet.create({
   emptyProfileText: {
     color: MUTED2,
     fontFamily: fonts.book,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     marginTop: 24,
     textAlign: "center",
     paddingHorizontal: 24,
@@ -1663,7 +1666,7 @@ const styles = StyleSheet.create({
   removingText: {
     color: MUTED2,
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
   },
   removeFriendBtn: {
     alignSelf: "center",
@@ -1776,7 +1779,7 @@ const styles = StyleSheet.create({
   blockedHint: {
     color: MUTED2,
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     textAlign: "center",
   },
 
@@ -1805,7 +1808,7 @@ const styles = StyleSheet.create({
   },
   optionsRowText: {
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
   },
   optionsDestructive: {
@@ -1828,7 +1831,7 @@ const styles = StyleSheet.create({
   },
   optionsCancelText: {
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.heavy,
   },
 
@@ -1863,7 +1866,7 @@ const styles = StyleSheet.create({
 
   connName: {
     color: TEXT,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     marginTop: 8,
     textAlign: "center",
     fontFamily: fonts.book,
@@ -1885,19 +1888,19 @@ const styles = StyleSheet.create({
   },
   pillText: {
     color: "rgba(255,255,255,0.88)",
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     fontFamily: fonts.book,
   },
   emptyText: {
     color: MUTED2,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     fontFamily: fonts.book,
     fontStyle: "italic",
   },
   removeFriendText: {
     color: DESTRUCTIVE,
     fontFamily: fonts.heavy,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
   },
   memoCard: {
     backgroundColor: PROFILE_SURFACE_RAISED,
@@ -1909,7 +1912,7 @@ const styles = StyleSheet.create({
 
   memoText: {
     color: TEXT,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     lineHeight: 20,
     fontFamily: fonts.medium,
   },

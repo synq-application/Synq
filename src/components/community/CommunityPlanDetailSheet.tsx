@@ -4,7 +4,6 @@ import {
   BORDER,
   BUTTON_RADIUS,
   DESTRUCTIVE,
-  fonts,
   MUTED2,
   SPACE_3,
   SPACE_4,
@@ -12,8 +11,11 @@ import {
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
+  TYPE_SUBHEAD,
   cardMetaText,
   cardTitleText,
+  fonts,
+  formSectionLabel,
 } from "@/constants/Variables";
 import CommunityPlanGoerAvatars from "@/src/components/community/CommunityPlanGoerAvatars";
 import {
@@ -306,10 +308,9 @@ const styles = StyleSheet.create({
     gap: SPACE_3,
   },
   sectionLabel: {
-    fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION,
+    ...formSectionLabel,
     color: MUTED2,
-    textTransform: "uppercase",
+    fontSize: TYPE_CAPTION,
     letterSpacing: 0.4,
   },
   goerStrip: {
@@ -399,7 +400,7 @@ const styles = StyleSheet.create({
   goerActionTitle: {
     color: MUTED2,
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     textAlign: "center",
     marginBottom: 10,
     paddingHorizontal: 24,
@@ -420,7 +421,7 @@ const styles = StyleSheet.create({
   },
   goerActionOptionText: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.medium,
   },
   goerActionDivider: {
@@ -439,7 +440,7 @@ const styles = StyleSheet.create({
   },
   goerActionCancelText: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.heavy,
   },
 });

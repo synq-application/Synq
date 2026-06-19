@@ -1,20 +1,21 @@
 import {
   ACCENT,
-  fonts,
   MUTED2,
-  RADIUS_MD,
   RADIUS_LG,
+  RADIUS_MD,
   SPACE_2,
   SPACE_3,
   SPACE_4,
   SPACE_5,
   TEXT,
   TYPE_BODY,
-  cardTitleText,
+  TYPE_CAPTION,
+  TYPE_NANO,
   cardMetaText,
+  cardTitleText,
+  fonts,
   listSectionTitle,
   sectionLinkText,
-  TYPE_CAPTION,
 } from "@/constants/Variables";
 import AlertModal from "@/app/alert-modal";
 import ConfirmModal from "@/app/confirm-modal";
@@ -599,7 +600,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   planMetaBullet: {
-    fontSize: 9,
+    fontSize: TYPE_NANO,
     color: MUTED2,
     lineHeight: 18,
   },

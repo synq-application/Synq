@@ -4,6 +4,7 @@ import {
   BUTTON_RADIUS,
   ON_ACCENT_TEXT,
   TEXT,
+  TYPE_SUBHEAD,
   fonts,
 } from "@/constants/Variables";
 import { cropProfilePhoto } from "@/src/lib/cropProfilePhoto";
@@ -429,12 +430,12 @@ const styles = StyleSheet.create({
   },
   footerCancel: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.medium,
   },
   footerChoose: {
     color: ON_ACCENT_TEXT,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.heavy,
   },
   footerPressed: {

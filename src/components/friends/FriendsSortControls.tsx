@@ -2,12 +2,13 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
   MUTED2,
   MUTED3,
   RADIUS_LG,
   TEXT,
   TYPE_CAPTION,
+  TYPE_SUBHEAD,
+  fonts,
 } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -215,7 +216,7 @@ const styles = StyleSheet.create({
   },
   sortMenuTitle: {
     color: MUTED3,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     fontFamily: fonts.book,
     letterSpacing: 0.15,
     paddingHorizontal: 20,
@@ -236,7 +237,7 @@ const styles = StyleSheet.create({
   sortMenuOptionLabel: {
     flex: 1,
     color: MUTED2,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.book,
     letterSpacing: 0.02,
     paddingRight: 12,

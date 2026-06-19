@@ -12,6 +12,10 @@ import {
   SPACE_6,
   TAB_BAR_SCROLL_INSET,
   TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_TITLE,
   fonts,
 } from "@/constants/Variables";
 import type { FriendGroup } from "@/src/lib/friendGroups";
@@ -444,7 +448,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: TEXT,
-    fontSize: 30,
+    fontSize: TYPE_TITLE,
     lineHeight: 36,
     fontFamily: fonts.heavy,
     letterSpacing: -0.45,
@@ -481,7 +485,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     color: MUTED3,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     lineHeight: 21,
     fontFamily: fonts.book,
     letterSpacing: 0.08,
@@ -490,7 +494,7 @@ const styles = StyleSheet.create({
   moodInput: {
     width: "100%",
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     lineHeight: 22,
     fontFamily: fonts.book,
     letterSpacing: 0.1,
@@ -531,7 +535,7 @@ const styles = StyleSheet.create({
   },
   sharingLabel: {
     color: MUTED3,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     lineHeight: 21,
     fontFamily: fonts.book,
     letterSpacing: 0.08,
@@ -540,7 +544,7 @@ const styles = StyleSheet.create({
   sharingValue: {
     flexShrink: 1,
     color: TEXT,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     lineHeight: 21,
     fontFamily: fonts.medium,
     letterSpacing: 0.02,
@@ -555,7 +559,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     color: MUTED2,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     lineHeight: 18,
     fontFamily: fonts.medium,
     letterSpacing: 1.2,

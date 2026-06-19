@@ -3,16 +3,26 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
-  cardMetaText,
-  cardTitleText,
-  fonts,
   MODAL_RADIUS,
   MUTED2,
   MUTED3,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_WIDTH,
-  profileScreenSectionTitle,
   RADIUS_LG,
   TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_FINE,
+  TYPE_LEAD,
+  TYPE_MICRO,
+  TYPE_MODAL_TITLE,
+  TYPE_NANO,
+  TYPE_SECTION,
+  cardMetaText,
+  cardTitleText,
+  fonts,
+  profileScreenSectionTitle,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
 import {
@@ -958,7 +968,7 @@ const DateBtn = ({
     <Text
       style={{
         color: selected ? accentColor : "white",
-        fontSize: 14,
+        fontSize: TYPE_LEAD,
         fontFamily: fonts.medium,
       }}
     >
@@ -979,7 +989,7 @@ const styles = StyleSheet.create({
   empty: {
     color: "#666",
     marginBottom: 0,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     lineHeight: 18,
     textAlign: "left",
     alignSelf: "stretch",
@@ -1012,13 +1022,13 @@ const styles = StyleSheet.create({
   },
   dateWeekday: {
     color: MUTED3,
-    fontSize: 9,
+    fontSize: TYPE_NANO,
     fontFamily: fonts.medium,
     letterSpacing: 0.5,
   },
   dateNumber: {
     color: TEXT,
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     fontFamily: fonts.heavy,
     lineHeight: 22,
     letterSpacing: -0.5,
@@ -1026,7 +1036,7 @@ const styles = StyleSheet.create({
   },
   dateMonth: {
     color: MUTED3,
-    fontSize: 9,
+    fontSize: TYPE_NANO,
     fontFamily: fonts.medium,
     letterSpacing: 0.4,
     marginTop: 1,
@@ -1048,22 +1058,22 @@ const styles = StyleSheet.create({
   },
   actionSep: {
     color: "rgba(255,255,255,0.2)",
-    fontSize: 11,
+    fontSize: TYPE_MICRO,
     marginHorizontal: 4,
   },
   actionEditText: {
     color: MUTED2,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     fontFamily: fonts.medium,
   },
   actionDeleteText: {
     color: "rgba(255,255,255,0.32)",
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     fontFamily: fonts.medium,
   },
   actionRemoveText: {
     color: MUTED3,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     fontFamily: fonts.medium,
   },
   title: {
@@ -1079,7 +1089,7 @@ const styles = StyleSheet.create({
   hostLine: {
     color: MUTED3,
     marginTop: 3,
-    fontSize: 11,
+    fontSize: TYPE_MICRO,
     fontFamily: fonts.medium,
     letterSpacing: 0.1,
   },
@@ -1089,7 +1099,7 @@ const styles = StyleSheet.create({
   },
   goingText: {
     color: ACCENT,
-    fontSize: 11,
+    fontSize: TYPE_MICRO,
     fontFamily: fonts.medium,
     letterSpacing: 0.05,
     lineHeight: 15,
@@ -1134,7 +1144,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 22,
+    fontSize: TYPE_MODAL_TITLE,
     letterSpacing: -0.2,
   },
   popupScrollContent: {
@@ -1154,9 +1164,9 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   popupPostBtnText: {
-    color: "#061006",
+    color: ON_ACCENT_TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
   },
   calendarWrap: {
     marginTop: 6,
@@ -1170,7 +1180,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: BUTTON_RADIUS,
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     marginBottom: 10,
   },
@@ -1194,7 +1204,7 @@ const styles = StyleSheet.create({
   },
   inviteFriendsBtnText: {
     color: ACCENT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.heavy,
   },
   planInputSecondary: {
@@ -1204,7 +1214,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: BUTTON_RADIUS,
     color: TEXT,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     fontFamily: fonts.medium,
     marginBottom: 0,
   },
@@ -1245,7 +1255,7 @@ const styles = StyleSheet.create({
   dateTimeTextWrap: { flex: 1 },
   dateTimeValue: {
     color: TEXT,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     fontFamily: fonts.heavy,
   },
   dateBtn: {
@@ -1259,7 +1269,7 @@ const styles = StyleSheet.create({
   },
   month: {
     color: "#888",
-    fontSize: 11,
+    fontSize: TYPE_MICRO,
     fontFamily: fonts.heavy,
     letterSpacing: 0.4,
     width: "100%",

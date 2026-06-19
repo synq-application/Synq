@@ -1,3 +1,6 @@
+import {
+  TYPE_SUBHEAD,
+} from "@/constants/Variables";
 import React from 'react';
 import { StyleSheet } from 'react-native';
 
@@ -59,7 +62,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   getStartedText: {
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     lineHeight: 24,
     textAlign: 'center',
   },

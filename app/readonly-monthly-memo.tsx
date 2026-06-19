@@ -1,3 +1,11 @@
+import {
+  TEXT,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_CTA,
+  TYPE_FINE,
+  TYPE_LEAD,
+} from "@/constants/Variables";
 import { filterOutPastOpenPlans, sortOpenPlansByDateTime } from "@/src/lib/planEvents";
 import { resolvePlanAttribution } from "@/src/lib/planAttribution";
 import {
@@ -193,13 +201,13 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   header: {
-    color: "white",
-    fontSize: 18,
+    color: TEXT,
+    fontSize: TYPE_CTA,
     marginBottom: 14,
   },
   empty: {
     color: "#666",
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     marginBottom: 20
   },
   card: {
@@ -237,35 +245,35 @@ const styles = StyleSheet.create({
 
   day: {
     color: "#666",
-    fontSize: 10,
+    fontSize: TYPE_FINE,
   },
 
   date: {
-    color: "white",
-    fontSize: 18,
+    color: TEXT,
+    fontSize: TYPE_CTA,
     fontWeight: "600",
   },
 
   month: {
     color: "#666",
-    fontSize: 10,
+    fontSize: TYPE_FINE,
     marginTop: 2,
   },
 
   title: {
-    color: "white",
-    fontSize: 15,
+    color: TEXT,
+    fontSize: TYPE_BUTTON,
   },
 
   meta: {
     color: "#777",
     marginTop: 3,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
   },
 
   planOwnerLine: {
     color: "rgba(255,255,255,0.45)",
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     marginTop: 5,
   },
 
@@ -282,7 +290,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.55)",
   },
   interestText: {
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     textAlign: "center",
     includeFontPadding: false,
   },

@@ -1,4 +1,11 @@
-import { fonts } from "@/constants/Variables";
+import {
+  ON_ACCENT_TEXT,
+  TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_FINE,
+  fonts,
+} from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -192,9 +199,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   monthLabel: {
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
   },
   weekdayRow: {
     flexDirection: "row",
@@ -204,7 +211,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
     color: "#666",
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     fontFamily: fonts.medium,
   },
   grid: {
@@ -232,12 +239,12 @@ const styles = StyleSheet.create({
     opacity: 0.28,
   },
   dayText: {
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
   },
   dayTextSelected: {
-    color: "#061006",
+    color: ON_ACCENT_TEXT,
     fontFamily: fonts.heavy,
   },
   dayTextDisabled: {

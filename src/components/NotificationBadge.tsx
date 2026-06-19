@@ -1,4 +1,11 @@
-import { ACCENT, BG, DESTRUCTIVE, fonts, TEXT } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  DESTRUCTIVE,
+  TEXT,
+  TYPE_FINE,
+  fonts,
+} from "@/constants/Variables";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -46,7 +53,7 @@ const styles = StyleSheet.create({
   },
   countText: {
     color: TEXT,
-    fontSize: 10,
+    fontSize: TYPE_FINE,
     fontFamily: fonts.black,
   },
 });

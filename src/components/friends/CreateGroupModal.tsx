@@ -2,11 +2,12 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
   MUTED2,
   ON_ACCENT_TEXT,
   TEXT,
   TYPE_BODY,
+  TYPE_CTA,
+  fonts,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
 import React, { useEffect, useState } from "react";
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.medium,
-    fontSize: 18,
+    fontSize: TYPE_CTA,
     color: TEXT,
   },
   hint: {
@@ -177,7 +178,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.04)",
     color: TEXT,
     fontFamily: fonts.book,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     paddingHorizontal: 14,
     paddingVertical: 14,
     minHeight: 52,
@@ -209,7 +210,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     color: ON_ACCENT_TEXT,
   },
 });

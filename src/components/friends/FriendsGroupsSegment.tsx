@@ -1,7 +1,9 @@
 import {
   ACCENT,
-  fonts,
   MUTED2,
+  TYPE_SECTION,
+  TYPE_SUBHEAD,
+  fonts,
   stackScreenHeaderTitle,
 } from "@/constants/Variables";
 import React from "react";
@@ -60,7 +62,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...stackScreenHeaderTitle,
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     lineHeight: 26,
     includeFontPadding: false,
   },
@@ -74,7 +76,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     fontFamily: fonts.book,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     lineHeight: 26,
     color: "rgba(255,255,255,0.22)",
     marginTop: 1,

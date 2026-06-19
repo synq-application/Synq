@@ -14,6 +14,7 @@ import {
   BUTTON_RADIUS,
   DESTRUCTIVE,
   TEXT,
+  TYPE_SUBHEAD,
   fonts,
 } from "../../constants/Variables";
 
@@ -128,7 +129,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.medium,
   },
   destructiveText: {
@@ -150,7 +151,7 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.heavy,
   },
 });

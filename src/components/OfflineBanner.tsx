@@ -1,4 +1,8 @@
-import { ACCENT, BG } from "@/constants/Variables";
+import {
+  ACCENT,
+  BG,
+  TYPE_CAPTION,
+} from "@/constants/Variables";
 import NetInfo, { type NetInfoState } from "@react-native-community/netinfo";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -49,7 +53,7 @@ const styles = StyleSheet.create({
   },
   text: {
     color: BG,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     fontWeight: "600",
     textAlign: "center",
   },

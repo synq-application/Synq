@@ -1,4 +1,7 @@
-import { ACCENT } from "@/constants/Variables";
+import {
+  ACCENT,
+  SURFACE_ELEVATED,
+} from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import React from "react";
@@ -51,7 +54,7 @@ const styles = StyleSheet.create({
     borderRadius: AVATAR_SIZE / 2,
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.1)",
-    backgroundColor: "#1C1C1E",
+    backgroundColor: SURFACE_ELEVATED,
   },
   iconRing: {
     width: AVATAR_SIZE,

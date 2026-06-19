@@ -2,12 +2,13 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
   MUTED2,
   ON_ACCENT_TEXT,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
+  TYPE_SECTION,
+  fonts,
 } from "@/constants/Variables";
 import { FriendGroup } from "@/src/lib/friendGroups";
 import CloseButton from "@/src/components/CloseButton";
@@ -184,7 +185,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.medium,
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     color: TEXT,
   },
   subtitle: {
@@ -205,7 +206,7 @@ const styles = StyleSheet.create({
   rowName: {
     flex: 1,
     fontFamily: fonts.book,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     color: TEXT,
   },
   empty: {
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     color: ON_ACCENT_TEXT,
   },
 });
