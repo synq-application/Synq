@@ -1,6 +1,6 @@
 import StackScreenHeader from "@/src/components/StackScreenHeader";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   Platform,
   SafeAreaView,
@@ -16,12 +16,15 @@ import {
   ACCENT,
   BG,
   BORDER,
-  fonts,
   ON_ACCENT_TEXT,
   RADIUS_MD,
   SPACE_4,
   SURFACE,
+  TEXT,
   TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  fonts,
 } from "../../constants/Variables";
 import { auth } from "../../src/lib/firebase";
 import { submitReport, type ReportReason } from "../../src/lib/moderation";
@@ -194,7 +197,7 @@ const styles = StyleSheet.create({
   label: {
     color: "rgba(255,255,255,0.55)",
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     marginBottom: 8,
   },
   input: {
@@ -203,7 +206,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     padding: 14,
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.medium,
     marginBottom: 16,
   },
@@ -217,7 +220,7 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
   },
   reasonActive: { borderColor: ACCENT },
-  reasonText: { color: "white", fontFamily: fonts.medium, fontSize: 15 },
+  reasonText: { color: TEXT, fontFamily: fonts.medium, fontSize: TYPE_BUTTON },
   submit: {
     marginTop: 8,
     backgroundColor: ACCENT,
@@ -226,5 +229,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   submitDisabled: { opacity: 0.45 },
-  submitText: { color: ON_ACCENT_TEXT, fontFamily: fonts.heavy, fontSize: 16 },
+  submitText: { color: ON_ACCENT_TEXT, fontFamily: fonts.heavy, fontSize: TYPE_BODY },
 });

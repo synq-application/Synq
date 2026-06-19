@@ -1,8 +1,7 @@
-import { StyleSheet } from "react-native";
+import { formScreenStyles } from "@/constants/formScreenStyles";
 import {
   ACCENT,
   BORDER,
-  MUTED,
   RADIUS_MD,
   SPACE_1,
   SPACE_3,
@@ -10,10 +9,14 @@ import {
   SPACE_5,
   SPACE_6,
   SURFACE,
+  TEXT,
+  TEXT_MUTED_HEX,
   TYPE_BODY,
-  TYPE_CAPTION,
-  fonts,
+  TYPE_CTA,
+  TYPE_LEAD,
+  fonts
 } from "@/constants/Variables";
+import { StyleSheet } from "react-native";
 
 export const legalDocumentStyles = StyleSheet.create({
   scrollContent: {
@@ -21,16 +24,7 @@ export const legalDocumentStyles = StyleSheet.create({
     paddingTop: SPACE_3,
   },
   section: { marginTop: 2 },
-  sectionTitle: {
-    color: MUTED,
-    fontSize: TYPE_CAPTION + 1,
-    fontFamily: fonts.medium,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginLeft: SPACE_5 + 1,
-    marginBottom: SPACE_3 - 2,
-    marginTop: SPACE_3 - 2,
-  },
+  sectionTitle: formScreenStyles.groupTitle,
   card: {
     backgroundColor: SURFACE,
     marginHorizontal: SPACE_4 + SPACE_1,
@@ -41,18 +35,18 @@ export const legalDocumentStyles = StyleSheet.create({
     borderColor: BORDER,
   },
   text: {
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.medium,
     fontSize: TYPE_BODY,
     lineHeight: 24,
     marginBottom: 10,
   },
-  bold: { fontFamily: fonts.heavy, color: "white" },
+  bold: { fontFamily: fonts.heavy, color: TEXT },
   bullets: { marginTop: 6 },
   bulletRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
-  bulletDot: { color: ACCENT, marginRight: 10, fontSize: 18, lineHeight: 22 },
+  bulletDot: { color: ACCENT, marginRight: 10, fontSize: TYPE_CTA, lineHeight: 22 },
   bulletText: {
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.medium,
     fontSize: TYPE_BODY,
     lineHeight: 24,
@@ -61,9 +55,9 @@ export const legalDocumentStyles = StyleSheet.create({
     minWidth: 0,
   },
   lastUpdated: {
-    color: "#A8A8A8",
+    color: TEXT_MUTED_HEX,
     fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION + 1,
+    fontSize: TYPE_LEAD,
     lineHeight: 18,
     marginTop: 24,
     marginHorizontal: SPACE_5 + 1,

@@ -1,6 +1,6 @@
 import StackScreenHeader from "@/src/components/StackScreenHeader";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Linking,
@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { formScreenStyles } from "../../constants/formScreenStyles";
 import {
   ACCENT,
   BG,
@@ -21,6 +22,7 @@ import {
   BUTTON_RADIUS,
   MUTED,
   MUTED3,
+  ON_ACCENT_TEXT,
   RADIUS_MD,
   SPACE_2,
   SPACE_3,
@@ -28,6 +30,7 @@ import {
   SPACE_5,
   SPACE_6,
   SURFACE,
+  TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
   fonts,
@@ -140,7 +143,7 @@ export default function FeedbackScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Type</Text>
+            <Text style={formScreenStyles.groupTitle}>Type</Text>
             <View style={styles.chipRow}>
               <TypeChip label="Feedback" />
               <TypeChip label="Bug" />
@@ -149,7 +152,7 @@ export default function FeedbackScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your email (optional)</Text>
+            <Text style={formScreenStyles.groupTitle}>Your email (optional)</Text>
             <View style={styles.card}>
               <TextInput
                 value={email}
@@ -165,7 +168,7 @@ export default function FeedbackScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Message</Text>
+            <Text style={formScreenStyles.groupTitle}>Message</Text>
             <View style={styles.card}>
               <TextInput
                 value={message}
@@ -222,7 +225,7 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: TYPE_BODY + 4,
     fontFamily: fonts.heavy,
-    color: "white",
+    color: TEXT,
     marginBottom: SPACE_3 - 4,
   },
   heroSubtitle: {
@@ -231,19 +234,9 @@ const styles = StyleSheet.create({
     color: MUTED,
     lineHeight: 22,
   },
-  bold: { fontFamily: fonts.heavy, color: "white" },
+  bold: { fontFamily: fonts.heavy, color: TEXT },
 
   section: { marginTop: 2 },
-  sectionTitle: {
-    color: MUTED,
-    fontSize: TYPE_CAPTION + 1,
-    fontFamily: fonts.medium,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginLeft: SPACE_5 + 1,
-    marginBottom: SPACE_3 - 2,
-    marginTop: SPACE_3 - 2,
-  },
 
   chipRow: {
     flexDirection: "row",
@@ -264,12 +257,12 @@ const styles = StyleSheet.create({
     borderColor: ACCENT,
   },
   chipText: {
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.medium,
     fontSize: TYPE_CAPTION + 1,
   },
   chipTextActive: {
-    color: "black",
+    color: ON_ACCENT_TEXT,
     fontFamily: fonts.heavy,
   },
 
@@ -283,7 +276,7 @@ const styles = StyleSheet.create({
   },
 
   input: {
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.medium,
     fontSize: TYPE_BODY,
     paddingVertical: SPACE_2,
@@ -308,7 +301,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   submitText: {
-    color: "black",
+    color: ON_ACCENT_TEXT,
     fontFamily: fonts.black,
     fontSize: TYPE_BODY,
   },

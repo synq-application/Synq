@@ -1,11 +1,13 @@
-import CloseButton from "@/src/components/CloseButton";
 import {
   BG,
   BORDER,
   MODAL_RADIUS,
   SURFACE,
+  TEXT,
+  TYPE_SECTION,
   fonts,
 } from "@/constants/Variables";
+import CloseButton from "@/src/components/CloseButton";
 import React from "react";
 import {
   Modal,
@@ -95,9 +97,9 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     lineHeight: 26,
     marginRight: 12,
   },

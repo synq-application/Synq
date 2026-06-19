@@ -6,10 +6,16 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
   MUTED,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_CTA,
+  TYPE_DISPLAY,
+  TYPE_LEAD,
+  fonts,
 } from "@/constants/Variables";
 import { auth, db } from "@/src/lib/firebase";
 import {
@@ -216,7 +222,7 @@ const styles = StyleSheet.create({
   title: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 32,
+    fontSize: TYPE_DISPLAY,
     letterSpacing: -0.5,
     lineHeight: 38,
   },
@@ -224,7 +230,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: "rgba(255,255,255,0.78)",
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     lineHeight: 24,
   },
   card: {
@@ -238,14 +244,14 @@ const styles = StyleSheet.create({
   cardLead: {
     color: ACCENT,
     fontFamily: fonts.heavy,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     lineHeight: 22,
     marginBottom: 12,
   },
   cardBody: {
     color: "rgba(255,255,255,0.88)",
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     lineHeight: 22,
     marginBottom: 10,
   },
@@ -258,7 +264,7 @@ const styles = StyleSheet.create({
   link: {
     color: ACCENT,
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     textDecorationLine: "underline",
   },
   linkSep: { color: MUTED, fontFamily: fonts.medium },
@@ -286,7 +292,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "rgba(255,255,255,0.9)",
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     lineHeight: 20,
   },
   footer: {
@@ -303,8 +309,8 @@ const styles = StyleSheet.create({
   },
   primaryBtnDisabled: { opacity: 0.45 },
   primaryText: {
-    color: "#061006",
+    color: ON_ACCENT_TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 18,
+    fontSize: TYPE_CTA,
   },
 });

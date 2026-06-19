@@ -19,8 +19,10 @@ import {
   SPACE_5,
   SPACE_6,
   SURFACE,
+  TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
+  TYPE_CTA,
   TYPE_SECTION,
   fonts,
 } from "../../constants/Variables";
@@ -130,7 +132,7 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: TYPE_SECTION,
     fontFamily: fonts.black,
-    color: "white",
+    color: TEXT,
     marginBottom: SPACE_3 - 4,
   },
   heroSubtitle: {
@@ -162,19 +164,19 @@ const styles = StyleSheet.create({
   },
 
   copyText: {
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.medium,
     fontSize: TYPE_BODY,
     lineHeight: 24,
     marginBottom: 10,
   },
-  bold: { fontFamily: fonts.heavy, color: "white" },
+  bold: { fontFamily: fonts.heavy, color: TEXT },
 
   bullets: { marginTop: 2 },
   bulletRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
-  bulletDot: { color: ACCENT, marginRight: 10, fontSize: 18, lineHeight: 22 },
+  bulletDot: { color: ACCENT, marginRight: 10, fontSize: TYPE_CTA, lineHeight: 22 },
   bulletText: {
-    color: "white",
+    color: TEXT,
     fontFamily: fonts.medium,
     fontSize: TYPE_BODY,
     lineHeight: 24,

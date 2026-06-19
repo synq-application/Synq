@@ -3,12 +3,18 @@ import {
   BG,
   BORDER,
   BUTTON_RADIUS,
-  fonts,
   MODAL_RADIUS,
+  ON_ACCENT_TEXT,
   TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_LEAD,
+  TYPE_MODAL_TITLE,
+  fonts,
 } from "@/constants/Variables";
 import { ReportReason, submitReport, type ReportContentType } from "@/src/lib/moderation";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -16,8 +22,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
-  View,
+  TouchableOpacity
 } from "react-native";
 
 const REASONS: { id: ReportReason; label: string }[] = [
@@ -147,13 +152,13 @@ const styles = StyleSheet.create({
   title: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 22,
+    fontSize: TYPE_MODAL_TITLE,
     marginBottom: 6,
   },
   sub: {
     color: "rgba(255,255,255,0.65)",
     fontFamily: fonts.medium,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     marginBottom: 16,
   },
   reasonRow: {
@@ -172,7 +177,7 @@ const styles = StyleSheet.create({
   reasonText: {
     color: TEXT,
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
   },
   input: {
     marginTop: 8,
@@ -182,13 +187,13 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
     color: TEXT,
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     textAlignVertical: "top",
   },
   error: {
     color: "#ff6b6b",
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     marginTop: 8,
   },
   submitBtn: {
@@ -201,9 +206,9 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { opacity: 0.45 },
   submitText: {
-    color: "#061006",
+    color: ON_ACCENT_TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
   },
   cancelBtn: {
     marginTop: 12,
@@ -213,6 +218,6 @@ const styles = StyleSheet.create({
   cancelText: {
     color: "rgba(255,255,255,0.55)",
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
   },
 });

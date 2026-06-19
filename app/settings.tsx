@@ -18,9 +18,11 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { formScreenStyles } from "../constants/formScreenStyles";
 import {
   BG,
   BORDER,
+  BORDER_MUTED,
   fonts,
   MUTED,
   MUTED2,
@@ -30,7 +32,8 @@ import {
   SPACE_4,
   SPACE_5,
   SPACE_6,
-  SURFACE,
+  SURFACE_ELEVATED,
+  TEXT,
   TYPE_BODY,
   TYPE_CAPTION
 } from "../constants/Variables";
@@ -178,8 +181,8 @@ export default function SettingsScreen() {
           </Text>
         </View>
 
-        <Text style={styles.groupTitle}>Account</Text>
-        <View style={styles.group}>
+        <Text style={formScreenStyles.groupTitle}>Account</Text>
+        <View style={formScreenStyles.group}>
           <SettingItem
             label="Edit profile"
             onPress={() => router.push("/edit-profile")}
@@ -191,16 +194,16 @@ export default function SettingsScreen() {
           <SettingItem label="Sign out" onPress={confirmSignOut} />
         </View>
 
-        <Text style={styles.groupTitle}>Safety</Text>
-        <View style={styles.group}>
+        <Text style={formScreenStyles.groupTitle}>Safety</Text>
+        <View style={formScreenStyles.group}>
           <SettingItem
             label="Report a safety issue"
             onPress={() => router.push("/profile-settings/safety-report")}
           />
         </View>
 
-        <Text style={styles.groupTitle}>More</Text>
-        <View style={styles.group}>
+        <Text style={formScreenStyles.groupTitle}>More</Text>
+        <View style={formScreenStyles.group}>
           <SettingItem
             label="About us"
             onPress={() => router.push("/profile-settings/about-us")}
@@ -224,8 +227,8 @@ export default function SettingsScreen() {
           <StaticItem label="Version" value={appVersion} />
         </View>
 
-        <Text style={styles.groupTitle}>Danger zone</Text>
-        <View style={styles.group}>
+        <Text style={formScreenStyles.groupTitle}>Danger zone</Text>
+        <View style={formScreenStyles.group}>
           <SettingItem
             label="Delete account"
             danger
@@ -266,9 +269,9 @@ const styles = StyleSheet.create({
   userSection: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1C1C1E",
+    backgroundColor: SURFACE_ELEVATED,
     borderWidth: 1,
-    borderColor: "#2A2A2A",
+    borderColor: BORDER_MUTED,
     margin: SPACE_4 + SPACE_1,
     padding: SPACE_4,
     borderRadius: RADIUS_MD,
@@ -278,32 +281,12 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     marginRight: 15,
-    backgroundColor: "#333",
+    backgroundColor: BORDER_MUTED,
   },
   userName: {
-    color: "white",
+    color: TEXT,
     fontSize: TYPE_BODY + 2,
     fontFamily: fonts.heavy,
-  },
-
-  groupTitle: {
-    color: MUTED,
-    fontSize: TYPE_CAPTION + 1,
-    fontFamily: fonts.medium,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginLeft: SPACE_5 + 1,
-    marginBottom: SPACE_3 - 2,
-    marginTop: SPACE_3 - 2,
-  },
-  group: {
-    backgroundColor: SURFACE,
-    marginHorizontal: SPACE_4 + SPACE_1,
-    borderRadius: RADIUS_MD,
-    overflow: "hidden",
-    marginBottom: SPACE_5 + 1,
-    borderWidth: 1,
-    borderColor: BORDER,
   },
 
   item: {
@@ -317,7 +300,7 @@ const styles = StyleSheet.create({
   },
   itemLeft: { flexDirection: "row", alignItems: "center" },
   itemLabel: {
-    color: "white",
+    color: TEXT,
     fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
   },

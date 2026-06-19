@@ -1,6 +1,13 @@
 import { Link, Stack } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
-import { ACCENT, BG, fonts, TYPE_BODY, TYPE_TITLE } from "../constants/Variables";
+import {
+  ACCENT,
+  BG,
+  TEXT,
+  TYPE_BODY,
+  TYPE_TITLE,
+  fonts,
+} from "../constants/Variables";
 
 export default function NotFoundScreen() {
   return (
@@ -29,7 +36,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: TYPE_TITLE,
     fontFamily: fonts.heavy,
-    color: "white",
+    color: TEXT,
     textAlign: "center",
     marginBottom: 8,
   },
