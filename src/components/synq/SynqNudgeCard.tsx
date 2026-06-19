@@ -1,10 +1,13 @@
 import { resolveAvatar } from "@/src/lib/helpers";
 import {
   ACCENT,
-  fonts,
   MUTED2,
   RADIUS_MD,
   TEXT,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_FINE,
+  fonts,
 } from "@/constants/Variables";
 import {
   GROUP_BORDER,
@@ -118,20 +121,20 @@ const styles = StyleSheet.create({
   kicker: {
     color: MUTED2,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     lineHeight: 16,
     letterSpacing: 0.1,
   },
   kickerSent: {
     color: TEXT,
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     lineHeight: 20,
   },
   subtitle: {
     color: TEXT,
     fontFamily: fonts.book,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     lineHeight: 21,
     opacity: 0.92,
   },
@@ -153,7 +156,7 @@ const styles = StyleSheet.create({
   ctaText: {
     color: ACCENT,
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     letterSpacing: 0.1,
   },
   ctaTextSent: {

@@ -5,7 +5,12 @@ import {
   MUTED2,
   ON_ACCENT_TEXT,
   PROFILE_HEADER_TOP_OFFSET,
+  SURFACE_ELEVATED,
   TEXT,
+  TYPE_CAPTION,
+  TYPE_FINE,
+  TYPE_LEAD,
+  TYPE_SECTION,
   fonts,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
@@ -1417,20 +1422,20 @@ const chatHeaderOverlayStyles = RNStyleSheet.create({
   memberSubtitle: {
     marginTop: 2,
     color: MUTED2,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     fontFamily: fonts.book,
     letterSpacing: 0.1,
   },
   expandedHeadline: {
     color: TEXT,
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     fontFamily: fonts.heavy,
     letterSpacing: 0.15,
   },
   showLessLink: {
     marginTop: 3,
     color: MUTED2,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     fontFamily: fonts.medium,
   },
   memberStripScroll: {
@@ -1456,7 +1461,7 @@ const chatHeaderOverlayStyles = RNStyleSheet.create({
     borderRadius: 24,
     borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "#1C1C1E",
+    backgroundColor: SURFACE_ELEVATED,
     overflow: "hidden",
   },
   memberTileAvatar: {
@@ -1467,7 +1472,7 @@ const chatHeaderOverlayStyles = RNStyleSheet.create({
     marginTop: 7,
     width: CHAT_MEMBER_TILE_WIDTH,
     color: MUTED2,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     fontFamily: fonts.medium,
     textAlign: "center",
     letterSpacing: 0.1,
@@ -1490,7 +1495,7 @@ const chatHeaderOverlayStyles = RNStyleSheet.create({
   },
   typingIndicatorText: {
     color: MUTED2,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     marginTop: 2,
   },
   chatErrorBanner: {
@@ -1502,11 +1507,11 @@ const chatHeaderOverlayStyles = RNStyleSheet.create({
   },
   chatErrorBannerText: {
     color: TEXT,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
   },
   chatErrorBannerAction: {
     color: ACCENT,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     marginTop: 2,
     fontWeight: "600",
   },
@@ -1518,7 +1523,7 @@ const chatHeaderOverlayStyles = RNStyleSheet.create({
   },
   loadEarlierText: {
     color: ACCENT,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     fontWeight: "600",
   },
   chatLoadingWrap: {
@@ -1530,6 +1535,6 @@ const chatHeaderOverlayStyles = RNStyleSheet.create({
   },
   chatLoadingText: {
     color: MUTED2,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
   },
 });

@@ -1,11 +1,13 @@
 import {
   ACCENT,
   BORDER,
-  fonts,
   MUTED2,
   MUTED3,
   SPACE_4,
   TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  fonts,
 } from "@/constants/Variables";
 import type { FriendGroup } from "@/src/lib/friendGroups";
 import type { SynqAudienceSelection } from "@/src/lib/synqBroadcast";
@@ -162,12 +164,12 @@ const styles = StyleSheet.create({
   rowLabel: {
     flex: 1,
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     marginRight: 12,
   },
   rowLabelCompact: {
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     marginRight: 10,
   },
   rowLabelDisabled: {

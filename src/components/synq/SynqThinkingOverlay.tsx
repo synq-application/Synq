@@ -1,4 +1,8 @@
-import { ACCENT, fonts } from "@/constants/Variables";
+import {
+  ACCENT,
+  TYPE_BODY,
+  fonts,
+} from "@/constants/Variables";
 import { Image as ExpoImage } from "expo-image";
 import React, { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
@@ -181,7 +185,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: "rgba(255,255,255,0.75)",
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     letterSpacing: 0.3,
     marginTop: 4,

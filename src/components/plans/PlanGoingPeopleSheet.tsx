@@ -1,15 +1,15 @@
 import {
-  ACCENT,
   BG,
   BORDER,
+  BORDER_STRONG,
   DEFAULT_AVATAR,
-  fonts,
-  MUTED2,
   TEXT,
+  TYPE_BUTTON,
+  TYPE_SUBHEAD,
+  fonts
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
 import { Image as ExpoImage } from "expo-image";
-import React from "react";
 import {
   FlatList,
   Modal,
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     marginRight: 12,
   },
   list: {
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#222",
+    backgroundColor: BORDER_STRONG,
     overflow: "hidden",
     marginRight: 12,
   },
@@ -148,6 +148,6 @@ const styles = StyleSheet.create({
     flex: 1,
     color: TEXT,
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
   },
 });

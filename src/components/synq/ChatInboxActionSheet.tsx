@@ -5,10 +5,11 @@ import {
   DESTRUCTIVE,
   MUTED2,
   TEXT,
+  TYPE_CAPTION,
+  TYPE_SUBHEAD,
   fonts,
 } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
 import {
   Pressable,
   StyleSheet,
@@ -115,7 +116,7 @@ const styles = StyleSheet.create({
   sheetTitle: {
     color: MUTED2,
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     textAlign: "center",
     marginBottom: 10,
     paddingHorizontal: 24,
@@ -136,7 +137,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.medium,
   },
   destructiveText: {
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.heavy,
   },
 });

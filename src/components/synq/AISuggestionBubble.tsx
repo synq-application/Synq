@@ -1,10 +1,15 @@
 import {
   BORDER,
-  fonts,
   MUTED2,
   MUTED3,
   SURFACE,
+  SURFACE_ELEVATED,
   TEXT,
+  TYPE_BUTTON,
+  TYPE_CTA,
+  TYPE_FINE,
+  TYPE_LEAD,
+  fonts,
 } from "@/constants/Variables";
 import { formatVenueAddressDisplay, stripLegacyAiPrefix } from "@/src/lib/helpers";
 import { Ionicons } from "@expo/vector-icons";
@@ -126,7 +131,7 @@ const styles = StyleSheet.create({
   },
   venueName: {
     color: TEXT,
-    fontSize: 18,
+    fontSize: TYPE_CTA,
     lineHeight: 24,
     fontFamily: fonts.heavy,
     letterSpacing: 0.1,
@@ -142,13 +147,13 @@ const styles = StyleSheet.create({
   addressText: {
     flex: 1,
     color: MUTED2,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     lineHeight: 20,
     fontFamily: fonts.book,
   },
   legacyBody: {
     color: TEXT,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     lineHeight: 22,
     fontFamily: fonts.book,
   },
@@ -163,7 +168,7 @@ const styles = StyleSheet.create({
   },
   footerHint: {
     color: MUTED3,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     fontFamily: fonts.medium,
     letterSpacing: 0.15,
   },
@@ -178,7 +183,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "#1C1C1E",
+    backgroundColor: SURFACE_ELEVATED,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
