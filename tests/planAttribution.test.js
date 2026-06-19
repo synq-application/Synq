@@ -160,6 +160,48 @@ describe("planAttribution", () => {
     expect(result.secondary).toBe("Elliott is going");
   });
 
+  test("shows Elliott's plan on Elliott profile when Priscilla joined", () => {
+    const result = resolvePlanAttribution(
+      {
+        planHostUid: "elliott",
+        joinedFromId: "elliott",
+        joinedFromIds: ["elliott", "priscilla"],
+        joinedFromNames: ["Priscilla"],
+        attendeeDisplayNames: {
+          elliott: "Elliott",
+          priscilla: "Priscilla",
+        },
+      },
+      "viewer",
+      { elliott: "Elliott", priscilla: "Priscilla" },
+      "elliott"
+    );
+
+    expect(result.primary).toBe("Elliott's plan");
+    expect(result.secondary).toBe("Priscilla is going");
+  });
+
+  test("shows Priscilla's plan on Priscilla profile when Elliott joined", () => {
+    const result = resolvePlanAttribution(
+      {
+        planHostUid: "priscilla",
+        joinedFromId: "priscilla",
+        joinedFromIds: ["priscilla", "elliott"],
+        joinedFromNames: ["Elliott"],
+        attendeeDisplayNames: {
+          elliott: "Elliott",
+          priscilla: "Priscilla",
+        },
+      },
+      "viewer",
+      { elliott: "Elliott", priscilla: "Priscilla" },
+      "priscilla"
+    );
+
+    expect(result.primary).toBe("Priscilla's plan");
+    expect(result.secondary).toBe("Elliott is going");
+  });
+
   test("shows Stefanie's plan when viewing Elliott's profile", () => {
     const result = resolvePlanAttribution(
       {

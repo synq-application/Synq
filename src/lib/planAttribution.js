@@ -121,6 +121,15 @@ function resolveEffectiveHostUid(event, viewerUid, joinedIds, profileSubjectUid)
     const anchorOthers = joinedIds.filter((id) => id !== viewer && id !== anchorUid);
     if (anchorOthers.length === 1) {
       if (profileSubject && anchorOthers[0] === profileSubject) return storedHost;
+      // Profile owner created this plan; only treat anchor as wrong when they joined
+      // via their own profile copy (joinedFromFriendUid points at themselves).
+      if (
+        profileSubject &&
+        storedHost === profileSubject &&
+        joinedThrough !== profileSubject
+      ) {
+        return storedHost;
+      }
       return anchorOthers[0];
     }
   }
