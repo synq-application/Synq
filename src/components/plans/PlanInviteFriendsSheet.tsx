@@ -1,35 +1,23 @@
 import {
   ACCENT,
-
   BG,
-
   BORDER,
-
+  BORDER_STRONG,
   BUTTON_RADIUS,
-
   DEFAULT_AVATAR,
-
-  fonts,
-
   MUTED,
-
   MUTED2,
-
   ON_ACCENT_TEXT,
-
   PRIMARY_CTA_WIDTH,
-
-  synqOutlineAddBtnCompact,
-
-  synqOutlineAddBtnDisabled,
-
-  synqOutlineAddBtnTextCompact,
-
-  synqOutlineAddBtnTextDisabled,
-
   TEXT,
-
   TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_SECTION,
+  fonts,
+  synqOutlineAddBtnCompact,
+  synqOutlineAddBtnDisabled,
+  synqOutlineAddBtnTextCompact,
+  synqOutlineAddBtnTextDisabled,
 } from "@/constants/Variables";
 
 import CloseButton from "@/src/components/CloseButton";
@@ -785,7 +773,7 @@ const styles = StyleSheet.create({
 
     color: TEXT,
 
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
 
     fontFamily: fonts.heavy,
 
@@ -859,7 +847,7 @@ const styles = StyleSheet.create({
 
     overflow: "hidden",
 
-    backgroundColor: "#222",
+    backgroundColor: BORDER_STRONG,
 
     marginRight: 12,
 
@@ -919,7 +907,7 @@ const styles = StyleSheet.create({
 
     fontFamily: fonts.heavy,
 
-    fontSize: 16,
+    fontSize: TYPE_BODY,
 
   },
 
@@ -951,7 +939,7 @@ const styles = StyleSheet.create({
 
     fontFamily: fonts.medium,
 
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
 
   },
 

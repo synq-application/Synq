@@ -1,21 +1,18 @@
+import { modalStyles } from "@/constants/modalStyles";
 import {
   ACCENT,
-  BG,
-  BORDER,
   BUTTON_RADIUS,
   DESTRUCTIVE,
-  MUTED2,
-  ON_ACCENT_TEXT,
-  TEXT,
-  fonts,
+  TYPE_LEAD,
+  primaryButtonText,
 } from "@/constants/Variables";
 import React from "react";
 import {
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type Props = {
@@ -43,11 +40,11 @@ export default function ConfirmModal({
 }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          {title && <Text style={styles.title}>{title}</Text>}
+      <View style={modalStyles.overlay}>
+        <View style={modalStyles.cardCompact}>
+          {title && <Text style={modalStyles.title}>{title}</Text>}
 
-          <Text style={styles.message}>{message}</Text>
+          <Text style={modalStyles.body}>{message}</Text>
 
           <View style={styles.actions}>
             <TouchableOpacity
@@ -55,7 +52,7 @@ export default function ConfirmModal({
               style={styles.cancelBtn}
               activeOpacity={0.8}
             >
-              <Text style={styles.cancelText}>{cancelText}</Text>
+              <Text style={modalStyles.secondaryBtnText}>{cancelText}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -70,7 +67,8 @@ export default function ConfirmModal({
             >
               <Text
                 style={[
-                  styles.confirmText,
+                  primaryButtonText,
+                  styles.confirmTextSize,
                   destructive && styles.destructiveText,
                 ]}
               >
@@ -85,78 +83,32 @@ export default function ConfirmModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.75)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-
-  container: {
-    width: "100%",
-    backgroundColor: BG,
-    borderRadius: BUTTON_RADIUS,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-
-  title: {
-    color: TEXT,
-    fontSize: 18,
-    fontFamily: fonts.heavy,
-    marginBottom: 8,
-  },
-
-  message: {
-    color: MUTED2,
-    fontSize: 14,
-    fontFamily: fonts.book,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-
   actions: {
     flexDirection: "row",
     justifyContent: "flex-end",
   },
-
   cancelBtn: {
     paddingVertical: 10,
     paddingHorizontal: 14,
     marginRight: 10,
   },
-
-  cancelText: {
-    color: MUTED2,
-    fontFamily: fonts.medium,
-    fontSize: 14,
-  },
-
   confirmBtn: {
     backgroundColor: ACCENT,
     borderRadius: BUTTON_RADIUS,
     paddingVertical: 10,
     paddingHorizontal: 16,
   },
-
   confirmBtnDisabled: {
     opacity: 0.45,
   },
-
-  confirmText: {
-    color: ON_ACCENT_TEXT,
-    fontFamily: fonts.heavy,
-    fontSize: 14,
+  confirmTextSize: {
+    fontSize: TYPE_LEAD,
   },
-
   destructiveBtn: {
     backgroundColor: "rgba(255,69,58,0.12)",
     borderWidth: 1,
     borderColor: DESTRUCTIVE,
   },
-
   destructiveText: {
     color: DESTRUCTIVE,
   },

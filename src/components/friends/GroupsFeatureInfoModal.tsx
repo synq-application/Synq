@@ -2,12 +2,13 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
   MODAL_RADIUS,
   MUTED2,
   ON_ACCENT_TEXT,
   TEXT,
   TYPE_BODY,
+  TYPE_SECTION,
+  fonts,
 } from "@/constants/Variables";
 import {
   Modal,
@@ -91,7 +92,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: fonts.heavy,
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     color: TEXT,
     letterSpacing: 0.06,
     marginBottom: 10,

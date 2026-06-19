@@ -1,9 +1,12 @@
 import {
   ACCENT,
   BG,
-  fonts,
   MUTED2,
   TEXT,
+  TYPE_CTA,
+  TYPE_LEAD,
+  TYPE_TITLE,
+  fonts,
 } from "@/constants/Variables";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -152,7 +155,7 @@ const styles = StyleSheet.create({
   name: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 26,
+    fontSize: TYPE_TITLE,
     lineHeight: 32,
     textAlign: "center",
     letterSpacing: 0.2,
@@ -161,7 +164,7 @@ const styles = StyleSheet.create({
   location: {
     color: MUTED2,
     fontFamily: fonts.book,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     textAlign: "center",
     marginTop: 6,
     maxWidth: "100%",
@@ -176,7 +179,7 @@ const styles = StyleSheet.create({
   tagline: {
     color: ACCENT,
     fontFamily: fonts.heavy,
-    fontSize: 18,
+    fontSize: TYPE_CTA,
     lineHeight: 24,
     textAlign: "center",
     letterSpacing: 0.3,

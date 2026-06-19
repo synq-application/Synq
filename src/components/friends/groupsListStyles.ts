@@ -2,6 +2,13 @@ import {
   ACCENT,
   ON_ACCENT_TEXT,
   RADIUS_LG,
+  SURFACE_ELEVATED,
+  SURFACE_RAISED,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_FINE,
+  TYPE_MICRO,
+  TYPE_SECTION,
   cardMetaText,
   cardTitleText,
   detailSectionTitle,
@@ -9,12 +16,10 @@ import {
   listRowTitleText,
   listSectionTitle,
   searchPlaceholderText,
-  TYPE_CAPTION,
-  TYPE_SECTION,
 } from "@/constants/Variables";
 import { StyleSheet } from "react-native";
 
-export const GROUP_SURFACE = "#0E1012";
+export const GROUP_SURFACE = SURFACE_RAISED;
 export const GROUP_BORDER = "rgba(255,255,255,0.06)";
 export const GROUP_ROW_INSET = 72;
 
@@ -131,7 +136,7 @@ export const groupsPageStyles = StyleSheet.create({
   },
   subsectionTitle: {
     ...detailSectionTitle,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     marginTop: 4,
   },
   discoverScroll: {
@@ -161,19 +166,19 @@ export const groupsPageStyles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     marginBottom: 12,
-    backgroundColor: "#1C1C1E",
+    backgroundColor: SURFACE_ELEVATED,
   },
   discoverCardTitle: {
     ...cardTitleText,
     fontFamily: fonts.heavy,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     letterSpacing: 0.05,
     marginBottom: 4,
   },
   discoverCardTag: {
     alignSelf: "flex-start",
     fontFamily: fonts.medium,
-    fontSize: TYPE_CAPTION - 2,
+    fontSize: TYPE_MICRO,
     color: ACCENT,
     letterSpacing: 0.3,
     textTransform: "uppercase",
@@ -181,7 +186,7 @@ export const groupsPageStyles = StyleSheet.create({
   },
   discoverCardMeta: {
     ...cardMetaText,
-    fontSize: TYPE_CAPTION - 1,
+    fontSize: TYPE_FINE,
     marginBottom: 12,
   },
   joinBtn: {

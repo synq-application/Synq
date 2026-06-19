@@ -25,6 +25,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+import { formScreenStyles } from "../constants/formScreenStyles";
 import {
   ACCENT,
   BG,
@@ -39,7 +40,6 @@ import {
   SPACE_4,
   SPACE_5,
   SPACE_6,
-  SURFACE,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
@@ -429,8 +429,8 @@ export default function EditProfileScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <Text style={styles.groupTitle}>Name</Text>
-          <View style={styles.group}>
+          <Text style={formScreenStyles.groupTitle}>Name</Text>
+          <View style={formScreenStyles.group}>
             <View style={styles.fieldRow}>
               <TextInput
                 style={styles.fieldInput}
@@ -444,10 +444,10 @@ export default function EditProfileScreen() {
             </View>
           </View>
 
-          <Text style={styles.groupTitle}>Location</Text>
+          <Text style={formScreenStyles.groupTitle}>Location</Text>
           <Animated.View
             style={[
-              styles.group,
+              formScreenStyles.group,
               locationFieldsAnimatedStyle,
               locating && styles.locationFieldsLocating,
             ]}
@@ -487,7 +487,7 @@ export default function EditProfileScreen() {
           </Animated.View>
 
           {locationAutofill !== "dismissed" && (
-            <View style={styles.group}>
+            <View style={formScreenStyles.group}>
               <TouchableOpacity
                 onPress={fillFromCurrentLocation}
                 disabled={
@@ -650,26 +650,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: SPACE_6,
     paddingTop: SPACE_3,
-  },
-
-  groupTitle: {
-    color: MUTED,
-    fontSize: TYPE_CAPTION + 1,
-    fontFamily: fonts.medium,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginLeft: SPACE_5,
-    marginBottom: SPACE_3 - 2,
-    marginTop: SPACE_3,
-  },
-  group: {
-    backgroundColor: SURFACE,
-    marginHorizontal: SPACE_4 + SPACE_3,
-    borderRadius: RADIUS_MD,
-    overflow: "hidden",
-    marginBottom: SPACE_3,
-    borderWidth: 1,
-    borderColor: BORDER,
   },
 
   fieldRow: {

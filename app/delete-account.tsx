@@ -1,10 +1,10 @@
 import StackScreenHeader from "@/src/components/StackScreenHeader";
+import { formScreenStyles } from "@/constants/formScreenStyles";
 import {
   BG,
   BORDER,
   BUTTON_RADIUS,
   DESTRUCTIVE,
-  fonts,
   MUTED,
   MUTED2,
   RADIUS_MD,
@@ -12,10 +12,10 @@ import {
   SPACE_4,
   SPACE_5,
   SPACE_6,
-  SURFACE,
   TEXT,
   TYPE_BODY,
   TYPE_SECTION,
+  fonts,
 } from "@/constants/Variables";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -109,8 +109,8 @@ export default function DeleteAccountScreen() {
           </Text>
         </View>
 
-        <Text style={styles.groupTitle}>What will be deleted</Text>
-        <View style={styles.group}>
+        <Text style={formScreenStyles.groupTitle}>What will be deleted</Text>
+        <View style={[formScreenStyles.group, styles.bulletGroup]}>
           <View style={styles.bulletRow}>
             <Text style={styles.bulletDot}>•</Text>
             <Text style={styles.bulletText}>Your profile</Text>
@@ -194,22 +194,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     lineHeight: 22,
   },
-  groupTitle: {
-    color: MUTED,
-    fontSize: 13,
-    fontFamily: fonts.medium,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: SPACE_3,
-  },
-  group: {
-    backgroundColor: SURFACE,
-    borderRadius: RADIUS_MD,
-    borderWidth: 1,
-    borderColor: BORDER,
+  bulletGroup: {
     paddingVertical: SPACE_3,
     paddingHorizontal: SPACE_4,
-    marginBottom: SPACE_5,
   },
   bulletRow: {
     flexDirection: "row",
@@ -221,7 +208,7 @@ const styles = StyleSheet.create({
   bulletDot: {
     color: MUTED2,
     marginRight: SPACE_3,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     lineHeight: 22,
   },
   bulletText: {

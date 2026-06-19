@@ -22,10 +22,13 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
+  MUTED,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
-  MUTED,
   TEXT,
+  TYPE_CTA,
+  TYPE_LEAD,
   fonts,
 } from "../constants/Variables";
 import { auth, db } from "../src/lib/firebase";
@@ -213,10 +216,10 @@ const styles = StyleSheet.create({
     },
     pillText: {
         color: "rgba(255,255,255,0.85)",
-        fontSize: 14,
+        fontSize: TYPE_LEAD,
         fontWeight: "700",
     },
-    pillTextOn: { color: "white" },
+    pillTextOn: { color: TEXT },
 
     button: {
         marginTop: 20,
@@ -228,11 +231,11 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
-    buttonText: { color: "black", fontSize: 18, fontFamily: fonts.heavy, letterSpacing: 0.2 },
+    buttonText: { color: ON_ACCENT_TEXT, fontSize: TYPE_CTA, fontFamily: fonts.heavy, letterSpacing: 0.2 },
     skipButton: { marginTop: 20, alignSelf: "center" },
     skipText: {
         color: "rgba(255,255,255,0.5)",
-        fontSize: 14,
+        fontSize: TYPE_LEAD,
         fontWeight: "600",
     },
 });
