@@ -150,7 +150,6 @@ import AlertModal from '../alert-modal';
 import ConfirmModal from '../confirm-modal';
 import ExploreModal from '../explore-modal';
 import {
-  GROUP_BORDER,
   GROUP_SURFACE,
 } from '../../src/components/friends/groupsListStyles';
 import FriendProfile from '../friend-profile';
@@ -2929,8 +2928,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     backgroundColor: GROUP_SURFACE,
     borderRadius: 26,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: GROUP_BORDER,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
     paddingLeft: 16,
     paddingRight: 5,
     paddingVertical: 5,
