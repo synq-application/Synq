@@ -80,3 +80,40 @@ export async function resolveProfileShareCodeToFriendId(
     return null;
   }
 }
+
+function parseFriendProfileIdFromUrl(url: string): string | null {
+  try {
+    const parsed = Linking.parse(url);
+    const path = String(parsed.path || "")
+      .trim()
+      .replace(/^\//, "");
+    const hostname = String(parsed.hostname || "").trim();
+    const isFriendProfile =
+      hostname === "friend-profile" || path === "friend-profile";
+    if (!isFriendProfile) return null;
+    const friendIdRaw = parsed.queryParams?.friendId;
+    const friendId = Array.isArray(friendIdRaw) ? friendIdRaw[0] : friendIdRaw;
+    const trimmed = typeof friendId === "string" ? friendId.trim() : "";
+    return trimmed || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve a scanned profile QR payload to a Firebase user id. */
+export async function resolveFriendIdFromScannedProfileQr(
+  rawData: string
+): Promise<string | null> {
+  const data = rawData.trim();
+  if (!data) return null;
+
+  const fromProfileLink = parseFriendProfileIdFromUrl(data);
+  if (fromProfileLink) return fromProfileLink;
+
+  const shareCode = parseProfileShareCodeFromUrl(data);
+  if (shareCode) {
+    return resolveProfileShareCodeToFriendId(shareCode);
+  }
+
+  return null;
+}
