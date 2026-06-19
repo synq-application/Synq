@@ -2,12 +2,15 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
   MUTED2,
   ON_ACCENT_TEXT,
+  SURFACE_RAISED,
   TEXT,
   TYPE_BODY,
   TYPE_CAPTION,
+  TYPE_SECTION,
+  TYPE_SUBHEAD,
+  fonts,
 } from "@/constants/Variables";
 import CloseButton from "@/src/components/CloseButton";
 import { resolveFriendIdFromScannedProfileQr } from "@/src/lib/profileShareUrl";
@@ -165,7 +168,7 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontFamily: fonts.medium,
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     color: TEXT,
     marginRight: 12,
   },
@@ -182,7 +185,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     borderRadius: BUTTON_RADIUS,
     overflow: "hidden",
-    backgroundColor: "#0E1012",
+    backgroundColor: SURFACE_RAISED,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
@@ -212,7 +215,7 @@ const styles = StyleSheet.create({
   },
   permissionTitle: {
     fontFamily: fonts.medium,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     color: TEXT,
     textAlign: "center",
   },
@@ -234,7 +237,7 @@ const styles = StyleSheet.create({
   },
   permissionBtnText: {
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     color: ON_ACCENT_TEXT,
   },
 });
