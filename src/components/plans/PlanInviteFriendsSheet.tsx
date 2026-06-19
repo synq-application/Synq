@@ -1,5 +1,4 @@
 import {
-
   ACCENT,
 
   BG,
@@ -31,7 +30,6 @@ import {
   TEXT,
 
   TYPE_BODY,
-
 } from "@/constants/Variables";
 
 import CloseButton from "@/src/components/CloseButton";
@@ -42,10 +40,9 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { Image as ExpoImage } from "expo-image";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
-
   ActivityIndicator,
 
   FlatList,
@@ -63,7 +60,6 @@ import {
   useWindowDimensions,
 
   View,
-
 } from "react-native";
 
 import { resolveAvatar } from "@/src/lib/helpers";
@@ -453,10 +449,6 @@ export default function PlanInviteFriendsSheet({
           <CloseButton onPress={handleClose} accessibilityLabel="Close invite friends" />
 
         </View>
-
-        <Text style={styles.subtitle}>Select friends to join {title}</Text>
-
-
 
         {sortedFriends.length === 0 ? (
 
