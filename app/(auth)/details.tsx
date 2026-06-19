@@ -34,9 +34,13 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   TEXT,
+  TYPE_BODY,
+  TYPE_CTA,
+  TYPE_FINE,
   fonts,
 } from "../../constants/Variables";
 import { auth, db } from "../../src/lib/firebase";
@@ -357,7 +361,7 @@ const styles = StyleSheet.create({
   placeholderIcon: { alignItems: "center" },
   addPhotoText: {
     color: "rgba(255,255,255,0.4)",
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     marginTop: 4,
     fontFamily: fonts.heavy,
   },
@@ -381,7 +385,7 @@ const styles = StyleSheet.create({
   },
   optionalText: {
     color: "rgba(255,255,255,0.3)",
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     marginTop: 6,
     fontFamily: fonts.book,
   },
@@ -389,12 +393,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   input: {
-    color: "white",
+    color: TEXT,
     backgroundColor: "rgba(255,255,255,0.08)",
     height: 52,
     borderRadius: BUTTON_RADIUS,
     paddingHorizontal: 14,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
@@ -410,8 +414,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   buttonText: {
-    color: "black",
-    fontSize: 18,
+    color: ON_ACCENT_TEXT,
+    fontSize: TYPE_CTA,
     fontFamily: fonts.heavy,
   },
 });

@@ -3,10 +3,16 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
-  synqSvg,
   TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_CTA,
+  TYPE_DISPLAY,
+  TYPE_FINE,
+  fonts,
+  synqSvg,
 } from "@/constants/Variables";
 import { router } from "expo-router";
 import React from "react";
@@ -82,7 +88,7 @@ const styles = StyleSheet.create({
   title: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 44,
+    fontSize: TYPE_DISPLAY,
     letterSpacing: -0.8,
     lineHeight: 48,
   },
@@ -90,7 +96,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     color: "rgba(255,255,255,0.78)",
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     lineHeight: 24,
     width: "92%",
   },
@@ -127,9 +133,9 @@ const styles = StyleSheet.create({
   },
 
   primaryText: {
-    color: "#061006",
+    color: ON_ACCENT_TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 18,
+    fontSize: TYPE_CTA,
     letterSpacing: 0.15,
   },
 
@@ -149,7 +155,7 @@ const styles = StyleSheet.create({
   secondaryText: {
     color: "rgba(255,255,255,0.82)",
     fontFamily: fonts.medium,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
   },
 
   micro: {
@@ -157,6 +163,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "rgba(255,255,255,0.40)",
     fontFamily: fonts.book,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
   },
 });

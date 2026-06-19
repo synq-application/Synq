@@ -4,6 +4,9 @@ import {
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   TEXT,
+  TYPE_BODY,
+  TYPE_CTA,
+  TYPE_DISPLAY,
   fonts,
   synqSvg,
 } from "@/constants/Variables";
@@ -245,14 +248,14 @@ const styles = StyleSheet.create({
   skipText: {
     color: "rgba(255,255,255,0.55)",
     fontFamily: fonts.book,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
   },
 
   topCopy: { paddingTop: 86, paddingHorizontal: 22, zIndex: 6 },
   title: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 34,
+    fontSize: TYPE_DISPLAY,
     letterSpacing: -0.3,
   },
   divider: {
@@ -265,7 +268,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     color: "rgba(255,255,255,0.78)",
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     lineHeight: 24,
   },
 
@@ -306,7 +309,7 @@ const styles = StyleSheet.create({
   nextText: {
     color: ACCENT,
     fontFamily: fonts.heavy,
-    fontSize: 18,
+    fontSize: TYPE_CTA,
     letterSpacing: 0.2,
   },
 

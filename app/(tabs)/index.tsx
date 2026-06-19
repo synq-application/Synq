@@ -87,13 +87,13 @@ type MessagesPane = "inbox" | "chat" | "profile";
 import {
   ACCENT,
   AI_PLACE_SUGGESTIONS_ENABLED,
-  aiPrompts,
   BG,
   BORDER,
+  BORDER_MUTED,
   BUTTON_RADIUS,
   DESTRUCTIVE,
   EXPIRATION_HOURS,
-  fonts,
+  HEADER_BLACK,
   MODAL_RADIUS,
   MUTED,
   MUTED2,
@@ -105,14 +105,27 @@ import {
   SPACE_4,
   SPACE_5,
   SURFACE,
-  tabScreenMainHeaderTitle,
+  SURFACE_ELEVATED,
+  SURFACE_INPUT,
   TEXT,
-  cardMetaText,
-  cardTitleText,
-  listSectionTitle,
+  TEXT_MUTED_HEX,
   TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
   TYPE_FINE,
   TYPE_LEAD,
+  TYPE_MICRO,
+  TYPE_MODAL_TITLE,
+  TYPE_SECTION,
+  TYPE_SUBHEAD,
+  TYPE_TITLE,
+  aiPrompts,
+  cardMetaText,
+  cardTitleText,
+  eyebrowLabel,
+  fonts,
+  listSectionTitle,
+  tabScreenMainHeaderTitle,
 } from '../../constants/Variables';
 import ActiveSynqSection from '../../src/components/synq/ActiveSynqSection';
 import MessagesChatPane from '../../src/components/synq/MessagesChatPane';
@@ -2368,7 +2381,7 @@ const styles = StyleSheet.create({
   activeEmptyTitle: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 22,
+    fontSize: TYPE_MODAL_TITLE,
     lineHeight: 34,
     letterSpacing: 0.2,
     textAlign: "center",
@@ -2425,13 +2438,13 @@ const styles = StyleSheet.create({
   audienceText: {
     flex: 1,
     color: MUTED2,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     fontFamily: fonts.medium,
   },
   activeMemoCard: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: "#0A0B0D",
+    backgroundColor: SURFACE_INPUT,
     borderRadius: BUTTON_RADIUS,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.05)",
@@ -2447,15 +2460,13 @@ const styles = StyleSheet.create({
   activeMemoText: {
     flex: 1,
     color: TEXT,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     lineHeight: 22,
     fontFamily: fonts.book,
     textAlign: "left",
   },
   headerTitle: {
     ...tabScreenMainHeaderTitle,
-    fontSize: 26,
-    lineHeight: 30,
     textAlign: "center",
     includeFontPadding: false,
   },
@@ -2469,7 +2480,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: ACCENT,
     borderWidth: 2,
-    borderColor: 'black'
+    borderColor: HEADER_BLACK,
   },
   closeBtn: {
     position: "absolute",
@@ -2497,7 +2508,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
   },
   friendImg: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
-  whiteBold: { color: 'white', fontSize: 17, fontFamily: fonts.medium },
+  whiteBold: { color: TEXT, fontSize: TYPE_SUBHEAD, fontFamily: fonts.medium },
   grayText: { ...cardMetaText, marginTop: 2 },
   communityChatMeta: { ...cardMetaText, fontSize: TYPE_FINE, marginTop: 1, color: MUTED2 },
   locationText: { ...cardMetaText, fontSize: TYPE_FINE, marginTop: 2 },
@@ -2510,7 +2521,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnText: { fontSize: 16, color: ON_ACCENT_TEXT, fontFamily: fonts.heavy },
+  btnText: { fontSize: TYPE_BODY, color: ON_ACCENT_TEXT, fontFamily: fonts.heavy },
   synqHomeLayer: {
     flex: 1,
   },
@@ -2530,18 +2541,14 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   mainEyebrow: {
+    ...eyebrowLabel,
     position: "absolute",
     top: 96,
-    color: MUTED,
-    fontSize: 14,
-    fontFamily: fonts.heavy,
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
     marginBottom: 0,
   },
   mainSubtitle: {
     color: "rgba(255,255,255,0.72)",
-    fontSize: 26,
+    fontSize: TYPE_TITLE,
     fontFamily: fonts.medium,
     textAlign: "center",
     lineHeight: 34,
@@ -2568,7 +2575,7 @@ const styles = StyleSheet.create({
   },
   inlineMetaText: {
     color: "rgba(255,255,255,0.62)",
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
   },
   memoCard: {
@@ -2584,13 +2591,13 @@ const styles = StyleSheet.create({
   },
   memoLabel: {
     color: "rgba(255,255,255,0.6)",
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     fontFamily: fonts.medium,
     marginBottom: 6,
   },
   memoInput: {
-    color: 'white',
-    fontSize: 17,
+    color: TEXT,
+    fontSize: TYPE_SUBHEAD,
     width: '100%',
     fontFamily: fonts.medium,
     paddingVertical: 6,
@@ -2649,7 +2656,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     color: TEXT,
-    fontSize: 22,
+    fontSize: TYPE_MODAL_TITLE,
     fontFamily: fonts.heavy,
     letterSpacing: 0.15,
   },
@@ -2659,7 +2666,7 @@ const styles = StyleSheet.create({
   inboxMergeSubtitle: {
     color: MUTED2,
     fontFamily: fonts.book,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     letterSpacing: 0.1,
     textAlign: 'center',
     paddingHorizontal: 24,
@@ -2679,7 +2686,7 @@ const styles = StyleSheet.create({
   inboxMergeFooterLabel: {
     color: MUTED2,
     fontFamily: fonts.medium,
-    fontSize: 11,
+    fontSize: TYPE_MICRO,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
     marginBottom: 6,
@@ -2687,7 +2694,7 @@ const styles = StyleSheet.create({
   inboxMergeFooterTitle: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     letterSpacing: 0.1,
     lineHeight: 26,
     marginBottom: 16,
@@ -2695,7 +2702,7 @@ const styles = StyleSheet.create({
   inboxMergeFooterHint: {
     color: MUTED,
     fontFamily: fonts.book,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     lineHeight: 20,
     marginBottom: 16,
   },
@@ -2714,7 +2721,7 @@ const styles = StyleSheet.create({
   inboxMergePrimaryBtnText: {
     color: ON_ACCENT_TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     letterSpacing: 0.2,
   },
   inboxMergePrimaryBtnTextDisabled: {
@@ -2746,7 +2753,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.16)",
     marginHorizontal: 20,
   },
-  modalTitle: { color: 'white', fontSize: 22, fontFamily: fonts.medium },
+  modalTitle: { color: TEXT, fontSize: TYPE_MODAL_TITLE, fontFamily: fonts.medium },
   messagesInboxTitle: tabScreenMainHeaderTitle,
   deleteAction: { backgroundColor: DESTRUCTIVE, justifyContent: 'center', alignItems: 'center', width: 80, height: '100%' },
   inboxItem: {
@@ -2814,7 +2821,7 @@ const styles = StyleSheet.create({
   },
   failedMessageHint: {
     marginTop: 4,
-    fontSize: 11,
+    fontSize: TYPE_MICRO,
     opacity: 0.85,
     ...Platform.select({
       ios: { fontFamily: "System" },
@@ -2834,7 +2841,7 @@ const styles = StyleSheet.create({
     }),
   },
   theirBubble: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: SURFACE_ELEVATED,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.07)',
   },
@@ -2863,7 +2870,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: '#1C1C1E',
+    backgroundColor: SURFACE_ELEVATED,
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2885,7 +2892,7 @@ const styles = StyleSheet.create({
   },
   chatTitle: {
     color: TEXT,
-    fontSize: 20,
+    fontSize: TYPE_SECTION,
     fontFamily: fonts.heavy,
     letterSpacing: 0.15,
   },
@@ -2938,7 +2945,7 @@ const styles = StyleSheet.create({
   composerInput: {
     flex: 1,
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     lineHeight: 21,
     paddingTop: 10,
@@ -2974,7 +2981,7 @@ const styles = StyleSheet.create({
   },
   chatTimestamp: {
     color: MUTED3,
-    fontSize: 11,
+    fontSize: TYPE_MICRO,
     marginTop: 5,
     fontFamily: fonts.book,
     letterSpacing: 0.2,
@@ -2983,7 +2990,7 @@ const styles = StyleSheet.create({
   sectionHeader: { ...listSectionTitle, color: TEXT, marginBottom: 20, paddingHorizontal: 20 },
   scrollRow: { marginBottom: 30, paddingLeft: 20 },
   ideaCircle: { alignItems: 'center', marginRight: 25 },
-  circlePlaceholder: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#1C1C1E', justifyContent: 'center', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#333' },
+  circlePlaceholder: { width: 70, height: 70, borderRadius: 35, backgroundColor: SURFACE_ELEVATED, justifyContent: 'center', alignItems: 'center', marginBottom: 10, borderWidth: 1, borderColor: '#333' },
   circleText: { ...cardMetaText, color: TEXT },
   venueCard: {
     flexDirection: 'row',
@@ -3003,24 +3010,24 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 12,
-    backgroundColor: '#333',
+    backgroundColor: BORDER_MUTED,
   },
   venueName: {
     ...cardTitleText,
   },
   venueRating: {
     color: ACCENT,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     marginVertical: 2,
   },
   venueDesc: {
     color: MUTED2,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     lineHeight: 18,
   },
   sendIdeaBtn: { backgroundColor: '#8E8E93', margin: 20, padding: 18, borderRadius: 12, alignItems: 'center' },
   sendIdeaBtnEnabled: { backgroundColor: ACCENT, margin: 20, padding: 18, borderRadius: 12, alignItems: 'center' },
-  sendIdeaText: { color: ON_ACCENT_TEXT, fontFamily: fonts.black, fontSize: 16 },
+  sendIdeaText: { color: ON_ACCENT_TEXT, fontFamily: fonts.black, fontSize: TYPE_BODY },
   inChatAICardContainer: { paddingHorizontal: 20, marginVertical: 10 },
   inChatAICard: {
     backgroundColor: '#141516',
@@ -3033,7 +3040,7 @@ const styles = StyleSheet.create({
   aiCardTitleSmall: { color: ACCENT, fontSize: TYPE_LEAD, fontFamily: fonts.heavy, letterSpacing: 0.5 },
   aiCardBodySmall: { ...cardMetaText, color: TEXT, fontSize: TYPE_BODY, lineHeight: 22, marginBottom: 15 },
   aiShareBtnSmall: { backgroundColor: ACCENT, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
-  aiShareBtnText: { color: ON_ACCENT_TEXT, fontSize: 14, fontFamily: fonts.heavy },
+  aiShareBtnText: { color: ON_ACCENT_TEXT, fontSize: TYPE_LEAD, fontFamily: fonts.heavy },
   editPanel: {
     width: '100%',
     backgroundColor: '#161616',
@@ -3044,19 +3051,19 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   panelTitle: {
-    color: 'white',
-    fontSize: 22,
+    color: TEXT,
+    fontSize: TYPE_MODAL_TITLE,
     fontFamily: 'Avenir-Medium',
   },
   panelInput: {
     width: '100%',
     backgroundColor: "#0E0E0E",
-    color: 'white',
+    color: TEXT,
     padding: 16,
     borderRadius: 16,
     marginTop: 8,
     marginBottom: 12,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     minHeight: 80,
   },
   saveBtn: {
@@ -3069,7 +3076,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 20,
   },
-  saveBtnText: { color: ON_ACCENT_TEXT, fontSize: 16, fontFamily: fonts.heavy },
+  saveBtnText: { color: ON_ACCENT_TEXT, fontSize: TYPE_BODY, fontFamily: fonts.heavy },
   centeredIdeaContainer: {
     alignItems: 'center',
     marginVertical: 15,
@@ -3090,7 +3097,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "#1C1C1E",
+    backgroundColor: SURFACE_ELEVATED,
     opacity: 1,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.2)",
@@ -3117,20 +3124,20 @@ const styles = StyleSheet.create({
   },
   friendMemoInline: {
     marginTop: 6,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     lineHeight: 21,
     color: MUTED2,
     fontFamily: fonts.medium,
   },
   timestampCentered: {
     color: MUTED2,
-    fontSize: 10,
+    fontSize: TYPE_FINE,
     marginTop: 4,
   },
   systemMessageText: {
     color: MUTED2,
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     lineHeight: 18,
     textAlign: 'center',
     paddingHorizontal: 24,
@@ -3147,7 +3154,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "#1C1C1E",
+    backgroundColor: SURFACE_ELEVATED,
   },
   inboxStackWrap: {
     width: 56,
@@ -3161,7 +3168,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     borderWidth: 2,
     borderColor: BG,
-    backgroundColor: "#1C1C1E",
+    backgroundColor: SURFACE_ELEVATED,
   },
   inboxStackPhotoBack: {
     left: 0,
@@ -3206,7 +3213,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#111",
     borderWidth: 1,
-    borderColor: "#1C1C1E",
+    borderColor: SURFACE_ELEVATED,
   },
   aiChipPremium: {
     flexDirection: "row",
@@ -3218,7 +3225,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "#1C1C1E",
+    borderColor: SURFACE_ELEVATED,
     gap: 4,
     maxWidth: "92%",
   },
@@ -3226,21 +3233,21 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   aiChipText: {
-    color: "#aaa",
-    fontSize: 12,
+    color: TEXT_MUTED_HEX,
+    fontSize: TYPE_FINE,
     marginHorizontal: 6,
     fontFamily: "Avenir-Medium",
   },
   aiChipTextPremium: {
     flexShrink: 1,
     color: "rgba(255,255,255,0.7)",
-    fontSize: 11,
+    fontSize: TYPE_MICRO,
     fontFamily: fonts.medium,
     letterSpacing: 0.1,
   },
   aiUnavailableHint: {
     color: MUTED2,
-    fontSize: 12,
+    fontSize: TYPE_FINE,
     fontFamily: fonts.book,
     lineHeight: 16,
     paddingRight: 8,
@@ -3251,7 +3258,7 @@ const styles = StyleSheet.create({
   },
   suggestionSectionTitle: {
     color: "rgba(255,255,255,0.55)",
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     fontFamily: fonts.medium,
   },
 
@@ -3273,7 +3280,7 @@ const styles = StyleSheet.create({
 
   suggestionText: {
     color: "rgba(255,255,255,0.85)",
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
   },
 
   inboxEmptyWrap: {
@@ -3296,7 +3303,7 @@ const styles = StyleSheet.create({
   },
   inboxEmptyTitle: {
     color: TEXT,
-    fontSize: 24,
+    fontSize: TYPE_MODAL_TITLE,
     fontFamily: fonts.heavy,
     textAlign: "center",
     letterSpacing: 0.2,
@@ -3304,7 +3311,7 @@ const styles = StyleSheet.create({
   inboxEmptySub: {
     marginTop: 10,
     color: MUTED2,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     lineHeight: 22,
     fontFamily: fonts.medium,
     textAlign: "center",
@@ -3330,7 +3337,7 @@ const styles = StyleSheet.create({
   },
   chatEmptyTitle: {
     color: TEXT,
-    fontSize: 17,
+    fontSize: TYPE_SUBHEAD,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
     textAlign: "center",
@@ -3338,7 +3345,7 @@ const styles = StyleSheet.create({
   chatEmptyText: {
     marginTop: 6,
     color: MUTED2,
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     fontFamily: fonts.medium,
     textAlign: "center",
     lineHeight: 20,

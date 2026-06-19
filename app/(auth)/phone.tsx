@@ -15,12 +15,18 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
   MUTED,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
-  synqSvg,
   TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_CTA,
+  TYPE_MODAL_TITLE,
+  fonts,
+  synqSvg,
 } from "@/constants/Variables";
 import BackButton from "@/src/components/BackButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -424,7 +430,7 @@ const styles = StyleSheet.create({
   countryInput: {
     color: TEXT,
     textAlign: "center",
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
   },
   phoneWrapper: {
@@ -438,13 +444,13 @@ const styles = StyleSheet.create({
   },
   phoneInput: {
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     letterSpacing: 0.8,
   },
   helper: {
     color: "rgba(255,255,255,0.45)",
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     marginTop: 18,
     fontFamily: fonts.book,
     lineHeight: 18,
@@ -460,8 +466,8 @@ const styles = StyleSheet.create({
     marginTop: 26,
   },
   primaryButtonText: {
-    color: "#061006",
-    fontSize: 18,
+    color: ON_ACCENT_TEXT,
+    fontSize: TYPE_CTA,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },
@@ -476,7 +482,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     opacity: 0.02,
     color: "transparent",
-    fontSize: 16,
+    fontSize: TYPE_BODY,
   },
   otpBox: {
     width: width / 8.5,
@@ -489,7 +495,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
   },
   otpDigit: {
-    fontSize: 22,
+    fontSize: TYPE_MODAL_TITLE,
     color: TEXT,
     fontFamily: fonts.heavy,
   },
@@ -507,7 +513,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   linkBtnInline: { paddingVertical: 4, paddingHorizontal: 2 },
-  linkDivider: { color: "rgba(255,255,255,0.35)", fontSize: 15 },
-  linkText: { color: ACCENT, fontSize: 15, fontFamily: fonts.medium },
+  linkDivider: { color: "rgba(255,255,255,0.35)", fontSize: TYPE_BUTTON },
+  linkText: { color: ACCENT, fontSize: TYPE_BUTTON, fontFamily: fonts.medium },
   linkTextDisabled: { opacity: 0.45 },
 });

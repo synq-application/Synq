@@ -29,9 +29,14 @@ import {
   BUTTON_RADIUS,
   MUTED,
   MUTED2,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   TEXT,
+  TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_CTA,
+  TYPE_LEAD,
   fonts,
 } from "../../constants/Variables";
 import { auth, db } from "../../src/lib/firebase";
@@ -408,12 +413,12 @@ const styles = StyleSheet.create({
   },
 
   input: {
-    color: "white",
+    color: TEXT,
     backgroundColor: "rgba(255,255,255,0.08)",
     height: 52,
     borderRadius: BUTTON_RADIUS,
     paddingHorizontal: 14,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
@@ -450,14 +455,14 @@ const styles = StyleSheet.create({
   },
   locationPrimary: {
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     lineHeight: 22,
   },
   locationSecondary: {
     marginTop: 2,
     color: MUTED,
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     fontFamily: fonts.book,
     lineHeight: 18,
   },
@@ -473,15 +478,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   buttonText: {
-    color: "black",
-    fontSize: 18,
+    color: ON_ACCENT_TEXT,
+    fontSize: TYPE_CTA,
     fontFamily: fonts.heavy,
   },
 
   skipButton: { marginTop: 20, alignSelf: "center" },
   skipText: {
     color: "rgba(255,255,255,0.5)",
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     fontFamily: fonts.medium,
   },
 });

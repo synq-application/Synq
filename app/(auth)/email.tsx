@@ -13,12 +13,17 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
   MUTED,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
-  synqSvg,
   TEXT,
+  TYPE_BODY,
+  TYPE_BUTTON,
+  TYPE_CAPTION,
+  TYPE_CTA,
+  fonts,
+  synqSvg,
 } from "@/constants/Variables";
 import BackButton from "@/src/components/BackButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -194,7 +199,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: MUTED,
-    fontSize: 15,
+    fontSize: TYPE_BUTTON,
     marginTop: 14,
     fontFamily: fonts.book,
     lineHeight: 22,
@@ -205,7 +210,7 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 14,
     paddingHorizontal: 16,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -221,8 +226,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryButtonText: {
-    color: "#061006",
-    fontSize: 18,
+    color: ON_ACCENT_TEXT,
+    fontSize: TYPE_CTA,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },
@@ -230,7 +235,7 @@ const styles = StyleSheet.create({
   small: {
     marginTop: 18,
     color: "rgba(255,255,255,0.45)",
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     textAlign: "center",
     lineHeight: 18,
     fontFamily: fonts.book,

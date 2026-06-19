@@ -34,11 +34,13 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
   MUTED,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
   TEXT,
+  TYPE_CTA,
+  fonts,
 } from "@/constants/Variables";
 import AlertModal from "../alert-modal";
 import { auth } from "../../src/lib/firebase";
@@ -174,7 +176,7 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_RADIUS,
     paddingHorizontal: 16,
     color: TEXT,
-    fontSize: 18,
+    fontSize: TYPE_CTA,
     letterSpacing: 4,
     fontFamily: fonts.medium,
     borderWidth: 1,
@@ -192,8 +194,8 @@ const styles = StyleSheet.create({
   },
   primaryButtonDisabled: { backgroundColor: "rgba(125, 255, 166, 0.30)" },
   primaryButtonText: {
-    color: "#061006",
-    fontSize: 18,
+    color: ON_ACCENT_TEXT,
+    fontSize: TYPE_CTA,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },

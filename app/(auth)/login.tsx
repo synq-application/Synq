@@ -15,12 +15,18 @@ import {
   ACCENT,
   BG,
   BUTTON_RADIUS,
-  fonts,
   MUTED,
+  ON_ACCENT_TEXT,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
-  synqSvg,
   TEXT,
+  TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_CTA,
+  TYPE_LEAD,
+  TYPE_MODAL_TITLE,
+  fonts,
+  synqSvg,
 } from "@/constants/Variables";
 import BackButton from "@/src/components/BackButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -292,7 +298,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 16,
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -300,7 +306,7 @@ const styles = StyleSheet.create({
   forgotBtn: { alignSelf: "flex-end", marginTop: 10, paddingVertical: 4 },
   forgotText: {
     color: "rgba(255,255,255,0.45)",
-    fontSize: 13,
+    fontSize: TYPE_CAPTION,
     fontFamily: fonts.book,
   },
   primaryButton: {
@@ -314,8 +320,8 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   primaryButtonText: {
-    color: "#061006",
-    fontSize: 18,
+    color: ON_ACCENT_TEXT,
+    fontSize: TYPE_CTA,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
   },
@@ -340,14 +346,14 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: TEXT,
-    fontSize: 22,
+    fontSize: TYPE_MODAL_TITLE,
     fontFamily: fonts.heavy,
     letterSpacing: 0.2,
     marginBottom: 8,
   },
   modalSubtitle: {
     color: "rgba(255,255,255,0.55)",
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     fontFamily: fonts.book,
     lineHeight: 20,
     marginBottom: 16,
@@ -358,7 +364,7 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_RADIUS,
     paddingHorizontal: 16,
     color: TEXT,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     fontFamily: fonts.medium,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -366,7 +372,7 @@ const styles = StyleSheet.create({
   cancelBtn: { marginTop: 14, alignItems: "center" },
   cancelText: {
     color: "rgba(255,255,255,0.55)",
-    fontSize: 14,
+    fontSize: TYPE_LEAD,
     fontFamily: fonts.book,
   },
 });

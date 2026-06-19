@@ -1,12 +1,15 @@
 import {
   ACCENT,
   BG,
-  fonts,
   MUTED,
   PRIMARY_CTA_HEIGHT,
   PRIMARY_CTA_WIDTH,
-  synqSvg,
   TEXT,
+  TYPE_BODY,
+  TYPE_CTA,
+  TYPE_DISPLAY,
+  fonts,
+  synqSvg,
 } from "@/constants/Variables";
 import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
@@ -160,14 +163,14 @@ const styles = StyleSheet.create({
   skipText: {
     color: "rgba(255,255,255,0.55)",
     fontFamily: fonts.book,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
   },
 
   topCopy: { paddingTop: 86 },
   title: {
     color: TEXT,
     fontFamily: fonts.heavy,
-    fontSize: 32,
+    fontSize: TYPE_DISPLAY,
     letterSpacing: 0.2,
   },
   divider: {
@@ -180,7 +183,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     color: MUTED,
     fontFamily: fonts.medium,
-    fontSize: 16,
+    fontSize: TYPE_BODY,
     lineHeight: 22,
   },
 
@@ -207,7 +210,7 @@ const styles = StyleSheet.create({
   nextText: {
     color: ACCENT,
     fontFamily: fonts.heavy,
-    fontSize: 18,
+    fontSize: TYPE_CTA,
     letterSpacing: 0.2,
   },
 

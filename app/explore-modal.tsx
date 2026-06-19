@@ -1,22 +1,26 @@
 import { formatVenueAddressDisplay } from "@/src/lib/helpers";
 import {
-    ACCENT,
-    BG,
-    BORDER,
-    BUTTON_RADIUS,
-    MODAL_RADIUS,
-    MUTED2,
-    MUTED3,
-    ON_ACCENT_TEXT,
-    PRIMARY_CTA_HEIGHT,
-    PRIMARY_CTA_WIDTH,
-    RADIUS_LG,
-    TEXT,
-    TYPE_TITLE,
-    cardMetaText,
-    cardTitleText,
-    fonts,
-    listRowTitleText,
+  ACCENT,
+  BG,
+  BORDER,
+  BUTTON_RADIUS,
+  MODAL_RADIUS,
+  MUTED2,
+  MUTED3,
+  ON_ACCENT_TEXT,
+  PRIMARY_CTA_HEIGHT,
+  PRIMARY_CTA_WIDTH,
+  RADIUS_LG,
+  TEXT,
+  TYPE_BODY,
+  TYPE_CAPTION,
+  TYPE_LEAD,
+  TYPE_SUBHEAD,
+  TYPE_TITLE,
+  cardMetaText,
+  cardTitleText,
+  fonts,
+  listRowTitleText,
 } from "@/constants/Variables";
 import BackButton from "@/src/components/BackButton";
 import CloseButton from "@/src/components/CloseButton";
@@ -437,7 +441,7 @@ const styles = StyleSheet.create({
     surprisePillText: {
         color: ACCENT,
         fontFamily: fonts.medium,
-        fontSize: 16,
+        fontSize: TYPE_BODY,
         letterSpacing: 0.04,
     },
     loadingRow: {
@@ -449,7 +453,7 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         color: MUTED2,
-        fontSize: 14,
+        fontSize: TYPE_LEAD,
         fontFamily: fonts.medium,
     },
     sheetHeader: {
@@ -552,7 +556,7 @@ const styles = StyleSheet.create({
     },
     placeName: {
         ...cardTitleText,
-        fontSize: 17,
+        fontSize: TYPE_SUBHEAD,
         lineHeight: 22,
     },
     placeAddress: {
@@ -594,7 +598,7 @@ const styles = StyleSheet.create({
         opacity: 0.45,
     },
     sendText: {
-        fontSize: 16,
+        fontSize: TYPE_BODY,
         color: ON_ACCENT_TEXT,
         fontFamily: fonts.medium,
     },
@@ -607,7 +611,7 @@ const styles = StyleSheet.create({
     },
     emptyStateTitle: {
         color: TEXT,
-        fontSize: 17,
+        fontSize: TYPE_SUBHEAD,
         fontFamily: fonts.heavy,
         marginBottom: 8,
     },
@@ -631,14 +635,14 @@ const styles = StyleSheet.create({
     },
     errorBannerText: {
         color: "#FF8A84",
-        fontSize: 14,
+        fontSize: TYPE_LEAD,
         fontFamily: fonts.medium,
         lineHeight: 20,
         textAlign: "center",
     },
     errorHintText: {
         color: "rgba(255,138,132,0.75)",
-        fontSize: 13,
+        fontSize: TYPE_CAPTION,
         fontFamily: fonts.medium,
         textAlign: "center",
     },
